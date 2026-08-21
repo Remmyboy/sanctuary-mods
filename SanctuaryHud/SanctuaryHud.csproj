@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SanctuaryHud</AssemblyName>
+    <Nullable>disable</Nullable>
+    <!-- Game + BepInEx locations; override with -p:GamePath=... if the install moves. -->
+    <GamePath>F:\SteamLibrary\steamapps\common\Sanctuary Shattered Sun Demo\engine</GamePath>
+    <DebugType>none</DebugType>
+    <!-- Unique AssemblyVersion per build: Mono's Assembly.Load(byte[]) returns
+         the cached assembly for an identical identity, which would make hot
+         reloads silently reuse the old code. -->
+    <Deterministic>false</Deterministic>
+    <AssemblyVersion>0.2.*</AssemblyVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Compile against .NET Framework reference assemblies without a Framework SDK install. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(GamePath)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Trebuchet">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Trebuchet.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Deploy into BepInEx\scripts: ScriptEngine hot-reloads DLLs from there
+       (F6 in game), so a rebuild + F6 replaces the plugin without a restart. -->
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(GamePath)\BepInEx\scripts')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePath)\BepInEx\scripts" />
+    <Message Importance="high" Text="Deployed $(AssemblyName).dll to $(GamePath)\BepInEx\scripts" />
+  </Target>
+
+</Project>
