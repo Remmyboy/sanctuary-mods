@@ -21,8 +21,9 @@ namespace SanctuaryHud
     //    can't intercept them), so we poll the DOTS world instead: every unit
     //    entity carries a DynamicBuffer<IconEntityElementComponent>, and on
     //    construction-capable units element 2 is the Idle adornment.
+    // The local-LAN lobby unlock lives in LocalLanLobby.cs.
     [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.6.0")]
-    public class SanctuaryHudPlugin : BaseUnityPlugin
+    public partial class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private static BepInEx.Logging.ManualLogSource _log;
         private Harmony _harmony;
@@ -122,6 +123,7 @@ namespace SanctuaryHud
         private ConfigEntry<float> _cfgPosY;
         private ConfigEntry<KeyCode> _cfgToggleKey;
         private static ConfigEntry<float> _cfgCommanderZoom;
+        private ConfigEntry<bool> _cfgUnlockLanLobby;
 
         // Geometry in 1080p-logical pixels (GUI.matrix rescales per resolution).
         private Rect _idleRect = new Rect(12, 250, 132, 44);
@@ -142,6 +144,10 @@ namespace SanctuaryHud
             _cfgCommanderZoom = Config.Bind("Commander", "JumpZoomFactor", 0.5f,
                 "How wide the camera sits after jumping to the commander, as a fraction of the current camera height. " +
                 "Higher = further out. 0.5 keeps roughly your current zoom.");
+            _cfgUnlockLanLobby = Config.Bind("LocalTesting", "UnlockLanLobby", true,
+                "Let the main menu open when the entitlement API is unreachable, so Multiplayer LAN can host a " +
+                "local game against AI. Affects this client's menu only - it grants no server access. Set false " +
+                "if you share this build.");
 
             _visible = _cfgVisible.Value;
             _idleRect.x = _cfgPosX.Value;
@@ -156,6 +162,22 @@ namespace SanctuaryHud
             {
                 _log.LogError($"Economy patch failed (strip will stay empty): {e}");
             }
+            try
+            {
+                PatchMapLocalFiles();
+            }
+            catch (Exception e)
+            {
+                _log.LogError($"Map-local file fallback failed (map-carried decals will not load): {e}");
+            }
+            try
+            {
+                if (_cfgUnlockLanLobby.Value) PatchPermissionGate();
+            }
+            catch (Exception e)
+            {
+                _log.LogError($"LAN lobby unlock failed (menu will still gate on the API): {e}");
+            }
             _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log.");
         }
 
@@ -164,6 +186,14 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+        }
+
+        // One Harmony instance for every patch we apply. The id carries a fresh
+        // GUID per load so a hot reload can't collide with the previous copy's
+        // registration before OnDestroy has unpatched it.
+        private void EnsureHarmony()
+        {
+            _harmony ??= new Harmony("com.sanctuarydb.hud." + Guid.NewGuid().ToString("N").Substring(0, 8));
         }
 
         // ---- economy capture ----------------------------------------------
@@ -175,7 +205,7 @@ namespace SanctuaryHud
                 .SelectMany(GetTypesSafe)
                 .Where(t => t.Name == "EconomyPanelUI");
 
-            _harmony = new Harmony("com.sanctuarydb.hud." + Guid.NewGuid().ToString("N").Substring(0, 8));
+            EnsureHarmony();
             var postfix = new HarmonyMethod(typeof(SanctuaryHudPlugin), nameof(EconomyValuesPostfix));
             var patched = 0;
 
@@ -317,6 +347,9 @@ namespace SanctuaryHud
         private static Vector4? FocusedArmyColourFromLua()
         {
             if (_getLuaGlobal == null) return null;
+            // Guards the read-back below too: _getLuaGlobal goes straight into
+            // LuaJIT with the same null-able state handle that RunLua checks.
+            if (_luaStateReady == null || !_luaStateReady()) return null;
             try
             {
                 RunLua(
@@ -471,6 +504,13 @@ namespace SanctuaryHud
         private static Func<string, int> _runLuaChunk;
         private static Func<string, string> _getLuaGlobal;
 
+        /// True once the client VM actually exists. Outside a match
+        /// ClientLuaInterface.Data.luaState is a null handle, and handing that
+        /// to luaL_dostring dereferences null inside LuaJIT — a native access
+        /// violation that no managed try/catch can stop, so the process dies.
+        /// Everything that reaches into Lua has to check this first.
+        private static Func<bool> _luaStateReady;
+
         // ClientLuaInterface.Data is `ref Unmanaged` over a Burst SharedStatic,
         // and reflection refuses to invoke ByRef-returning getters. Emit a tiny
         // method that does it in IL instead: get the ref, load .luaState off it,
@@ -504,6 +544,33 @@ namespace SanctuaryHud
             il.Emit(System.Reflection.Emit.OpCodes.Ret);
 
             _runLuaChunk = (Func<string, int>)dm.CreateDelegate(typeof(Func<string, int>));
+
+            // lua_State is a struct wrapping a single nuint Handle, so the
+            // readiness check is Data.luaState.Handle != 0.
+            var handleField = stateField.FieldType.GetField("Handle", BindingFlags.Public | BindingFlags.Instance);
+            if (handleField != null)
+            {
+                var rm = new System.Reflection.Emit.DynamicMethod(
+                    "SanctuaryHud_LuaStateReady", typeof(bool), Type.EmptyTypes, typeof(SanctuaryHudPlugin), skipVisibility: true);
+                var ril = rm.GetILGenerator();
+                ril.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);   // ref Unmanaged
+                ril.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);  // lua_State
+                ril.Emit(System.Reflection.Emit.OpCodes.Ldfld, handleField); // nuint
+                ril.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_0);
+                ril.Emit(System.Reflection.Emit.OpCodes.Conv_U);
+                ril.Emit(System.Reflection.Emit.OpCodes.Cgt_Un);             // handle != 0
+                ril.Emit(System.Reflection.Emit.OpCodes.Ret);
+                _luaStateReady = (Func<bool>)rm.CreateDelegate(typeof(Func<bool>));
+            }
+            else
+            {
+                // Without a way to test the handle, calling in is a coin flip
+                // between working and killing the process. Stay out.
+                _log.LogWarning("Lua bridge disabled: lua_State.Handle not found, so the null-state guard " +
+                                "can't be emitted. Selection and camera jumps will be inert.");
+                _runLuaChunk = null;
+                return;
+            }
 
             // Reading back out of Lua: push a global, convert to string, pop.
             var getGlobal = luaJit.GetMethod("lua_getglobal", BindingFlags.Public | BindingFlags.Static);
@@ -548,6 +615,9 @@ namespace SanctuaryHud
             try
             {
                 if (_runLuaChunk == null) return false;
+                // No VM yet (menu, loading, or after a match) — calling in
+                // would segfault the process rather than throw.
+                if (_luaStateReady == null || !_luaStateReady()) return false;
                 var code = _runLuaChunk(chunk);
                 if (code != 0) _log.LogWarning($"Lua chunk failed (code {code}): {chunk}");
                 return code == 0;

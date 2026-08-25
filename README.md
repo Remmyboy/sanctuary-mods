@@ -1,11 +1,13 @@
 # SanctuaryHud
 
 Client-side HUD mod for _Sanctuary: Shattered Sun_ (demo, `engine` build), as a
-BepInEx plugin. Presentation-side only: it never touches the game's Lua tree
-(which the multiplayer lobby hashes — `ComputeLuaHash` over `*.lua`/`*.santp`
-under `engine\LJ\lua\`) and never touches the simulation (which is hash-checked
-per tick between players), so a modded client stays lobby-compatible with
-unmodded players.
+BepInEx plugin. The HUD is presentation-side only: it never touches the game's
+Lua tree (which the multiplayer lobby hashes — `ComputeLuaHash` over
+`*.lua`/`*.santp` under `engine\LJ\lua\`) and never touches the simulation
+(which is hash-checked per tick between players), so a modded client stays
+lobby-compatible with unmodded players. The one exception is the opt-out
+[local LAN lobby unlock](#local-lan-lobby-unlock), which changes this client's
+main menu and nothing else.
 
 ## Features
 
@@ -28,8 +30,30 @@ patched. Selection and camera moves run through the client's own Lua via an
 emitted call to `luaL_dostring` — client-side only, so still MP-safe.
 
 Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
-Settings (overlay position, commander jump zoom) live in
+Settings (overlay position, commander jump zoom, LAN lobby unlock) live in
 `BepInEx\config\com.sanctuarydb.hud.cfg`.
+
+## Local LAN lobby unlock
+
+One piece of this is not presentation-side, so it is worth stating plainly.
+`LocalTesting/UnlockLanLobby` (default on, see [LocalLanLobby.cs](SanctuaryHud/LocalLanLobby.cs))
+lets the main menu open when the entitlement API is unreachable.
+
+`EM.UI.InterfaceManager.Start()` calls `SssApiClient.GetPermissions(steamId, …)`
+against the developers' `PermissionCheck` endpoint. A request error and a
+`HasMulti == false` response both land on `MainMenuInterface.OnPermissionDenied()`,
+which raises a full-screen canvas whose only button is `Application.Quit()`. With
+the demo's multiplayer backend closed that request just errors, which also shuts
+off **Multiplayer LAN** — hosted locally by `TcpLobbyBackend`, needing no servers
+at all. There is no config or launch flag for this: `InterfaceManager.TryAutoStart()`
+would host over LAN with no menu, but nothing in the build calls it, and
+Singleplayer is a stub that logs `"Not implemented yet!"`.
+
+The patch flips `HasMulti` on this client and routes `OnPermissionDenied` to
+`OnPermissionsPassed`. It grants no server access, and deliberately leaves
+`HasCampaign` and `HasDev` as the API returned them — those gate unreleased
+content rather than a dead server check. It exists so custom maps can be played
+against AI offline. Set it `false` before sharing a build.
 
 ## Development
 
