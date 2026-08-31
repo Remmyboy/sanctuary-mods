@@ -139,12 +139,20 @@ namespace SanctuaryHud
                 var name = Path.GetFileName(dir);
                 if (name.StartsWith(".")) continue;
                 var files = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).ToList();
+                var luaCount = files.Count(f => f.EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+                var santpCount = files.Count(f => f.EndsWith(".santp", StringComparison.OrdinalIgnoreCase));
+
+                // Mod folders now hold UI mods (a DLL, loaded by the loader)
+                // as well as Lua overlays, and a mod may ship both. Only the
+                // Lua half belongs in this list.
+                if (luaCount == 0 && santpCount == 0) continue;
+
                 _mods.Add(new ModEntry
                 {
                     Name = name,
                     Dir = dir,
-                    LuaCount = files.Count(f => f.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)),
-                    SantpCount = files.Count(f => f.EndsWith(".santp", StringComparison.OrdinalIgnoreCase)),
+                    LuaCount = luaCount,
+                    SantpCount = santpCount,
                     Enabled = enabled.Contains(name),
                 });
             }
@@ -402,12 +410,14 @@ namespace SanctuaryHud
 
             GUILayout.Label($"Lua hash: {Short(_hashNow)}{(_hashNow == _hashVanilla ? " (vanilla)" : "   [modded — all players must match]")}");
 
+            GUILayout.Label("Lua Mods");
+
             // Only tall enough for what is there, up to a scrolling cap.
             var listHeight = Mathf.Min(240f, Mathf.Max(20f, _mods.Count * 20f));
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(listHeight));
             if (_mods.Count == 0)
             {
-                GUILayout.Label("No mods found.");
+                GUILayout.Label("No Lua mods found.");
             }
             GUI.enabled = !locked;
             foreach (var mod in _mods)

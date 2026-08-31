@@ -74,10 +74,10 @@ structures", furnaces included.
 
 Its own window on **F8**, managing two kinds of mods:
 
-**Lua mods** live in `engine\SanctuaryMods\<ModName>\`, each mirroring the
-`LJ\lua` tree; only `*.lua` and `*.santp` are applied (later mods win
-conflicts, and new files/folders are registered so Lua directory listings see
-them). The manager overlays them into the game's in-memory `FilesCache` — the
+**Lua mods** are a mod folder's `*.lua`/`*.santp` files, laid out mirroring the
+`LJ\lua` tree (later mods win conflicts, and new files/folders are registered
+so Lua directory listings see them). The manager overlays them into the
+game's in-memory `FilesCache` — the
 single source both the lobby hash and every match's Lua VMs read from — so
 mods toggled in the main menu apply at the next match launch, no restart
 needed, and nothing on disk is modified. Enabled mods persist in config and
@@ -92,9 +92,9 @@ they desync mid-game), and toggling is blocked while in a lobby or match. A
 sample mod, `SanctuaryMods\ExamplePinkArmy`, turns army slot 1 hot pink as a
 smoke test (safe to delete).
 
-**C# plugins** (every mod in this repo) are listed with toggles: off destroys
-the plugin component — its `OnDestroy` unpatches Harmony, so it is a genuine
-unload — and on adds it back. C# plugins never enter the Lua hash, so these
+**UI mods** — the DLLs, every mod in this repo — are listed with toggles: off
+destroys the plugin component (its `OnDestroy` unpatches Harmony, so it is a
+genuine unload) and on adds it back. They never enter the Lua hash, so they
 are safe to flip any time, even mid-match, and the disabled set persists
 across restarts.
 
@@ -115,14 +115,17 @@ references, target framework, deploy step) live in
 [Directory.Build.targets](Directory.Build.targets), and the shared runtime
 plumbing in [shared/](shared/) is compiled into the mods that reference it.
 
-Every mod deploys to `BepInEx\scripts`; the loader deploys to
-`BepInEx\plugins` and hot-reloads each scripts DLL independently about a
-second after its rebuild (F6 forces a reload of everything, and a deleted DLL
-has its plugins torn down). So `dotnet build` — of one project or the whole
-`SanctuaryMods.sln` — is the entire iteration loop, no game restart. The
-loader rewrites each assembly's identity per load because Mono caches
-byte-loaded assemblies, and attaches plugins to BepInEx's hidden manager
-object because this game destroys unknown root GameObjects.
+Every mod deploys to its own folder under `engine\SanctuaryMods\` — outside
+the BepInEx tree, alongside the Lua mods, so one folder is the whole of a mod
+whether it ships a DLL, Lua files, or both. The loader is the exception: it
+deploys to `BepInEx\plugins`, because BepInEx is what loads *it*. It then
+hot-reloads each mod DLL independently about a second after its rebuild (F6
+forces a reload of everything, and a deleted DLL has its plugins torn down).
+So `dotnet build` — of one project or the whole `SanctuaryMods.sln` — is the
+entire iteration loop, no game restart. The loader rewrites each assembly's
+identity per load because Mono caches byte-loaded assemblies, and attaches
+plugins to BepInEx's hidden manager object because this game destroys unknown
+root GameObjects.
 
 ## Setup
 
@@ -133,7 +136,7 @@ object because this game destroys unknown root GameObjects.
    BepInEx generate its folders.
 3. `dotnet build SanctuaryMods.sln` — the projects reference game assemblies
    from the install (override with `-p:GamePath=...`, default is the playtest)
-   and copy each built mod into the game automatically.
+   and copy each built mod into `engine\SanctuaryMods\` automatically.
 4. Launch the game; check `BepInEx\LogOutput.log` for the load lines, and
    press **F8** in the menu for the mod manager.
 

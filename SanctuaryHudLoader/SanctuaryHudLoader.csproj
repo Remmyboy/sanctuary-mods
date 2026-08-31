@@ -3,8 +3,9 @@
   <PropertyGroup>
     <AssemblyName>SanctuaryHudLoader</AssemblyName>
     <!-- The loader is the stable half: it lives in plugins\ (loaded normally
-         by BepInEx) and rarely changes. -->
-    <DeployFolder>plugins</DeployFolder>
+         by BepInEx) and rarely changes. It is the one file that must sit
+         inside the BepInEx tree — everything it loads does not. -->
+    <DeployPath>$(GamePath)\BepInEx\plugins</DeployPath>
     <!-- Loaded from disk by identity, so keep a fixed version. -->
     <Deterministic>true</Deterministic>
     <AssemblyVersion>1.1.0</AssemblyVersion>

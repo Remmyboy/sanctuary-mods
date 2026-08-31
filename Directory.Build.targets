@@ -1,11 +1,17 @@
 <Project>
 
-  <!-- Deploy every built assembly into the game. Mods go to BepInEx\scripts
-       (watched and hot-reloaded by the loader); the loader project overrides
-       DeployFolder to plugins, where BepInEx loads it normally. -->
-  <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(GamePath)\BepInEx\$(DeployFolder)')">
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GamePath)\BepInEx\$(DeployFolder)" />
-    <Message Importance="high" Text="Deployed $(AssemblyName).dll to $(GamePath)\BepInEx\$(DeployFolder)" />
+  <!-- Where each project lands in the game install. Mods go to their own
+       folder under SanctuaryMods (the loader scans those and hot-reloads
+       them); the loader project overrides DeployPath to BepInEx\plugins,
+       where BepInEx loads it normally. -->
+  <PropertyGroup>
+    <DeployPath Condition="'$(DeployPath)' == ''">$(GamePath)\SanctuaryMods\$(AssemblyName)</DeployPath>
+  </PropertyGroup>
+
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(GamePath)')">
+    <MakeDir Directories="$(DeployPath)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployPath)" />
+    <Message Importance="high" Text="Deployed $(AssemblyName).dll to $(DeployPath)" />
   </Target>
 
 </Project>

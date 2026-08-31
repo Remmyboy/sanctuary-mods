@@ -8,11 +8,16 @@ using UnityEngine;
 
 namespace SanctuaryHudLoader
 {
-    // Hot-reload host for every mod DLL in BepInEx\scripts. Sanctuary destroys
-    // foreign root GameObjects (which is why BepInEx needs HideManagerGameObject
-    // and why ScriptEngine's visible host object silently dies), so this loader
-    // attaches reloaded plugins to its own gameObject — BepInEx's protected,
-    // hidden manager — instead of creating a new one.
+    // Hot-reload host for every mod DLL under engine\SanctuaryMods. Sanctuary
+    // destroys foreign root GameObjects (which is why BepInEx needs
+    // HideManagerGameObject and why ScriptEngine's visible host object silently
+    // dies), so this loader attaches reloaded plugins to its own gameObject —
+    // BepInEx's protected, hidden manager — instead of creating a new one.
+    //
+    // Mods live outside the BepInEx tree, one folder each, next to the Lua
+    // mods the mod manager overlays — so a single folder is the whole of a
+    // mod, whether it ships a DLL, Lua files, or both. This loader is the one
+    // piece that has to sit in BepInEx\plugins, because BepInEx loads it.
     //
     // Each DLL is watched and reloaded independently about a second after every
     // rebuild; F6 forces a reload of everything. A DLL deleted from the folder
@@ -20,15 +25,15 @@ namespace SanctuaryHudLoader
     [BepInPlugin("com.sanctuarydb.hudloader", "Sanctuary Mods Loader", "1.1.0")]
     public class LoaderPlugin : BaseUnityPlugin
     {
-        private string _scriptsDir;
+        private string _modsDir;
         private readonly Dictionary<string, DateTime> _loadedStamps = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<Component>> _live = new Dictionary<string, List<Component>>(StringComparer.OrdinalIgnoreCase);
         private float _pollAccum;
 
         private void Awake()
         {
-            _scriptsDir = Path.Combine(Paths.BepInExRootPath, "scripts");
-            Logger.LogInfo($"Mods loader ready; watching {_scriptsDir}\\*.dll (auto-reload on change, F6 forces).");
+            _modsDir = Path.Combine(Paths.GameRootPath, "SanctuaryMods");
+            Logger.LogInfo($"Mods loader ready; watching {_modsDir} for mod DLLs (auto-reload on change, F6 forces).");
             LoadChanged(force: true);
         }
 
@@ -48,9 +53,11 @@ namespace SanctuaryHudLoader
 
         private void LoadChanged(bool force)
         {
-            if (!Directory.Exists(_scriptsDir)) return;
+            if (!Directory.Exists(_modsDir)) return;
 
-            var onDisk = Directory.GetFiles(_scriptsDir, "*.dll");
+            // One folder per mod is the convention, but a DLL dropped anywhere
+            // under SanctuaryMods is picked up — no silent no-shows.
+            var onDisk = Directory.GetFiles(_modsDir, "*.dll", SearchOption.AllDirectories);
             foreach (var path in onDisk)
             {
                 var stamp = File.GetLastWriteTimeUtc(path);

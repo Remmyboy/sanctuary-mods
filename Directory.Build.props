@@ -9,9 +9,8 @@
     <DebugType>none</DebugType>
     <!-- Game + BepInEx locations; override with -p:GamePath=... if the install moves. -->
     <GamePath>C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine</GamePath>
-    <!-- Mods deploy to BepInEx\scripts (hot-reloaded); the loader overrides
-         this to plugins. -->
-    <DeployFolder>scripts</DeployFolder>
+    <!-- Mods deploy to SanctuaryMods\<AssemblyName>\ (see
+         Directory.Build.targets); the loader overrides DeployPath. -->
     <!-- Unique AssemblyVersion per build: Mono's Assembly.Load(byte[]) returns
          the cached assembly for an identical identity, which would make hot
          reloads silently reuse the old code. -->
