@@ -90,7 +90,6 @@ namespace SanctuaryHud
         private Vector2 _scroll;
         private string _hashVanilla = "";
         private string _hashNow = "";
-        private string _status = "";
         private bool _pendingApply;
 
         private static string ModsRoot => Path.Combine(Paths.GameRootPath, "SanctuaryMods");
@@ -182,10 +181,10 @@ namespace SanctuaryHud
 
             RefreshHash();
             _cfgEnabled.Value = string.Join(";", _mods.Where(m => m.Enabled).Select(m => m.Name));
-            _status = applied > 0
+            var summary = applied > 0
                 ? $"{applied} file(s) overlaid from {_mods.Count(m => m.Enabled)} mod(s)."
                 : "No mods applied (vanilla).";
-            _log.LogInfo($"Mod overlay: {_status} Lua hash {_hashNow}.");
+            _log.LogInfo($"Mod overlay: {summary} Lua hash {_hashNow}.");
         }
 
         /// Returns the number of files overlaid. Later mods win on conflicts
@@ -403,10 +402,12 @@ namespace SanctuaryHud
 
             GUILayout.Label($"Lua hash: {Short(_hashNow)}{(_hashNow == _hashVanilla ? " (vanilla)" : "   [modded — all players must match]")}");
 
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(240));
+            // Only tall enough for what is there, up to a scrolling cap.
+            var listHeight = Mathf.Min(240f, Mathf.Max(20f, _mods.Count * 20f));
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(listHeight));
             if (_mods.Count == 0)
             {
-                GUILayout.Label($"No mods found.\nPut each mod in its own folder under:\n{ModsRoot}\nmirroring LJ\\lua (e.g. MyMod\\common\\colors.lua).");
+                GUILayout.Label("No mods found.");
             }
             GUI.enabled = !locked;
             foreach (var mod in _mods)
@@ -426,7 +427,7 @@ namespace SanctuaryHud
             if (_plugins.Count > 0)
             {
                 GUILayout.Space(6);
-                GUILayout.Label("Client plugins (C#) — hash-neutral, toggle any time:");
+                GUILayout.Label("UI Mods");
                 foreach (var plugin in _plugins)
                 {
                     var now = GUILayout.Toggle(plugin.Enabled, plugin.Name);
@@ -434,8 +435,7 @@ namespace SanctuaryHud
                 }
             }
 
-            if (!string.IsNullOrEmpty(_status)) GUILayout.Label(_status);
-
+            GUILayout.Space(4);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Rescan"))
             {
