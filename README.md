@@ -1,15 +1,26 @@
-# SanctuaryHud
+# Sanctuary Mods
 
-Client-side HUD mod for _Sanctuary: Shattered Sun_ (demo, `engine` build), as a
-BepInEx plugin. The HUD is presentation-side only: it never touches the game's
-Lua tree (which the multiplayer lobby hashes — `ComputeLuaHash` over
-`*.lua`/`*.santp` under `engine\LJ\lua\`) and never touches the simulation
-(which is hash-checked per tick between players), so a modded client stays
-lobby-compatible with unmodded players. The one exception is the opt-out
-[local LAN lobby unlock](#local-lan-lobby-unlock), which changes this client's
-main menu and nothing else.
+A monorepo of client-side BepInEx mods for _Sanctuary: Shattered Sun_ (demo
+and playtest, `engine` build). One project per mod, each building to its own
+DLL that hot-reloads independently — so any mod can be shared, loaded or
+unloaded on its own.
 
-## Features
+The UI mods are presentation-side only: they never touch the game's Lua tree
+(which the multiplayer lobby hashes — `ComputeLuaHash` over `*.lua` under
+`engine\LJ\lua\`) and never touch the simulation (which is hash-checked per
+tick between players), so a modded client stays lobby-compatible with unmodded
+players. The exceptions are called out in their own sections below.
+
+| Project | DLL | What it does |
+| --- | --- | --- |
+| [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
+| [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
+| [ModManager](ModManager/) | `ModManager.dll` | F8 window: Lua mod overlays + plugin toggles |
+| [LanLobbyUnlock](LanLobbyUnlock/) | `LanLobbyUnlock.dll` | Opens the menu when the entitlement API is dead |
+| [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
+| [SanctuaryHudLoader](SanctuaryHudLoader/) | `SanctuaryHudLoader.dll` | Hot-reload host for all of the above |
+
+## SanctuaryHud
 
 - **Economy strip** across the top: alloy on the left, energy on the right,
   each showing current storage, gross income, gross spend and net per second,
@@ -17,27 +28,59 @@ main menu and nothing else.
   heads for empty. `STALL −N/s` appears when the economy can't pay for what is
   queued. Source: Harmony postfix on `SanctuaryUI.EconomyPanelUI`, the C#
   receiver of Lua's `Engine.UI_SetEconomyValues`.
-- **Idle panel**: one clickable row per tech tier of idle engineers (plus a
-  COMMANDER row and an ALL row) — clicking selects that group. Hidden entirely
-  when nothing is idle; draggable, and its position persists.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.
 
+Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
+
+## IdleEngineers
+
+One clickable row per tech tier of idle engineers (plus a COMMANDER row and an
+ALL row) — clicking selects that group. Hidden entirely when nothing is idle;
+draggable, and its position persists.
+
 Idle state and unit identity come from the DOTS icon buffers rather than
 Harmony hooks, because the icon FFI receivers are Burst-compiled and cannot be
 patched. Selection and camera moves run through the client's own Lua via an
-emitted call to `luaL_dostring` — client-side only, so still MP-safe.
+emitted call to `luaL_dostring` — client-side only, so still MP-safe. That
+plumbing lives in [shared/HudCore.cs](shared/HudCore.cs), which is compiled
+into each mod that needs it — so each DLL is fully standalone, at the cost of
+each running its own copy of the once-a-second poll.
 
-Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
-Settings (overlay position, commander jump zoom, LAN lobby unlock) live in
-`BepInEx\config\com.sanctuarydb.hud.cfg`.
+## ModManager
 
-## Local LAN lobby unlock
+Its own window on **F8**, managing two kinds of mods:
 
-One piece of this is not presentation-side, so it is worth stating plainly.
-`LocalTesting/UnlockLanLobby` (default on, see [LocalLanLobby.cs](SanctuaryHud/LocalLanLobby.cs))
-lets the main menu open when the entitlement API is unreachable.
+**Lua mods** live in `engine\SanctuaryMods\<ModName>\`, each mirroring the
+`LJ\lua` tree; only `*.lua` and `*.santp` are applied (later mods win
+conflicts, and new files/folders are registered so Lua directory listings see
+them). The manager overlays them into the game's in-memory `FilesCache` — the
+single source both the lobby hash and every match's Lua VMs read from — so
+mods toggled in the main menu apply at the next match launch, no restart
+needed, and nothing on disk is modified. Enabled mods persist in config and
+re-apply on startup.
+
+Multiplayer safety falls out of the game's own design: the lobby host compares
+`ComputeLuaHash` of the *cache* (not the disk) against each joiner and refuses
+mismatches, so everyone in a lobby provably runs the same Lua. The F8 window
+shows the live hash for comparing with friends. Two caveats: `.santp` files
+are loaded but **not** hashed (template mods must be coordinated manually or
+they desync mid-game), and toggling is blocked while in a lobby or match. A
+sample mod, `SanctuaryMods\ExamplePinkArmy`, turns army slot 1 hot pink as a
+smoke test (safe to delete).
+
+**C# plugins** (every mod in this repo) are listed with toggles: off destroys
+the plugin component — its `OnDestroy` unpatches Harmony, so it is a genuine
+unload — and on adds it back. C# plugins never enter the Lua hash, so these
+are safe to flip any time, even mid-match, and the disabled set persists
+across restarts.
+
+## LanLobbyUnlock
+
+One mod is not presentation-side, so it is worth stating plainly.
+`LanLobbyUnlock` lets the main menu open when the entitlement API is
+unreachable.
 
 `EM.UI.InterfaceManager.Start()` calls `SssApiClient.GetPermissions(steamId, …)`
 against the developers' `PermissionCheck` endpoint. A request error and a
@@ -53,17 +96,34 @@ The patch flips `HasMulti` on this client and routes `OnPermissionDenied` to
 `OnPermissionsPassed`. It grants no server access, and deliberately leaves
 `HasCampaign` and `HasDev` as the API returned them — those gate unreleased
 content rather than a dead server check. It exists so custom maps can be played
-against AI offline. Set it `false` before sharing a build.
+against AI offline. On builds where the entitlement check passes (the playtest),
+the patch never fires. Unload it from the F8 manager before sharing a build.
+
+## MapLocalFiles
+
+Lets Lua's `Engine.GetFileContent` see files inside the loaded map's folder,
+so a converted map can carry its own decal blueprints under `map/...`. The
+game's `EM.Lua.FilesCache` is built once at startup and never includes map
+folders; this patches a lazy fallback on the miss path only, serving `map/`
+paths from the loaded map's folder on disk. The hit path is untouched, so
+shipped content behaves exactly as before.
 
 ## Development
 
-Two projects: `SanctuaryHud` is the mod itself, deployed to `BepInEx\scripts`;
-`SanctuaryHudLoader` is a small hot-reload host deployed to `BepInEx\plugins`.
-The loader watches the scripts folder and reloads the mod about a second after
-each build (F6 forces it), so `dotnet build` is the whole iteration loop — no
-game restart. It rewrites the assembly identity per load because Mono caches
-byte-loaded assemblies, and attaches plugins to BepInEx's hidden manager object
-because this game destroys unknown root GameObjects.
+Layout: one folder per mod, each a tiny csproj — the shared settings (game
+references, target framework, deploy step) live in
+[Directory.Build.props](Directory.Build.props) /
+[Directory.Build.targets](Directory.Build.targets), and the shared runtime
+plumbing in [shared/](shared/) is compiled into the mods that reference it.
+
+Every mod deploys to `BepInEx\scripts`; the loader deploys to
+`BepInEx\plugins` and hot-reloads each scripts DLL independently about a
+second after its rebuild (F6 forces a reload of everything, and a deleted DLL
+has its plugins torn down). So `dotnet build` — of one project or the whole
+`SanctuaryMods.sln` — is the entire iteration loop, no game restart. The
+loader rewrites each assembly's identity per load because Mono caches
+byte-loaded assemblies, and attaches plugins to BepInEx's hidden manager
+object because this game destroys unknown root GameObjects.
 
 ## Setup
 
@@ -72,12 +132,14 @@ because this game destroys unknown root GameObjects.
    into the game's `engine` folder (the one with `Sanctuary.exe`) — extract so
    `winhttp.dll` and `BepInEx\` sit next to the exe. Run the game once to let
    BepInEx generate its folders.
-3. `dotnet build` — the csproj references game assemblies from the install
-   (override the location with `-p:GamePath=...`) and copies the built plugin
-   into `BepInEx\plugins\` automatically.
-4. Launch the game; check `BepInEx\LogOutput.log` for the load line.
+3. `dotnet build SanctuaryMods.sln` — the projects reference game assemblies
+   from the install (override with `-p:GamePath=...`, default is the playtest)
+   and copy each built mod into the game automatically.
+4. Launch the game; check `BepInEx\LogOutput.log` for the load lines, and
+   press **F8** in the menu for the mod manager.
 
 ## Removal
 
-Delete `engine\winhttp.dll` and the `engine\BepInEx\` folder. Steam's
-"verify integrity" also never sees them — they are not game files.
+Delete `engine\winhttp.dll` and the `engine\BepInEx\` folder (and
+`engine\SanctuaryMods\` if you used Lua mods). Steam's "verify integrity"
+never sees any of them — they are not game files.

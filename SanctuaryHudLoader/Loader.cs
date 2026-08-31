@@ -8,76 +8,93 @@ using UnityEngine;
 
 namespace SanctuaryHudLoader
 {
-    // Hot-reload host for SanctuaryHud.dll. Sanctuary destroys foreign root
-    // GameObjects (which is why BepInEx needs HideManagerGameObject and why
-    // ScriptEngine's visible host object silently dies), so this loader
+    // Hot-reload host for every mod DLL in BepInEx\scripts. Sanctuary destroys
+    // foreign root GameObjects (which is why BepInEx needs HideManagerGameObject
+    // and why ScriptEngine's visible host object silently dies), so this loader
     // attaches reloaded plugins to its own gameObject — BepInEx's protected,
     // hidden manager — instead of creating a new one.
     //
-    // Watches BepInEx\scripts\SanctuaryHud.dll and reloads it automatically
-    // about a second after every rebuild. F6 forces a reload.
-    [BepInPlugin("com.sanctuarydb.hudloader", "SanctuaryDB HUD Loader", "1.0.0")]
+    // Each DLL is watched and reloaded independently about a second after every
+    // rebuild; F6 forces a reload of everything. A DLL deleted from the folder
+    // has its plugins torn down on the next poll.
+    [BepInPlugin("com.sanctuarydb.hudloader", "Sanctuary Mods Loader", "1.1.0")]
     public class LoaderPlugin : BaseUnityPlugin
     {
-        private string _dllPath;
-        private DateTime _loadedStamp;
-        private readonly List<Component> _live = new List<Component>();
+        private string _scriptsDir;
+        private readonly Dictionary<string, DateTime> _loadedStamps = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<Component>> _live = new Dictionary<string, List<Component>>(StringComparer.OrdinalIgnoreCase);
         private float _pollAccum;
 
         private void Awake()
         {
-            _dllPath = Path.Combine(Path.Combine(Paths.BepInExRootPath, "scripts"), "SanctuaryHud.dll");
-            Logger.LogInfo($"HUD loader ready; watching {_dllPath} (auto-reload on change, F6 forces).");
-            TryLoad();
+            _scriptsDir = Path.Combine(Paths.BepInExRootPath, "scripts");
+            Logger.LogInfo($"Mods loader ready; watching {_scriptsDir}\\*.dll (auto-reload on change, F6 forces).");
+            LoadChanged(force: true);
         }
 
         private void Update()
         {
             if (Input.GetKeyDown(KeyCode.F6))
             {
-                TryLoad();
+                LoadChanged(force: true);
                 return;
             }
 
             _pollAccum += Time.unscaledDeltaTime;
             if (_pollAccum < 1f) return;
             _pollAccum = 0f;
+            LoadChanged(force: false);
+        }
 
-            if (File.Exists(_dllPath) && File.GetLastWriteTimeUtc(_dllPath) != _loadedStamp)
+        private void LoadChanged(bool force)
+        {
+            if (!Directory.Exists(_scriptsDir)) return;
+
+            var onDisk = Directory.GetFiles(_scriptsDir, "*.dll");
+            foreach (var path in onDisk)
             {
-                TryLoad();
+                var stamp = File.GetLastWriteTimeUtc(path);
+                if (!force && _loadedStamps.TryGetValue(path, out var loaded) && loaded == stamp) continue;
+                TryLoad(path, stamp);
+            }
+
+            // A DLL removed from the folder takes its plugins with it.
+            foreach (var gone in _loadedStamps.Keys.Except(onDisk, StringComparer.OrdinalIgnoreCase).ToList())
+            {
+                TearDown(gone);
+                _loadedStamps.Remove(gone);
+                Logger.LogInfo($"{Path.GetFileName(gone)} removed; its plugin(s) unloaded.");
             }
         }
 
-        private void TryLoad()
+        private void TearDown(string path)
         {
-            if (!File.Exists(_dllPath))
+            if (!_live.TryGetValue(path, out var components)) return;
+            // Their OnDestroy handlers drop the Harmony patches they applied.
+            foreach (var component in components.Where(c => c != null))
             {
-                Logger.LogWarning($"Not found: {_dllPath}");
-                return;
+                Destroy(component);
             }
+            _live.Remove(path);
+        }
 
+        private void TryLoad(string path, DateTime stamp)
+        {
             byte[] bytes;
-            var stamp = File.GetLastWriteTimeUtc(_dllPath);
             try
             {
-                bytes = File.ReadAllBytes(_dllPath);
+                bytes = File.ReadAllBytes(path);
             }
             catch (IOException)
             {
                 return; // mid-copy; the poll picks it up next second
             }
 
-            // Tear down the previous instance (its OnDestroy unpatches Harmony).
-            foreach (var component in _live.Where(c => c != null))
-            {
-                Destroy(component);
-            }
-            _live.Clear();
+            TearDown(path);
 
             // Record the stamp even if the load fails, so a broken build logs
             // one error instead of one per second; F6 retries on demand.
-            _loadedStamp = stamp;
+            _loadedStamps[path] = stamp;
 
             try
             {
@@ -97,16 +114,18 @@ namespace SanctuaryHudLoader
                 }
 
                 var assembly = Assembly.Load(bytes);
+                var components = new List<Component>();
                 foreach (var type in GetTypesSafe(assembly)
                              .Where(t => typeof(BaseUnityPlugin).IsAssignableFrom(t) && !t.IsAbstract))
                 {
-                    _live.Add(gameObject.AddComponent(type));
+                    components.Add(gameObject.AddComponent(type));
                 }
-                Logger.LogInfo($"Hot-loaded {_live.Count} plugin(s) from SanctuaryHud.dll (built {stamp:HH:mm:ss} UTC).");
+                _live[path] = components;
+                Logger.LogInfo($"Hot-loaded {components.Count} plugin(s) from {Path.GetFileName(path)} (built {stamp:HH:mm:ss} UTC).");
             }
             catch (Exception e)
             {
-                Logger.LogError($"Hot reload failed: {e}");
+                Logger.LogError($"Hot reload of {Path.GetFileName(path)} failed: {e}");
             }
         }
 

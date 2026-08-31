@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BepInEx;
+using BepInEx.Configuration;
 using HarmonyLib;
 
 namespace SanctuaryHud
@@ -27,11 +30,45 @@ namespace SanctuaryHud
     // Scope: this flips HasMulti, which gates the lobby UI on this client, and
     // nothing else. HasCampaign and HasDev are left exactly as the API returned
     // them - those gate unreleased content rather than a dead server check.
-    // No server access is granted or attempted.
-    public partial class SanctuaryHudPlugin
+    // No server access is granted or attempted. On builds where the
+    // entitlement check passes (e.g. the playtest), the patch simply never
+    // fires. Unload the mod (F8 manager) or set Enabled=false before sharing
+    // a build.
+    [BepInPlugin("com.sanctuarydb.lanlobbyunlock", "LAN Lobby Unlock", "0.1.0")]
+    public class LanLobbyUnlockPlugin : BaseUnityPlugin
     {
+        private static BepInEx.Logging.ManualLogSource _log;
+        private Harmony _harmony;
+        private ConfigEntry<bool> _cfgEnabled;
+
         private static MethodInfo _onPermissionsPassed;
         private static FieldInfo _hasMultiField;
+
+        private void Awake()
+        {
+            _log = Logger;
+            _cfgEnabled = Config.Bind("LocalTesting", "Enabled", true,
+                "Let the main menu open when the entitlement API is unreachable, so Multiplayer LAN can host a " +
+                "local game against AI. Affects this client's menu only - it grants no server access.");
+            if (!_cfgEnabled.Value)
+            {
+                _log.LogInfo("LAN lobby unlock disabled by config; leaving the gate alone.");
+                return;
+            }
+            try
+            {
+                PatchPermissionGate();
+            }
+            catch (Exception e)
+            {
+                _log.LogError($"LAN lobby unlock failed (menu will still gate on the API): {e}");
+            }
+        }
+
+        private void OnDestroy()
+        {
+            _harmony?.UnpatchSelf();
+        }
 
         private void PatchPermissionGate()
         {
@@ -64,8 +101,8 @@ namespace SanctuaryHud
                 _log.LogWarning("LAN lobby unlock: ApiPermissions.HasMulti not found; the menu will open but " +
                                 "anything else reading that flag stays false.");
 
-            EnsureHarmony();
-            _harmony.Patch(denied, prefix: new HarmonyMethod(typeof(SanctuaryHudPlugin), nameof(PermissionDeniedPrefix)));
+            _harmony = new Harmony("com.sanctuarydb.lanlobbyunlock." + Guid.NewGuid().ToString("N").Substring(0, 8));
+            _harmony.Patch(denied, prefix: new HarmonyMethod(typeof(LanLobbyUnlockPlugin), nameof(PermissionDeniedPrefix)));
             _log.LogInfo("LAN lobby unlock active: the menu will open even if the entitlement API is unreachable. " +
                          "Use Multiplayer LAN, set the second slot to AI, and pick your map.");
         }
@@ -90,6 +127,12 @@ namespace SanctuaryHud
                 return true;
             }
             return false;
+        }
+
+        private static IEnumerable<Type> GetTypesSafe(Assembly assembly)
+        {
+            try { return assembly.GetTypes(); }
+            catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t != null); }
         }
     }
 }

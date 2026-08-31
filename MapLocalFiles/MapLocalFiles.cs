@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BepInEx;
 using HarmonyLib;
 using Unity.Collections;
 
@@ -23,8 +24,12 @@ namespace SanctuaryHud
     // and the path starts with "map/", resolve it against the loaded map's
     // folder and serve it from disk. The hit path is untouched, so shipped
     // content behaves exactly as before.
-    public partial class SanctuaryHudPlugin
+    [BepInPlugin("com.sanctuarydb.maplocalfiles", "Map-Local Files", "0.1.0")]
+    public class MapLocalFilesPlugin : BaseUnityPlugin
     {
+        private static BepInEx.Logging.ManualLogSource _log;
+        private Harmony _harmony;
+
         // Keyed by resolved on-disk path, which includes the map folder name -
         // so two maps carrying a file of the same name can never collide.
         // NativeArrays are Persistent and live for the session, matching how
@@ -32,13 +37,26 @@ namespace SanctuaryHud
         private static readonly Dictionary<string, NativeArray<byte>> _mapFileCache =
             new Dictionary<string, NativeArray<byte>>(StringComparer.OrdinalIgnoreCase);
 
-        private void PatchMapLocalFiles()
+        private void Awake()
         {
-            EnsureHarmony();
-            var target = AccessTools.Method(typeof(EM.Lua.FilesCache), nameof(EM.Lua.FilesCache.TryGetFileContent));
-            if (target == null) throw new MissingMethodException("EM.Lua.FilesCache.TryGetFileContent not found");
-            _harmony.Patch(target, postfix: new HarmonyMethod(typeof(SanctuaryHudPlugin), nameof(FileContentPostfix)));
-            _log.LogInfo("Map-local file fallback: FilesCache.TryGetFileContent patched.");
+            _log = Logger;
+            try
+            {
+                var target = AccessTools.Method(typeof(EM.Lua.FilesCache), nameof(EM.Lua.FilesCache.TryGetFileContent));
+                if (target == null) throw new MissingMethodException("EM.Lua.FilesCache.TryGetFileContent not found");
+                _harmony = new Harmony("com.sanctuarydb.maplocalfiles." + Guid.NewGuid().ToString("N").Substring(0, 8));
+                _harmony.Patch(target, postfix: new HarmonyMethod(typeof(MapLocalFilesPlugin), nameof(FileContentPostfix)));
+                _log.LogInfo("Map-local file fallback: FilesCache.TryGetFileContent patched.");
+            }
+            catch (Exception e)
+            {
+                _log.LogError($"Map-local file fallback failed (map-carried decals will not load): {e}");
+            }
+        }
+
+        private void OnDestroy()
+        {
+            _harmony?.UnpatchSelf();
         }
 
         private static void FileContentPostfix(string path, ref NativeArray<byte> fileContent, ref bool __result)
