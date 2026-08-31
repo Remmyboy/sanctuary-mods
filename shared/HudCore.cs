@@ -65,20 +65,25 @@ namespace SanctuaryHud
         // the atlas with the icon's own rect.
         internal static Texture _iconAtlas;
         internal static List<Rect> _iconUvRects;
+        private static bool _loggedAtlasWait;
 
-        private static void ResolveIconAtlas(List<Assembly> assemblies)
+        private static void ResolveIconAtlas()
         {
             try
             {
-                var loader = assemblies.SelectMany(GetTypesSafe).First(t => t.Name == "IconLoader");
+                if (_iconLoaderType == null) return;
                 _iconAtlas = Shader.GetGlobalTexture(Shader.PropertyToID("_StrategicIconAtlas"));
                 if (_iconAtlas == null)
                 {
-                    _log.LogWarning("Strategic icon atlas not bound yet; commander icon falls back to a glyph.");
+                    if (!_loggedAtlasWait)
+                    {
+                        _loggedAtlasWait = true;
+                        _log.LogInfo("Strategic icon atlas not bound yet; will keep retrying each poll.");
+                    }
                     return;
                 }
 
-                var rectsMember = loader.GetField("iconRects", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
+                var rectsMember = _iconLoaderType.GetField("iconRects", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
                     as System.Collections.IEnumerable;
                 if (rectsMember == null) return;
 
@@ -103,7 +108,11 @@ namespace SanctuaryHud
             }
             catch (Exception e)
             {
-                _log.LogWarning($"Icon atlas unavailable ({e.Message}); commander icon falls back to a glyph.");
+                if (!_loggedAtlasWait)
+                {
+                    _loggedAtlasWait = true;
+                    _log.LogWarning($"Icon atlas unavailable ({e.Message}); commander icon falls back to a glyph.");
+                }
             }
         }
 
@@ -190,6 +199,12 @@ namespace SanctuaryHud
         private static object _allocatorTemp;
         private static bool _ecsResolved;
         private static bool _ecsResolveFailed;
+        private static float _nextResolveRetry;
+        private static bool _loggedResolveFail;
+        private static bool _loggedIdleIndexWait;
+        // Cached for the late-resolve retries (see PollIdleBuilders).
+        private static Type _cliType;
+        private static Type _iconLoaderType;
         private static int _idleAllCount;
         private static int _idleBuilderCount;
 
@@ -394,15 +409,20 @@ namespace SanctuaryHud
             return _iconNamesByIndex != null && _iconNamesByIndex.TryGetValue(registryIndex, out var name) ? name : null;
         }
 
-        // IconLoader.iconLookup maps name -> registry index; invert it once so
-        // we can read a unit's tier off its strategic icon.
-        private static void ResolveIconNames(List<Assembly> assemblies)
+        // IconLoader.iconLookup maps name -> registry index; invert it so we
+        // can read a unit's tier off its strategic icon. Icons are registered
+        // by Lua during match load, so the table can legitimately be empty on
+        // the first polls of a session — only a non-empty result is kept, and
+        // callers retry until then.
+        private static bool _loggedIconNamesWait;
+
+        private static void ResolveIconNames()
         {
             try
             {
-                var loader = assemblies.SelectMany(GetTypesSafe).First(t => t.Name == "IconLoader");
-                var lookupMember = (object)loader.GetField("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
-                    ?? loader.GetProperty("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+                if (_iconLoaderType == null) return;
+                var lookupMember = (object)_iconLoaderType.GetField("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
+                    ?? _iconLoaderType.GetProperty("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
                 if (lookupMember == null) return;
 
                 var map = new Dictionary<int, string>();
@@ -413,12 +433,74 @@ namespace SanctuaryHud
                     var v = t.GetProperty("Value")?.GetValue(entry);
                     if (k != null && v != null) map[Convert.ToInt32(v)] = k;
                 }
+                if (map.Count == 0)
+                {
+                    if (!_loggedIconNamesWait)
+                    {
+                        _loggedIconNamesWait = true;
+                        _log.LogInfo("Icon name table empty (icons not registered yet); will keep retrying each poll.");
+                    }
+                    return;
+                }
                 _iconNamesByIndex = map;
                 _log.LogInfo($"Icon names: {map.Count} entries (idle = {IconName(_idleImageIndex)}).");
             }
             catch (Exception e)
             {
-                _log.LogWarning($"Icon name table unavailable (no tech split): {e.Message}");
+                if (!_loggedIconNamesWait)
+                {
+                    _loggedIconNamesWait = true;
+                    _log.LogWarning($"Icon name table unavailable (no tech split yet): {e.Message}");
+                }
+            }
+        }
+
+        // The idle-adornment image is registered by Lua during match load,
+        // often after the economy stream (our in-match signal) has started —
+        // so this can fail on the first polls and is retried until it sticks.
+        private static void TryResolveIdleImageIndex()
+        {
+            try
+            {
+                if (_cliType == null) return;
+                var checkValidIcon = _cliType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                    .FirstOrDefault(m => m.Name == "CheckValidIcon");
+                if (checkValidIcon == null) return;
+
+                var ps = checkValidIcon.GetParameters();
+                var args = new object[ps.Length];
+                var stringSeen = 0;
+                var outPos = -1;
+                for (var i = 0; i < ps.Length; i++)
+                {
+                    if (ps[i].IsOut) { outPos = i; continue; }
+                    if (ps[i].ParameterType == typeof(string))
+                    {
+                        args[i] = stringSeen++ == 0 ? "SanctuaryHud" : "strategic_icon_adornment_idle";
+                    }
+                }
+                // (functionName, iconName, out index) — if there is only
+                // one string param it is the icon name.
+                if (stringSeen == 1) args[Array.FindIndex(ps, p => p.ParameterType == typeof(string))] = "strategic_icon_adornment_idle";
+                var ok = checkValidIcon.Invoke(null, args);
+                if (ok is bool b && b && outPos >= 0)
+                {
+                    _idleImageIndex = Convert.ToInt32(args[outPos]);
+                    _log.LogInfo($"ECS idle poll: idle image registry index = {_idleImageIndex}.");
+                }
+                else if (!_loggedIdleIndexWait)
+                {
+                    _loggedIdleIndexWait = true;
+                    _log.LogInfo("ECS idle poll: idle image not registered yet; will keep retrying each poll.");
+                }
+            }
+            catch (Exception e)
+            {
+                if (!_loggedIdleIndexWait)
+                {
+                    _loggedIdleIndexWait = true;
+                    _log.LogWarning($"ECS idle poll: idle image lookup failed ({e.Message}); will keep retrying each poll.");
+                }
             }
         }
 
@@ -712,7 +794,14 @@ namespace SanctuaryHud
         private static bool ResolveEcs()
         {
             if (_ecsResolved) return true;
-            if (_ecsResolveFailed) return false;
+            if (_ecsResolveFailed)
+            {
+                // The first poll can land during the loading screen (economy
+                // streams before the match world is fully up), so a failure
+                // must not disable the mod for the session — retry on a delay.
+                if (Time.realtimeSinceStartup < _nextResolveRetry) return false;
+                _ecsResolveFailed = false;
+            }
 
             try
             {
@@ -725,42 +814,12 @@ namespace SanctuaryHud
                 // Resolve the registry index of the idle-adornment image so we
                 // can match the idle icon exactly — entities like resource
                 // deposits and wrecks carry icon buffers too, so slot position
-                // alone overcounts badly.
-                try
-                {
-                    var cli = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
-                    var checkValidIcon = cli.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-                        .First(m => m.Name == "CheckValidIcon");
-                    var ps = checkValidIcon.GetParameters();
-                    var args = new object[ps.Length];
-                    var stringSeen = 0;
-                    var outPos = -1;
-                    for (var i = 0; i < ps.Length; i++)
-                    {
-                        if (ps[i].IsOut) { outPos = i; continue; }
-                        if (ps[i].ParameterType == typeof(string))
-                        {
-                            args[i] = stringSeen++ == 0 ? "SanctuaryHud" : "strategic_icon_adornment_idle";
-                        }
-                    }
-                    // (functionName, iconName, out index) — if there is only
-                    // one string param it is the icon name.
-                    if (stringSeen == 1) args[Array.FindIndex(ps, p => p.ParameterType == typeof(string))] = "strategic_icon_adornment_idle";
-                    var ok = checkValidIcon.Invoke(null, args);
-                    if (ok is bool b && b && outPos >= 0)
-                    {
-                        _idleImageIndex = Convert.ToInt32(args[outPos]);
-                        _log.LogInfo($"ECS idle poll: idle image registry index = {_idleImageIndex}.");
-                    }
-                    else
-                    {
-                        _log.LogWarning("ECS idle poll: CheckValidIcon rejected the idle image name; falling back to slot-2 heuristic.");
-                    }
-                }
-                catch (Exception e)
-                {
-                    _log.LogWarning($"ECS idle poll: could not resolve idle image index ({e.Message}); falling back to slot-2 heuristic.");
-                }
+                // alone overcounts badly. Registration happens during match
+                // load, so this (and the other icon lookups below) may not
+                // succeed yet — PollIdleBuilders keeps retrying them.
+                _cliType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
+                _iconLoaderType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
+                TryResolveIdleImageIndex();
 
                 var entities = assemblies.First(a => a.GetName().Name == "Unity.Entities");
                 var worldType = entities.GetType("Unity.Entities.World", true);
@@ -787,8 +846,8 @@ namespace SanctuaryHud
                     _log.LogWarning($"Ownership filter unavailable (counts will include allies): {e.Message}");
                 }
 
-                ResolveIconNames(assemblies);
-                ResolveIconAtlas(assemblies);
+                ResolveIconNames();
+                ResolveIconAtlas();
 
                 try
                 {
@@ -850,8 +909,13 @@ namespace SanctuaryHud
             catch (Exception e)
             {
                 _ecsResolveFailed = true;
+                _nextResolveRetry = Time.realtimeSinceStartup + 5f;
                 _pollStatus = "resolve failed";
-                _log.LogError($"ECS idle poll: type resolution failed: {e}");
+                if (!_loggedResolveFail)
+                {
+                    _loggedResolveFail = true;
+                    _log.LogError($"ECS idle poll: type resolution failed (will keep retrying): {e}");
+                }
                 return false;
             }
         }
@@ -859,6 +923,15 @@ namespace SanctuaryHud
         private static void PollIdleBuilders()
         {
             if (!ResolveEcs()) return;
+
+            // Icon data is registered by the game during match load, often
+            // after the economy stream (our in-match signal) has started — so
+            // the one-shot resolve above can run too early for these. Without
+            // them the idle rows and the commander stay invisible all session,
+            // so retry until they exist.
+            if (_idleImageIndex < 0) TryResolveIdleImageIndex();
+            if (_iconNamesByIndex == null) ResolveIconNames();
+            if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();
 
             try
             {
