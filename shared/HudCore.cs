@@ -51,6 +51,19 @@ namespace SanctuaryHud
         internal static readonly object _groupLock = new object();
         internal static List<IdleGroup> _idleGroups = new List<IdleGroup>();
 
+        // ---- alloy structures, by tier (for the EcoManager mod) ----
+        // Extractors are `structure1_t{1,2,3}_alloy` in the icon registry,
+        // identically across all three factions. The Tier-3 Alloy Furnace
+        // (ues3603/ucs3603/ugs3603, tagged ALLOYS_PRODUCTION rather than
+        // ALLOYS_EXTRACTION) carries that same strategic icon, and nothing on
+        // the render entity distinguishes the two — so the T3 row counts both.
+        // Rows are labelled by tier rather than "extractor" for that reason.
+        internal static List<IdleGroup> _alloyGroups = new List<IdleGroup>();
+        /// The subset currently upgrading, same tier keys.
+        internal static List<IdleGroup> _alloyUpgradingGroups = new List<IdleGroup>();
+        internal static int _alloyCount;
+        internal static int _alloyUpgradingCount;
+
         // ---- commander ----
         // "bot2_t1_direct" is the commander icon for all three factions and is
         // used by nothing else, so icon + own army colour pins ours exactly.
@@ -196,6 +209,8 @@ namespace SanctuaryHud
         private static FieldInfo _iconEnabledField;
         private static FieldInfo _iconIndexField;
         private static int _idleImageIndex = -1;
+        private static int _upgradeImageIndex = -1;
+        private static bool _loggedUpgradeIndexWait;
         private static object _allocatorTemp;
         private static bool _ecsResolved;
         private static bool _ecsResolveFailed;
@@ -455,17 +470,17 @@ namespace SanctuaryHud
             }
         }
 
-        // The idle-adornment image is registered by Lua during match load,
-        // often after the economy stream (our in-match signal) has started —
-        // so this can fail on the first polls and is retried until it sticks.
-        private static void TryResolveIdleImageIndex()
+        // Adornment images are registered by Lua during match load, often
+        // after the economy stream (our in-match signal) has started — so
+        // these can fail on the first polls and are retried until they stick.
+        private static int ResolveAdornmentIndex(string iconName)
         {
             try
             {
-                if (_cliType == null) return;
+                if (_cliType == null) return -1;
                 var checkValidIcon = _cliType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
                     .FirstOrDefault(m => m.Name == "CheckValidIcon");
-                if (checkValidIcon == null) return;
+                if (checkValidIcon == null) return -1;
 
                 var ps = checkValidIcon.GetParameters();
                 var args = new object[ps.Length];
@@ -476,31 +491,50 @@ namespace SanctuaryHud
                     if (ps[i].IsOut) { outPos = i; continue; }
                     if (ps[i].ParameterType == typeof(string))
                     {
-                        args[i] = stringSeen++ == 0 ? "SanctuaryHud" : "strategic_icon_adornment_idle";
+                        args[i] = stringSeen++ == 0 ? "SanctuaryHud" : iconName;
                     }
                 }
                 // (functionName, iconName, out index) — if there is only
                 // one string param it is the icon name.
-                if (stringSeen == 1) args[Array.FindIndex(ps, p => p.ParameterType == typeof(string))] = "strategic_icon_adornment_idle";
+                if (stringSeen == 1) args[Array.FindIndex(ps, p => p.ParameterType == typeof(string))] = iconName;
                 var ok = checkValidIcon.Invoke(null, args);
-                if (ok is bool b && b && outPos >= 0)
-                {
-                    _idleImageIndex = Convert.ToInt32(args[outPos]);
-                    _log.LogInfo($"ECS idle poll: idle image registry index = {_idleImageIndex}.");
-                }
-                else if (!_loggedIdleIndexWait)
-                {
-                    _loggedIdleIndexWait = true;
-                    _log.LogInfo("ECS idle poll: idle image not registered yet; will keep retrying each poll.");
-                }
+                if (ok is bool b && b && outPos >= 0) return Convert.ToInt32(args[outPos]);
+                return -1;
             }
-            catch (Exception e)
+            catch
             {
-                if (!_loggedIdleIndexWait)
-                {
-                    _loggedIdleIndexWait = true;
-                    _log.LogWarning($"ECS idle poll: idle image lookup failed ({e.Message}); will keep retrying each poll.");
-                }
+                return -1;
+            }
+        }
+
+        private static void TryResolveIdleImageIndex()
+        {
+            _idleImageIndex = ResolveAdornmentIndex("strategic_icon_adornment_idle");
+            if (_idleImageIndex >= 0)
+            {
+                _log.LogInfo($"ECS idle poll: idle image registry index = {_idleImageIndex}.");
+            }
+            else if (!_loggedIdleIndexWait)
+            {
+                _loggedIdleIndexWait = true;
+                _log.LogInfo("ECS idle poll: idle image not registered yet; will keep retrying each poll.");
+            }
+        }
+
+        // The upgrade adornment is what ClientUnit:CheckShowUpgradingAdornment
+        // enables (`icons.Upgrade:SetEnabled(self:IsUpgradeQueued())`), so it
+        // is the game's own "this building is upgrading" signal.
+        private static void TryResolveUpgradeImageIndex()
+        {
+            _upgradeImageIndex = ResolveAdornmentIndex("strategic_icon_adornment_upgrade");
+            if (_upgradeImageIndex >= 0)
+            {
+                _log.LogInfo($"ECS poll: upgrade image registry index = {_upgradeImageIndex}.");
+            }
+            else if (!_loggedUpgradeIndexWait)
+            {
+                _loggedUpgradeIndexWait = true;
+                _log.LogInfo("ECS poll: upgrade image not registered yet; will keep retrying each poll.");
             }
         }
 
@@ -791,6 +825,58 @@ namespace SanctuaryHud
             }
         }
 
+        /// True for an alloy extractor (or the T3 furnace, which shares the
+        /// icon), reading the tier off the strategic icon name — extractors
+        /// are `structure1_t{n}_alloy` across every faction.
+        private static bool IsAlloyStructure(string iconName, out int tier)
+        {
+            tier = 0;
+            if (string.IsNullOrEmpty(iconName)) return false;
+            var m = System.Text.RegularExpressions.Regex.Match(iconName, @"^structure\d*_t(\d)_alloy(_\w+)?$");
+            if (!m.Success) return false;
+            tier = int.Parse(m.Groups[1].Value);
+            return true;
+        }
+
+        /// Files an alloy structure into its tier row (and the upgrading row
+        /// when the game's upgrade adornment is lit). `name` is the already
+        /// resolved strategic icon name, `tier` its parsed tech level.
+        private static void RecordAlloy(object em, object entity, int tier, bool upgrading,
+            Dictionary<int, IdleGroup> groups, Dictionary<int, IdleGroup> upgradingGroups)
+        {
+            try
+            {
+                var localIndex = -1;
+                if (_localIdField != null && _getLocalIdMi != null)
+                {
+                    var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var localId = _localIdField.GetValue(component);
+                    var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                    if (indexField != null) localIndex = Convert.ToInt32(indexField.GetValue(localId));
+                }
+
+                Add(groups);
+                // An upgrading extractor is still one of its current tier, so
+                // it is counted in both rows rather than moved.
+                if (upgrading) Add(upgradingGroups);
+
+                void Add(Dictionary<int, IdleGroup> into)
+                {
+                    if (!into.TryGetValue(tier, out var group))
+                    {
+                        group = new IdleGroup { Tier = tier, Label = $"T{tier}" };
+                        into[tier] = group;
+                    }
+                    group.Count++;
+                    if (localIndex >= 0) group.UnitIds.Add(localIndex);
+                }
+            }
+            catch
+            {
+                // A row without ids still counts; it just won't be clickable.
+            }
+        }
+
         private static bool ResolveEcs()
         {
             if (_ecsResolved) return true;
@@ -820,6 +906,7 @@ namespace SanctuaryHud
                 _cliType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
                 _iconLoaderType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
                 TryResolveIdleImageIndex();
+                TryResolveUpgradeImageIndex();
 
                 var entities = assemblies.First(a => a.GetName().Name == "Unity.Entities");
                 var worldType = entities.GetType("Unity.Entities.World", true);
@@ -930,6 +1017,7 @@ namespace SanctuaryHud
             // them the idle rows and the commander stay invisible all session,
             // so retry until they exist.
             if (_idleImageIndex < 0) TryResolveIdleImageIndex();
+            if (_upgradeImageIndex < 0) TryResolveUpgradeImageIndex();
             if (_iconNamesByIndex == null) ResolveIconNames();
             if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();
 
@@ -939,6 +1027,8 @@ namespace SanctuaryHud
                 var allCount = 0;
                 var ownColour = LocalArmyColour();
                 var groups = new Dictionary<int, IdleGroup>();
+                var alloyGroups = new Dictionary<int, IdleGroup>();
+                var alloyUpgrading = new Dictionary<int, IdleGroup>();
 
                 // Without a trustworthy owner, show nothing rather than
                 // everything: listing an enemy's idle engineers as if they were
@@ -946,8 +1036,15 @@ namespace SanctuaryHud
                 if (ownColour == null)
                 {
                     _idleCount = 0;
+                    _alloyCount = 0;
+                    _alloyUpgradingCount = 0;
                     _commanderLocalIndex = -1;
-                    lock (_groupLock) _idleGroups = new List<IdleGroup>();
+                    lock (_groupLock)
+                    {
+                        _idleGroups = new List<IdleGroup>();
+                        _alloyGroups = new List<IdleGroup>();
+                        _alloyUpgradingGroups = new List<IdleGroup>();
+                    }
                     _pollStatus = "no owner";
                     return;
                 }
@@ -976,37 +1073,59 @@ namespace SanctuaryHud
                                 var bufLength = (int)bufferType.GetProperty("Length").GetValue(buffer);
                                 var itemGetter = bufferType.GetProperty("Item");
 
-                                // The commander is tracked whether or not it is
-                                // idle, for the always-on health readout.
+                                // The strategic icon (slot 0) identifies what
+                                // the unit is; the rest of the buffer carries
+                                // adornments. Read the name once, then scan
+                                // the buffer once for every adornment we care
+                                // about, rather than a pass per feature.
+                                string iconName = null;
                                 if (bufLength > 0 && _iconIndexField != null)
                                 {
                                     var strategic = itemGetter.GetValue(buffer, new object[] { 0 });
-                                    var iconName = IconName(Convert.ToInt32(_iconIndexField.GetValue(strategic)));
+                                    var strategicIndex = Convert.ToInt32(_iconIndexField.GetValue(strategic));
+                                    iconName = IconName(strategicIndex);
+
+                                    // The commander is tracked whether or not
+                                    // it is idle, for the always-on health
+                                    // readout.
                                     if (iconName != null && iconName.StartsWith(CommanderIconSuffix) &&
                                         ColourMatches(em, entity, ownColour.Value))
                                     {
-                                        _commanderIconIndex = Convert.ToInt32(_iconIndexField.GetValue(strategic));
+                                        _commanderIconIndex = strategicIndex;
                                         RecordCommander(em, entity);
                                     }
                                 }
 
-                                if (_idleImageIndex >= 0 && _iconIndexField != null)
+                                if (_iconIndexField != null && (_idleImageIndex >= 0 || _upgradeImageIndex >= 0))
                                 {
-                                    // Exact match on the idle-adornment image.
+                                    var idle = false;
+                                    var upgrading = false;
                                     for (var e = 0; e < bufLength; e++)
                                     {
                                         var element = itemGetter.GetValue(buffer, new object[] { e });
-                                        if (Convert.ToInt32(_iconIndexField.GetValue(element)) == _idleImageIndex &&
-                                            (bool)_iconEnabledField.GetValue(element))
+                                        var index = Convert.ToInt32(_iconIndexField.GetValue(element));
+                                        if (index != _idleImageIndex && index != _upgradeImageIndex) continue;
+                                        if (!(bool)_iconEnabledField.GetValue(element)) continue;
+                                        if (index == _idleImageIndex) idle = true;
+                                        else upgrading = true;
+                                    }
+
+                                    var mine = (idle || IsAlloyStructure(iconName, out _)) &&
+                                               ColourMatches(em, entity, ownColour.Value);
+
+                                    if (idle)
+                                    {
+                                        allCount++;
+                                        if (mine)
                                         {
-                                            allCount++;
-                                            if (ColourMatches(em, entity, ownColour.Value))
-                                            {
-                                                count++;
-                                                RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
-                                            }
-                                            break;
+                                            count++;
+                                            RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
                                         }
+                                    }
+
+                                    if (mine && IsAlloyStructure(iconName, out var alloyTier))
+                                    {
+                                        RecordAlloy(em, entity, alloyTier, upgrading, alloyGroups, alloyUpgrading);
                                     }
                                 }
                                 else if (bufLength > IdleIconIndex)
@@ -1033,7 +1152,18 @@ namespace SanctuaryHud
                 _idleCount = ordered.Sum(g => g.Count);
                 _idleBuilderCount = count;
                 _idleAllCount = allCount;
-                lock (_groupLock) _idleGroups = ordered;
+
+                var alloyOrdered = alloyGroups.Values.OrderBy(g => g.Tier).ToList();
+                var alloyUpgradingOrdered = alloyUpgrading.Values.OrderBy(g => g.Tier).ToList();
+                _alloyCount = alloyOrdered.Sum(g => g.Count);
+                _alloyUpgradingCount = alloyUpgradingOrdered.Sum(g => g.Count);
+
+                lock (_groupLock)
+                {
+                    _idleGroups = ordered;
+                    _alloyGroups = alloyOrdered;
+                    _alloyUpgradingGroups = alloyUpgradingOrdered;
+                }
                 _pollStatus = "ok";
             }
             catch (Exception e)
@@ -1059,12 +1189,19 @@ namespace SanctuaryHud
             {
                 // Leaving a match: drop everything so the next one starts clean
                 // rather than flashing the previous game's units.
-                if (_commanderLocalIndex >= 0 || _idleCount > 0)
+                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _alloyCount > 0)
                 {
                     _commanderLocalIndex = -1;
                     _commanderIconIndex = -1;
                     _idleCount = 0;
-                    lock (_groupLock) _idleGroups = new List<IdleGroup>();
+                    _alloyCount = 0;
+                    _alloyUpgradingCount = 0;
+                    lock (_groupLock)
+                    {
+                        _idleGroups = new List<IdleGroup>();
+                        _alloyGroups = new List<IdleGroup>();
+                        _alloyUpgradingGroups = new List<IdleGroup>();
+                    }
                     lock (_ecoLock) _eco = null;
                 }
                 return;
@@ -1107,7 +1244,7 @@ namespace SanctuaryHud
         private static bool _stylesReady;
         internal static GUIStyle _stWindow, _stName, _stSub, _stBarText, _stChevron, _stRowLabel, _stRowCount, _stIdleNone;
         internal static GUIStyle _stStripLabel, _stStripValue, _stStripMax, _stStripIn, _stStripOut, _stStripNet, _stStripChip;
-        internal static GUIStyle _stCmdLabel, _stCmdGlyph;
+        internal static GUIStyle _stCmdLabel, _stCmdGlyph, _stSubHeading;
         internal static Texture2D _texPanel, _texBarBack, _texWhite, _texRowHover;
 
         internal static readonly Color AlloyColour = new Color(0.16f, 0.75f, 0.72f, 0.92f);  // teal
@@ -1115,6 +1252,9 @@ namespace SanctuaryHud
         internal static readonly Color DangerColour = new Color(0.88f, 0.16f, 0.12f, 0.95f);
         internal static readonly Color GainColour = new Color(0.42f, 0.88f, 0.5f);
         internal static readonly Color LossColour = new Color(1f, 0.42f, 0.36f);
+        /// In-progress work (upgrading structures) — distinct from both the
+        /// alloy teal and the idle orange so the two panels never read alike.
+        internal static readonly Color UpgradeColour = new Color(0.55f, 0.78f, 1f);
 
         internal static void EnsureStyles()
         {
@@ -1142,6 +1282,7 @@ namespace SanctuaryHud
             _stStripOut = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, normal = { textColor = new Color(1f, 0.55f, 0.5f, 0.95f) } };
             _stStripNet = new GUIStyle { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
             _stStripChip = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+            _stSubHeading = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = UpgradeColour } };
             _stCmdLabel = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _stCmdGlyph = new GUIStyle { fontSize = 17, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
         }

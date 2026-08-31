@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModManager", "ModManager\Mo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SanctuaryHudLoader", "SanctuaryHudLoader\SanctuaryHudLoader.csproj", "{976DECA3-23B1-4752-ABBC-8B75602B7721}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EcoManager", "EcoManager\EcoManager.csproj", "{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +50,9 @@ Global
 		{976DECA3-23B1-4752-ABBC-8B75602B7721}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{976DECA3-23B1-4752-ABBC-8B75602B7721}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{976DECA3-23B1-4752-ABBC-8B75602B7721}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

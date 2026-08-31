@@ -15,6 +15,7 @@ players. The exceptions are called out in their own sections below.
 | --- | --- | --- |
 | [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
+| [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [ModManager](ModManager/) | `ModManager.dll` | F8 window: Lua mod overlays + plugin toggles |
 | [LanLobbyUnlock](LanLobbyUnlock/) | `LanLobbyUnlock.dll` | Opens the menu when the entitlement API is dead |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
@@ -47,6 +48,28 @@ emitted call to `luaL_dostring` — client-side only, so still MP-safe. That
 plumbing lives in [shared/HudCore.cs](shared/HudCore.cs), which is compiled
 into each mod that needs it — so each DLL is fully standalone, at the cost of
 each running its own copy of the once-a-second poll.
+
+## EcoManager
+
+A small **ALLOY** panel: one clickable row per extractor tier (T1/T2/T3, plus
+an ALL row), and — only while something is actually upgrading — an
+**UPGRADING** block underneath listing those by tier. Clicking any row selects
+that group. Hidden until you have your first extractor; draggable, position
+persists.
+
+Extractors are identified by their strategic icon, `structure1_t{n}_alloy_normal`,
+which is uniform across all three factions, so the tier comes straight off the
+icon. Upgrading state is the game's own upgrade adornment — the one
+`ClientUnit:CheckShowUpgradingAdornment` drives from `IsUpgradeQueued()` — so it
+lights and clears exactly in step with the icon the game itself draws. An
+upgrading extractor is counted in both its tier row and the upgrading row,
+since it is still live at its current tier until the upgrade completes.
+
+Rows are labelled by tier rather than "extractor" for a reason: the Tier-3
+Alloy Furnace (`ues3603` and faction equivalents, tagged `ALLOYS_PRODUCTION`
+rather than `ALLOYS_EXTRACTION`) carries that same strategic icon, and nothing
+on the render entity separates the two — so the T3 row means "tier-3 alloy
+structures", furnaces included.
 
 ## ModManager
 
