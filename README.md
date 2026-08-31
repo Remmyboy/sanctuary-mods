@@ -28,6 +28,13 @@ players. The exceptions are called out in their own sections below.
   heads for empty. `STALL −N/s` appears when the economy can't pay for what is
   queued. Source: Harmony postfix on `SanctuaryUI.EconomyPanelUI`, the C#
   receiver of Lua's `Engine.UI_SetEconomyValues`.
+
+  The spend figure is what your queue is **asking for**, not what the economy
+  managed to pay (`RequestedTotal` rather than `RequestedStalled`). The two are
+  equal until you stall; during a stall actual spend is capped by income, so
+  showing it would just mirror the income back at you (`+12 −12`) and hide the
+  shortfall. Net stays on actual spend, since that is what really moves the
+  store.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.

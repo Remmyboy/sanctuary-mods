@@ -137,8 +137,9 @@ namespace SanctuaryHud
             var current = V("StorageCurrent");
             var limit = Mathf.Max(1f, V("StorageLimit"));
             var incomeRaw = V("GeneratedIncome") + V("HarvestIncome");
-            // Lua sends these negated: Total = what builds asked for,
-            // Stalled = what the economy actually paid out.
+            // Lua sends these negated (economyPanel.lua): RequestedTotal is
+            // "how much we wanted to spend", RequestedStalled "how much we
+            // actually spent".
             var wantedRaw = -V("RequestedTotal");
             var spendRaw = -V("RequestedStalled");
             var netRaw = incomeRaw - spendRaw;
@@ -146,10 +147,17 @@ namespace SanctuaryHud
 
             if (!_smooth.TryGetValue(key, out var s)) _smooth[key] = s = new float[3];
             s[0] += (incomeRaw - s[0]) * 0.2f;
-            s[1] += (spendRaw - s[1]) * 0.2f;
+            // The spend figure shows demand, not what the economy managed to
+            // pay: while stalling those differ, and the useful number is what
+            // your queue is asking for. Actual spend is capped by income, so
+            // showing it just mirrors the income back at you (+12 −12) and
+            // hides the shortfall. Off a stall the two are equal anyway.
+            s[1] += (wantedRaw - s[1]) * 0.2f;
             s[2] += (netRaw - s[2]) * 0.15f;
             var income = s[0];
-            var spend = s[1];
+            var demand = s[1];
+            // Net stays on actual spend: it describes the store's real
+            // movement, which is what the bar and the "empty in" chip need.
             var net = s[2];
 
             const float pad = 16f;
@@ -170,7 +178,11 @@ namespace SanctuaryHud
             GUI.Label(new Rect(x + w - pad - 108f, 4f, 108f, 22f), netText, _stStripNet);
 
             GUI.Label(new Rect(x + w - pad - 108f - 150f, 7f, 70f, 18f), "+" + Fmt(income), _stStripIn);
-            GUI.Label(new Rect(x + w - pad - 108f - 76f, 7f, 70f, 18f), "−" + Fmt(spend), _stStripOut);
+            // Flag the spend figure while stalling, since it is then demand
+            // you are not actually meeting rather than resources leaving the
+            // store — the STALL chip below carries the size of the shortfall.
+            _stStripOut.normal.textColor = stalling ? DangerColour : new Color(1f, 0.55f, 0.5f, 0.95f);
+            GUI.Label(new Rect(x + w - pad - 108f - 76f, 7f, 70f, 18f), "−" + Fmt(demand), _stStripOut);
 
             // --- row 2: capacity bar ---
             var lengthFactor = Mathf.Clamp(0.45f + 0.15f * Mathf.Log10(limit / 400f), 0.45f, 1f);
