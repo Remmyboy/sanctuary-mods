@@ -15,7 +15,7 @@ namespace SanctuaryHud
     // to the render side and draws an IMGUI overlay. Never touches the
     // lobby-hashed Lua tree or the simulation.
     //
-    // The idle-engineers panel, the LAN lobby unlock and the map-local file
+    // The idle-engineers panel, the alloy panel and the map-local file
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.

@@ -363,6 +363,21 @@ namespace SanctuaryHud
 
         // ---- UI -----------------------------------------------------------
 
+        private static GUIStyle _stClose;
+
+        /// Flat close glyph — the default button chrome looks wrong sitting
+        /// in the title bar. Built lazily because GUI.skin is only valid
+        /// inside OnGUI.
+        private static GUIStyle CloseStyle => _stClose ??= new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 13,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = new Color(0.75f, 0.79f, 0.85f) },
+            hover = { textColor = new Color(1f, 0.45f, 0.4f) },
+            active = { textColor = new Color(1f, 0.3f, 0.25f) },
+        };
+
         private void OnGUI()
         {
             if (!_visible) return;
@@ -372,6 +387,14 @@ namespace SanctuaryHud
 
         private void DrawWindow(int id)
         {
+            // Close box in the title bar, so the window can be dismissed
+            // without knowing the hotkey. Drawn before the layout content so
+            // it takes the click ahead of anything underneath it.
+            if (GUI.Button(new Rect(_winRect.width - 22f, 3f, 18f, 16f), "✕", CloseStyle))
+            {
+                _visible = false;
+            }
+
             var locked = InLobbyOrMatch();
 
             GUILayout.Label(locked
@@ -424,6 +447,8 @@ namespace SanctuaryHud
                 Application.OpenURL("file:///" + ModsRoot.Replace('\\', '/'));
             }
             GUILayout.EndHorizontal();
+
+            GUILayout.Label($"{_cfgToggleKey.Value} closes and reopens this window.");
 
             GUI.DragWindow();
         }

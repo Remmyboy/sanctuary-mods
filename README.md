@@ -17,7 +17,6 @@ players. The exceptions are called out in their own sections below.
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [ModManager](ModManager/) | `ModManager.dll` | F8 window: Lua mod overlays + plugin toggles |
-| [LanLobbyUnlock](LanLobbyUnlock/) | `LanLobbyUnlock.dll` | Opens the menu when the entitlement API is dead |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
 | [SanctuaryHudLoader](SanctuaryHudLoader/) | `SanctuaryHudLoader.dll` | Hot-reload host for all of the above |
 
@@ -98,29 +97,6 @@ the plugin component — its `OnDestroy` unpatches Harmony, so it is a genuine
 unload — and on adds it back. C# plugins never enter the Lua hash, so these
 are safe to flip any time, even mid-match, and the disabled set persists
 across restarts.
-
-## LanLobbyUnlock
-
-One mod is not presentation-side, so it is worth stating plainly.
-`LanLobbyUnlock` lets the main menu open when the entitlement API is
-unreachable.
-
-`EM.UI.InterfaceManager.Start()` calls `SssApiClient.GetPermissions(steamId, …)`
-against the developers' `PermissionCheck` endpoint. A request error and a
-`HasMulti == false` response both land on `MainMenuInterface.OnPermissionDenied()`,
-which raises a full-screen canvas whose only button is `Application.Quit()`. With
-the demo's multiplayer backend closed that request just errors, which also shuts
-off **Multiplayer LAN** — hosted locally by `TcpLobbyBackend`, needing no servers
-at all. There is no config or launch flag for this: `InterfaceManager.TryAutoStart()`
-would host over LAN with no menu, but nothing in the build calls it, and
-Singleplayer is a stub that logs `"Not implemented yet!"`.
-
-The patch flips `HasMulti` on this client and routes `OnPermissionDenied` to
-`OnPermissionsPassed`. It grants no server access, and deliberately leaves
-`HasCampaign` and `HasDev` as the API returned them — those gate unreleased
-content rather than a dead server check. It exists so custom maps can be played
-against AI offline. On builds where the entitlement check passes (the playtest),
-the patch never fires. Unload it from the F8 manager before sharing a build.
 
 ## MapLocalFiles
 
