@@ -63,19 +63,23 @@ an ALL row), and — only while something is actually upgrading — an
 that group. Hidden until you have your first extractor; draggable, position
 persists.
 
-Extractors are identified by their strategic icon, `structure1_t{n}_alloy_normal`,
-which is uniform across all three factions, so the tier comes straight off the
-icon. Upgrading state is the game's own upgrade adornment — the one
-`ClientUnit:CheckShowUpgradingAdornment` drives from `IsUpgradeQueued()` — so it
-lights and clears exactly in step with the icon the game itself draws. An
-upgrading extractor is counted in both its tier row and the upgrading row,
-since it is still live at its current tier until the upgrade completes.
+The tier comes off the strategic icon, `structure1_t{n}_alloy_normal`, which is
+uniform across all three factions. Upgrading state is the game's own upgrade
+adornment — the one `ClientUnit:CheckShowUpgradingAdornment` drives from
+`IsUpgradeQueued()` — so it lights and clears exactly in step with the icon the
+game itself draws. An upgrading extractor is counted in both its tier row and
+the upgrading row, since it is still live at its current tier until the
+upgrade completes.
 
-Rows are labelled by tier rather than "extractor" for a reason: the Tier-3
-Alloy Furnace (`ues3603` and faction equivalents, tagged `ALLOYS_PRODUCTION`
-rather than `ALLOYS_EXTRACTION`) carries that same strategic icon, and nothing
-on the render entity separates the two — so the T3 row means "tier-3 alloy
-structures", furnaces included.
+That icon alone is *not* enough to identify an extractor, though: alloy
+storages (`ues1602`) and the Tier-3 alloy furnace (`ues3603`) carry the very
+same icon, and the render entity holds no template id. So the client's Lua
+supplies identity instead — every template is filed into `Tags[tag][tpId]` as
+it loads, making `Tags.ALLOYS_EXTRACTION` exactly the set of extractor
+template ids, and `Armies[focused].units` exactly our own units. One query per
+poll turns that into a set of LocalIDs, which the panel matches against. It
+doubles as the ownership filter, so the alloy rows never depend on the
+army-colour match the idle rows use.
 
 ## ModManager
 

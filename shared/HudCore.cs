@@ -825,9 +825,64 @@ namespace SanctuaryHud
             }
         }
 
-        /// True for an alloy extractor (or the T3 furnace, which shares the
-        /// icon), reading the tier off the strategic icon name — extractors
-        /// are `structure1_t{n}_alloy` across every faction.
+        // ---- extractor identity, from the client's own tag tables ----
+        // The strategic icon cannot answer this: alloy extractors, alloy
+        // storages (ues1602 &c.) and the T3 alloy furnace (ues3603) all carry
+        // the same `structure1_t{n}_alloy` icon, and the render entity holds
+        // no template id. The client Lua does know — every template is filed
+        // into Tags[tag][tpId] as it loads, so Tags.ALLOYS_EXTRACTION is
+        // exactly the set of extractor template ids, and Armies[focused].units
+        // is exactly our own units. Ask once per poll and match on LocalID.
+        private static readonly HashSet<int> _extractorLocalIds = new HashSet<int>();
+        private static bool _extractorIdsValid;
+        private static bool _loggedExtractorQueryFail;
+
+        private static void RefreshExtractorIds()
+        {
+            if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
+            try
+            {
+                if (!RunLua(
+                        "__SdbExtractors = '' " +
+                        "local out = {} " +
+                        "for _, a in pairs(Armies or {}) do " +
+                        "  if a.focused then " +
+                        "    for _, u in pairs(a.units or {}) do " +
+                        "      local li = u.localId and u.localId.index " +
+                        "      if li and u.tpId and Tags and Tags.ALLOYS_EXTRACTION and Tags.ALLOYS_EXTRACTION[u.tpId] then " +
+                        "        out[#out+1] = li " +
+                        "      end " +
+                        "    end " +
+                        "  end " +
+                        "end " +
+                        "__SdbExtractors = table.concat(out, ',')"))
+                    return;
+
+                var raw = _getLuaGlobal("__SdbExtractors");
+                if (raw == null) return;
+
+                _extractorLocalIds.Clear();
+                // An empty string is a valid answer: no extractors yet.
+                foreach (var part in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (int.TryParse(part, out var id)) _extractorLocalIds.Add(id);
+                }
+                _extractorIdsValid = true;
+            }
+            catch (Exception e)
+            {
+                if (!_loggedExtractorQueryFail)
+                {
+                    _loggedExtractorQueryFail = true;
+                    _log.LogWarning($"Extractor lookup failed (the alloy panel will stay hidden): {e.Message}");
+                }
+            }
+        }
+
+        /// True for an alloy structure by icon — extractors are
+        /// `structure1_t{n}_alloy` across every faction, but so are alloy
+        /// storages and the T3 furnace, so callers must also check
+        /// `_extractorLocalIds`. This only supplies the tier.
         private static bool IsAlloyStructure(string iconName, out int tier)
         {
             tier = 0;
@@ -854,6 +909,12 @@ namespace SanctuaryHud
                     var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
                     if (indexField != null) localIndex = Convert.ToInt32(indexField.GetValue(localId));
                 }
+
+                // Extractors only — the icon also matches storages and the
+                // furnace, and Lua's tag set is what separates them. It is
+                // already restricted to our own army, so this doubles as the
+                // ownership check.
+                if (localIndex < 0 || !_extractorLocalIds.Contains(localIndex)) return;
 
                 Add(groups);
                 // An upgrading extractor is still one of its current tier, so
@@ -1026,6 +1087,7 @@ namespace SanctuaryHud
                 var count = 0;
                 var allCount = 0;
                 var ownColour = LocalArmyColour();
+                RefreshExtractorIds();
                 var groups = new Dictionary<int, IdleGroup>();
                 var alloyGroups = new Dictionary<int, IdleGroup>();
                 var alloyUpgrading = new Dictionary<int, IdleGroup>();
@@ -1110,20 +1172,19 @@ namespace SanctuaryHud
                                         else upgrading = true;
                                     }
 
-                                    var mine = (idle || IsAlloyStructure(iconName, out _)) &&
-                                               ColourMatches(em, entity, ownColour.Value);
-
                                     if (idle)
                                     {
                                         allCount++;
-                                        if (mine)
+                                        if (ColourMatches(em, entity, ownColour.Value))
                                         {
                                             count++;
                                             RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
                                         }
                                     }
 
-                                    if (mine && IsAlloyStructure(iconName, out var alloyTier))
+                                    // RecordAlloy does its own ownership check,
+                                    // via the army-scoped extractor id set.
+                                    if (_extractorIdsValid && IsAlloyStructure(iconName, out var alloyTier))
                                     {
                                         RecordAlloy(em, entity, alloyTier, upgrading, alloyGroups, alloyUpgrading);
                                     }

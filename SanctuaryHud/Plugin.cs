@@ -136,7 +136,14 @@ namespace SanctuaryHud
 
             var current = V("StorageCurrent");
             var limit = Mathf.Max(1f, V("StorageLimit"));
-            var incomeRaw = V("GeneratedIncome") + V("HarvestIncome");
+            // GeneratedIncome already includes harvest: economy.lua sets
+            // res.income = generation + harvest, and that is what Lua ships as
+            // GeneratedIncome. Adding HarvestIncome on top would double-count
+            // reclaim — it only looks harmless today because economyPanel.lua
+            // assigns alloyHarvestIncome twice in one table constructor (real
+            // value, then 0 beside a TODO), so the zero wins and it always
+            // arrives empty. Take the combined figure and ignore the rest.
+            var incomeRaw = V("GeneratedIncome");
             // Lua sends these negated (economyPanel.lua): RequestedTotal is
             // "how much we wanted to spend", RequestedStalled "how much we
             // actually spent".
