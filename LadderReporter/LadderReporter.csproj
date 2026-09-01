@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>LadderReporter</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Must bind to the game's own Steamworks.NET: its callback dispatcher
+         is per-assembly, and only the game's copy is pumped every frame. -->
+    <Reference Include="com.rlabrecque.steamworks.net">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Framework HttpClient; Unity's Mono ships System.Net.Http in Managed. -->
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+</Project>

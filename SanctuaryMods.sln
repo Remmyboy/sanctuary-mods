@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SanctuaryHudLoader", "Sanct
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EcoManager", "EcoManager\EcoManager.csproj", "{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LadderReporter", "LadderReporter\LadderReporter.csproj", "{577C1C62-970B-496C-BE1B-AB8AC657B14D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +50,9 @@ Global
 		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{577C1C62-970B-496C-BE1B-AB8AC657B14D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{577C1C62-970B-496C-BE1B-AB8AC657B14D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{577C1C62-970B-496C-BE1B-AB8AC657B14D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{577C1C62-970B-496C-BE1B-AB8AC657B14D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
