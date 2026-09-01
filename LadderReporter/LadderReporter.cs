@@ -109,7 +109,10 @@ namespace SanctuaryHud
                 "Report ranked 1v1 results to the SanctuaryDB ladder when the game ends. Only Steam lobbies " +
                 "with exactly two human players are reported; the ladder ignores games that aren't an open " +
                 "ladder match, so unranked 1v1s are unaffected.");
-            _cfgEndpoint = Config.Bind("Report", "Endpoint", "https://sanctuarydb.net/api/report",
+            // www, not the apex: the apex 308-redirects, and UnityWebRequest
+            // drops the POST body when it follows a redirect — the report
+            // arrives empty. Talk to the canonical host directly.
+            _cfgEndpoint = Config.Bind("Report", "Endpoint", "https://www.sanctuarydb.net/api/report",
                 "Where results are sent.");
             _cfgDryRun = Config.Bind("Report", "DryRun", false,
                 "Log the report instead of sending it. For testing.");
