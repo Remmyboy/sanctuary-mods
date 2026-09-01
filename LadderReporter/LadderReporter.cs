@@ -1,12 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 using BepInEx;
 using BepInEx.Configuration;
 using EM.Core;
@@ -15,6 +13,7 @@ using EM.Network.Lobby;
 using HarmonyLib;
 using Steamworks;
 using UnityEngine;
+using UnityEngine.Networking;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
@@ -58,8 +57,6 @@ namespace SanctuaryHud
         private Callback<GetTicketForWebApiResponse_t> _ticketCallback;
         private HAuthTicket _pendingTicket = HAuthTicket.Invalid;
         private string _pendingBody; // payload awaiting its ticket
-
-        private static readonly HttpClient Http = CreateHttpClient();
 
         private sealed class Participant
         {
@@ -311,8 +308,7 @@ namespace SanctuaryHud
             }
 
             var json = "{\"ticket\":\"" + ticket + "\"," + body.Substring(1);
-            var endpoint = _cfgEndpoint.Value;
-            Task.Run(() => PostAsync(endpoint, json));
+            StartCoroutine(PostRoutine(_cfgEndpoint.Value, json));
         }
 
         private string BuildPayload(List<Participant> winners)
@@ -359,39 +355,43 @@ namespace SanctuaryHud
             return sb.ToString();
         }
 
-        private static HttpClient CreateHttpClient()
+        // UnityWebRequest, not HttpClient: Unity's Mono BCL can't complete a
+        // TLS handshake against modern cert chains ("An error occurred while
+        // sending the request"), while UnityWebRequest uses the engine's
+        // native TLS. A coroutine never blocks the frame — SendWebRequest is
+        // asynchronous and this only wakes to check on it.
+        private IEnumerator PostRoutine(string endpoint, string json)
         {
-            // Older Unity Mono defaults can exclude TLS 1.2; the ladder is
-            // https-only, so make sure it's on before the first request.
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-            return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        }
-
-        // Off the main thread: a lockstep RTS cannot afford a blocked frame.
-        private async Task PostAsync(string endpoint, string json)
-        {
+            var payload = Encoding.UTF8.GetBytes(json);
             for (var attempt = 1; attempt <= 3; attempt++)
             {
-                try
+                using (var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST))
                 {
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await Http.PostAsync(endpoint, content).ConfigureAwait(false);
-                    var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    if (response.IsSuccessStatusCode)
+                    request.uploadHandler = new UploadHandlerRaw(payload) { contentType = "application/json" };
+                    request.downloadHandler = new DownloadHandlerBuffer();
+                    request.timeout = 15;
+                    yield return request.SendWebRequest();
+
+                    var status = (int)request.responseCode;
+                    if (request.result == UnityWebRequest.Result.Success)
                     {
                         Logger.LogInfo("Ladder reporter: result reported to the ladder.");
-                        return;
+                        yield break;
                     }
-                    Logger.LogWarning($"Ladder reporter: the ladder said {(int)response.StatusCode}: " +
-                                      $"{Truncate(body, 200)} (attempt {attempt}/3)");
-                    // 4xx is a decision, not an outage — retrying won't change it.
-                    if ((int)response.StatusCode < 500) return;
+                    if (status > 0)
+                    {
+                        Logger.LogWarning($"Ladder reporter: the ladder said {status}: " +
+                                          $"{Truncate(request.downloadHandler?.text, 200)} (attempt {attempt}/3)");
+                        // 4xx is a decision, not an outage — retrying won't change it.
+                        if (status < 500) yield break;
+                    }
+                    else
+                    {
+                        Logger.LogWarning($"Ladder reporter: couldn't reach the ladder " +
+                                          $"(attempt {attempt}/3): {request.error}");
+                    }
                 }
-                catch (Exception e)
-                {
-                    Logger.LogWarning($"Ladder reporter: couldn't reach the ladder (attempt {attempt}/3): {e.Message}");
-                }
-                await Task.Delay(TimeSpan.FromSeconds(5 * attempt)).ConfigureAwait(false);
+                yield return new WaitForSecondsRealtime(5f * attempt);
             }
             Logger.LogWarning("Ladder reporter: giving up — report the result on the site instead.");
         }

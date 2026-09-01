@@ -15,8 +15,12 @@
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- Framework HttpClient; Unity's Mono ships System.Net.Http in Managed. -->
-    <Reference Include="System.Net.Http" />
+    <!-- Delivery uses UnityWebRequest: the engine's native TLS works where
+         Mono's BCL HttpClient handshake fails against modern cert chains. -->
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
