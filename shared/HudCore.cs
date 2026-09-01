@@ -833,6 +833,13 @@ namespace SanctuaryHud
         // into Tags[tag][tpId] as it loads, so Tags.ALLOYS_EXTRACTION is
         // exactly the set of extractor template ids, and Armies[focused].units
         // is exactly our own units. Ask once per poll and match on LocalID.
+        //
+        // Only completed extractors count. An upgrading extractor builds its
+        // replacement as a second entity that exists from the moment the
+        // upgrade starts, already carrying the higher tier's icon — so without
+        // the IsCompleted() test a T1 mid-upgrade reads as a finished T2. The
+        // T1 itself stays until the upgrade lands, and it is the one wearing
+        // the upgrade adornment, so it is what fills the UPGRADING row.
         private static readonly HashSet<int> _extractorLocalIds = new HashSet<int>();
         private static bool _extractorIdsValid;
         private static bool _loggedExtractorQueryFail;
@@ -849,7 +856,8 @@ namespace SanctuaryHud
                         "  if a.focused then " +
                         "    for _, u in pairs(a.units or {}) do " +
                         "      local li = u.localId and u.localId.index " +
-                        "      if li and u.tpId and Tags and Tags.ALLOYS_EXTRACTION and Tags.ALLOYS_EXTRACTION[u.tpId] then " +
+                        "      if li and u.tpId and Tags and Tags.ALLOYS_EXTRACTION and Tags.ALLOYS_EXTRACTION[u.tpId] " +
+                        "         and u.IsCompleted and u:IsCompleted() then " +
                         "        out[#out+1] = li " +
                         "      end " +
                         "    end " +

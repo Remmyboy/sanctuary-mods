@@ -81,6 +81,12 @@ poll turns that into a set of LocalIDs, which the panel matches against. It
 doubles as the ownership filter, so the alloy rows never depend on the
 army-colour match the idle rows use.
 
+That query counts only completed extractors. An upgrading extractor builds
+its replacement as a second entity, present from the moment the upgrade
+starts and already wearing the higher tier's icon — so a T1 mid-upgrade would
+otherwise read as a finished T2. The T1 stays until the upgrade lands and is
+the one carrying the upgrade adornment, so it is what fills the UPGRADING row.
+
 ## ModManager
 
 Its own window on **F8**, managing two kinds of mods:
