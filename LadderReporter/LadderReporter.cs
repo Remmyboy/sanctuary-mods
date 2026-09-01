@@ -382,8 +382,16 @@ namespace SanctuaryHud
                     {
                         Logger.LogWarning($"Ladder reporter: the ladder said {status}: " +
                                           $"{Truncate(request.downloadHandler?.text, 200)} (attempt {attempt}/3)");
-                        // 4xx is a decision, not an outage — retrying won't change it.
-                        if (status < 500) yield break;
+                        // 4xx is a decision, not an outage — retrying won't
+                        // change it. Log what was sent (ticket masked) so the
+                        // rejection is debuggable from this side alone.
+                        if (status < 500)
+                        {
+                            Logger.LogWarning("Ladder reporter: rejected payload was " +
+                                              System.Text.RegularExpressions.Regex.Replace(
+                                                  json, "\"ticket\":\"[0-9a-f]*\"", "\"ticket\":\"…\""));
+                            yield break;
+                        }
                     }
                     else
                     {
