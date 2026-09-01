@@ -548,6 +548,14 @@ namespace SanctuaryHud
         /// True once the client VM exists and can be called into.
         internal static bool LuaReady => _luaStateReady != null && _luaStateReady();
 
+        /// Reads a global out of the client VM as a string, or null.
+        internal static string GetLuaGlobal(string name)
+        {
+            if (_getLuaGlobal == null || !LuaReady) return null;
+            try { return _getLuaGlobal(name); }
+            catch { return null; }
+        }
+
         /// True once the client VM actually exists. Outside a match
         /// ClientLuaInterface.Data.luaState is a null handle, and handing that
         /// to luaL_dostring dereferences null inside LuaJIT — a native access

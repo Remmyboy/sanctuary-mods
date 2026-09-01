@@ -31,6 +31,7 @@ namespace SanctuaryHud
         private ConfigEntry<bool> _cfgAssistStartsUpgrade;
         private bool _assistHookInstalled;
         private float _installAccum;
+        private int _upgradesQueued;
 
         // Guarded by a global inside the VM, so re-running it is harmless —
         // which is what makes retrying safe. Each match builds a fresh Lua
@@ -43,12 +44,19 @@ namespace SanctuaryHud
             "  __SdbAssistUpgradeOrig = orig " +
             "  local wrapped = function(...) " +
             "    local ok, err = pcall(function() " +
-            "      local hover = GetHoverUnit and GetHoverUnit() " +
+            // GetHoverUnit is a global *of that module's environment table*,
+            // not of _G — Import gives every file its own env (with _G only as
+            // an __index fallback) and the file's globals land there. This
+            // chunk runs in _G, so it has to go through the module table.
+            "      local hover = m.GetHoverUnit and m.GetHoverUnit() " +
             "      if not (hover and hover.id and hover.tpId) then return end " +
-            // Ours only: Armies[focused].units is keyed by global id index.
-            "      local focus = GetFocusArmy and GetFocusArmy() " +
-            "      local army = focus and Armies and Armies[focus] " +
-            "      if not (army and army.units and army.units[hover.id.index]) then return end " +
+            // Ours only. Armies is a real _G global and each army's `units` is
+            // keyed by global id index, so this needs nothing module-scoped.
+            "      local mine = false " +
+            "      for _, a in pairs(Armies or {}) do " +
+            "        if a.focused and a.units and a.units[hover.id.index] then mine = true end " +
+            "      end " +
+            "      if not mine then return end " +
             // Extractors only. Factories upgrade too, and silently spending a
             // fortune because someone assisted one would be a nasty surprise.
             "      if not (Tags and Tags.ALLOYS_EXTRACTION and Tags.ALLOYS_EXTRACTION[hover.tpId]) then return end " +
@@ -66,6 +74,9 @@ namespace SanctuaryHud
             "        { deltaAmount = 1, queueItemId = itemId, tpID = up }) " +
             "      Import('common/systems/commands.lua')" +
             ".SendUpdateQueueAmountCommandRaw({ hover.id }, { itemId }, up, 1) " +
+            // Lets the C# side confirm the hook is actually firing; the Lua
+            // log is not much use for that from here.
+            "      __SdbAssistUpgradeCount = (__SdbAssistUpgradeCount or 0) + 1 " +
             "    end) " +
             "    if not ok then Warn('SanctuaryHud assist-upgrade: ' .. tostring(err)) end " +
             // The assist itself always goes through untouched, upgrade or not.
@@ -127,17 +138,29 @@ namespace SanctuaryHud
                 _assistHookInstalled = false;
                 return;
             }
-            if (_assistHookInstalled) return;
-
             _installAccum += deltaTime;
             if (_installAccum < 1f) return;
             _installAccum = 0f;
+
+            if (_assistHookInstalled)
+            {
+                // Report each upgrade the hook starts, so "is it working?" is
+                // answerable from the log rather than by inference.
+                var raw = GetLuaGlobal("__SdbAssistUpgradeCount");
+                if (int.TryParse(raw, out var count) && count > _upgradesQueued)
+                {
+                    _upgradesQueued = count;
+                    Logger.LogInfo($"Assist started an extractor upgrade ({count} this match).");
+                }
+                return;
+            }
 
             if (!LuaReady) return;
             try
             {
                 if (!RunLua(InstallChunk)) return;
                 _assistHookInstalled = true;
+                _upgradesQueued = 0;
                 Logger.LogInfo("Assist-starts-upgrade hook installed for this match.");
             }
             catch (Exception e)
