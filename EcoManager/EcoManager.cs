@@ -22,8 +22,9 @@ namespace SanctuaryHud
     // Rows are labelled by tier, not "extractor", because the Tier-3 Alloy
     // Furnace carries the same strategic icon and nothing on the render entity
     // separates the two — so the T3 row is "tier-3 alloy structures".
-    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.1.0")]
-    public class EcoManagerPlugin : BaseUnityPlugin
+    // Assisting an extractor to start its upgrade lives in AssistUpgrade.cs.
+    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.2.0")]
+    public partial class EcoManagerPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
         private ConfigEntry<float> _cfgPosX;
@@ -40,6 +41,7 @@ namespace SanctuaryHud
             _cfgPosY = Config.Bind("Panel", "PosY", 420f, "Alloy panel Y in 1080p-logical pixels.");
             _rect.x = _cfgPosX.Value;
             _rect.y = _cfgPosY.Value;
+            AwakeAssistUpgrade();
 
             try
             {
@@ -58,11 +60,14 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+            // Unloading via the mod manager must also undo the Lua-side hook.
+            RemoveAssistHook();
         }
 
         private void Update()
         {
             SharedTick();
+            UpdateAssistUpgrade(Time.unscaledDeltaTime);
 
             // Persist the panel position once the drag is over.
             if (!Input.GetMouseButton(0) &&

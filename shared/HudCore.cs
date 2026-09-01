@@ -545,6 +545,9 @@ namespace SanctuaryHud
         private static Func<string, int> _runLuaChunk;
         private static Func<string, string> _getLuaGlobal;
 
+        /// True once the client VM exists and can be called into.
+        internal static bool LuaReady => _luaStateReady != null && _luaStateReady();
+
         /// True once the client VM actually exists. Outside a match
         /// ClientLuaInterface.Data.luaState is a null handle, and handing that
         /// to luaL_dostring dereferences null inside LuaJIT — a native access
@@ -651,7 +654,9 @@ namespace SanctuaryHud
             _log.LogInfo($"Lua bridge: ready (emitted), read-back {(_getLuaGlobal != null ? "ok" : "missing")}.");
         }
 
-        private static bool RunLua(string chunk)
+        /// Runs a chunk in the client's own VM. Returns false (rather than
+        /// throwing) when there is no VM yet, so callers can simply retry.
+        internal static bool RunLua(string chunk)
         {
             try
             {

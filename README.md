@@ -81,6 +81,33 @@ poll turns that into a set of LocalIDs, which the panel matches against. It
 doubles as the ownership filter, so the alloy rows never depend on the
 army-colour match the idle rows use.
 
+### Assist starts the upgrade
+
+Ordering an engineer to assist a structure with an empty build queue does
+nothing today — the engineer walks over and stands there — so the obvious
+gesture for "help this extractor along" is a dead end. With
+`AssistStartsUpgrade` (default on) an assist ordered onto one of your own
+finished extractors queues its upgrade first, then issues the assist exactly
+as the game would, so the engineer arrives to real work and keeps its order.
+It is scoped to extractors on purpose: factories upgrade too, and silently
+spending that much because someone assisted one would be a nasty surprise.
+
+This is the one thing in the repo that *acts* rather than displays. It goes
+through the game's own client path — the same `ModifyBuildQueue` prediction
+and `UpdateQueueAmount` command the construction panel sends when you click
+the upgrade button — so the host validates and replicates it like any other
+order, and no files change, so the lobby hash is untouched. What it costs you
+is that an assist click now spends alloy.
+
+The hook is a runtime wrapper around the client's `IssueAssistOrder`:
+`inputActions.lua` binds the key to
+`Import("client/inputEventsFunctions.lua").IssueAssistOrder()`, resolved at
+press time, so replacing that field intercepts every assist without editing a
+file. It is removed again when the mod is unloaded or the setting is switched
+off, and each match's fresh Lua state reinstalls it.
+
+### Counting
+
 That query counts only completed extractors. An upgrading extractor builds
 its replacement as a second entity, present from the moment the upgrade
 starts and already wearing the higher tier's icon — so a T1 mid-upgrade would
