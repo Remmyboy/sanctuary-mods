@@ -142,6 +142,17 @@ genuine unload) and on adds it back. They never enter the Lua hash, so they
 are safe to flip any time, even mid-match, and the disabled set persists
 across restarts.
 
+Each loaded mod also has a **settings** button that expands its own settings
+inline — panel positions, the commander zoom factor, `AssistStartsUpgrade`,
+hotkeys, anything a mod binds. The list is read from the mod's BepInEx
+`ConfigFile`, so a mod's settings appear here simply by being bound, with no
+work in the manager. Booleans get a checkbox; everything else is edited as
+text and committed through the entry's own serializer (the same one that
+writes the config file), so floats, enums and `KeyCode`s all work and a
+half-typed value just doesn't take until it parses. Hovering a setting shows
+its description along the bottom of the window, and each mod has a "Reset to
+defaults". Changes save to `BepInEx\config\<guid>.cfg` immediately.
+
 ## MapLocalFiles
 
 Lets Lua's `Engine.GetFileContent` see files inside the loaded map's folder,

@@ -58,6 +58,14 @@ namespace SanctuaryHud
         }
 
         private readonly List<PluginEntry> _plugins = new List<PluginEntry>();
+
+        // Which mods have their settings panel open, and the in-progress text
+        // for the fields being typed into. Values are committed through
+        // ConfigEntryBase's own serializer, so a half-typed or invalid entry
+        // simply doesn't take until it parses — hence keeping the raw text
+        // separately rather than round-tripping the live value every frame.
+        private readonly HashSet<string> _settingsOpen = new HashSet<string>();
+        private readonly Dictionary<string, string> _editBuffers = new Dictionary<string, string>();
         private ConfigEntry<string> _cfgDisabledPlugins;
         private float _pluginScanAccum = 999f; // scan on the first Update
 
@@ -440,8 +448,23 @@ namespace SanctuaryHud
                 GUILayout.Label("UI Mods");
                 foreach (var plugin in _plugins)
                 {
+                    GUILayout.BeginHorizontal();
                     var now = GUILayout.Toggle(plugin.Enabled, plugin.Name);
                     if (now != plugin.Enabled) SetPluginEnabled(plugin, now);
+
+                    // Settings live on the running instance, so an unloaded
+                    // mod has none to show.
+                    var open = _settingsOpen.Contains(plugin.Guid);
+                    GUI.enabled = plugin.Enabled;
+                    if (GUILayout.Button(open ? "settings ▾" : "settings ▸", GUILayout.Width(80f)))
+                    {
+                        if (open) _settingsOpen.Remove(plugin.Guid);
+                        else _settingsOpen.Add(plugin.Guid);
+                    }
+                    GUI.enabled = true;
+                    GUILayout.EndHorizontal();
+
+                    if (plugin.Enabled && _settingsOpen.Contains(plugin.Guid)) DrawSettings(plugin);
                 }
             }
 
@@ -458,9 +481,91 @@ namespace SanctuaryHud
             }
             GUILayout.EndHorizontal();
 
-            GUILayout.Label($"{_cfgToggleKey.Value} closes and reopens this window.");
+            // IMGUI only collects the hovered tooltip; something has to draw
+            // it. This is where each setting's description shows up.
+            var tooltip = GUI.tooltip;
+            GUILayout.Label(string.IsNullOrEmpty(tooltip)
+                ? $"{_cfgToggleKey.Value} closes and reopens this window."
+                : tooltip);
 
             GUI.DragWindow();
+        }
+
+        /// One row per config entry the mod bound. Booleans get a checkbox;
+        /// everything else is edited as text and committed through the entry's
+        /// own serializer, which is what BepInEx uses for the config file — so
+        /// floats, enums and KeyCodes all work without special cases here.
+        private void DrawSettings(PluginEntry plugin)
+        {
+            BepInEx.Configuration.ConfigEntryBase[] entries;
+            try
+            {
+                entries = plugin.Instance?.Config?.GetConfigEntries();
+            }
+            catch (Exception e)
+            {
+                GUILayout.Label($"   (settings unavailable: {e.Message})");
+                return;
+            }
+            if (entries == null || entries.Length == 0)
+            {
+                GUILayout.Label("   No settings.");
+                return;
+            }
+
+            foreach (var entry in entries.OrderBy(e => e.Definition.Section).ThenBy(e => e.Definition.Key))
+            {
+                var label = $"   {entry.Definition.Section} / {entry.Definition.Key}";
+                var tip = entry.Description?.Description ?? "";
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(new GUIContent(label, tip), GUILayout.Width(230f));
+
+                if (entry.SettingType == typeof(bool))
+                {
+                    var current = entry.BoxedValue is bool b && b;
+                    var next = GUILayout.Toggle(current, GUIContent.none);
+                    if (next != current) entry.BoxedValue = next;
+                }
+                else
+                {
+                    var bufferKey = plugin.Guid + "/" + entry.Definition.Section + "/" + entry.Definition.Key;
+                    if (!_editBuffers.TryGetValue(bufferKey, out var text))
+                    {
+                        _editBuffers[bufferKey] = text = entry.GetSerializedValue();
+                    }
+
+                    var edited = GUILayout.TextField(text, GUILayout.Width(120f));
+                    if (edited != text)
+                    {
+                        _editBuffers[bufferKey] = edited;
+                        // Commit only when it parses; until then the field
+                        // holds the half-typed text and the value is untouched.
+                        try { entry.SetSerializedValue(edited); }
+                        catch { /* keep typing */ }
+                    }
+                }
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(230f);
+            if (GUILayout.Button("Reset to defaults", GUILayout.Width(140f)))
+            {
+                foreach (var entry in entries)
+                {
+                    try
+                    {
+                        entry.BoxedValue = entry.DefaultValue;
+                        _editBuffers.Remove(plugin.Guid + "/" + entry.Definition.Section + "/" + entry.Definition.Key);
+                    }
+                    catch (Exception e)
+                    {
+                        _log.LogWarning($"Could not reset {entry.Definition}: {e.Message}");
+                    }
+                }
+            }
+            GUILayout.EndHorizontal();
         }
 
         private static string Short(string hash) =>
