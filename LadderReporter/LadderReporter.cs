@@ -70,9 +70,23 @@ namespace SanctuaryHud
         {
             public bool Reportable;
             public string MapName;
-            public List<Participant> Humans;
+            public List<Participant> Humans;    // humans commanding an army
+            public List<Participant> Observers; // humans watching (see ArmyCountChunk)
             public float StartRealtime;
         }
+
+        // The lobby has no observer slot type: a human whose armyID is beyond
+        // the map's army slots is made an observer at match start (script.lua,
+        // "If ArmyID is not present on the map then you become an observer!").
+        // The lobby state still lists them as PlayerType.Player, so the map's
+        // army count is the only way to tell a spectator from a competitor.
+        private const string ArmyCountChunk =
+            "__SdbLadderArmyCount = '' " +
+            "pcall(function() " +
+            "  local n = 0 " +
+            "  for _ in pairs(GameInfo.MapData.armies) do n = n + 1 end " +
+            "  __SdbLadderArmyCount = tostring(n) " +
+            "end)";
 
         // Wrap the client's WinConditionUpdate; every {armyID, condition} the
         // host broadcasts is appended to a _G global this side polls. Guarded
@@ -241,32 +255,43 @@ namespace SanctuaryHud
             var state = LobbyManager.CurrentState;
             if (state?.players == null || state.players.Count == 0) return null;
 
+            // Map data lands in the client VM early in loading; until it has,
+            // the chunk leaves the global empty and we try again next tick.
+            if (!LuaReady || !RunLua(ArmyCountChunk)) return null;
+            if (!int.TryParse(GetLuaGlobal("__SdbLadderArmyCount"), out var armyCount) || armyCount <= 0) return null;
+
+            var humans = state.players
+                .Where(p => p != null && p.type == PlayerType.Player)
+                .Select(p => new Participant
+                {
+                    SteamId = p.id.value,
+                    ArmyId = p.armyID,
+                    Team = p.team,
+                    Name = p.name ?? "",
+                })
+                .ToList();
             var snapshot = new MatchSnapshot
             {
                 MapName = Path.GetFileNameWithoutExtension(state.mapPath ?? ""),
                 StartRealtime = Time.realtimeSinceStartup,
-                Humans = state.players
-                    .Where(p => p != null && p.type == PlayerType.Player)
-                    .Select(p => new Participant
-                    {
-                        SteamId = p.id.value,
-                        ArmyId = p.armyID,
-                        Team = p.team,
-                        Name = p.name ?? "",
-                    })
-                    .ToList(),
+                Humans = humans.Where(p => p.ArmyId >= 1 && p.ArmyId <= armyCount).ToList(),
+                Observers = humans.Where(p => p.ArmyId < 1 || p.ArmyId > armyCount).ToList(),
             };
 
             var localId = LobbyManager.localPlayerID.value;
             string skip = null;
             if (!(LobbyManager.Backend is SteamLobbyBackend)) skip = "LAN lobby (no Steam identities)";
             else if (!SteamManager.IsSteamInitialized) skip = "Steam session not initialised";
-            else if (snapshot.Humans.Count != 2) skip = $"{snapshot.Humans.Count} human player(s), ladder games have 2";
-            else if (snapshot.Humans.All(p => p.SteamId != localId)) skip = "observing, not playing";
+            else if (snapshot.Observers.Any(p => p.SteamId == localId)) skip = "observing, not playing";
+            else if (snapshot.Humans.Count != 2)
+                skip = $"{snapshot.Humans.Count} human player(s) plus {snapshot.Observers.Count} observer(s), ladder games have 2 players";
+            else if (snapshot.Humans.All(p => p.SteamId != localId)) skip = "not one of the two players";
 
             snapshot.Reportable = skip == null;
+            var roster = string.Join(" vs ", snapshot.Humans.Select(p => p.Name)) +
+                         (snapshot.Observers.Count > 0 ? $" ({snapshot.Observers.Count} observing)" : "");
             Logger.LogInfo(snapshot.Reportable
-                ? $"Ladder reporter: ranked-shaped game on {snapshot.MapName} — will report the result."
+                ? $"Ladder reporter: ranked-shaped game on {snapshot.MapName}, {roster} — will report the result."
                 : $"Ladder reporter: not a ladder game ({skip}).");
             return snapshot;
         }
