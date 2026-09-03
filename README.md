@@ -325,7 +325,7 @@ root GameObjects.
    `winhttp.dll` and `BepInEx\` sit next to the exe. Run the game once to let
    BepInEx generate its folders.
    Then set `HideManagerGameObject = true` under `[Chainloader]` in
-   `BepInExnfigBepInEx.cfg`: Sanctuary destroys foreign root GameObjects
+   `BepInEx\config\BepInEx.cfg`: Sanctuary destroys foreign root GameObjects
    after start-up, and without it the BepInEx manager object (and every
    plugin on it) dies right after `Awake`, so plugins load but never update.
    The release zips ship this setting.
