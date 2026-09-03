@@ -548,6 +548,24 @@ namespace SanctuaryHud
         /// True once the client VM exists and can be called into.
         internal static bool LuaReady => _luaStateReady != null && _luaStateReady();
 
+        /// Resolves the Lua bridge on demand, outside the in-match poll that
+        /// normally does it. Replay playback needs to talk to the client VM
+        /// before the economy stream (and so InMatch) has started, and a mod
+        /// that never polls the ECS still wants RunLua to work.
+        internal static void EnsureLuaBridge()
+        {
+            if (_runLuaChunk != null) return;
+            try
+            {
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
+                ResolveLuaBridge(assemblies);
+            }
+            catch (Exception e)
+            {
+                _log?.LogWarning($"Lua bridge resolve failed: {e.Message}");
+            }
+        }
+
         /// Reads a global out of the client VM as a string, or null.
         internal static string GetLuaGlobal(string name)
         {

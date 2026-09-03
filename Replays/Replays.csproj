@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Replays</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Playback pushes packets straight into the client's receive buffer, so
+         this mod touches the DOTS-side network structs directly rather than
+         through reflection. -->
+    <Reference Include="Unity.Entities">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Entities.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Collections">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Collections.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Burst">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Burst.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Mathematics">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Mathematics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The replay header is JSON; the game ships Newtonsoft. -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Only for the CompressionLevel/CompressionMode enums and GZipStream.
+         BrotliStream is in the game's copy of this assembly but not in the
+         .NET Framework reference one, which MSBuild insists on by version, so
+         it is reached by reflection (see Brotli in ReplayFile.cs). -->
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
+
+</Project>
