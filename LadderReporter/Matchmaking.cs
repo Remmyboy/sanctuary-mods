@@ -70,6 +70,11 @@ namespace SanctuaryHud
         private float _overlayUntil;
 
         private bool _runInBackgroundWas;
+        private int _cfgReloadAccum;
+
+        // Mock testing is two people coordinating by hand, so every wait
+        // stretches to ten minutes there; the live limits mirror the site's.
+        private float Limit(float seconds) => MockMode ? Mathf.Max(seconds, 600f) : seconds;
 
         private sealed class MmMatch
         {
@@ -145,6 +150,14 @@ namespace SanctuaryHud
             if (_mmHbAccum >= Mathf.Max(2f, _cfgMmHeartbeat.Value))
             {
                 _mmHbAccum = 0f;
+                // Re-read the config file so a tester without the F8 window
+                // can set MockFile (or flip Enabled) by editing it, no restart.
+                _cfgReloadAccum += 1;
+                if (_cfgReloadAccum >= 3)
+                {
+                    _cfgReloadAccum = 0;
+                    try { Config.Reload(); } catch { }
+                }
                 Heartbeat();
             }
 
@@ -562,7 +575,7 @@ namespace SanctuaryHud
             switch (_phase)
             {
                 case Phase.HostCreating:
-                    if (inPhase > 20f) Abort("The lobby took too long to create.", "lobby timeout");
+                    if (inPhase > Limit(20f)) Abort("The lobby took too long to create.", "lobby timeout");
                     break;
 
                 case Phase.HostWaiting:
@@ -582,7 +595,7 @@ namespace SanctuaryHud
                         LobbyManager.RequestStartGame();
                         SetPhase(Phase.JoinerInLobby);   // reuse the "waiting for start" timeout
                     }
-                    else if (inPhase > 60f)
+                    else if (inPhase > Limit(60f))
                     {
                         Abort($"{m.OpponentName ?? "Your opponent"} didn't arrive in time.", "opponent did not join");
                     }
@@ -590,7 +603,7 @@ namespace SanctuaryHud
 
                 case Phase.JoinerWaiting:
                     if (m.SessionId != 0) TryJoin(m.SessionId);
-                    else if (now - _launchSince > 30f) Abort("The host's lobby never appeared.", "no session id");
+                    else if (now - _launchSince > Limit(30f)) Abort("The host's lobby never appeared.", "no session id");
                     break;
 
                 case Phase.JoinerJoining:
@@ -601,7 +614,7 @@ namespace SanctuaryHud
                         Overlay("LAUNCHING", "In the lobby. Readying up...", 60f);
                         SetPhase(Phase.JoinerInLobby);
                     }
-                    else if (inPhase > 30f) Abort("Couldn't join the host's lobby.", "join timeout");
+                    else if (inPhase > Limit(30f)) Abort("Couldn't join the host's lobby.", "join timeout");
                     break;
 
                 case Phase.JoinerInLobby:
@@ -612,7 +625,7 @@ namespace SanctuaryHud
                     }
                     ApplyOwnSeat(m, me);
                     if (LocalIsSeated(m, me)) PostEvent("ready");
-                    if (now - _launchSince > 90f) Abort("The game didn't start in time.", "start timeout");
+                    if (now - _launchSince > Limit(90f)) Abort("The game didn't start in time.", "start timeout");
                     break;
 
                 case Phase.Started:
