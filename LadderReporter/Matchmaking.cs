@@ -286,18 +286,37 @@ namespace SanctuaryHud
             req.Dispose();
         }
 
+        private string _lastSentState;
+        private float _slowestHb;
+        private string _loggedMatchKey;
+
         private IEnumerator HeartbeatRoutine()
         {
             _mmHbInFlight = true;
+            var state = CurrentState();
+            if (state != _lastSentState)
+            {
+                Logger.LogInfo($"Matchmaking: state {_lastSentState ?? "(none)"} -> {state}");
+                _lastSentState = state;
+            }
             var body = new JObject
             {
-                ["state"] = CurrentState(),
+                ["state"] = state,
                 ["gameVersion"] = Application.version,
                 ["modVersion"] = ModVersion,
             };
+            var started = Time.realtimeSinceStartup;
             var req = Post("/api/mm/heartbeat", body, _mmToken);
             yield return req.SendWebRequest();
             _mmHbInFlight = false;
+            var took = Time.realtimeSinceStartup - started;
+            // The site treats a heartbeat older than 15 s as gone; say when
+            // the round trip alone is eating into that.
+            if (took > 3f && took > _slowestHb)
+            {
+                _slowestHb = took;
+                Logger.LogWarning($"Matchmaking: heartbeat took {took:0.0} s (slowest so far).");
+            }
 
             if (req.result == UnityWebRequest.Result.Success)
             {
@@ -305,7 +324,19 @@ namespace SanctuaryHud
                 {
                     var o = JObject.Parse(req.downloadHandler.text);
                     _mmQueued = (bool?)o["queued"] ?? false;
-                    ApplyMatch(MmMatch.Parse(o["match"] as JObject));
+                    var match = MmMatch.Parse(o["match"] as JObject);
+                    if (match != null)
+                    {
+                        var key = match.Id + ":" + match.Status + ":" + match.Mode;
+                        if (key != _loggedMatchKey)
+                        {
+                            _loggedMatchKey = key;
+                            Logger.LogInfo($"Matchmaking: match {match.Id} mode={match.Mode} status={match.Status} " +
+                                           $"host={(match.Host == LocalSteamId ? "me" : match.Host)} map={match.Map} " +
+                                           $"session={match.SessionId} reason={match.Reason ?? "-"}");
+                        }
+                    }
+                    ApplyMatch(match);
                 }
                 catch (Exception e)
                 {
