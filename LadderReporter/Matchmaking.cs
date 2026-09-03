@@ -204,7 +204,17 @@ namespace SanctuaryHud
                 catch (Exception e) { Logger.LogWarning($"Matchmaking (mock): {e.Message}"); }
                 return;
             }
-            if (!UsingSteam || _mmHbInFlight) return;
+            if (!UsingSteam)
+            {
+                if (!_loggedNoSteam)
+                {
+                    _loggedNoSteam = true;
+                    Logger.LogWarning("Matchmaking: waiting for Steam (backend " +
+                                      $"{LobbyManager.Backend?.GetType().Name ?? "none"}, initialised {SteamManager.IsSteamInitialized}).");
+                }
+                return;
+            }
+            if (_mmHbInFlight) return;
             if (_mmToken == null)
             {
                 EnsureSession();
@@ -213,14 +223,34 @@ namespace SanctuaryHud
             StartCoroutine(HeartbeatRoutine());
         }
 
+        private bool _loggedNoSteam;
+        private float _mmSessionStarted;
+        private bool _mmUpdateFailedLogged;
+
         private void EnsureSession()
         {
-            if (_mmSessionInFlight || Time.realtimeSinceStartup < _mmNextSessionTry) return;
+            var now = Time.realtimeSinceStartup;
+            if (_mmSessionInFlight)
+            {
+                // Steam never answered the ticket request (offline mode, or
+                // no connection to Steam's servers). Say so and try again.
+                if (now - _mmSessionStarted > 30f)
+                {
+                    Logger.LogWarning("Matchmaking: Steam did not answer the ticket request in 30 s; is Steam online? Retrying.");
+                    _mmSessionInFlight = false;
+                    _mmNextSessionTry = now + 30f;
+                }
+                return;
+            }
+            if (now < _mmNextSessionTry) return;
             _mmSessionInFlight = true;
+            _mmSessionStarted = now;
+            Logger.LogInfo("Matchmaking: requesting a Steam ticket to sign in to the ladder.");
             RequestTicket(ticket =>
             {
                 if (ticket == null)
                 {
+                    Logger.LogWarning("Matchmaking: Steam refused a ticket; retrying in a minute.");
                     _mmSessionInFlight = false;
                     _mmNextSessionTry = Time.realtimeSinceStartup + 60f;
                     return;

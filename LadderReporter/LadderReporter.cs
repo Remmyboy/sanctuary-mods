@@ -165,8 +165,18 @@ namespace SanctuaryHud
 
         private void Update()
         {
+            // Matchmaking first and on its own: a fault in the shared HUD
+            // polling must not starve the heartbeat, or vice versa.
+            try { UpdateMatchmaking(); }
+            catch (Exception e)
+            {
+                if (!_mmUpdateFailedLogged)
+                {
+                    _mmUpdateFailedLogged = true;
+                    Logger.LogError($"Matchmaking: update failed: {e}");
+                }
+            }
             SharedTick();
-            UpdateMatchmaking();
             if (!_cfgEnabled.Value) return;
 
             _tickAccum += Time.unscaledDeltaTime;
