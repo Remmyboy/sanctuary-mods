@@ -37,8 +37,8 @@ namespace SanctuaryHud
     // ladder's shape. Skirmish vs AI, LAN, observers and team games are
     // recognised and left alone. The server ignores reports for games that
     // aren't an open ladder match, so playing unranked with a friend is fine.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.1.1")]
-    public class LadderReporterPlugin : BaseUnityPlugin
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.2.0")]
+    public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
 
@@ -54,9 +54,11 @@ namespace SanctuaryHud
         private bool _snapshotFailed;
         private float _tickAccum;
 
+        // Steam web-API tickets arrive by callback; each request remembers
+        // what to do with its ticket (null on refusal). Shared with the
+        // matchmaking session exchange in Matchmaking.cs.
         private Callback<GetTicketForWebApiResponse_t> _ticketCallback;
-        private HAuthTicket _pendingTicket = HAuthTicket.Invalid;
-        private string _pendingBody; // payload awaiting its ticket
+        private readonly Dictionary<uint, Action<string>> _ticketWaiters = new Dictionary<uint, Action<string>>();
 
         private sealed class Participant
         {
@@ -142,11 +144,13 @@ namespace SanctuaryHud
             {
                 Logger.LogError($"Ladder reporter: economy patch failed (results will not be reported): {e}");
             }
+            AwakeMatchmaking();
             Logger.LogInfo("Ladder reporter loaded (toggle it from the F8 mod manager).");
         }
 
         private void OnDestroy()
         {
+            DestroyMatchmaking();
             _harmony?.UnpatchSelf();
             try
             {
@@ -162,6 +166,7 @@ namespace SanctuaryHud
         private void Update()
         {
             SharedTick();
+            UpdateMatchmaking();
             if (!_cfgEnabled.Value) return;
 
             _tickAccum += Time.unscaledDeltaTime;
@@ -308,24 +313,43 @@ namespace SanctuaryHud
                 return;
             }
 
-            // The ticket callback arrives via the game's own per-frame
-            // SteamAPI.RunCallbacks pump; the payload waits for it.
-            _pendingBody = body;
-            _ticketCallback ??= Callback<GetTicketForWebApiResponse_t>.Create(OnTicket);
-            _pendingTicket = SteamUser.GetAuthTicketForWebApi(TicketIdentity);
             Logger.LogInfo("Ladder reporter: result detected, requesting a Steam ticket…");
+            RequestTicket(ticket =>
+            {
+                if (ticket == null)
+                {
+                    Logger.LogWarning("Ladder reporter: no Steam ticket; report the result on the site instead.");
+                    return;
+                }
+                var json = "{\"ticket\":\"" + ticket + "\"," + body.Substring(1);
+                StartCoroutine(PostRoutine(_cfgEndpoint.Value, json));
+            });
+        }
+
+        /// Asks Steam for a web-API ticket and hands the hex string to
+        /// `onTicket`, or null if Steam refused. The callback arrives via the
+        /// game's own per-frame SteamAPI.RunCallbacks pump.
+        private void RequestTicket(Action<string> onTicket)
+        {
+            _ticketCallback ??= Callback<GetTicketForWebApiResponse_t>.Create(OnTicket);
+            var handle = SteamUser.GetAuthTicketForWebApi(TicketIdentity);
+            if (handle == HAuthTicket.Invalid)
+            {
+                onTicket(null);
+                return;
+            }
+            _ticketWaiters[handle.m_HAuthTicket] = onTicket;
         }
 
         private void OnTicket(GetTicketForWebApiResponse_t response)
         {
-            if (response.m_hAuthTicket != _pendingTicket || _pendingBody == null) return;
-            var body = _pendingBody;
-            _pendingBody = null;
+            if (!_ticketWaiters.TryGetValue(response.m_hAuthTicket.m_HAuthTicket, out var waiter)) return;
+            _ticketWaiters.Remove(response.m_hAuthTicket.m_HAuthTicket);
 
             if (response.m_eResult != EResult.k_EResultOK)
             {
-                Logger.LogWarning($"Ladder reporter: Steam refused an auth ticket ({response.m_eResult}); " +
-                                  "report the result on the site instead.");
+                Logger.LogWarning($"Ladder reporter: Steam refused an auth ticket ({response.m_eResult}).");
+                waiter(null);
                 return;
             }
 
@@ -334,9 +358,7 @@ namespace SanctuaryHud
             {
                 ticket.Append(response.m_rgubTicket[i].ToString("x2"));
             }
-
-            var json = "{\"ticket\":\"" + ticket + "\"," + body.Substring(1);
-            StartCoroutine(PostRoutine(_cfgEndpoint.Value, json));
+            waiter(ticket.ToString());
         }
 
         private string BuildPayload(List<Participant> winners)
@@ -345,6 +367,12 @@ namespace SanctuaryHud
             sb.Append('{');
             sb.Append("\"identity\":\"").Append(TicketIdentity).Append("\",");
             sb.Append("\"appId\":").Append(SteamUtils.GetAppID().m_AppId.ToString(CultureInfo.InvariantCulture)).Append(',');
+            // A matchmade game carries its match id so the site can close
+            // the match and tie the result to it.
+            if (!string.IsNullOrEmpty(_mmReportMatchId))
+            {
+                sb.Append("\"matchId\":\"").Append(JsonEscape(_mmReportMatchId)).Append("\",");
+            }
             sb.Append("\"mapName\":\"").Append(JsonEscape(_snapshot.MapName)).Append("\",");
             sb.Append("\"durationSeconds\":")
                 .Append(((int)Math.Max(0f, Time.realtimeSinceStartup - _snapshot.StartRealtime)).ToString(CultureInfo.InvariantCulture))

@@ -1,0 +1,15 @@
+{
+  "id": "mock-0001",
+  "mode": "auto",
+  "status": "launch",
+  "host": "me",
+  "joiner": "76561198000000000",
+  "opponent": { "steamId": "76561198000000000", "name": "Friend" },
+  "map": "Maps/The_Forge/The_Forge.sanmap",
+  "factions": { "me": "EDA", "76561198000000000": "Chosen" },
+  "slots": { "me": 1, "76561198000000000": 2 },
+  "sessionId": null,
+  "countdownEndsAt": null,
+  "cancelledBy": null,
+  "reason": null
+}

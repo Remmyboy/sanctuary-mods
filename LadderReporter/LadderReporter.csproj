@@ -21,6 +21,11 @@
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Matchmaking parses the site's JSON; the game ships Newtonsoft. -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

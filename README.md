@@ -16,6 +16,7 @@ players. The exceptions are called out in their own sections below.
 | [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
+| [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
 | [Replays](Replays/) | `Replays.dll` | Records matches; plays them back fog-free from any seat |
 | [ModManager](ModManager/) | `ModManager.dll` | F8 window: Lua mod overlays + plugin toggles |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
@@ -114,6 +115,51 @@ its replacement as a second entity, present from the moment the upgrade
 starts and already wearing the higher tier's icon — so a T1 mid-upgrade would
 otherwise read as a finished T2. The T1 stays until the upgrade lands and is
 the one carrying the upgrade adornment, so it is what fills the UPGRADING row.
+
+## LadderReporter
+
+Reports ranked 1v1 results to the [SanctuaryDB ladder](https://www.sanctuarydb.net/ladder)
+automatically, and — new in 0.2 — lets the ladder launch a matchmade game
+with no lobby interaction from either player.
+
+**Reporting.** The host computes each army's win condition in Lua and
+broadcasts every change to every client; a runtime wrapper around the
+client's `WinConditionUpdate` sees the result. Identity is the game's own
+Steam session: at report time the mod mints a Steam web-API ticket and sends
+it with the result, so a report is exactly as trustworthy as being signed in
+to Steam in the running game. Only Steam lobbies with exactly two human
+players are reported; skirmish, LAN, observers and team games are recognised
+and left alone.
+
+**Matchmaking.** The site pairs queued players, picks map, factions, slots
+and host, and runs the countdown. While the game is open the mod heartbeats
+(`POST /api/mm/heartbeat`, every 5 s, with a bearer token from one Steam
+ticket) so the site knows who has the game in the main menu with the mod.
+Nobody needs the mod to queue: the site only picks the automatic path when
+*both* players are heartbeating, and falls back to today's manual hosting
+otherwise. When a match reaches `launch`:
+
+- the host's mod creates the lobby on the assigned map (`CreateLobby`),
+  moves the UI to it, posts the session ID to the site, seats itself
+  (faction, slot, ready), kicks anyone who isn't the assigned opponent, and
+  starts the game as soon as the joiner is seated and ready;
+- the joiner's mod sees the session ID on its next heartbeat and joins by ID
+  through the same public entry point Steam "join game" uses
+  (`InterfaceManager.JoinSessionFromInvite`), then seats itself.
+
+Both bring the game window back if it's minimised or buried (a `user32`
+restore, with a taskbar flash when Windows refuses focus), post progress
+events, and mirror the site's timeouts locally so both sides converge if a
+heartbeat is late. Any failure leaves the lobby, tells the player why in a
+small overlay, and points at manual hosting. A matchmade game's result
+report carries its `matchId` so the site can close the match.
+
+Everything the site side needs is in [docs/matchmaking-site-plan.md](docs/matchmaking-site-plan.md).
+To test the launch flow without the site, point `Matchmaking.MockFile` (F8
+window) at a copy of [docs/matchmaking-mock-host.json](docs/matchmaking-mock-host.json)
+or [matchmaking-mock-joiner.json](docs/matchmaking-mock-joiner.json); `"me"`
+stands in for your own Steam ID, and the joiner's file takes the session ID
+the host logs.
 
 ## Replays
 
