@@ -41,21 +41,41 @@ The mod calls this every 5 seconds while the game is running.
 → `{ queued, match }` where `match` is `null` or the player's current match
 (see §4).
 
-Rules driven by the heartbeat:
+The heartbeat is a **capability signal, not a gate**. Nobody needs the mod
+to queue; the queue works for everyone exactly as it does today.
 
-- A player is **online** while their last heartbeat is under 15 seconds old.
-- **Queueing requires being online and in `menu`.** The queue button on the
-  site is disabled otherwise, with a line saying why ("Open the game to
-  queue", "Leave your lobby to queue"). A player whose heartbeat lapses, or
-  whose state leaves `menu`, is dropped from the queue and told so.
+- A player is **launchable** while their last heartbeat is under 15 seconds
+  old and its state is `menu`.
+- The site can show this next to a queued player ("auto-launch ready") so
+  people understand which kind of match they'll get, but it never blocks
+  queueing.
 
-This is what makes no-shows nearly impossible: anyone the site pairs is, by
-construction, sitting in the game's main menu with the mod running.
+### 3. Pairing picks the mode
 
-### 3. Pairing and countdown (mostly exists)
+Pairing is unchanged. When a pair is formed, the site decides the mode once:
 
-On pairing, create a match record with everything the mod needs to launch
-without a lobby screen:
+- **`auto`** if *both* players are launchable at that moment. The rest of
+  this document applies: countdown, then the mods create, join and start the
+  game with no lobby interaction.
+- **`manual`** otherwise: today's flow, unchanged. The site tells the host to
+  create the lobby and the joiner who to look for, and the mod (if one side
+  has it) does nothing beyond reporting the result as it does now.
+
+The mode is recorded on the match (`mode: auto | manual`) and shown to both
+players. Because a manual match needs no mod on either side, nothing about
+the current player base is forced to update, and the auto path simply
+appears for pairs who both have the mod and the game open.
+
+If a countdown for an `auto` match reaches zero and one player is no longer
+launchable (closed the game, entered a lobby), don't fail the match: **fall
+back to `manual`** for that match and say why ("Skoub's game closed, so
+host manually"). Failure states below are reserved for the auto flow going
+wrong after `launch`.
+
+### 3a. The `auto` countdown (site-owned)
+
+For an `auto` match, create the record with everything the mod needs to
+launch without a lobby screen:
 
 - `host` / `joiner` Steam IDs (host is picked as today)
 - `map`: the game's map path, e.g. `Maps/The_Forge/The_Forge.sanmap`, from
@@ -68,15 +88,16 @@ without a lobby screen:
 
 The site plays the ding and shows the countdown with a **Cancel** button. A
 cancel sets `status: cancelled`, `cancelledBy`. At zero, if both players are
-still online and in `menu`, set `status: launch`; otherwise
-`status: failed` with `reason` naming who wasn't ready ("Skoub closed the
-game", "Remmy is in a lobby").
+still launchable, set `status: launch`; otherwise switch the match to
+`mode: manual` with a `reason` naming who dropped ("Skoub closed the game",
+"Remmy is in a lobby") and show today's manual-hosting instructions.
 
 ### 4. The match object returned to the mod
 
 ```json
 {
   "id": "m_01HX...",
+  "mode": "auto | manual",
   "status": "countdown | launch | cancelled | failed | done",
   "host": "7656119...",
   "joiner": "7656119...",
@@ -134,9 +155,12 @@ confused with it.
 - Private lobbies or passwords: the lobby is public for the few seconds
   before it fills; the host's mod kicks anyone who isn't the assigned
   opponent.
-- Launching the game from the browser (`steam://run/4511930//<sessionId>`
-  would do it, and the game already handles that connect string) — the
-  "must be in the menu to queue" rule makes it unnecessary.
+- Launching the game from the browser for `manual` matches
+  (`steam://run/4511930//<sessionId>` would do it, and the game already
+  handles that connect string). A possible later step: it would let a player
+  without the mod be joined into a mod host's lobby with one click.
+- Requiring the mod for anything. The manual flow stays the baseline; the
+  auto flow is an upgrade that appears when both sides have it.
 - An in-game countdown mirror. The site owns the countdown; the mod can add
   an overlay reading the same status later if people tab into the game while
   queued.

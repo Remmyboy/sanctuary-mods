@@ -47,10 +47,15 @@ Lives in the existing `LadderReporter` project (renamed in the README to
 ### Launch state machine
 
 Driven entirely by the `match` object in the heartbeat response. The site
-owns the countdown and the cancel; the mod acts on `status: launch`.
+owns the countdown and the cancel, and decides the mode when it pairs: the
+mod acts only on `mode: auto` with `status: launch`. A `manual` match is
+today's flow; the mod's only job there is the result report, plus an
+optional overlay line ("Ladder match vs Skoub: you're hosting, they'll
+join") so a player who tabbed into the game isn't left guessing. Nobody is
+required to have the mod: the auto path appears when both sides do.
 
 ```
-Idle ──match.status==launch──▶ Launching
+Idle ──match.mode==auto && status==launch──▶ Launching
 Launching (host):
   1. restore/focus the game window (below)
   2. CreateLobby { name: "Ladder: A vs B", mapPath, maxPlayerCount:
