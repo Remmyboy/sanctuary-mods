@@ -482,7 +482,17 @@ namespace SanctuaryHud
             StartCoroutine(PostAndForget($"/api/mm/match/{_match.Id}/session",
                 new JObject { ["sessionId"] = sessionId.ToString() }, "session id"));
             PostEvent("lobby_created");
-            Overlay("LAUNCHING", $"Lobby up. Waiting for {_match.OpponentName ?? "your opponent"} to join...", 120f);
+            if (MockMode)
+            {
+                // Testing without the site: the joiner needs this number.
+                try { GUIUtility.systemCopyBuffer = sessionId.ToString(); } catch { }
+                Overlay("LAUNCHING (MOCK)", $"Lobby up. Session ID {sessionId} (copied to the clipboard). " +
+                    $"Waiting for {_match.OpponentName ?? "your opponent"} to join...", 300f);
+            }
+            else
+            {
+                Overlay("LAUNCHING", $"Lobby up. Waiting for {_match.OpponentName ?? "your opponent"} to join...", 120f);
+            }
             SetPhase(Phase.HostWaiting);
         }
 
