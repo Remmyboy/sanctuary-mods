@@ -324,6 +324,11 @@ root GameObjects.
    into the game's `engine` folder (the one with `Sanctuary.exe`) — extract so
    `winhttp.dll` and `BepInEx\` sit next to the exe. Run the game once to let
    BepInEx generate its folders.
+   Then set `HideManagerGameObject = true` under `[Chainloader]` in
+   `BepInExconfigBepInEx.cfg`: Sanctuary destroys foreign root GameObjects
+   after start-up, and without it the BepInEx manager object (and every
+   plugin on it) dies right after `Awake`, so plugins load but never update.
+   The release zips ship this setting.
 3. `dotnet build SanctuaryMods.sln` — the projects reference game assemblies
    from the install (override with `-p:GamePath=...`, default is the playtest)
    and copy each built mod into `engine\SanctuaryMods\` automatically.

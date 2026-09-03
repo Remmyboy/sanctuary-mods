@@ -145,7 +145,10 @@ namespace SanctuaryHud
                 Logger.LogError($"Ladder reporter: economy patch failed (results will not be reported): {e}");
             }
             AwakeMatchmaking();
-            Logger.LogInfo("Ladder reporter loaded (toggle it from the F8 mod manager).");
+            // The assembly version changes every build, so a log can be
+            // matched to the DLL that produced it.
+            Logger.LogInfo($"Ladder reporter loaded, build {typeof(LadderReporterPlugin).Assembly.GetName().Version} " +
+                           $"(toggle it from the F8 mod manager).");
         }
 
         private void OnDestroy()
