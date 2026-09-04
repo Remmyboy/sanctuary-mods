@@ -11,13 +11,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MapLocalFiles", "MapLocalFi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModManager", "ModManager\ModManager.csproj", "{4FE678F9-9B2F-412E-B4EA-B14CCFD54565}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SanctuaryHudLoader", "SanctuaryHudLoader\SanctuaryHudLoader.csproj", "{976DECA3-23B1-4752-ABBC-8B75602B7721}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModLoader", "ModLoader\ModLoader.csproj", "{976DECA3-23B1-4752-ABBC-8B75602B7721}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EcoManager", "EcoManager\EcoManager.csproj", "{1E4D329F-D15F-4C41-8C7C-A60C136F9C45}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LadderReporter", "LadderReporter\LadderReporter.csproj", "{577C1C62-970B-496C-BE1B-AB8AC657B14D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Replays", "Replays\Replays.csproj", "{637780E5-AD3F-4800-B248-52F6C4331F3F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReplayManager", "ReplayManager\ReplayManager.csproj", "{637780E5-AD3F-4800-B248-52F6C4331F3F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

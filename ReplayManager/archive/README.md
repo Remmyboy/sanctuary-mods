@@ -9,4 +9,4 @@ client. The game's `ReplayClientSockets` now does the same job (a fake
 socket that reads `.sanreplay` frames paced by the sim speed), so the mod
 only drives that.
 
-Kept for reference; excluded from the build by `Replays.csproj`.
+Kept for reference; excluded from the build by `ReplayManager.csproj`.

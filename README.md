@@ -17,7 +17,7 @@ players. The exceptions are called out in their own sections below.
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
-| [Replays](Replays/) | `Replays.dll` | Watch the game's replays fog-free from any seat, with every economy |
+| [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
 | [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | `ModLoader.dll` | Loads and hot-reloads every mod above from `SanctuaryMods` |
@@ -161,7 +161,7 @@ or [matchmaking-mock-joiner.json](docs/matchmaking-mock-joiner.json); `"me"`
 stands in for your own Steam ID, and the joiner's file takes the session ID
 the host logs.
 
-## Replays
+## ReplayManager
 
 Makes the game's own replays watchable properly: any player's point of view
 or every army at once, the fog lifted, every army's economy with whole-game
@@ -275,6 +275,25 @@ folders; this patches a lazy fallback on the miss path only, serving `map/`
 paths from the loaded map's folder on disk. The hit path is untouched, so
 shipped content behaves exactly as before.
 
+## ModLoader
+
+The one piece that lives inside the BepInEx tree (`BepInEx\plugins\ModLoader.dll`),
+because BepInEx is what loads it. Everything else is a folder under
+`engine\SanctuaryMods\`: the loader loads every `*.dll` it finds there at
+start-up, watches them, and reloads any that change about a second after
+the file is written (F6 forces a reload of everything; a deleted DLL has its
+plugins torn down). A mod is installed by dropping its folder in and removed
+by deleting it, with no restart either way, and `dotnet build` of a project
+is the whole iteration loop while developing.
+
+Two things it has to do that a plain BepInEx plugin would not: it rewrites
+each assembly's identity per load, because Mono returns the cached assembly
+for a byte-load with an identical name and a rebuild would silently keep
+running the old code; and it attaches the plugins it loads to BepInEx's own
+hidden manager object rather than a GameObject of its own, because Sanctuary
+destroys foreign root GameObjects after start-up (the same reason BepInEx
+needs `HideManagerGameObject = true` here, see Setup).
+
 ## Development
 
 Layout: one folder per mod, each a tiny csproj — the shared settings (game
@@ -286,14 +305,9 @@ plumbing in [shared/](shared/) is compiled into the mods that reference it.
 Every mod deploys to its own folder under `engine\SanctuaryMods\` — outside
 the BepInEx tree, alongside the Lua mods, so one folder is the whole of a mod
 whether it ships a DLL, Lua files, or both. The loader is the exception: it
-deploys to `BepInEx\plugins`, because BepInEx is what loads *it*. It then
-hot-reloads each mod DLL independently about a second after its rebuild (F6
-forces a reload of everything, and a deleted DLL has its plugins torn down).
-So `dotnet build` — of one project or the whole `SanctuaryMods.sln` — is the
-entire iteration loop, no game restart. The loader rewrites each assembly's
-identity per load because Mono caches byte-loaded assemblies, and attaches
-plugins to BepInEx's hidden manager object because this game destroys unknown
-root GameObjects.
+deploys to `BepInEx\plugins`, because BepInEx is what loads *it* (see
+[ModLoader](#modloader)). So `dotnet build` — of one project or the whole
+`SanctuaryMods.sln` — is the entire iteration loop, no game restart.
 
 ## Setup
 
