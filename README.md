@@ -152,11 +152,19 @@ drops back to the highest tier. A factory never enters build mode, so repeat
 presses there queue more of the same instead of walking down the tiers, and
 holding **Shift** queues five exactly as the stock hotkeys do.
 
-One key can serve several roles: they are tried in order and the first with
-anything buildable wins. That is how **R** is the land factory's tank and the
-naval factory's warship (which is itself one role across frigate → destroyer →
-battleship), and **Q** is raider or submarine, without either needing to know
-about the other.
+**Several roles can share a key**, merging into one cycle ranked by tier first
+and role order second. That does two jobs at once. Where the roles cannot
+coexist it reads as "first one that applies": **R** is the land factory's tank
+and the naval factory's warship, and no factory builds both. Where they can
+coexist it reads as a round-robin: **W** is land, air, then naval factory off
+repeated presses, each at its best tier, before the cycle drops a tier and
+comes round again — one key for the whole decision instead of three. Splitting
+them back onto separate keys is just a config edit.
+
+Note the ordering that falls out of this for a high-tier engineer: W gives the
+T3 land factory before the T1 one, so placing a cheap T1 factory to upgrade
+later takes several presses. If that reads wrong in play, the fix is a
+per-role "prefer lowest tier" flag rather than a change to the cycle.
 
 Roles stop at T3 on purpose. The experimentals above are faction-specific
 one-offs that want their own keys — without the cap, Guard's T4 Experimental

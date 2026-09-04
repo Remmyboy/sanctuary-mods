@@ -321,19 +321,30 @@ if not __SdbBuildHotkeys then
     return 1
   end
 
-  local function candidates(role, buildable)
-    local expr = role.expr()
-    local out = {}
-    for tpId in pairs(buildable) do
-      -- DEMO_UI_ONLY templates are drawn as blank, unclickable buttons and
-      -- left out of the panel's own hotkey list; they are not buildable.
-      if expr[tpId] and not Tags.DEMO_UI_ONLY[tpId] and techOf(tpId) <= role.maxTier then
-        table.insert(out, tpId)
+  -- Every role on this key, in one cycle: ranked by tier first and by role
+  -- order second. Where the roles cannot coexist (tank vs warship) that reads
+  -- as 'first one that applies'; where they can (the three factories) it reads
+  -- as a round-robin across them at the best tier, then again a tier down.
+  local function candidates(roles, buildable, want)
+    local out, ord = {}, {}
+    for ri, role in ipairs(roles) do
+      if role.mode == want then
+        local expr = role.expr()
+        for tpId in pairs(buildable) do
+          -- DEMO_UI_ONLY templates are drawn as blank, unclickable buttons and
+          -- left out of the panel's own hotkey list; they are not buildable.
+          if expr[tpId] and ord[tpId] == nil and not Tags.DEMO_UI_ONLY[tpId]
+             and techOf(tpId) <= role.maxTier then
+            ord[tpId] = ri
+            table.insert(out, tpId)
+          end
+        end
       end
     end
     table.sort(out, function(a, b)
       local ta, tb = techOf(a), techOf(b)
       if ta ~= tb then return ta > tb end
+      if ord[a] ~= ord[b] then return ord[a] < ord[b] end
       return a < b
     end)
     return out
@@ -362,33 +373,28 @@ if not __SdbBuildHotkeys then
     if not list then return false end
     local want = isFactory and 'u' or 's'
 
-    for _, role in ipairs(list) do
-      if role.mode == want then
-        local cands = candidates(role, buildable)
-        if #cands > 0 then
-          -- Cycle only while the previous press is still uncommitted, i.e. its
-          -- template is still on the cursor. Placing it, cancelling, or
-          -- changing selection drops us back to the highest tier. A factory
-          -- never enters build mode, so repeat presses there queue more of the
-          -- same rather than walking down the tiers.
-          local idx, st = 1, BH.state
-          if st.key == key and st.role == role.name
-             and BM.GetBuildMode() and BM.GetBuildTpId() == st.tpId then
-            idx = (st.index % #cands) + 1
-          end
-          local tpId = cands[idx]
-          BH.state = { key = key, role = role.name, index = idx, tpId = tpId }
-          -- The panel's own click handler: it wraps the file-local
-          -- ExecuteConstructionAction, so this is exactly a button click.
-          CP.ConstructionClickFunction(
-            { mouseClickType = UIMouseClickType.Left, isShiftHeld = shift },
-            { tpId = tpId, isFactory = isFactory, selectedUnits = units })
-          __SdbBuildHotkeysCount = __SdbBuildHotkeysCount + 1
-          return true
-        end
-      end
+    local cands = candidates(list, buildable, want)
+    if #cands == 0 then return false end
+
+    -- Cycle only while the previous press is still uncommitted, i.e. its
+    -- template is still on the cursor. Placing it, cancelling, or changing
+    -- selection drops us back to the start. A factory never enters build mode,
+    -- so repeat presses there queue more of the same rather than walking the
+    -- cycle.
+    local idx, st = 1, BH.state
+    if st.key == key and st.mode == want
+       and BM.GetBuildMode() and BM.GetBuildTpId() == st.tpId then
+      idx = (st.index % #cands) + 1
     end
-    return false
+    local tpId = cands[idx]
+    BH.state = { key = key, mode = want, index = idx, tpId = tpId }
+    -- The panel's own click handler: it wraps the file-local
+    -- ExecuteConstructionAction, so this is exactly a button click.
+    CP.ConstructionClickFunction(
+      { mouseClickType = UIMouseClickType.Left, isShiftHeld = shift },
+      { tpId = tpId, isFactory = isFactory, selectedUnits = units })
+    __SdbBuildHotkeysCount = __SdbBuildHotkeysCount + 1
+    return true
   end
 
   BH.Fire = function(key, shift)

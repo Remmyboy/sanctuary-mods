@@ -51,11 +51,18 @@ namespace SanctuaryHud
     internal static class Roles
     {
         /// The shared T1-T3 roles — the ones every faction has, so one key
-        /// means the same thing whoever you are playing. Order matters: roles
-        /// sharing a key are tried in this order and the first with anything
-        /// buildable wins, which is what lets one key serve several domains
-        /// (R is the land factory's tank and the naval factory's warship —
-        /// a given factory only ever builds one of them).
+        /// means the same thing whoever you are playing.
+        ///
+        /// Order matters: roles sharing a key merge into one cycle, ranked by
+        /// tier first and this order second. That does two jobs at once. Where
+        /// the roles are mutually exclusive by context it reads as "first one
+        /// that applies" — R is the land factory's tank and the naval
+        /// factory's warship, and no factory builds both. Where they can
+        /// coexist it reads as a round-robin: an engineer that can build all
+        /// three factories gets land, air, then naval off repeated presses of
+        /// W, each at its best tier, before the cycle drops a tier and comes
+        /// round again. Splitting them back onto separate keys is just a
+        /// config edit.
         ///
         /// Faction-unique units (Guard transmitters, Chosen shield boosters,
         /// EDA repair stations) and the T4/T5 experimentals are deliberately
@@ -65,10 +72,12 @@ namespace SanctuaryHud
             // ---- Structures: what an engineer places ----
             new Role("LandFactory", RoleMode.Structure,
                 "Tags.LAND_FACTORY", "W", "Land factory."),
+            // Air and naval share W: one key cycles the three domains, each at
+            // its best tier, rather than spending three keys on one decision.
             new Role("AirFactory", RoleMode.Structure,
-                "Tags.AIR_FACTORY", "Q", "Air factory."),
+                "Tags.AIR_FACTORY", "W", "Air factory — second press of the factory key."),
             new Role("NavalFactory", RoleMode.Structure,
-                "Tags.NAVAL_FACTORY", "N", "Naval factory."),
+                "Tags.NAVAL_FACTORY", "W", "Naval factory — third press of the factory key."),
             new Role("EngineeringStation", RoleMode.Structure,
                 "Tags.ENGINEERING_STATION", "E", "Engineering station."),
 
