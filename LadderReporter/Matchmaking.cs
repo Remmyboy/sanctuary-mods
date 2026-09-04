@@ -188,6 +188,10 @@ namespace SanctuaryHud
         // launchable.
         private string CurrentState()
         {
+            // Watching a replay looks like a match to the economy signal and
+            // like the menu when it's paused; it is neither, and never
+            // launchable.
+            if (NetworkManager.IsReplayPlayback) return "replay";
             if (InMatch) return "ingame";
             if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby && LobbyManager.IsInLobby) return "loading";
             if (LobbyManager.IsInLobby) return "lobby";

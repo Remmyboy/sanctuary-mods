@@ -140,7 +140,9 @@ namespace SanctuaryHud.Replays
             if (!Active)
             {
                 if (_restart != null) ContinueRestart();
-                if (NetworkManager.IsReplayPlayback) Begin();
+                // ContinueRestart may itself have begun playback (and set the
+                // seek target); don't begin a second time over it.
+                if (!Active && NetworkManager.IsReplayPlayback) Begin();
                 return;
             }
 
