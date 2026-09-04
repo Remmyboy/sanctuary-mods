@@ -321,7 +321,7 @@ namespace SanctuaryHud
                 var meta = comp.GetType().GetCustomAttribute<BepInPlugin>();
                 if (meta == null) continue;
                 // Killing the loader would kill hot reload (and us with it).
-                if (meta.GUID == "com.sanctuarydb.hudloader") continue;
+                if (meta.GUID == "com.sanctuarydb.modloader") continue;
 
                 var entry = _plugins.FirstOrDefault(p => string.Equals(p.Guid, meta.GUID, StringComparison.OrdinalIgnoreCase));
                 if (entry == null)

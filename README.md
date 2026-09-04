@@ -18,9 +18,9 @@ players. The exceptions are called out in their own sections below.
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
 | [Replays](Replays/) | `Replays.dll` | Watch the game's replays fog-free from any seat, with every economy |
-| [ModManager](ModManager/) | `ModManager.dll` | F8 window: Lua mod overlays + plugin toggles |
+| [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
-| [SanctuaryHudLoader](SanctuaryHudLoader/) | `SanctuaryHudLoader.dll` | Hot-reload host for all of the above |
+| [ModLoader](ModLoader/) | `ModLoader.dll` | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
 ## SanctuaryHud
 
@@ -311,7 +311,7 @@ root GameObjects.
    from the install (override with `-p:GamePath=...`, default is the playtest)
    and copy each built mod into `engine\SanctuaryMods\` automatically.
 4. Launch the game; check `BepInEx\LogOutput.log` for the load lines, and
-   press **F8** in the menu for the mod manager.
+   open **Mods** from the menu's sidebar (or press **F8**).
 
 ## Removal
 

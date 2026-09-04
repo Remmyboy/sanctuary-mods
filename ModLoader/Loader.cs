@@ -6,7 +6,7 @@ using System.Reflection;
 using BepInEx;
 using UnityEngine;
 
-namespace SanctuaryHudLoader
+namespace SanctuaryModLoader
 {
     // Hot-reload host for every mod DLL under engine\SanctuaryMods. Sanctuary
     // destroys foreign root GameObjects (which is why BepInEx needs
@@ -22,7 +22,7 @@ namespace SanctuaryHudLoader
     // Each DLL is watched and reloaded independently about a second after every
     // rebuild; F6 forces a reload of everything. A DLL deleted from the folder
     // has its plugins torn down on the next poll.
-    [BepInPlugin("com.sanctuarydb.hudloader", "Sanctuary Mods Loader", "1.1.0")]
+    [BepInPlugin("com.sanctuarydb.modloader", "Sanctuary Mod Loader", "1.2.0")]
     public class LoaderPlugin : BaseUnityPlugin
     {
         private string _modsDir;
