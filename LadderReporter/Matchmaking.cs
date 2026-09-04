@@ -12,6 +12,7 @@ using EM.Core;
 using EM.Network;
 using EM.Network.Lobby;
 using EM.UI;
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using Steamworks;
 using UnityEngine;
@@ -133,12 +134,54 @@ namespace SanctuaryHud
             // so a patch changing that can't silently stall matchmaking.
             _runInBackgroundWas = Application.runInBackground;
             Application.runInBackground = true;
+
+            // A refused join surfaces only as the game's error modal; a kick
+            // only as the lobby quietly emptying. Catch both with their
+            // reasons so a failed launch says why.
+            LobbyManager.OnKicked += OnMmKicked;
+            try
+            {
+                _mmHarmony = new Harmony("com.sanctuarydb.ladderreporter.mm." + Guid.NewGuid().ToString("N").Substring(0, 8));
+                var joined = AccessTools.Method(typeof(InterfaceManager), "OnSteamEventLobbyJoined");
+                if (joined != null)
+                {
+                    _mmHarmony.Patch(joined, postfix: new HarmonyMethod(typeof(LadderReporterPlugin), nameof(LobbyJoinedPostfix)));
+                }
+                else
+                {
+                    Logger.LogWarning("Matchmaking: InterfaceManager.OnSteamEventLobbyJoined not found; a refused join will time out instead of reporting why.");
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning($"Matchmaking: join-result patch failed: {e.Message}");
+            }
         }
+
+        private Harmony _mmHarmony;
+        private static string _lastJoinFailure;
+        private bool _sawLobby;
 
         private void DestroyMatchmaking()
         {
             LobbyManager.OnLobbyCreated -= OnMmLobbyCreated;
+            LobbyManager.OnKicked -= OnMmKicked;
+            _mmHarmony?.UnpatchSelf();
             Application.runInBackground = _runInBackgroundWas;
+        }
+
+        private static void LobbyJoinedPostfix(bool isSuccessful, string failureReason)
+        {
+            if (isSuccessful) return;
+            _lastJoinFailure = failureReason ?? "unknown";
+        }
+
+        private void OnMmKicked()
+        {
+            if (_phase == Phase.JoinerJoining || _phase == Phase.JoinerInLobby)
+            {
+                Abort("The host's game removed you from the lobby.", "kicked by host");
+            }
         }
 
         private void UpdateMatchmaking()
@@ -336,7 +379,8 @@ namespace SanctuaryHud
                         {
                             _loggedMatchKey = key;
                             Logger.LogInfo($"Matchmaking: match {match.Id} mode={match.Mode} status={match.Status} " +
-                                           $"host={(match.Host == LocalSteamId ? "me" : match.Host)} map={match.Map} " +
+                                           $"host={(match.Host == LocalSteamId ? "me" : match.Host)} " +
+                                           $"joiner={(match.Joiner == LocalSteamId ? "me" : match.Joiner)} map={match.Map} " +
                                            $"session={match.SessionId} reason={match.Reason ?? "-"}");
                         }
                     }
@@ -524,6 +568,9 @@ namespace SanctuaryHud
 
             if (isHost)
             {
+                // Logged so a kick of the wrong person is diagnosable: the
+                // host keeps only this Steam ID and its own in the lobby.
+                Logger.LogInfo($"Matchmaking: hosting as {me}; expecting joiner {m.Joiner ?? "(none)"}.");
                 SetPhase(Phase.HostCreating);
                 LobbyManager.OnLobbyCreated -= OnMmLobbyCreated;
                 LobbyManager.OnLobbyCreated += OnMmLobbyCreated;
@@ -608,8 +655,10 @@ namespace SanctuaryHud
                 Abort("The game UI isn't ready to join.", "no ui");
                 return;
             }
-            Logger.LogInfo($"Matchmaking: joining session {sessionId}.");
+            Logger.LogInfo($"Matchmaking: joining session {sessionId} as {LocalSteamId}.");
             Overlay("LAUNCHING", "Joining the host's lobby...", 120f);
+            _sawLobby = false;
+            _lastJoinFailure = null;
             SetPhase(Phase.JoinerJoining);
             ui.JoinSessionFromInvite(new PlayerID(sessionId));
         }
@@ -672,14 +721,25 @@ namespace SanctuaryHud
                     break;
 
                 case Phase.JoinerJoining:
-                    if (LobbyManager.IsInLobby && LobbyManager.CurrentState != null)
+                    if (_lastJoinFailure != null)
+                    {
+                        var why = _lastJoinFailure;
+                        _lastJoinFailure = null;
+                        Abort("The host's lobby refused the join: " + why, "join refused: " + why);
+                    }
+                    else if (LobbyManager.IsInLobby && LobbyManager.CurrentState != null)
                     {
                         _lobbyIsOurs = true;
                         PostEvent("joined");
                         Overlay("LAUNCHING", "In the lobby. Readying up...", 60f);
                         SetPhase(Phase.JoinerInLobby);
                     }
+                    else if (_sawLobby && !LobbyManager.IsInLobby)
+                    {
+                        Abort("The lobby went away while joining.", "lobby lost during join");
+                    }
                     else if (inPhase > Limit(30f)) Abort("Couldn't join the host's lobby.", "join timeout");
+                    if (LobbyManager.IsInLobby) _sawLobby = true;
                     break;
 
                 case Phase.JoinerInLobby:
