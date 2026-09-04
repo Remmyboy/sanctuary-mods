@@ -38,6 +38,7 @@ namespace SanctuaryHud
         private Transform _templates;
         private Transform _uiList, _luaList;
         private string _pluginSignature = "";
+        private bool _sidebarRegistered;
 
         // Templates lifted out of the cloned Settings screen before its
         // lists are emptied. They sit under an inactive holder so a clone can
@@ -87,6 +88,17 @@ namespace SanctuaryHud
                     _builtFor = mmi; // don't retry every frame
                     return;
                 }
+            }
+
+            if (!_sidebarRegistered && _sidebarButton != null && _sidebarButton.activeInHierarchy)
+            {
+                // The sidebar dims the other buttons while one is hovered
+                // and re-lights them afterwards; FetchButtons only takes
+                // active buttons, so it has to run once the menu is up.
+                var pb = _sidebarButton.GetComponent<PanelButton>();
+                ForceNormal(pb);
+                _sidebarButton.GetComponentInParent<PanelButtonDimmer>()?.FetchButtons();
+                _sidebarRegistered = true;
             }
 
             if (IsOpen)
@@ -272,7 +284,13 @@ namespace SanctuaryHud
             var pb = _sidebarButton.GetComponent<PanelButton>();
             RenamePanelButton(pb, "Mods", _icon);
             pb.onClick.AddListener(Open);
-            settingsButton.GetComponentInParent<PanelButtonDimmer>()?.FetchButtons();
+            // At start-up the game holds its Settings button disabled until
+            // the menu is ready, then re-enables it by reference — which a
+            // clone taken in that window never gets. So the clone is put in
+            // the normal state here, and registered with the sidebar's
+            // hover-dimming once the menu is actually showing (see Tick).
+            ForceNormal(pb);
+            _sidebarRegistered = false;
 
             _pluginSignature = "";
             _log.LogInfo("Mods page built into the front menu.");
@@ -370,6 +388,19 @@ namespace SanctuaryHud
                 pb.selectedIcon = icon;
             }
             if (pb.gameObject.activeInHierarchy) pb.UpdateUI();
+        }
+
+        /// Interactable, unselected, showing its Normal state — whatever
+        /// state the source button was cloned in.
+        private static void ForceNormal(PanelButton pb)
+        {
+            pb.isInteractable = true;
+            pb.isSelected = false;
+            foreach (var cg in pb.GetComponentsInChildren<CanvasGroup>(true))
+            {
+                if (cg.transform.parent != pb.transform) continue;
+                cg.alpha = cg.name == "Normal" ? 1f : 0f;
+            }
         }
 
         private static void SetButtonText(ButtonManager bm, string text)
