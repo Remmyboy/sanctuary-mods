@@ -4,4 +4,22 @@
     <AssemblyName>ModManager</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The manager builds its page out of the game's own Beam UI widgets
+         (TextMeshPro text, animated panels), so it needs these on top of the
+         shared references. -->
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Michsky.UI.Beam">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Michsky.UI.Beam.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
 </Project>

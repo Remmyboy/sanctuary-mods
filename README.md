@@ -220,7 +220,16 @@ the speed slider for a moment; the panel re-applies its value.
 
 ## ModManager
 
-Its own window on **F8**, managing two kinds of mods:
+A **Mods** entry in the front menu's sidebar (the cube icon, just below
+Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods
+and Lua Mods. The page is the game's own Settings screen, cloned and refilled:
+the tab bar, the switch rows, the text fields (a settings slider's input box,
+widened), the headings and the buttons are all the game's Beam UI widgets, so
+it looks like the rest of the menu and follows any restyling the game does.
+It lives in the menu canvas, so there is no in-match UI; UI mod toggles and
+settings changes made in the menu apply immediately anyway.
+
+It manages two kinds of mods:
 
 **Lua mods** are a mod folder's `*.lua`/`*.santp` files, laid out mirroring the
 `LJ\lua` tree (later mods win conflicts, and new files/folders are registered
@@ -233,8 +242,8 @@ re-apply on startup.
 
 Multiplayer safety falls out of the game's own design: the lobby host compares
 `ComputeLuaHash` of the *cache* (not the disk) against each joiner and refuses
-mismatches, so everyone in a lobby provably runs the same Lua. The F8 window
-shows the live hash for comparing with friends. Two caveats: `.santp` files
+mismatches, so everyone in a lobby provably runs the same Lua. The Lua Mods
+tab shows the live hash for comparing with friends. Two caveats: `.santp` files
 are loaded but **not** hashed (template mods must be coordinated manually or
 they desync mid-game), and toggling is blocked while in a lobby or match. A
 sample mod, `SanctuaryMods\ExamplePinkArmy`, turns army slot 1 hot pink as a
@@ -246,16 +255,16 @@ genuine unload) and on adds it back. They never enter the Lua hash, so they
 are safe to flip any time, even mid-match, and the disabled set persists
 across restarts.
 
-Each loaded mod also has a **settings** button that expands its own settings
-inline — panel positions, the commander zoom factor, `AssistStartsUpgrade`,
-hotkeys, anything a mod binds. The list is read from the mod's BepInEx
-`ConfigFile`, so a mod's settings appear here simply by being bound, with no
-work in the manager. Booleans get a checkbox; everything else is edited as
-text and committed through the entry's own serializer (the same one that
-writes the config file), so floats, enums and `KeyCode`s all work and a
-half-typed value just doesn't take until it parses. Hovering a setting shows
-its description along the bottom of the window, and each mod has a "Reset to
-defaults". Changes save to `BepInEx\config\<guid>.cfg` immediately.
+Each loaded mod's settings follow its row — panel positions, the commander
+zoom factor, `AssistStartsUpgrade`, hotkeys, anything a mod binds. The list
+is read from the mod's BepInEx `ConfigFile`, so a mod's settings appear here
+simply by being bound, with no work in the manager. Booleans get the game's
+on/off switch; everything else is edited in a text field and committed
+through the entry's own serializer (the same one that writes the config
+file), so floats, enums and `KeyCode`s all work and a half-typed value just
+doesn't take until it parses (it snaps back to the last good value when the
+field loses focus). Each mod has a "Reset to defaults". Changes save to
+`BepInEx\config\<guid>.cfg` immediately.
 
 ## MapLocalFiles
 

@@ -26,12 +26,12 @@ namespace SanctuaryHud
     // Toggling is blocked while in a lobby or match: the VMs snapshot the
     // cache at match launch, and swapping content under a live session would
     // change the hash out from under the lobby's compatibility check.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.1.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.2.0")]
     public class ModManagerPlugin : BaseUnityPlugin
     {
         private static BepInEx.Logging.ManualLogSource _log;
 
-        private class ModEntry
+        internal class ModEntry
         {
             public string Name;
             public string Dir;
@@ -42,13 +42,36 @@ namespace SanctuaryHud
 
         private readonly List<ModEntry> _mods = new List<ModEntry>();
 
+        // ---- what the menu page reads and drives ---------------------------
+        internal IReadOnlyList<ModEntry> Mods => _mods;
+        internal IReadOnlyList<PluginEntry> Plugins => _plugins;
+        internal string HashNow => _hashNow;
+        internal string HashVanilla => _hashVanilla;
+        internal bool Locked => InLobbyOrMatch();
+
+        internal void SetModEnabled(ModEntry mod, bool enabled)
+        {
+            if (mod.Enabled == enabled) return;
+            if (Locked) return;
+            mod.Enabled = enabled;
+            Reapply();
+        }
+
+        internal void Rescan()
+        {
+            ScanMods();
+            if (!Locked) Reapply();
+        }
+
+        internal void OpenModsFolder() => Application.OpenURL("file:///" + ModsRoot.Replace('\\', '/'));
+
         // ---- C# plugin toggles --------------------------------------------
         // Everything BepInEx (or the hot-reload loader) attached to this same
         // hidden manager GameObject. Disabling destroys the component — its
         // OnDestroy unpatches Harmony, so it is a real unload — and enabling
         // adds it back. C# plugins never enter the Lua hash, so unlike Lua
         // mods these are safe to toggle any time, even mid-match.
-        private class PluginEntry
+        internal class PluginEntry
         {
             public string Guid;
             public string Name;
@@ -59,13 +82,6 @@ namespace SanctuaryHud
 
         private readonly List<PluginEntry> _plugins = new List<PluginEntry>();
 
-        // Which mods have their settings panel open, and the in-progress text
-        // for the fields being typed into. Values are committed through
-        // ConfigEntryBase's own serializer, so a half-typed or invalid entry
-        // simply doesn't take until it parses — hence keeping the raw text
-        // separately rather than round-tripping the live value every frame.
-        private readonly HashSet<string> _settingsOpen = new HashSet<string>();
-        private readonly Dictionary<string, string> _editBuffers = new Dictionary<string, string>();
         private ConfigEntry<string> _cfgDisabledPlugins;
         private float _pluginScanAccum = 999f; // scan on the first Update
 
@@ -93,9 +109,10 @@ namespace SanctuaryHud
         private ConfigEntry<KeyCode> _cfgToggleKey;
         private ConfigEntry<string> _cfgEnabled;
 
-        private bool _visible;
-        private Rect _winRect = new Rect(220, 140, 470, 420);
-        private Vector2 _scroll;
+        // The UI: a "Mods" entry in the front menu's sidebar opening a page
+        // built from the game's own settings screen. It lives in the menu
+        // canvas, so there is no UI during a match.
+        private ModsPage _page;
         private string _hashVanilla = "";
         private string _hashNow = "";
         private bool _pendingApply;
@@ -106,7 +123,7 @@ namespace SanctuaryHud
         private void Awake()
         {
             _log = Logger;
-            _cfgToggleKey = Config.Bind("UI", "ToggleKey", KeyCode.F8, "Key that shows/hides the mod manager window.");
+            _cfgToggleKey = Config.Bind("UI", "ToggleKey", KeyCode.F8, "Key that opens/closes the Mods page in the front menu.");
             _cfgEnabled = Config.Bind("Mods", "Enabled", "",
                 "Semicolon-separated mod folder names (under SanctuaryMods) applied at startup.");
             _cfgDisabledPlugins = Config.Bind("Plugins", "Disabled", "",
@@ -116,20 +133,30 @@ namespace SanctuaryHud
             catch (Exception e) { _log.LogWarning($"Could not create {ModsRoot}: {e.Message}"); }
 
             ScanMods();
+            _page = new ModsPage(this, _log);
             // The cache is built in a BeforeSceneLoad callback that may not
             // have run yet (and would wipe an early overlay by reassigning the
             // dictionary), so the first apply waits for it in Update.
             _pendingApply = true;
             _log.LogInfo($"Mod manager ready: {_mods.Count} mod(s) in {ModsRoot}, " +
-                         $"{_mods.Count(m => m.Enabled)} enabled. {_cfgToggleKey.Value} opens the window.");
+                         $"{_mods.Count(m => m.Enabled)} enabled. Mods is in the front menu's sidebar ({_cfgToggleKey.Value} also opens it).");
         }
 
         private void OnDestroy()
         {
+            try { _page?.Destroy(); }
+            catch (Exception e) { _log.LogWarning($"Mods page teardown failed: {e.Message}"); }
             // Hot reload tears us down; put the cache back so the next copy
             // starts from vanilla (its config re-applies the enabled set).
             try { RestoreAll(); }
             catch (Exception e) { _log.LogWarning($"Mod manager restore on unload failed: {e.Message}"); }
+        }
+
+        /// The hotkey: opens or closes the page while the front menu is up,
+        /// nothing elsewhere.
+        internal void ToggleUi()
+        {
+            if (_page != null && _page.CanOpen) _page.Toggle();
         }
 
         // ---- mod discovery -------------------------------------------------
@@ -308,7 +335,15 @@ namespace SanctuaryHud
             }
         }
 
-        private void SetPluginEnabled(PluginEntry entry, bool enable, bool persist = true)
+        /// Everything the mod bound, or an empty list for an unloaded mod.
+        internal static ConfigEntryBase[] ConfigEntriesOf(PluginEntry plugin)
+        {
+#pragma warning disable CS0618 // GetConfigEntries is obsolete, but the Values replacement is not in this BepInEx.
+            return plugin.Instance?.Config?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
+#pragma warning restore CS0618
+        }
+
+        internal void SetPluginEnabled(PluginEntry entry, bool enable, bool persist = true)
         {
             if (enable && entry.Instance == null && entry.Type != null)
             {
@@ -344,7 +379,9 @@ namespace SanctuaryHud
 
         private void Update()
         {
-            if (Input.GetKeyDown(_cfgToggleKey.Value)) _visible = !_visible;
+            if (Input.GetKeyDown(_cfgToggleKey.Value)) ToggleUi();
+            try { _page?.Tick(); }
+            catch (Exception e) { _log.LogError($"Mods page: {e}"); }
 
             // Rescan periodically rather than once: each mod is its own
             // hot-reloadable DLL now, so plugins (re)appear at any time — and
@@ -376,199 +413,7 @@ namespace SanctuaryHud
             }
         }
 
-        // ---- UI -----------------------------------------------------------
-
-        private static GUIStyle _stClose;
-
-        /// Flat close glyph — the default button chrome looks wrong sitting
-        /// in the title bar. Built lazily because GUI.skin is only valid
-        /// inside OnGUI.
-        private static GUIStyle CloseStyle => _stClose ??= new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 13,
-            fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleCenter,
-            normal = { textColor = new Color(0.75f, 0.79f, 0.85f) },
-            hover = { textColor = new Color(1f, 0.45f, 0.4f) },
-            active = { textColor = new Color(1f, 0.3f, 0.25f) },
-        };
-
-        private void OnGUI()
-        {
-            if (!_visible) return;
-            _winRect.height = 0; // auto-size to content each frame
-            _winRect = GUILayout.Window(0x53444d4d, _winRect, DrawWindow, "Sanctuary Mod Manager");
-        }
-
-        private void DrawWindow(int id)
-        {
-            // Close box in the title bar, so the window can be dismissed
-            // without knowing the hotkey. Drawn before the layout content so
-            // it takes the click ahead of anything underneath it.
-            if (GUI.Button(new Rect(_winRect.width - 22f, 3f, 18f, 16f), "✕", CloseStyle))
-            {
-                _visible = false;
-            }
-
-            var locked = InLobbyOrMatch();
-
-            GUILayout.Label(locked
-                ? "In a lobby or match — leave it to change mods."
-                : "Mods overlay the game's Lua at the next match launch.");
-
-            GUILayout.Label($"Lua hash: {Short(_hashNow)}{(_hashNow == _hashVanilla ? " (vanilla)" : "   [modded — all players must match]")}");
-
-            GUILayout.Label("Lua Mods");
-
-            // Only tall enough for what is there, up to a scrolling cap.
-            var listHeight = Mathf.Min(240f, Mathf.Max(20f, _mods.Count * 20f));
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(listHeight));
-            if (_mods.Count == 0)
-            {
-                GUILayout.Label("No Lua mods found.");
-            }
-            GUI.enabled = !locked;
-            foreach (var mod in _mods)
-            {
-                var label = $"{mod.Name}  ({mod.LuaCount} lua" +
-                            (mod.SantpCount > 0 ? $", {mod.SantpCount} santp — not hash-checked!" : "") + ")";
-                var now = GUILayout.Toggle(mod.Enabled, label);
-                if (now != mod.Enabled)
-                {
-                    mod.Enabled = now;
-                    Reapply();
-                }
-            }
-            GUI.enabled = true;
-            GUILayout.EndScrollView();
-
-            if (_plugins.Count > 0)
-            {
-                GUILayout.Space(6);
-                GUILayout.Label("UI Mods");
-                foreach (var plugin in _plugins)
-                {
-                    GUILayout.BeginHorizontal();
-                    var now = GUILayout.Toggle(plugin.Enabled, plugin.Name);
-                    if (now != plugin.Enabled) SetPluginEnabled(plugin, now);
-
-                    // Settings live on the running instance, so an unloaded
-                    // mod has none to show.
-                    var open = _settingsOpen.Contains(plugin.Guid);
-                    GUI.enabled = plugin.Enabled;
-                    if (GUILayout.Button(open ? "settings ▾" : "settings ▸", GUILayout.Width(80f)))
-                    {
-                        if (open) _settingsOpen.Remove(plugin.Guid);
-                        else _settingsOpen.Add(plugin.Guid);
-                    }
-                    GUI.enabled = true;
-                    GUILayout.EndHorizontal();
-
-                    if (plugin.Enabled && _settingsOpen.Contains(plugin.Guid)) DrawSettings(plugin);
-                }
-            }
-
-            GUILayout.Space(4);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Rescan"))
-            {
-                ScanMods();
-                if (!locked) Reapply();
-            }
-            if (GUILayout.Button("Open mods folder"))
-            {
-                Application.OpenURL("file:///" + ModsRoot.Replace('\\', '/'));
-            }
-            GUILayout.EndHorizontal();
-
-            // IMGUI only collects the hovered tooltip; something has to draw
-            // it. This is where each setting's description shows up.
-            var tooltip = GUI.tooltip;
-            GUILayout.Label(string.IsNullOrEmpty(tooltip)
-                ? $"{_cfgToggleKey.Value} closes and reopens this window."
-                : tooltip);
-
-            GUI.DragWindow();
-        }
-
-        /// One row per config entry the mod bound. Booleans get a checkbox;
-        /// everything else is edited as text and committed through the entry's
-        /// own serializer, which is what BepInEx uses for the config file — so
-        /// floats, enums and KeyCodes all work without special cases here.
-        private void DrawSettings(PluginEntry plugin)
-        {
-            BepInEx.Configuration.ConfigEntryBase[] entries;
-            try
-            {
-                entries = plugin.Instance?.Config?.GetConfigEntries();
-            }
-            catch (Exception e)
-            {
-                GUILayout.Label($"   (settings unavailable: {e.Message})");
-                return;
-            }
-            if (entries == null || entries.Length == 0)
-            {
-                GUILayout.Label("   No settings.");
-                return;
-            }
-
-            foreach (var entry in entries.OrderBy(e => e.Definition.Section).ThenBy(e => e.Definition.Key))
-            {
-                var label = $"   {entry.Definition.Section} / {entry.Definition.Key}";
-                var tip = entry.Description?.Description ?? "";
-
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(new GUIContent(label, tip), GUILayout.Width(230f));
-
-                if (entry.SettingType == typeof(bool))
-                {
-                    var current = entry.BoxedValue is bool b && b;
-                    var next = GUILayout.Toggle(current, GUIContent.none);
-                    if (next != current) entry.BoxedValue = next;
-                }
-                else
-                {
-                    var bufferKey = plugin.Guid + "/" + entry.Definition.Section + "/" + entry.Definition.Key;
-                    if (!_editBuffers.TryGetValue(bufferKey, out var text))
-                    {
-                        _editBuffers[bufferKey] = text = entry.GetSerializedValue();
-                    }
-
-                    var edited = GUILayout.TextField(text, GUILayout.Width(120f));
-                    if (edited != text)
-                    {
-                        _editBuffers[bufferKey] = edited;
-                        // Commit only when it parses; until then the field
-                        // holds the half-typed text and the value is untouched.
-                        try { entry.SetSerializedValue(edited); }
-                        catch { /* keep typing */ }
-                    }
-                }
-                GUILayout.EndHorizontal();
-            }
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Space(230f);
-            if (GUILayout.Button("Reset to defaults", GUILayout.Width(140f)))
-            {
-                foreach (var entry in entries)
-                {
-                    try
-                    {
-                        entry.BoxedValue = entry.DefaultValue;
-                        _editBuffers.Remove(plugin.Guid + "/" + entry.Definition.Section + "/" + entry.Definition.Key);
-                    }
-                    catch (Exception e)
-                    {
-                        _log.LogWarning($"Could not reset {entry.Definition}: {e.Message}");
-                    }
-                }
-            }
-            GUILayout.EndHorizontal();
-        }
-
-        private static string Short(string hash) =>
+        internal static string Short(string hash) =>
             string.IsNullOrEmpty(hash) ? "…" : (hash.Length > 16 ? hash.Substring(0, 16) : hash);
     }
 }
