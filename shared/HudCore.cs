@@ -263,6 +263,17 @@ namespace SanctuaryHud
             _log.LogInfo($"Ownership filter: {_armyColours?.Length ?? 0} army colours, GetClientID {(_getClientIdMi != null ? "found" : "missing")}, lobbyInfo {(_lobbyInfoType != null ? "found" : "missing")}.");
         }
 
+        /// A Lua numeric literal, or a division of two (`216/255`).
+        private static float LuaNumber(string s)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var slash = s.IndexOf('/');
+            if (slash < 0) return float.Parse(s.Trim(), inv);
+            var a = float.Parse(s.Substring(0, slash).Trim(), inv);
+            var b = float.Parse(s.Substring(slash + 1).Trim(), inv);
+            return b == 0f ? 0f : a / b;
+        }
+
         private static Vector4[] ParseArmyColours(string path)
         {
             try
@@ -272,7 +283,9 @@ namespace SanctuaryHud
                 foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
                              text, "\\[\"(\\w+)\"\\]\\s*=\\s*EngineClasses\\.float4\\(([^)]+)\\)"))
                 {
-                    var parts = m.Groups[2].Value.Split(',').Select(s => float.Parse(s.Trim(), System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                    // Components are literals or, since the 2026-09-04 update,
+                    // byte fractions such as `216/255`.
+                    var parts = m.Groups[2].Value.Split(',').Select(LuaNumber).ToArray();
                     if (parts.Length >= 3) colours[m.Groups[1].Value] = new Vector4(parts[0], parts[1], parts[2], parts.Length > 3 ? parts[3] : 1f);
                 }
 
