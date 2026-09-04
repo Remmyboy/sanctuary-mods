@@ -72,8 +72,10 @@ namespace SanctuaryHud
             "      hover.buildQueuePendingOperations = hover.buildQueuePendingOperations or {} " +
             "      table.insert(hover.buildQueuePendingOperations, " +
             "        { deltaAmount = 1, queueItemId = itemId, tpID = up }) " +
-            "      Import('common/systems/commands.lua')" +
-            ".SendUpdateQueueAmountCommandRaw({ hover.id }, { itemId }, up, 1) " +
+            // Since the 2026-09-04 update commands live in a registry; this
+            // is the same call constructionPanel.lua makes for an upgrade click.
+            "      Import('common/commands/definitions/buildQueue.lua')" +
+            ".RequestQueueAmount.Send({ hover.id }, { itemId }, up, 1) " +
             // Lets the C# side confirm the hook is actually firing; the Lua
             // log is not much use for that from here.
             "      __SdbAssistUpgradeCount = (__SdbAssistUpgradeCount or 0) + 1 " +
