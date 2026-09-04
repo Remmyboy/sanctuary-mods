@@ -1,78 +1,122 @@
 using System;
-using System.Collections.Generic;
-using EM.Components;
+using System.IO;
 using EM.DOTS.Engine.Loader;
-using EM.GameUtils;
-using EM.Map;
+using EM.Lua.Client;
 using EM.Network;
+using EM.Network.Replay;
+using EM.Network.Sockets;
 using EM.UI;
 using HarmonyLib;
-using Unity.Collections;
 using UnityEngine;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud.Replays
 {
-    // Plays a recording back through the game's own client. The client never
-    // simulates on its own: it applies the host's packet for each tick, and
-    // its rate manager only steps once a packet for that tick is buffered.
-    // So playback is just the normal client start-up with no socket, plus a
-    // feeder that pushes recorded packets into the receive buffer at the
-    // chosen speed. Pause is "feed nothing"; fast-forward is "feed ahead" and
-    // the client catches up as fast as it can simulate.
+    // Drives the game's own replay playback. The game plays a `.sanreplay`
+    // through ReplayClientSockets, a fake socket that reads recorded packets
+    // into the client's receive buffer, paced by the sim speed, with at most
+    // 32 ticks queued. The client only steps a tick once its packet is
+    // buffered, so everything here is about that socket:
     //
-    // Rewind is the one thing the client can't do, since it keeps no
-    // snapshots: going back means leaving through the game's own quit path
-    // (which reloads the scene), starting the client again once the menu is
-    // back, and fast-forwarding to the target tick.
+    //   pause        a prefix on its Receive that feeds nothing
+    //   speed        the client's own SetSimulationSpeed (0.1x to 16x)
+    //   position     frames read (a postfix on TryReadFrame) minus queued
+    //   length       a scan of the file's frame headers
+    //   fast-forward speed 16x until the target tick is reached
+    //   rewind       the game's quit path, then StartReplayPlayback again
+    //
+    // Nothing is recorded by the mod any more; the game writes the file.
     internal static class ReplayPlayer
     {
         internal enum Stage { Idle, Loading, Running, Finished }
 
         internal static Stage Current { get; private set; } = Stage.Idle;
         internal static bool Active => Current != Stage.Idle;
-        internal static ReplayHeader Header { get; private set; }
         internal static string FilePath { get; private set; }
-        internal static int PovClientId { get; private set; }
-        internal static float Speed = 1f;
-        internal static bool Paused;
-
-        /// Tick the player is fast-forwarding to, or -1. Cleared once the
-        /// client has caught up.
+        internal static ReplayFile.Header Header;
+        internal static int TotalTicks { get; private set; }
         internal static int SeekTarget { get; private set; } = -1;
-
-        /// True from a rewind being requested until the client is running
-        /// again; the panel keeps showing through the restart.
         internal static bool Restarting => _restart != null;
 
-        private static List<ReplayFrame> _frames;
-        private static int _fed;
-        private static double _clock;         // playback position, in ticks
-        private static string _savedMapPref;
-        private static float _loadingSince;
+        private static float _speed = 1f;
+        internal static float Speed
+        {
+            get => _speed;
+            set
+            {
+                _speed = Mathf.Clamp(value, 0.1f, 16f);
+                _speedDirty = true;
+            }
+        }
+        private static bool _speedDirty;
+
+        internal static bool Paused;
+
+        private static object _socket;             // the ReplayClientSockets being driven
+        private static int _fed;                   // frames the socket has read from the file
+        private static float _seekSpeedBefore;
+        private static bool _seekPausedBefore;
 
         private sealed class PendingRestart
         {
             public string Path;
-            public int PovClientId;
             public int TargetTick;
             public float Speed;
             public bool Paused;
             public InterfaceManager OldInterface;
-            public EngineLoader OldLoader;
             public float StoppedAt;
             public bool WaitingForScene;
         }
-
         private static PendingRestart _restart;
 
-        // Packets waiting in the client's buffer each hold a 1 MB rewindable
-        // allocator, so feeding far ahead costs memory rather than time.
-        private const int MaxBuffered = 30;
-        private const float LoadTimeoutSeconds = 600f;
+        // Private members of the game's replay socket.
+        private static AccessTools.FieldRef<object, string> _filePathRef;
+        private static AccessTools.FieldRef<object, bool> _loadedRef;
+        private static AccessTools.FieldRef<object, bool> _endRef;
+        private static AccessTools.FieldRef<object, bool> _launchSentRef;
+        private static Func<INetworkClientSockets> _clientSockets;
 
-        internal static int TotalTicks => _frames?.Count ?? 0;
-        internal static int CurrentTick => Math.Max(0, _fed - Buffered);
+        internal static event Action OnLuaStartup;   // the client VM exists; install early hooks
+
+        internal static void ApplyPatches(Harmony harmony)
+        {
+            var t = typeof(ReplayClientSockets);
+            _filePathRef = AccessTools.FieldRefAccess<string>(t, "filePath");
+            _loadedRef = AccessTools.FieldRefAccess<bool>(t, "hasClientLoaded");
+            _endRef = AccessTools.FieldRefAccess<bool>(t, "hasReachedEnd");
+            _launchSentRef = AccessTools.FieldRefAccess<bool>(t, "hasSentLaunchMessages");
+            var socketsField = AccessTools.Field(typeof(NetworkManager), "clientSockets")
+                               ?? throw new MissingFieldException("NetworkManager.clientSockets");
+            _clientSockets = () => (INetworkClientSockets)socketsField.GetValue(null);
+
+            harmony.Patch(AccessTools.Method(t, "Receive"),
+                prefix: new HarmonyMethod(typeof(ReplayPlayer), nameof(ReceivePrefix)));
+            harmony.Patch(AccessTools.Method(t, "TryReadFrame") ?? throw new MissingMethodException("ReplayClientSockets.TryReadFrame"),
+                postfix: new HarmonyMethod(typeof(ReplayPlayer), nameof(TryReadFramePostfix)));
+            harmony.Patch(AccessTools.Method(typeof(ClientLuaInterface), nameof(ClientLuaInterface.Startup)),
+                postfix: new HarmonyMethod(typeof(ReplayPlayer), nameof(LuaStartupPostfix)));
+        }
+
+        // Pause: once the launch messages are through, a paused socket reads
+        // nothing, and the client stops at the last buffered tick.
+        private static bool ReceivePrefix(object __instance)
+        {
+            if (!Paused || !ReferenceEquals(__instance, _socket)) return true;
+            try { if (!_launchSentRef(__instance)) return true; } catch { return true; }
+            return false;
+        }
+
+        private static void TryReadFramePostfix(object __instance, bool __result)
+        {
+            if (__result && ReferenceEquals(__instance, _socket)) _fed++;
+        }
+
+        private static void LuaStartupPostfix()
+        {
+            if (!NetworkManager.IsReplayPlayback) return;
+            try { OnLuaStartup?.Invoke(); }
+            catch (Exception e) { _log.LogWarning($"Replay: early Lua hook failed: {e.Message}"); }
+        }
 
         private static int Buffered
         {
@@ -87,264 +131,143 @@ namespace SanctuaryHud.Replays
             }
         }
 
-        internal static void ApplyPatches(Harmony harmony)
-        {
-            // The client start-up coroutine reports "Waiting for players" at
-            // 100% right before it would tell a host it is loaded. That is the
-            // moment the receive buffer may start filling.
-            var report = AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.SetLoadingStatusReport),
-                             new[] { typeof(string), typeof(float) })
-                         ?? throw new MissingMethodException("InterfaceManager.SetLoadingStatusReport(string, float)");
-            harmony.Patch(report, postfix: new HarmonyMethod(typeof(ReplayPlayer), nameof(LoadingStatusPostfix)));
-        }
+        internal static int CurrentTick => Math.Max(0, _fed - Buffered);
 
-        private static void LoadingStatusPostfix(float percentage)
-        {
-            if (Current == Stage.Loading && percentage >= 0.999f) OnClientLoaded();
-        }
-
-        /// Starts playback from the main menu. Returns null on success, else a
-        /// reason for the UI.
-        internal static string Start(string path, int povClientId)
-        {
-            if (InMatch) return "leave the match first";
-            return Launch(path, povClientId);
-        }
-
-        private static string Launch(string path, int povClientId)
-        {
-            if (Active) return "a replay is already playing";
-            if (LobbyManager.IsInLobby) return "leave the lobby first";
-            if (InterfaceManager.Instance == null || EngineLoader.Instance == null) return "the game UI is not ready";
-
-            List<ReplayFrame> frames;
-            ReplayHeader header;
-            try
-            {
-                frames = ReplayFile.ReadFrames(path, out header);
-            }
-            catch (Exception e)
-            {
-                return "could not read the replay: " + e.Message;
-            }
-            if (frames.Count == 0) return "the replay holds no ticks";
-            if (string.IsNullOrEmpty(header.Map)) return "the replay has no map path";
-            if (header.GameVersion != Application.version)
-            {
-                _log.LogWarning($"Replay was recorded on game version '{header.GameVersion}', this is '{Application.version}'; it may not play back cleanly.");
-            }
-
-            try
-            {
-                // A client context with no socket: the send side returns early
-                // without a server connection, and the receive side is what
-                // the feeder fills.
-                NetworkManager.CreateClient(NetworkTransport.LAN);
-                ref var net = ref NetworkManager.ClientData.Data;
-                net.ownClientID = (byte)povClientId;
-
-                // SelectedMapPath is a PlayerPref; put the user's pick back
-                // once the map has loaded.
-                _savedMapPref = MapManager.SelectedMapPath;
-                MapManager.SelectedMapPath = header.Map;
-
-                InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Loading);
-                InterfaceManager.Instance.SetLoadingStatusReport("Loading replay...", 0f);
-                EngineLoader.Instance.CreateClient();
-                EngineLoader.Instance.LaunchClient();
-            }
-            catch (Exception e)
-            {
-                _log.LogError($"Replay: client start failed: {e}");
-                RestoreMapPref();
-                return "the client could not be started: " + e.Message;
-            }
-
-            _frames = frames;
-            Header = header;
-            FilePath = path;
-            PovClientId = povClientId;
-            _fed = 0;
-            _clock = 0;
-            Paused = false;
-            Speed = 1f;
-            SeekTarget = -1;
-            _loadingSince = Time.realtimeSinceStartup;
-            Current = Stage.Loading;
-            _log.LogInfo($"Replay: playing {path} ({frames.Count} ticks) as client {povClientId}");
-            return null;
-        }
-
-        private static void OnClientLoaded()
-        {
-            RestoreMapPref();
-            Current = Stage.Running;
-            _log.LogInfo("Replay: client loaded, feeding.");
-        }
-
-        internal static void Update(float dt)
+        /// Called every frame. Notices the game starting a replay (from its
+        /// own menu or a rewind), tracks it, and ends with it.
+        internal static void Update()
         {
             if (!Active)
             {
                 if (_restart != null) ContinueRestart();
+                if (NetworkManager.IsReplayPlayback) Begin();
                 return;
             }
 
-            bool created;
-            try { created = NetworkManager.ClientData.Data.isCreated; }
-            catch { created = false; }
-            if (!created)
+            if (!NetworkManager.IsReplayPlayback)
             {
-                // The game tore the client down (quit to menu) without going
-                // through CleanUpGame first.
                 Stop();
                 return;
             }
 
-            if (Current == Stage.Loading)
-            {
-                if (Time.realtimeSinceStartup - _loadingSince > LoadTimeoutSeconds)
-                {
-                    _log.LogError("Replay: the client never finished loading; giving up.");
-                    _restart = null;
-                    Quit();
-                }
-                return;
-            }
-            if (Current != Stage.Running) return;
-
-            if (!Paused) _clock += dt * 10.0 * Speed;
-
-            int minDelay = 0;
-            try { minDelay = DebugManager.data.miscelenous.minimumSimTickDelayBetweenHostAndClient; }
-            catch { }
-
-            // The client runs to (latest buffered tick - minDelay), so stay
-            // that far ahead of the clock.
-            int target = (int)_clock + minDelay + 1;
-            int buffered = Buffered;
-            while (_fed < _frames.Count && _fed < target && buffered < MaxBuffered)
-            {
-                if (!Feed(_frames[_fed]))
-                {
-                    Current = Stage.Finished;
-                    return;
-                }
-                _fed++;
-                buffered++;
-            }
-            // Don't let the clock run away while the client is still catching
-            // up, or a pause would take seconds to bite. A seek is the one
-            // time the clock is meant to be far ahead: hold it at the target
-            // until the client gets there.
-            if (SeekTarget >= 0 && CurrentTick >= SeekTarget) SeekTarget = -1;
-            if (_clock > _fed + MaxBuffered)
-            {
-                _clock = Math.Max(_fed + MaxBuffered, SeekTarget >= 0 ? SeekTarget : 0);
-            }
-            if (_fed >= _frames.Count && Buffered == 0) Current = Stage.Finished;
-        }
-
-        // A decoded frame is put back into the wire layout the client's own
-        // deserialiser expects: brotli(simTick) int int brotli(types)
-        // brotli(data) brotli(hash). Fastest quality; it's undone a moment
-        // later and only has to be a valid stream.
-        private static byte[] Encode(ReplayFrame f)
-        {
-            var d = f.Data;
-            int typeCount = BitConverter.ToInt32(d, 16);
-            int dataCount = BitConverter.ToInt32(d, 20);
-            using (var ms = new System.IO.MemoryStream(d.Length / 2 + 64))
-            {
-                Block(ms, BitConverter.GetBytes(f.Tick), 0, 4);
-                ms.Write(d, 16, 8);
-                Block(ms, d, 24, typeCount);
-                Block(ms, d, 24 + typeCount, dataCount);
-                Block(ms, d, 0, 16);
-                return ms.ToArray();
-            }
-        }
-
-        private static void Block(System.IO.Stream ms, byte[] src, int offset, int count)
-        {
-            using (var brotli = Brotli.Compress(ms, System.IO.Compression.CompressionLevel.Fastest))
-            {
-                brotli.Write(src, offset, count);
-            }
-        }
-
-        private static bool Feed(ReplayFrame f)
-        {
-            ref var net = ref NetworkManager.ClientData.Data;
-            var wire = f.Kind == ReplayFrame.KindDecoded ? Encode(f) : f.Data;
-            var payload = new NativeArray<byte>(wire, Allocator.Temp);
+            bool loaded = false, ended = false;
             try
             {
-                // Same three steps NetworkManager takes for a HostData message.
-                var alloc = net.GetRewindableAllocator();
-                var packet = default(HostToClientCommunicatorDataSingleton);
-                if (packet.DeserializeNetworkData(payload, alloc.Allocator.ToAllocator, out var read) && read == payload.Length)
-                {
-                    net.receivedHostData.bufferedCommunicatorDatas.Add(in packet);
-                    net.receivedHostData.allocatorsInUse.Add(in alloc);
-                    return true;
-                }
-                net.ReturnAllocator(alloc);
-                _log.LogError($"Replay: tick {f.Tick} would not decode ({read} of {payload.Length} bytes); stopping here.");
-                return false;
+                loaded = _loadedRef(_socket);
+                ended = _endRef(_socket);
             }
-            finally
+            catch { }
+
+            if (Current == Stage.Loading && loaded) Current = Stage.Running;
+            if (Current == Stage.Running)
             {
-                payload.Dispose();
+                if (ended && Buffered == 0) Current = Stage.Finished;
+                if (SeekTarget >= 0 && (CurrentTick >= SeekTarget || Current == Stage.Finished)) EndSeek();
+            }
+
+            if (_speedDirty && LuaReady)
+            {
+                _speedDirty = !RunLua($"pcall(function() Engine.SetSimulationSpeed({_speed.ToString(System.Globalization.CultureInfo.InvariantCulture)}) end)");
             }
         }
 
-        /// Moves to a tick. Forward is a fast-forward: the clock jumps and the
-        /// client catches up. Backward restarts the client and fast-forwards
-        /// from the beginning.
+        private static void Begin()
+        {
+            _socket = _clientSockets();
+            if (_socket == null) return;
+            try { FilePath = _filePathRef(_socket); }
+            catch { FilePath = null; }
+            _fed = 0;
+            Paused = false;
+            _speedDirty = false;
+            _speed = 1f;
+            SeekTarget = -1;
+            Header = default;
+            TotalTicks = 0;
+            if (FilePath != null) ReadFile(FilePath);
+            Current = Stage.Loading;
+            _log.LogInfo($"Replay: playback of {FilePath} ({TotalTicks} ticks) started; controls on.");
+        }
+
+        // The header the game wrote, and how many frames follow it: each is
+        // a type byte and an int length, so counting is a seek per frame.
+        private static void ReadFile(string path)
+        {
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    if (!ReplayFile.TryReadHeader(fs, out Header)) return;
+                    var head = new byte[5];
+                    int count = 0;
+                    while (fs.Read(head, 0, 5) == 5)
+                    {
+                        var len = BitConverter.ToInt32(head, 1);
+                        if (len < 0 || fs.Position + len > fs.Length) break;
+                        fs.Seek(len, SeekOrigin.Current);
+                        count++;
+                    }
+                    TotalTicks = count;
+                }
+            }
+            catch (Exception e)
+            {
+                _log.LogWarning($"Replay: could not read {path}: {e.Message}");
+            }
+        }
+
+        /// Moves to a tick. Forward runs the socket at 16x until the client
+        /// gets there; backward restarts playback and does the same from 0.
         internal static void SeekTo(int tick)
         {
             if (Current != Stage.Running && Current != Stage.Finished) return;
-            tick = Math.Max(0, Math.Min(tick, TotalTicks - 1));
+            tick = Math.Max(0, Math.Min(tick, Math.Max(0, TotalTicks - 1)));
             if (tick >= CurrentTick)
             {
                 if (Current == Stage.Finished) return;
-                _clock = Math.Max(_clock, tick);
+                if (SeekTarget < 0)
+                {
+                    _seekSpeedBefore = _speed;
+                    _seekPausedBefore = Paused;
+                }
                 SeekTarget = tick;
+                Paused = false;
+                Speed = 16f;
                 return;
             }
+            if (FilePath == null) return;
 
             _restart = new PendingRestart
             {
                 Path = FilePath,
-                PovClientId = PovClientId,
                 TargetTick = tick,
-                Speed = Speed,
-                Paused = Paused,
+                Speed = SeekTarget >= 0 ? _seekSpeedBefore : _speed,
+                Paused = SeekTarget >= 0 ? _seekPausedBefore : Paused,
                 OldInterface = InterfaceManager.Instance,
-                OldLoader = EngineLoader.Instance,
             };
             SeekTarget = tick;
-            _log.LogInfo($"Replay: rewinding to tick {tick}, restarting the client.");
-            // The game's own quit path: CleanUpGame (our Stop) then a scene reload.
+            _log.LogInfo($"Replay: rewinding to tick {tick}, restarting playback.");
             EngineLoader.isGameRestartRequested = true;
         }
 
-        internal static void SkipBy(int seconds)
+        private static void EndSeek()
         {
-            SeekTo(CurrentTick + seconds * 10);
+            SeekTarget = -1;
+            Speed = _seekSpeedBefore;
+            Paused = _seekPausedBefore;
         }
 
-        // Runs while idle with a rewind pending: wait for the scene reload to
-        // hand us fresh UI and loader instances, then launch again.
+        internal static void SkipBy(int seconds) => SeekTo(CurrentTick + seconds * 10);
+
+        // After the game's quit path has reloaded the scene, start the same
+        // file again the way the replay menu does.
         private static void ContinueRestart()
         {
             var r = _restart;
             if (!r.WaitingForScene) return;
             if (Time.realtimeSinceStartup - r.StoppedAt < 1f) return;
             var ui = InterfaceManager.Instance;
-            var loader = EngineLoader.Instance;
-            if (ui == null || loader == null || ui == r.OldInterface || loader == r.OldLoader)
+            if (ui == null || ui == r.OldInterface || EngineLoader.Instance == null)
             {
                 if (Time.realtimeSinceStartup - r.StoppedAt > 30f)
                 {
@@ -354,22 +277,23 @@ namespace SanctuaryHud.Replays
                 }
                 return;
             }
-
             _restart = null;
-            var error = Launch(r.Path, r.PovClientId);
-            if (error != null)
+            ui.TransitionTo(InterfaceManager.Window.Loading);
+            if (!NetworkManager.StartReplayPlayback(r.Path, out var error))
             {
                 _log.LogError($"Replay: rewind failed: {error}");
+                ui.TransitionTo(InterfaceManager.Window.Main);
                 SeekTarget = -1;
                 return;
             }
-            _clock = r.TargetTick;
-            Speed = r.Speed;
-            Paused = r.Paused;
+            Begin();
+            _seekSpeedBefore = r.Speed;
+            _seekPausedBefore = r.Paused;
             SeekTarget = r.TargetTick;
+            Speed = 16f;
         }
 
-        /// Leaves via the game's own quit path, which ends in CleanUpGame.
+        /// Leaves via the game's own quit path.
         internal static void Quit()
         {
             if (!Active) return;
@@ -381,11 +305,9 @@ namespace SanctuaryHud.Replays
         {
             if (!Active) return;
             Current = Stage.Idle;
-            _frames = null;
-            Header = null;
+            _socket = null;
             FilePath = null;
             _fed = 0;
-            RestoreMapPref();
             if (_restart != null)
             {
                 _restart.WaitingForScene = true;
@@ -395,13 +317,6 @@ namespace SanctuaryHud.Replays
             {
                 SeekTarget = -1;
             }
-        }
-
-        private static void RestoreMapPref()
-        {
-            if (_savedMapPref == null) return;
-            try { MapManager.SelectedMapPath = _savedMapPref; } catch { }
-            _savedMapPref = null;
         }
     }
 }

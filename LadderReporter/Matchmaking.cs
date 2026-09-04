@@ -591,7 +591,7 @@ namespace SanctuaryHud
                 Logger.LogWarning($"Matchmaking: UI move via CreateLobby failed ({e.Message}); using the public route.");
             }
             ui.TransitionTo(InterfaceManager.Window.Lobby);
-            LobbyInterface.Instance?.ClearData();
+            LobbyInterface.Instance?.Clear();
             LobbyInterface.Instance?.UpdateData(state);
         }
 
@@ -607,7 +607,7 @@ namespace SanctuaryHud
             Logger.LogInfo($"Matchmaking: joining session {sessionId}.");
             Overlay("LAUNCHING", "Joining the host's lobby...", 120f);
             SetPhase(Phase.JoinerJoining);
-            ui.JoinSessionFromInvite(sessionId);
+            ui.JoinSessionFromInvite(new PlayerID(sessionId));
         }
 
         private void TickMatch()

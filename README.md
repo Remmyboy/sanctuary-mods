@@ -17,7 +17,7 @@ players. The exceptions are called out in their own sections below.
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
-| [Replays](Replays/) | `Replays.dll` | Records matches; plays them back fog-free from any seat |
+| [Replays](Replays/) | `Replays.dll` | Watch the game's replays fog-free from any seat, with every economy |
 | [ModManager](ModManager/) | `ModManager.dll` | F8 window: Lua mod overlays + plugin toggles |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
 | [SanctuaryHudLoader](SanctuaryHudLoader/) | `SanctuaryHudLoader.dll` | Hot-reload host for all of the above |
@@ -163,91 +163,60 @@ the host logs.
 
 ## Replays
 
-Records every match to a file and plays it back inside the game with the
-fog lifted, from any player's seat, with every army's economy on screen.
-Press **F7** in the main menu for the browser; during playback F7 shows and
-hides the control panel. Replays land in `Documents\Sanctuary Replays` as
-`202609031240_There_Is_Time_Remmy_vs_Skoub.sanrep` — date to the minute,
-map, then the seats grouped by team (folder and key are configurable from
-the F8 window).
+Makes the game's own replays watchable properly: any player's point of view
+or every army at once, the fog lifted, every army's economy with whole-game
+totals, and a transport with pause, speed, seek and rewind. Since the
+playtest update of 2026-09-04 the game records every match to
+`%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary Shattered Sun\Replays\*.sanreplay`
+and plays them from the main menu's replay list; the panel appears whenever
+one is playing, and **F7** shows and hides it.
 
-**Why it works.** Only the host simulates. Every client receives one packet
-per sim tick (ten a second) holding the host's ordered command stream — unit
-spawns, health, move orders, the Lua-level custom commands — and the host
-appends the *same bytes* to every connection: there is no per-client
-filtering. Fog is a client-side test of each unit's intel bitmask against the
-focused army, and the economy totals of every army are broadcast and simply
-dropped by the client when they aren't the focused army's. So any client's
-inbound stream is a full-information record of the match, and the game
-already knows how to turn that stream into a picture.
+**What the game does.** Its replay is the host-to-client packet stream,
+written by the client as it arrives, behind a small header (map, game
+version + Lua hash, recording client). Playback goes through
+`ReplayClientSockets`, a fake socket that synthesises the launch messages
+and then reads recorded packets into the client's receive buffer, paced by
+the sim speed, at most 32 ticks ahead. The client only steps a tick once its
+packet is buffered, so the socket's feed rate is the playback rate. This is
+the same design the mod used before (see [archive/](Replays/archive/)), so
+the mod now only drives the game's socket:
 
-**Recording** is a Harmony prefix on the client's message parser
-(`NetworkManager.HandleMessage`), writing each host packet behind a small
-JSON header (map, players, game version, Lua hash). It starts on the launch
-message and stops when the client is torn down, on the host machine as much
-as on a joiner's (the host's own client is a socket client too). Nothing in
-the Lua tree or the simulation is touched, so recording is lobby-safe. While
-a match is open the file is a raw `.part`, flushed every couple of seconds;
-on leaving it is compressed in the background. A game that crashed still
-leaves a playable `.part`.
+- **pause** is a Harmony prefix on the socket's `Receive` that feeds nothing
+  once the launch messages are through;
+- **speed** is the client's own `Engine.SetSimulationSpeed` (0.1× to 16×),
+  which is what the socket paces by;
+- **position** is frames read (a postfix on `TryReadFrame`) minus frames
+  still queued; **length** is a scan of the file's frame headers;
+- **fast-forward** runs at 16× until the target tick; **rewind** leaves
+  through the game's quit path (scene reload) and calls the game's own
+  `StartReplayPlayback` on the same file again, then fast-forwards. There
+  are no snapshots to seek with, so going back costs a restart.
 
-The game Brotli-compresses each packet field on its own, which leaves a
-second compressor nothing to find, so the recorder decodes the fields with
-the game's own `NetworkUtils.DecompressData` and stores them plain; one
-long-window Brotli pass over the whole file then sees how alike consecutive
-ticks are. A seven-minute 1v1 is about 0.7 MB (2.7× smaller than gzip over
-the wire bytes). Maps that spawn tens of thousands of props at start add a
-fixed per-map cost that does not compress well. The format is
-`"SANREP02" jsonLen json encoding` then frames of
-`kind simTick len bytes`; kind 0 is decoded fields, kind 1 the packet as it
-came off the socket (the fallback if decoding ever fails); `encoding` is 0
-for a raw part and 1 once everything after it is one Brotli stream.
-Format-1 files (gzipped wire packets) still load. `BrotliStream` is reached
-by reflection because the .NET Framework reference assembly this compiles
-against lacks it and MSBuild prefers that one by version.
-
-**Playback** creates a client context with no socket — the game's own send
-path returns early without a server connection — points the map loader at the
-recorded map, and starts the client exactly as a joiner would. Once the
-loading screen reports it is waiting for players, a feeder pushes recorded
-packets into the same receive buffer the network layer fills (decoded frames
-are re-encoded at the fastest Brotli setting first, so the game's
-deserialiser is used unchanged), pacing them by a clock the panel controls.
-The client's own rate manager does the rest: it only steps a tick once that
-tick's packet is buffered, so pausing is feeding nothing and fast-forward is
-feeding ahead (the client catches up as fast as it can simulate). Rewind has
-no snapshots to use, so it goes through the game's own quit path (scene
-reload), relaunches the client, and fast-forwards to the target; speed,
-pause state and the viewed army are put back afterwards. The recorded
-per-tick hash is the same one the game uses for its desync check, so a
-replay that diverges is detectable.
-
-**The panel** has the clock, play/pause, a log-scale speed slider (0.25× to
-8×), ±1 minute, a FOG toggle for the post-process overlay, a TIMELINE toggle
-that hides the total length and the seek bar for watching without knowing
-when the game ends, and one row per army: the name button (in the army's own
-colour) switches to that army's view, then alloy and energy as a storage bar,
-net / in / out per second, and the amount used so far in the game. ALL is the
-game's own all-armies observer mode. The browser lists replays newest first
-with map, length and players, offers each human's seat, and flags a replay
-recorded on a different game build.
-
-**Seats and fog.** The player whose view you open from is just the client ID
-the packets are read as: the host's `InitClient` message for that seat is in
-every packet, so any human's seat is available. Once in, the view buttons
-call the client's own `SetFocusArmy` — `-1` shows every army — and the fog
+**Seats, fog, economy.** The recording's `InitClient` message only seats the
+client that recorded it, so the view buttons call the client's own
+`SetFocusArmy` (`-1` is the game's all-armies observer mode) and the fog
 post-process is switched with the focus (or by hand). The client is marked
 an observer so clicks can't issue orders into the void. Every army's economy
-comes from a runtime wrapper around the client's `UpdateEconomyTotals`
-receiver that keeps all armies' totals and sums income and spend per tick
-for the whole-game figures; the receiver's format table is a `local` in
-`commands.lua`, reached as an upvalue of the original function (with a
-literal copy as fallback).
+comes from a wrapper on `UpdateEconomyTotals.Receive` in the game's command
+registry, which keeps all armies' totals and sums income and spend per tick;
+the registry hands the receiver an already-decoded payload, so the wrapper
+is a few lines. Player names come from the recorded lobby: a wrapper on the
+`ReceiveDataClient` global captures `InitClient`'s roster. Both hooks are
+installed from a postfix on `ClientLuaInterface.Startup`, before the first
+packet is applied, with the half-second poll as fallback.
 
-**Caveats.** A replay is tied to the game build and the map files it was
-recorded with; a patch that changes a command format will break old files.
-Playback is a normal client, so the other mods in this repo behave as they
-would in a match and follow the focused army.
+**The panel** has the clock, play/pause, a log-scale speed slider, ±1
+minute, a FOG toggle, a TIMELINE toggle that hides the total length and the
+seek bar for watching without knowing when the game ends, QUIT, and one row
+per army: the name button (in the army's own colour) switches to that army's
+view, then alloy and energy as a storage bar, net / in / out per second, and
+the amount used so far in the game. ALL shows every army.
+
+**Caveats.** A replay is tied to the game build and Lua hash it was recorded
+with; the game's own list greys out mismatches. Playback is a normal client,
+so the other mods in this repo behave as they would in a match and follow
+the focused army. A recorded change of sim speed by the host would override
+the speed slider for a moment; the panel re-applies its value.
 
 ## ModManager
 

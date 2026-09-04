@@ -2,44 +2,34 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using EM.DOTS.Engine.Loader;
+using EM.Network;
 using HarmonyLib;
 using UnityEngine;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud.Replays
 {
-    // Records every match to a file and plays recordings back in-game with
-    // the fog lifted, any player's point of view, and every army's economy.
+    // Makes the game's own replays watchable properly: any player's point of
+    // view or every army at once, the fog lifted, every army's economy with
+    // whole-game totals, and a transport with pause, speed, seek and rewind.
     //
-    // Recording: see ReplayRecorder. Playback: see ReplayPlayer. This class
-    // is the config, the hotkey, the replay browser (main menu) and the
-    // control panel (during playback), plus the runtime Lua hooks that make
-    // the client keep every army's economy totals instead of only the
-    // focused one.
-    [BepInPlugin("com.sanctuarydb.replays", "Replays", "0.1.0")]
+    // The game records every match to a `.sanreplay` and plays it back from
+    // the main menu's replay list; this panel appears whenever one is
+    // playing. Driving the playback lives in ReplayPlayer; this class is the
+    // config, the hotkey, the runtime Lua hooks (economy for every army, the
+    // lobby roster for names, observer mode) and the panel.
+    [BepInPlugin("com.sanctuarydb.replays", "Replays", "0.2.0")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
-        private ConfigEntry<bool> _cfgRecord;
-        private ConfigEntry<string> _cfgFolder;
         private ConfigEntry<KeyCode> _cfgKey;
-        private ConfigEntry<bool> _cfgRecIndicator;
         private ConfigEntry<bool> _cfgTimeline;
         private ConfigEntry<float> _cfgPosX;
         private ConfigEntry<float> _cfgPosY;
 
-        // Browser (main menu).
-        private bool _browserOpen;
-        private List<Entry> _entries;
-        private Vector2 _scroll;
-        private string _status;
-        private Rect _browserRect = new Rect(160, 100, 1000, 620);
-
-        // Control panel (playback).
         private bool _controlsOpen = true;
         private Rect _ctrlRect = new Rect(12, 300, 0, 0);
         private bool _fogOverlay;
@@ -50,9 +40,9 @@ namespace SanctuaryHud.Replays
         private bool _luaHooked;
         private List<ArmyRow> _armies = new List<ArmyRow>();
         private Dictionary<int, EcoRow> _eco = new Dictionary<int, EcoRow>();
+        private Dictionary<int, string> _seatNames = new Dictionary<int, string>();   // armyId -> nickname
         private int _focus = int.MinValue;
         private string _lastHookErr;
-        private bool _loggedLuaSample;
 
         // Seek bar: the knob sets a target while dragged; it is applied when
         // the mouse comes up, so a drag doesn't fire a restart per pixel.
@@ -60,16 +50,6 @@ namespace SanctuaryHud.Replays
         private float _dragValue;
         // View to put back after a rewind rebuilds the client.
         private int _pendingFocus = int.MinValue;
-
-        private sealed class Entry
-        {
-            public string Path;
-            public string Name;
-            public DateTime Written;
-            public ReplayHeader Header;
-            public bool Unfinished;
-            public string Error;
-        }
 
         private sealed class ArmyRow
         {
@@ -91,84 +71,51 @@ namespace SanctuaryHud.Replays
         {
             _log ??= Logger;
 
-            _cfgRecord = Config.Bind("Recording", "Enabled", true,
-                "Record every match you play or observe to a replay file.");
-            _cfgFolder = Config.Bind("Recording", "Folder", "",
-                "Where replays are saved. Empty means Documents\\Sanctuary Replays.");
+            _cfgKey = Config.Bind("UI", "ToggleKey", KeyCode.F7,
+                "Shows/hides the replay control panel during playback.");
             _cfgTimeline = Config.Bind("UI", "ShowTimeline", true,
                 "Show the replay's total length and the seek bar. Off hides both, for watching without knowing when the game ends.");
-            _cfgRecIndicator = Config.Bind("Recording", "ShowIndicator", true,
-                "Show a small REC marker in the corner while a match is being recorded.");
-            _cfgKey = Config.Bind("UI", "ToggleKey", KeyCode.F7,
-                "Opens the replay browser in the main menu, and shows/hides the control panel during playback.");
             _cfgPosX = Config.Bind("UI", "PanelX", 12f, "Playback control panel X in 1080p-logical pixels.");
             _cfgPosY = Config.Bind("UI", "PanelY", 300f, "Playback control panel Y in 1080p-logical pixels.");
             _ctrlRect.x = _cfgPosX.Value;
             _ctrlRect.y = _cfgPosY.Value;
 
-            ReplayRecorder.Folder = ResolveFolder();
-            ReplayRecorder.Enabled = _cfgRecord.Value;
-
             try
             {
                 _harmony = new Harmony("com.sanctuarydb.replays." + Guid.NewGuid().ToString("N").Substring(0, 8));
-                // In-match signal, same as the other mods.
-                ApplyEconomyPatch(_harmony);
-                ReplayRecorder.ApplyPatches(_harmony);
+                ApplyEconomyPatch(_harmony);   // the in-match signal, same as the other mods
                 ReplayPlayer.ApplyPatches(_harmony);
                 _harmony.Patch(AccessTools.Method(typeof(EngineLoader), nameof(EngineLoader.CleanUpGame)),
                     prefix: new HarmonyMethod(typeof(ReplaysPlugin), nameof(CleanUpPrefix)));
+                ReplayPlayer.OnLuaStartup += InstallEarlyHooks;
             }
             catch (Exception e)
             {
-                Logger.LogError($"Replays: patching failed, recording and playback are off: {e}");
+                Logger.LogError($"Replays: patching failed, the replay panel is off: {e}");
                 _harmony?.UnpatchSelf();
                 _harmony = null;
             }
 
-            Logger.LogInfo($"Replays loaded: {_cfgKey.Value} for the browser, saving to {ReplayRecorder.Folder}.");
+            Logger.LogInfo($"Replays loaded: play a replay from the game's menu; {_cfgKey.Value} shows/hides the panel.");
         }
 
         private void OnDestroy()
         {
-            ReplayRecorder.Stop();
+            ReplayPlayer.OnLuaStartup -= InstallEarlyHooks;
             ReplayPlayer.Stop();
             _harmony?.UnpatchSelf();
         }
 
-        // Leaving a match, by any route, ends both.
         private static void CleanUpPrefix()
         {
-            ReplayRecorder.Stop();
             ReplayPlayer.Stop();
-        }
-
-        private string ResolveFolder()
-        {
-            var folder = _cfgFolder.Value;
-            if (string.IsNullOrWhiteSpace(folder))
-            {
-                folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Sanctuary Replays");
-            }
-            return folder;
         }
 
         private void Update()
         {
-            ReplayRecorder.Enabled = _cfgRecord.Value;
-            ReplayRecorder.Folder = ResolveFolder();
+            if (Input.GetKeyDown(_cfgKey.Value) && ReplayPlayer.Active) _controlsOpen = !_controlsOpen;
 
-            if (Input.GetKeyDown(_cfgKey.Value))
-            {
-                if (ReplayPlayer.Active) _controlsOpen = !_controlsOpen;
-                else if (!InMatch)
-                {
-                    _browserOpen = !_browserOpen;
-                    if (_browserOpen) Rescan();
-                }
-            }
-
-            ReplayPlayer.Update(Time.unscaledDeltaTime);
+            ReplayPlayer.Update();
 
             if (_dragging && !Input.GetMouseButton(0))
             {
@@ -186,61 +133,46 @@ namespace SanctuaryHud.Replays
                     _cfgPosY.Value = _ctrlRect.y;
                 }
             }
-            else if (_luaHooked || _armies.Count > 0)
+            else if (_luaHooked || _armies.Count > 0 || _seatNames.Count > 0)
             {
                 _luaHooked = false;
                 _armies = new List<ArmyRow>();
                 _eco = new Dictionary<int, EcoRow>();
+                _seatNames = new Dictionary<int, string>();
                 _focus = int.MinValue;
                 _lastFocus = int.MinValue;
+                _lastRowCount = -1;
             }
         }
 
         // ---- Lua side ------------------------------------------------------
 
-        // Keeps every army's economy totals, not just the focused army's. The
-        // receiver is looked up from the command table each time, so swapping
-        // the table entry catches it; the format table it needs is a local of
-        // commands.lua, reachable only as an upvalue of the original receiver.
-        // Also marks this client an observer so clicks can't issue orders.
+        // Installed as soon as the client VM exists, before the first host
+        // packet, so the lobby roster (InitClient) is seen. Guarded by a
+        // global, so running it again later is harmless.
+        //
+        // - Every army's economy: the registry calls `command.Receive` through
+        //   the command table each time, so swapping the field catches it, and
+        //   the payload arrives already decoded.
+        // - The roster: `ReceiveDataClient` is a plain global (networking.lua
+        //   is `require`d), and InitClient's data carries every seat's
+        //   nickname, army and client id.
+        // - Observer: so clicks can't issue orders into the void.
         private const string InstallChunk =
             "if not __SdbReplayHook then " +
             "  __SdbReplayHook = true " +
             "  __SdbReplayEco = '' " +
+            "  __SdbReplayPlayers = '' " +
             "  __SdbReplayHookErr = '' " +
             "  pcall(function() SetObserver(true) end) " +
             "  local ok, err = pcall(function() " +
-            "    local C = Import('common/systems/commands.lua') " +
-            "    local cmd = C.HostCustomCommands.UpdateEconomyTotalsCommand " +
-            "    local orig = cmd.ClientReceive " +
-            "    local bs = Import('common/systems/binarySerialization.lua') " +
-            "    local fmt = nil " +
-            "    pcall(function() " +
-            "      for i = 1, 64 do " +
-            "        local n, v = debug.getupvalue(orig, i) " +
-            "        if not n then break end " +
-            "        if n == 'commandFormats' then fmt = v.UpdateEconomyTotalsCommand end " +
-            "      end " +
-            "    end) " +
-            // The receiver's format table is a local of commands.lua; if it
-            // can't be reached as an upvalue, fall back to a copy of it.
-            "    if not fmt then " +
-            "      local f = {} " +
-            "      for _, k in ipairs({'current','storage','satisfaction','income','harvest','outcome','request','balance'}) do " +
-            "        f[#f+1] = { key = k, type = 'float' } " +
-            "      end " +
-            "      fmt = { { key = 'armyId', type = 'int' }, " +
-            "              { key = 'totals', type = { type = 'dictionary', key_type = 'string', value_type = f } } } " +
-            "      __SdbReplayHookErr = 'format copied' " +
-            "    end " +
-            "    local eco = {} " +
-            "    local sum = {} " +
-            "    cmd.ClientReceive = function(command) " +
+            "    local E = Import('common/commands/definitions/economy.lua') " +
+            "    local cmd = E.UpdateEconomyTotals " +
+            "    local orig = cmd.Receive " +
+            "    local eco, sum = {}, {} " +
+            "    cmd.Receive = function(data, commandData) " +
             "      local ok2, err2 = pcall(function() " +
-            "        local data = bs.Deserialize(fmt, command.commandData) " +
             "        eco[data.armyId] = data.totals " +
-            // Totals arrive once per army per tick, so summing the per-tick
-            // figures here gives the whole game so far.
             "        local a, e = data.totals.alloys or {}, data.totals.energy or {} " +
             "        local s = sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0 } " +
             "        s.ai = s.ai + (a.income or 0) + (a.harvest or 0) " +
@@ -259,11 +191,28 @@ namespace SanctuaryHud.Replays
             "        end " +
             "        __SdbReplayEco = table.concat(parts, ';') " +
             "      end) " +
-            "      if not ok2 then __SdbReplayHookErr = 'receive: ' .. tostring(err2) end " +
-            "      return orig(command) " +
+            "      if not ok2 then __SdbReplayHookErr = 'eco: ' .. tostring(err2) end " +
+            "      return orig(data, commandData) " +
             "    end " +
             "  end) " +
-            "  if not ok then __SdbReplayHookErr = 'install: ' .. tostring(err) end " +
+            "  if not ok then __SdbReplayHookErr = 'install eco: ' .. tostring(err) end " +
+            "  local ok3, err3 = pcall(function() " +
+            "    local origRecv = _G.ReceiveDataClient " +
+            "    if type(origRecv) ~= 'function' then error('ReceiveDataClient is not a global') end " +
+            "    _G.ReceiveDataClient = function(name, data) " +
+            "      if name == 'InitClient' then " +
+            "        pcall(function() " +
+            "          local parts = {} " +
+            "          for _, p in ipairs(data.playersInformation or {}) do " +
+            "            parts[#parts+1] = string.format('%s|%s|%s|%s', tostring(p.clientID), tostring(p.nickname), tostring(p.armyID), tostring(p.playerType)) " +
+            "          end " +
+            "          __SdbReplayPlayers = table.concat(parts, ';') " +
+            "        end) " +
+            "      end " +
+            "      return origRecv(name, data) " +
+            "    end " +
+            "  end) " +
+            "  if not ok3 then __SdbReplayHookErr = __SdbReplayHookErr .. ' roster: ' .. tostring(err3) end " +
             "end";
 
         private const string QueryChunk =
@@ -279,6 +228,17 @@ namespace SanctuaryHud.Replays
             "  __SdbReplayFocus = tostring(GetFocusArmy()) " +
             "end)";
 
+        private void InstallEarlyHooks()
+        {
+            EnsureLuaBridge();
+            if (!LuaReady) return;
+            if (RunLua(InstallChunk))
+            {
+                _luaHooked = true;
+                Logger.LogInfo("Replays: hooks installed at Lua start-up.");
+            }
+        }
+
         private void PollLua(float dt)
         {
             _luaAccum += dt;
@@ -288,36 +248,29 @@ namespace SanctuaryHud.Replays
             EnsureLuaBridge();
             if (!LuaReady) return;
 
+            // Normally already done at start-up; this is the fallback.
             if (!_luaHooked && RunLua(InstallChunk)) _luaHooked = true;
             if (!RunLua(QueryChunk)) return;
 
-            var armies = GetLuaGlobal("__SdbReplayArmies");
-            var eco = GetLuaGlobal("__SdbReplayEco");
-            ParseArmies(armies);
-            ParseEco(eco);
+            ParseArmies(GetLuaGlobal("__SdbReplayArmies"));
+            ParseEco(GetLuaGlobal("__SdbReplayEco"));
+            ParseSeats(GetLuaGlobal("__SdbReplayPlayers"));
             var focus = GetLuaGlobal("__SdbReplayFocus");
             if (int.TryParse(focus, out var f)) _focus = f;
 
-            // After a rewind the client is brand new and back on the seat's
-            // own army; restore the view that was being watched.
+            // After a rewind the client is brand new and back on the
+            // recorder's own army; restore the view that was being watched.
             if (_pendingFocus != int.MinValue && _luaHooked && _focus != int.MinValue && _armies.Count > 0)
             {
                 if (_pendingFocus != _focus) SetFocus(_pendingFocus);
                 _pendingFocus = int.MinValue;
             }
 
-            // Say once what the Lua side is producing, so a silent hook can be
-            // diagnosed from the log alone.
             var err = GetLuaGlobal("__SdbReplayHookErr");
             if (!string.IsNullOrEmpty(err) && err != _lastHookErr)
             {
                 _lastHookErr = err;
-                Logger.LogWarning($"Replays: economy hook reports: {err}");
-            }
-            if (!_loggedLuaSample && !string.IsNullOrEmpty(eco))
-            {
-                _loggedLuaSample = true;
-                Logger.LogDebug($"Replays: armies '{armies}', focus {focus}, eco sample '{eco}'");
+                Logger.LogWarning($"Replays: Lua hook reports: {err}");
             }
 
             // The fog overlay follows the focus unless the user has overridden it:
@@ -380,6 +333,20 @@ namespace SanctuaryHud.Replays
             }
         }
 
+        // "clientID|nickname|armyID|playerType;..." from the recorded lobby.
+        private void ParseSeats(string raw)
+        {
+            if (string.IsNullOrEmpty(raw) || _seatNames.Count > 0) return;
+            var seats = new Dictionary<int, string>();
+            foreach (var part in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var f = part.Split('|');
+                if (f.Length < 3 || !int.TryParse(f[2], out var armyId)) continue;
+                if (armyId > 0 && !string.IsNullOrEmpty(f[1]) && !seats.ContainsKey(armyId)) seats[armyId] = f[1];
+            }
+            if (seats.Count > 0) _seatNames = seats;
+        }
+
         private static string FactionName(string factionId)
         {
             switch (factionId)
@@ -390,6 +357,11 @@ namespace SanctuaryHud.Replays
                 default: return factionId;
             }
         }
+
+        // The client only knows armies by slot ("Army_1"); the recorded
+        // lobby, captured from InitClient, says who sat in each.
+        private string DisplayName(ArmyRow a) =>
+            _seatNames.TryGetValue(a.Id, out var n) ? n : a.Name;
 
         private void SetFocus(int armyId)
         {
@@ -409,36 +381,6 @@ namespace SanctuaryHud.Replays
             ReplayPlayer.SeekTo(tick);
         }
 
-        // ---- browser -------------------------------------------------------
-
-        private void Rescan()
-        {
-            _status = null;
-            var list = new List<Entry>();
-            try
-            {
-                var folder = ReplayRecorder.Folder;
-                if (Directory.Exists(folder))
-                {
-                    foreach (var path in Directory.GetFiles(folder))
-                    {
-                        var unfinished = path.EndsWith(ReplayFile.Extension + ReplayFile.PartSuffix, StringComparison.OrdinalIgnoreCase);
-                        if (!unfinished && !path.EndsWith(ReplayFile.Extension, StringComparison.OrdinalIgnoreCase)) continue;
-                        var e = new Entry { Path = path, Name = Path.GetFileName(path), Written = File.GetLastWriteTime(path), Unfinished = unfinished };
-                        try { e.Header = ReplayFile.ReadHeaderOnly(path); }
-                        catch (Exception ex) { e.Error = ex.Message; }
-                        list.Add(e);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                _status = "Could not read the replay folder: " + e.Message;
-            }
-            list.Sort((a, b) => b.Written.CompareTo(a.Written));
-            _entries = list;
-        }
-
         // ---- look ----------------------------------------------------------
 
         private static readonly Color Accent = new Color(0.3f, 0.6f, 0.95f, 0.95f);
@@ -447,9 +389,9 @@ namespace SanctuaryHud.Replays
         private static readonly Color OutColour = new Color(1f, 0.5f, 0.45f);
 
         private static bool _uiReady;
-        private static Texture2D _texPanelBg, _texBtn, _texBtnHover, _texBtnOn, _texBtnOnHover, _texKnob, _texTrack, _texRow;
-        private static GUIStyle _stPanel, _stTitle, _stTime, _stBody, _stDim, _stHead, _stButton, _stToggleBtn, _stCheck;
-        private static GUIStyle _stNet, _stIn, _stOut, _stBar, _stEntryTitle, _stEntrySub, _stPrimary;
+        private static Texture2D _texPanelBg, _texBtn, _texBtnHover, _texBtnOn, _texBtnOnHover, _texKnob, _texTrack;
+        private static GUIStyle _stPanel, _stTitle, _stTime, _stBody, _stDim, _stHead, _stButton, _stToggleBtn;
+        private static GUIStyle _stNet, _stIn, _stOut, _stBar;
 
         private static void EnsureUi()
         {
@@ -465,10 +407,7 @@ namespace SanctuaryHud.Replays
             _texBtnOn = Rounded(5, Color.white);
             _texBtnOnHover = Rounded(5, new Color(0.92f, 0.92f, 0.92f, 1f));
             _texKnob = Rounded(7, new Color(0.95f, 0.96f, 0.98f, 1f));
-            // Opaque white; tracks, fills and bars tint it at draw time, so the
-            // fill colour isn't washed out by a translucent source.
             _texTrack = Rounded(3, Color.white);
-            _texRow = Rounded(5, new Color(1f, 1f, 1f, 0.05f));
 
             _stPanel = new GUIStyle
             {
@@ -499,20 +438,10 @@ namespace SanctuaryHud.Replays
                 onHover = { background = _texBtnOnHover, textColor = Color.white },
                 onActive = { background = _texBtnOnHover, textColor = Color.white },
             };
-            _stCheck = new GUIStyle(_stToggleBtn) { alignment = TextAnchor.MiddleCenter };
-            // A solid button, tinted by GUI.backgroundColor at draw time.
-            _stPrimary = new GUIStyle(_stButton)
-            {
-                normal = { background = _texBtnOn, textColor = Color.white },
-                hover = { background = _texBtnOnHover, textColor = Color.white },
-                active = { background = _texBtnOnHover, textColor = Color.white },
-            };
             _stNet = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, normal = { textColor = Color.white } };
             _stIn = new GUIStyle { fontSize = 11, alignment = TextAnchor.MiddleRight, normal = { textColor = GainColour } };
             _stOut = new GUIStyle { fontSize = 11, alignment = TextAnchor.MiddleRight, normal = { textColor = OutColour } };
             _stBar = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-            _stEntryTitle = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
-            _stEntrySub = new GUIStyle { fontSize = 11, alignment = TextAnchor.MiddleLeft, normal = { textColor = TextDim }, wordWrap = true };
         }
 
         // A rounded square with an anti-aliased edge; sliced by the style's
@@ -526,7 +455,6 @@ namespace SanctuaryHud.Replays
             {
                 for (int x = 0; x < size; x++)
                 {
-                    // Distance from the nearest corner arc centre, only in the corner quadrants.
                     float cx = x < radius ? radius : x >= size - radius ? size - radius - 1 : x;
                     float cy = y < radius ? radius : y >= size - radius ? size - radius - 1 : y;
                     var d = Mathf.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
@@ -599,7 +527,7 @@ namespace SanctuaryHud.Replays
         private static bool Toggle(bool on, string label, Color colour, params GUILayoutOption[] options)
         {
             var oldBg = GUI.backgroundColor;
-            GUI.backgroundColor = on ? colour : new Color(colour.r, colour.g, colour.b, 1f);
+            GUI.backgroundColor = new Color(colour.r, colour.g, colour.b, 1f);
             var luma = 0.299f * colour.r + 0.587f * colour.g + 0.114f * colour.b;
             var onText = luma > 0.62f ? new Color(0.08f, 0.1f, 0.12f) : Color.white;
             var savedOn = _stToggleBtn.onNormal.textColor;
@@ -617,7 +545,6 @@ namespace SanctuaryHud.Replays
 
         private static void Bar(Rect r, float fraction, Color colour, string text)
         {
-            // Plain flat rectangles: a faint track with a solid fill.
             if (Event.current.type == EventType.Repaint)
             {
                 var old = GUI.color;
@@ -659,6 +586,9 @@ namespace SanctuaryHud.Replays
 
         private void OnGUI()
         {
+            if (!ReplayPlayer.Active && !ReplayPlayer.Restarting) return;
+            if (!_controlsOpen || ReplayPlayer.Current == ReplayPlayer.Stage.Loading) return;
+
             var scale = Screen.height / 1080f;
             var previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
@@ -668,40 +598,19 @@ namespace SanctuaryHud.Replays
 
             try
             {
-                if (ReplayPlayer.Active || ReplayPlayer.Restarting)
+                // A layout window grows to its content but never shrinks, so
+                // zero the height once when the row count changes. Not every
+                // frame: drag events skip the layout pass, and a zero-height
+                // rect then draws nothing.
+                _ctrlRect.width = PanelW;
+                if (_armies.Count != _lastRowCount)
                 {
-                    if (_controlsOpen && ReplayPlayer.Current != ReplayPlayer.Stage.Loading)
-                    {
-                        // A layout window grows to its content but never
-                        // shrinks, so zero the height once when the row count
-                        // changes. Not every frame: drag events skip the layout
-                        // pass, and a zero-height rect then draws nothing.
-                        _ctrlRect.width = PanelW;
-                        if (_armies.Count != _lastRowCount)
-                        {
-                            _lastRowCount = _armies.Count;
-                            _ctrlRect.height = 0;
-                        }
-                        _ctrlRect.x = Mathf.Clamp(_ctrlRect.x, -PanelW + 80, logicalWidth - 80);
-                        _ctrlRect.y = Mathf.Clamp(_ctrlRect.y, 0, logicalHeight - 40);
-                        _ctrlRect = GUILayout.Window(0x53445250, _ctrlRect, DrawControls, GUIContent.none, _stPanel, GUILayout.Width(PanelW));
-                    }
+                    _lastRowCount = _armies.Count;
+                    _ctrlRect.height = 0;
                 }
-                else if (_browserOpen && !InMatch)
-                {
-                    _browserRect.x = (logicalWidth - _browserRect.width) / 2;
-                    _browserRect.y = Mathf.Max(40, (logicalHeight - _browserRect.height) / 2);
-                    _browserRect = GUILayout.Window(0x53445251, _browserRect, DrawBrowser, GUIContent.none, _stPanel,
-                        GUILayout.Width(_browserRect.width), GUILayout.Height(_browserRect.height));
-                }
-                else if (_cfgRecIndicator.Value && ReplayRecorder.Recording && InMatch)
-                {
-                    var t = Math.Max(0, ReplayRecorder.LastTick) / 10;
-                    var old = GUI.color;
-                    GUI.color = new Color(1f, 0.35f, 0.35f, 0.9f);
-                    GUI.Label(new Rect(8, logicalHeight - 22, 200, 20), $"● REC {t / 60}:{t % 60:00}", _stBody);
-                    GUI.color = old;
-                }
+                _ctrlRect.x = Mathf.Clamp(_ctrlRect.x, -PanelW + 80, logicalWidth - 80);
+                _ctrlRect.y = Mathf.Clamp(_ctrlRect.y, 0, logicalHeight - 40);
+                _ctrlRect = GUILayout.Window(0x53445250, _ctrlRect, DrawControls, GUIContent.none, _stPanel, GUILayout.Width(PanelW));
             }
             finally
             {
@@ -719,24 +628,25 @@ namespace SanctuaryHud.Replays
             if (ReplayPlayer.Restarting)
             {
                 GUILayout.Label("REPLAY", _stTitle);
-                GUILayout.Label($"Rewinding to {Clock(ReplayPlayer.SeekTarget)}, restarting the client...", _stBody);
+                GUILayout.Label($"Rewinding to {Clock(ReplayPlayer.SeekTarget)}, restarting playback...", _stBody);
                 GUI.DragWindow(new Rect(0, 0, 10000, 30));
                 return;
             }
 
-            // Header: clock, transport, speed, jumps, fog, quit.
+            // Header: clock, transport, speed, jumps, fog, timeline, quit.
             GUILayout.BeginHorizontal(GUILayout.Height(22));
-            var status = finished ? " end" : seeking ? $" > {Clock(ReplayPlayer.SeekTarget)}" : "";
             var timeline = _cfgTimeline.Value;
+            var status = finished ? " end" : seeking ? $" > {Clock(ReplayPlayer.SeekTarget)}" : "";
             var clock = timeline ? $"{Clock(tick)} / {Clock(total)}" : Clock(tick);
             GUILayout.Label(clock + status, _stTime, GUILayout.Width(NameW + 30));
             if (GUILayout.Button(ReplayPlayer.Paused ? "PLAY" : "PAUSE", _stButton, GUILayout.Width(56))) ReplayPlayer.Paused = !ReplayPlayer.Paused;
             GUILayout.Space(6);
-            // Speed on a log scale, 0.25x to 8x with 1x in the middle, in quarter stops.
-            var exp = Mathf.Log(Mathf.Max(0.01f, ReplayPlayer.Speed), 2f);
+            // Speed on a log scale, 0.25x to 16x with 1x a third of the way
+            // along, in quarter stops. The game clamps at 16x.
+            var exp = Mathf.Log(Mathf.Max(0.1f, ReplayPlayer.Speed), 2f);
             var speedRect = GUILayoutUtility.GetRect(90, 22, GUILayout.Width(90));
-            var newExp = Slider(speedRect, exp, -2f, 3f, Accent, out var speedChanged);
-            if (speedChanged) ReplayPlayer.Speed = Mathf.Pow(2f, Mathf.Round(newExp * 4f) / 4f);
+            var newExp = Slider(speedRect, exp, -2f, 4f, Accent, out var speedChanged);
+            if (speedChanged && !seeking) ReplayPlayer.Speed = Mathf.Pow(2f, Mathf.Round(newExp * 4f) / 4f);
             GUILayout.Label(ReplayPlayer.Speed.ToString("0.##", CultureInfo.InvariantCulture) + "x", _stBody, GUILayout.Width(34));
             if (GUILayout.Button("-1m", _stButton, GUILayout.Width(40))) Seek(tick - 600);
             if (GUILayout.Button("+1m", _stButton, GUILayout.Width(40))) Seek(tick + 600);
@@ -775,7 +685,7 @@ namespace SanctuaryHud.Replays
             GUILayout.Label("ARMY", _stHead, GUILayout.Width(NameW));
             GUILayout.Space(Gap);
             ResourceHeader("ALLOY", AlloyColour);
-            GUILayout.Space(14);
+            GUILayout.Space(10);
             ResourceHeader("ENERGY", EnergyColour);
             GUILayout.EndHorizontal();
 
@@ -788,7 +698,7 @@ namespace SanctuaryHud.Replays
                 if (_eco.TryGetValue(a.Id, out var e))
                 {
                     Resource(AlloyColour, e.ACur, e.AStore, e.AIn + e.AHarvest, e.AReq, e.AOut, e.ATotalOut);
-                    GUILayout.Space(14);
+                    GUILayout.Space(10);
                     Resource(EnergyColour, e.ECur, e.EStore, e.EIn + e.EHarvest, e.EReq, e.EOut, e.ETotalOut);
                 }
                 else
@@ -804,21 +714,6 @@ namespace SanctuaryHud.Replays
             GUILayout.EndHorizontal();
 
             GUI.DragWindow(new Rect(0, 0, 10000, 30));
-        }
-
-        // The client only knows armies by slot ("Army_1"); the replay header
-        // carries the lobby, which maps each slot to who sat in it.
-        private static string DisplayName(ArmyRow a)
-        {
-            var players = ReplayPlayer.Header?.Players;
-            if (players != null)
-            {
-                foreach (var p in players)
-                {
-                    if (p.ArmyId == a.Id && !string.IsNullOrEmpty(p.Name) && p.Type != "Observer") return p.Name;
-                }
-            }
-            return a.Name;
         }
 
         private static void ResourceHeader(string name, Color colour)
@@ -860,112 +755,6 @@ namespace SanctuaryHud.Replays
             GUILayout.Space(Gap);
             var right = new GUIStyle(_stBody) { alignment = TextAnchor.MiddleRight };
             GUILayout.Label(Short(used), right, GUILayout.Width(UsedW), GUILayout.Height(RowH));
-        }
-
-        // ---- browser -------------------------------------------------------
-
-        private void DrawBrowser(int id)
-        {
-            GUILayout.BeginHorizontal(GUILayout.Height(RowH));
-            GUILayout.Label("REPLAYS", _stTitle, GUILayout.Width(80));
-            GUILayout.Label(ReplayRecorder.Folder, _stDim, GUILayout.ExpandWidth(true));
-            var rec = Toggle(_cfgRecord.Value, "RECORD MATCHES", Accent, GUILayout.Width(130));
-            if (rec != _cfgRecord.Value) _cfgRecord.Value = rec;
-            if (GUILayout.Button("REFRESH", _stButton, GUILayout.Width(80))) Rescan();
-            if (GUILayout.Button("OPEN FOLDER", _stButton, GUILayout.Width(100)))
-            {
-                try
-                {
-                    Directory.CreateDirectory(ReplayRecorder.Folder);
-                    Application.OpenURL("file:///" + ReplayRecorder.Folder.Replace('\\', '/'));
-                }
-                catch (Exception e) { _status = e.Message; }
-            }
-            if (GUILayout.Button("CLOSE", _stButton, GUILayout.Width(64))) _browserOpen = false;
-            GUILayout.EndHorizontal();
-
-            if (!string.IsNullOrEmpty(_status)) GUILayout.Label(_status, _stBody);
-            GUILayout.Space(6);
-
-            _scroll = GUILayout.BeginScrollView(_scroll);
-            if (_entries == null || _entries.Count == 0)
-            {
-                GUILayout.Label("No replays yet. Play a match with recording on and it will show up here.", _stBody);
-            }
-            else
-            {
-                foreach (var e in _entries) DrawEntry(e);
-            }
-            GUILayout.EndScrollView();
-        }
-
-        private void DrawEntry(Entry e)
-        {
-            var box = new GUIStyle { normal = { background = _texRow }, border = new RectOffset(6, 6, 6, 6), padding = new RectOffset(10, 10, 6, 6), margin = new RectOffset(0, 0, 0, 6) };
-            GUILayout.BeginVertical(box);
-            GUILayout.BeginHorizontal();
-
-            var h = e.Header;
-            var when = e.Written.ToString("yyyy-MM-dd HH:mm");
-            if (h == null)
-            {
-                GUILayout.Label($"{when}   {e.Name}", _stEntryTitle, GUILayout.ExpandWidth(true));
-                GUILayout.Label("unreadable: " + e.Error, _stDim, GUILayout.Width(300));
-            }
-            else
-            {
-                var map = Path.GetFileNameWithoutExtension(h.Map ?? "") ?? "?";
-                var length = h.TickCount > 0 ? Clock(h.TickCount) : "?:??";
-                var flag = e.Unfinished ? "   unfinished" : "";
-                GUILayout.BeginVertical();
-                GUILayout.Label($"{map.Replace('_', ' ')}   {length}{flag}", _stEntryTitle);
-                var players = h.Players
-                    .Where(p => p.Type != "Empty")
-                    .Select(p => p.Type == "Observer" ? $"{p.Name} (observer)" : $"{p.Name}  {p.Faction}, team {p.Team}");
-                GUILayout.Label($"{when}   {string.Join("   ·   ", players)}", _stEntrySub);
-                // A replay is tied to the build it was recorded on; a
-                // different one may still play, but say so up front.
-                if (!string.IsNullOrEmpty(h.GameVersion) && h.GameVersion != Application.version)
-                {
-                    var old = GUI.color;
-                    GUI.color = new Color(0.95f, 0.75f, 0.3f);
-                    GUILayout.Label($"Recorded on game build {h.GameVersion}; this is {Application.version}. It may not play back correctly.", _stEntrySub);
-                    GUI.color = old;
-                }
-                GUILayout.EndVertical();
-
-                GUILayout.FlexibleSpace();
-                GUILayout.BeginVertical();
-                GUILayout.BeginHorizontal();
-                var oldBg = GUI.backgroundColor;
-                GUI.backgroundColor = Accent;
-                var watch = GUILayout.Button("WATCH", _stPrimary, GUILayout.Width(80));
-                GUI.backgroundColor = oldBg;
-                if (watch)
-                {
-                    _status = ReplayPlayer.Start(e.Path, h.RecorderClientId);
-                    if (_status == null) _browserOpen = false;
-                }
-                GUILayout.EndHorizontal();
-                // One seat per human, for opening straight into their view.
-                var seats = h.Players.Where(p => p.Type == "Player" && p.ClientId != 255).ToList();
-                if (seats.Count > 1)
-                {
-                    GUILayout.BeginHorizontal();
-                    foreach (var p in seats)
-                    {
-                        if (GUILayout.Button(p.Name, _stButton, GUILayout.Width(110)))
-                        {
-                            _status = ReplayPlayer.Start(e.Path, p.ClientId);
-                            if (_status == null) _browserOpen = false;
-                        }
-                    }
-                    GUILayout.EndHorizontal();
-                }
-                GUILayout.EndVertical();
-            }
-            GUILayout.EndHorizontal();
-            GUILayout.EndVertical();
         }
     }
 }
