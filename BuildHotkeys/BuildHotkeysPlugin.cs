@@ -89,20 +89,9 @@ namespace SanctuaryHud
 
         private void Update()
         {
-            SharedTick();
-
             if (!_cfgEnabled.Value)
             {
                 if (_installed) Remove();
-                return;
-            }
-
-            if (!InMatch)
-            {
-                // Each match builds a fresh Lua state, which takes the binding
-                // with it — so the next one reinstalls from scratch.
-                _installed = false;
-                _installedSignature = null;
                 return;
             }
 
@@ -110,38 +99,55 @@ namespace SanctuaryHud
             if (_accum < 1f) return;
             _accum = 0f;
 
+            // The client VM exists exactly while a match or replay is running,
+            // so it is the whole gate: no VM means nothing to bind into, and a
+            // new match builds a fresh one that needs reinstalling.
+            //
+            // Deliberately not InMatch — that rides on the economy Harmony
+            // patch, and HudCore is compiled into each assembly, so its statics
+            // are per-mod: InMatch would be permanently false here unless this
+            // mod applied a patch it has no other reason to want.
+            EnsureLuaBridge();
+            if (!LuaReady)
+            {
+                _installed = false;
+                _installedSignature = null;
+                return;
+            }
+
             var signature = Signature();
             if (_installed)
             {
                 // Rebound from the mod manager mid-match: swap the layout over.
-                if (signature != _installedSignature)
-                {
-                    Remove();
-                }
-                else
-                {
-                    ReportBuilds();
-                    return;
-                }
+                if (signature != _installedSignature) Remove();
+                else if (StillInstalled()) return;
+                else _installed = false;   // VM swapped under us; rebind below.
             }
 
-            if (!LuaReady) return;
             Install(signature);
         }
 
         private string Signature() =>
             string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray());
 
-        private void ReportBuilds()
+        /// True while our binding is still live in the VM the game is running.
+        /// Polling a global rather than trusting the flag means a match that
+        /// starts and ends between two ticks — swapping the VM without
+        /// LuaReady ever reading false — still gets rebound rather than
+        /// silently leaving the hotkeys dead for the rest of the session.
+        /// Doubles as the build counter.
+        private bool StillInstalled()
         {
             // A flat global, not a field on the state table: the read-back
             // bridge is lua_getglobal, so it can only resolve a bare name.
             var raw = GetLuaGlobal("__SdbBuildHotkeysCount");
+            if (raw == null) return false;
             if (int.TryParse(raw, out var count) && count > _builds)
             {
                 _builds = count;
                 Logger.LogInfo($"Build hotkeys: {count} build(s) issued this match.");
             }
+            return true;
         }
 
         /// A configured key, split into the form the input system indexes by.
@@ -220,6 +226,7 @@ namespace SanctuaryHud
                     ",mode=" + (role.Mode == RoleMode.Structure ? "'s'" : "'u'") +
                     ",name=" + Quote(role.Name) +
                     ",maxTier=" + role.MaxTier +
+                    ",label=" + Quote(Label(roleKey)) +
                     ",expr=function() return " + role.Expression + " end}");
 
                 foreach (var b in roleBindings)
@@ -282,6 +289,26 @@ namespace SanctuaryHud
 
         private static string Quote(string s) => "'" + s.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
 
+        /// Compact form for the corner text on a construction button, which the
+        /// stock panel fills with a single letter. Modifiers become
+        /// one-character sigils so "Ctrl-S" still fits where "S" did.
+        private static string Label(string roleKey)
+        {
+            var parts = roleKey.Split('-');
+            var b = parts[parts.Length - 1];
+            if (b.StartsWith("Digit")) b = b.Substring(5);
+            else if (b.StartsWith("Numpad")) b = "N" + b.Substring(6);
+
+            var prefix = "";
+            for (var i = 0; i < parts.Length - 1; i++)
+            {
+                if (parts[i] == "Ctrl") prefix += "^";
+                else if (parts[i] == "Shift") prefix += "+";
+                else if (parts[i] == "Alt") prefix += "~";
+            }
+            return prefix + b;
+        }
+
         // Installed once per match, guarded by a global inside the VM so a
         // retry is harmless. Every name it reaches for is a module-level global
         // of the file that owns it: Import hands back the file's environment
@@ -319,6 +346,34 @@ if not __SdbBuildHotkeys then
     if Tags.TECH3[tpId] then return 3 end
     if Tags.TECH2[tpId] then return 2 end
     return 1
+  end
+
+  -- Relabel the construction buttons. Each one draws a hotkey in its corner,
+  -- filled from constructionPanelHotkeys.GetHotkeyForTemplate; constructionPanel
+  -- holds the module table rather than the function, and looks the field up per
+  -- button, so replacing it here relabels every button with our own key the
+  -- next time the panel is built. Templates no role claims keep the stock
+  -- answer (usually '?').
+  local CH = Import('client/input/constructionPanelHotkeys.lua')
+  BH.CH = CH
+  BH.origLabel = CH.GetHotkeyForTemplate
+  local labelCache = {}
+  CH.GetHotkeyForTemplate = function(tpId, isFactory)
+    local want = isFactory and 'u' or 's'
+    local ck = want .. tpId
+    local hit = labelCache[ck]
+    if hit == nil then
+      hit = false
+      for _, r in ipairs(BH.roles) do
+        if r.mode == want and techOf(tpId) <= r.maxTier and r.expr()[tpId] then
+          hit = r.label
+          break
+        end
+      end
+      labelCache[ck] = hit
+    end
+    if hit == false then return BH.origLabel(tpId, isFactory) end
+    return hit
   end
 
   -- Every role on this key, in one cycle: ranked by tier first and by role
@@ -425,7 +480,9 @@ if __SdbBuildHotkeys then
       if saved == BH.NIL then BH.grp[hk] = nil else BH.grp[hk] = saved end
     end
   end
+  if BH.CH and BH.origLabel then BH.CH.GetHotkeyForTemplate = BH.origLabel end
   __SdbBuildHotkeys = nil
+  __SdbBuildHotkeysCount = nil
 end";
     }
 }

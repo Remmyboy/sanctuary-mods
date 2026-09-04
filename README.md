@@ -178,6 +178,14 @@ unbinds. Defaults keep the stock construction letters where they already fit
 order key is stolen — **G** is still Repair. `M` is left alone, so the stock
 "upgrade structure" hotkey still works.
 
+**The construction buttons relabel themselves.** Each one draws its hotkey in
+the corner, filled from `constructionPanelHotkeys.GetHotkeyForTemplate` —
+`constructionPanel` holds the module table rather than the function and looks
+the field up per button, so replacing it relabels every button with the key
+that actually builds it. Modifiers compress to one character (`^S` for
+`Ctrl-S`) to fit where a single letter went. Anything no role claims keeps the
+stock answer, which is usually the `?` it shows today.
+
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into
 `inputSystem.lua`'s `LoadedActionMap` (which `CallAction` reads live on every
