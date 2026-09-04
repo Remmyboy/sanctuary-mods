@@ -34,7 +34,7 @@ namespace SanctuaryHud
     // the site's, so both sides converge even when a heartbeat is late.
     public partial class LadderReporterPlugin
     {
-        private const string ModVersion = "0.2.0";
+        private const string ModVersion = "0.2.3";
 
         private ConfigEntry<bool> _cfgMmEnabled;
         private ConfigEntry<string> _cfgMmBaseUrl;
