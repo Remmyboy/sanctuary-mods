@@ -234,7 +234,9 @@ namespace SanctuaryHud
             // Watching a replay looks like a match to the economy signal and
             // like the menu when it's paused; it is neither, and never
             // launchable.
-            if (NetworkManager.IsReplayPlayback) return "replay";
+            // The site accepts only the four states below, and none but
+            // `menu` is launchable, so a replay reports as in a game.
+            if (NetworkManager.IsReplayPlayback) return "ingame";
             if (InMatch) return "ingame";
             if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby && LobbyManager.IsInLobby) return "loading";
             if (LobbyManager.IsInLobby) return "lobby";
@@ -702,6 +704,7 @@ namespace SanctuaryHud
                     KickStrangers(m, me);
                     var joiner = FindPlayer(m.Joiner);
                     if (joiner != null && joiner.isReady && m.Slots.TryGetValue(m.Joiner, out var jslot) && joiner.armyID == jslot &&
+                        joiner.team == jslot &&
                         LocalIsSeated(m, me) && LobbyManager.CanStartGame())
                     {
                         Logger.LogInfo("Matchmaking: both seated and ready, starting.");
@@ -785,7 +788,10 @@ namespace SanctuaryHud
             if (local == null) return;
             if (!TryFaction(m.Factions[me], out var faction)) return;
             var slot = m.Slots[me];
+            // The lobby puts everyone on team 1; a 1v1 needs one team per
+            // seat, so the team is the slot number.
             if (local.faction != faction) LobbyManager.SetMemberFaction(local, faction);
+            else if (local.team != slot) LobbyManager.SetMemberTeam(local, slot);
             else if (local.armyID != slot) LobbyManager.SetMemberArmyID(local, slot);
             else if (!local.isReady) LobbyManager.SetMemberIsReady(local, true);
         }
@@ -794,7 +800,7 @@ namespace SanctuaryHud
         {
             var local = FindPlayer(me);
             return local != null && local.isReady && m.Slots.TryGetValue(me, out var slot) && local.armyID == slot &&
-                   TryFaction(m.Factions[me], out var f) && local.faction == f;
+                   local.team == slot && TryFaction(m.Factions[me], out var f) && local.faction == f;
         }
 
         // The lobby is public for the seconds before it fills; anyone who
