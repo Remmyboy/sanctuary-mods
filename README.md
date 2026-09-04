@@ -16,6 +16,7 @@ players. The exceptions are called out in their own sections below.
 | [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
+| [BuildHotkeys](BuildHotkeys/) | `BuildHotkeys.dll` | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
 | [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
@@ -115,6 +116,69 @@ its replacement as a second entity, present from the moment the upgrade
 starts and already wearing the higher tier's icon — so a T1 mid-upgrade would
 otherwise read as a finished T2. The T1 stays until the upgrade lands and is
 the one carrying the upgrade adornment, so it is what fills the UPGRADING row.
+
+## BuildHotkeys
+
+One hotkey per **role** rather than per panel slot, so the same key means the
+same thing whichever faction you are playing, and pressing it again walks down
+the tiers.
+
+The game's own construction hotkeys are nine fixed letters resolved by tag
+category, first displayed match wins (`constructionPanelHotkeys.lua`). That
+leaves two gaps: you cannot reach a *specific* unit — the T1 and T3 tank are
+both `Tags.TANK`, so only one of them has a key — and whole categories have no
+key at all. Shields, artillery, air and naval factories, tech centres, walls
+and storage all render their button with `?` on it.
+
+**A role is a tag expression**, not a list of template ids, which is what makes
+it faction-agnostic for free. `PointDefence` is
+`DEFENCE * ANTI_SURFACE * STRUCTURE`; that resolves to `ues1001` for EDA,
+`ucs1001` for Chosen and `ugs1001` for Guard without naming any of them. The
+three factions share 77 of their ~99 roles, and the T1–T3 core — factories,
+point defence, anti-air, radar, energy, extractors, tech centres — is
+essentially universal, so one table covers everyone.
+
+**Tier cycling falls out of the templates.** Each one carries its own gating
+(`BUILDABLE_BY_T2_ENGINEER` and friends), so `GetBuildableTags` already returns
+exactly what the selected builder can make. Intersect that with the role, sort
+by tech tier descending, and the first press gives you the best you can
+currently build. Where a faction lacks a tier the cycle is simply shorter:
+only Chosen has a T3 point defence, so **X** gives them T3 → T2 → T1 and
+everyone else T2 → T1. No per-faction configuration anywhere.
+
+Cycling only continues while the previous press is still uncommitted — the
+template is still on the cursor. Placing it, cancelling, or changing selection
+drops back to the highest tier. A factory never enters build mode, so repeat
+presses there queue more of the same instead of walking down the tiers, and
+holding **Shift** queues five exactly as the stock hotkeys do.
+
+One key can serve several roles: they are tried in order and the first with
+anything buildable wins. That is how **R** is the land factory's tank and the
+naval factory's warship (which is itself one role across frigate → destroyer →
+battleship), and **Q** is raider or submarine, without either needing to know
+about the other.
+
+Roles stop at T3 on purpose. The experimentals above are faction-specific
+one-offs that want their own keys — without the cap, Guard's T4 Experimental
+Generator (`ugs4621`, tagged `ENERGY_PRODUCTION`) would sit at the top of the
+energy cycle and a tap of **D** would try to start one.
+
+Every role's key is a config entry, so they are all rebindable from the F8 mod
+manager in the game's own hotkey format (`G`, `Ctrl-G`, `Ctrl-Alt-G`); blank
+unbinds. Defaults keep the stock construction letters where they already fit
+(W/E/S/D/X/C/R) and take only free keys otherwise (Q, T, B, K, N, O), so no
+order key is stolen — **G** is still Repair. `M` is left alone, so the stock
+"upgrade structure" hotkey still works.
+
+Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
+client still joins unmodded lobbies. The binding is a runtime insert into
+`inputSystem.lua`'s `LoadedActionMap` (which `CallAction` reads live on every
+event, so it takes effect immediately and is restored on unload), and the build
+goes through `constructionPanel.lua`'s own `ConstructionClickFunction` — the
+same observer check, the same local prediction and the same host-validated
+command a button click sends. Returning `false` when nothing matched lets the
+key fall through to whatever it normally does, and because chat disables every
+action group but `MouseControls`, typing already suppresses these for free.
 
 ## LadderReporter
 

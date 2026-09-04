@@ -1,0 +1,150 @@
+using System.Collections.Generic;
+
+namespace SanctuaryHud
+{
+    /// What a hotkey means, independent of faction.
+    ///
+    /// Every role is a tag expression rather than a list of template ids,
+    /// because the three factions share the same tag vocabulary: the T1 point
+    /// defence is ucs1001 / ues1001 / ugs1001, and all three carry
+    /// DEFENCE + ANTI_SURFACE + STRUCTURE. So one expression resolves to the
+    /// right template whichever faction is playing, and a faction that lacks a
+    /// tier (only Chosen has a T3 point defence) simply has a shorter cycle.
+    ///
+    /// The expressions are evaluated inside the game's own Tags table, which
+    /// overloads `+` as union, `*` as intersection and `-` as difference.
+    internal enum RoleMode
+    {
+        /// Something an engineer, engineering station or the commander places.
+        Structure,
+        /// Something a factory queues.
+        Unit,
+    }
+
+    internal sealed class Role
+    {
+        internal string Name;
+        internal RoleMode Mode;
+        /// A Lua expression over `Tags`, evaluated at press time.
+        internal string Expression;
+        internal string DefaultKey;
+        internal string Description;
+        /// Highest tech tier this role will offer. These roles stop at T3
+        /// because the experimentals above them are faction-specific one-offs
+        /// that want their own keys — without the cap, Guard's T4 Experimental
+        /// Generator (ugs4621, tagged ENERGY_PRODUCTION) would sit at the top
+        /// of the energy cycle and a tap of D would try to start one.
+        internal int MaxTier;
+
+        internal Role(string name, RoleMode mode, string expression, string defaultKey, string description,
+            int maxTier = 3)
+        {
+            Name = name;
+            Mode = mode;
+            Expression = expression;
+            DefaultKey = defaultKey;
+            Description = description;
+            MaxTier = maxTier;
+        }
+    }
+
+    internal static class Roles
+    {
+        /// The shared T1-T3 roles — the ones every faction has, so one key
+        /// means the same thing whoever you are playing. Order matters: roles
+        /// sharing a key are tried in this order and the first with anything
+        /// buildable wins, which is what lets one key serve several domains
+        /// (R is the land factory's tank and the naval factory's warship —
+        /// a given factory only ever builds one of them).
+        ///
+        /// Faction-unique units (Guard transmitters, Chosen shield boosters,
+        /// EDA repair stations) and the T4/T5 experimentals are deliberately
+        /// absent; they need their own generic keys and are a separate pass.
+        internal static readonly List<Role> All = new List<Role>
+        {
+            // ---- Structures: what an engineer places ----
+            new Role("LandFactory", RoleMode.Structure,
+                "Tags.LAND_FACTORY", "W", "Land factory."),
+            new Role("AirFactory", RoleMode.Structure,
+                "Tags.AIR_FACTORY", "Q", "Air factory."),
+            new Role("NavalFactory", RoleMode.Structure,
+                "Tags.NAVAL_FACTORY", "N", "Naval factory."),
+            new Role("EngineeringStation", RoleMode.Structure,
+                "Tags.ENGINEERING_STATION", "E", "Engineering station."),
+
+            new Role("AlloyExtractor", RoleMode.Structure,
+                "Tags.ALLOYS_EXTRACTION * Tags.STRUCTURE", "S", "Alloy extractor."),
+            new Role("AlloyStorage", RoleMode.Structure,
+                "Tags.ALLOYS_STORAGE * Tags.STRUCTURE", "Ctrl-S", "Alloy storage."),
+            new Role("EnergyGenerator", RoleMode.Structure,
+                "Tags.ENERGY_PRODUCTION * Tags.STRUCTURE", "D", "Energy generator."),
+            // Factories carry ENERGY_STORAGE too, so they have to come out or
+            // this key would offer a land factory as its top "storage" result.
+            new Role("EnergyStorage", RoleMode.Structure,
+                "Tags.ENERGY_STORAGE * Tags.STRUCTURE - Tags.FACTORY", "Ctrl-D", "Energy storage."),
+
+            new Role("PointDefence", RoleMode.Structure,
+                "Tags.DEFENCE * Tags.ANTI_SURFACE * Tags.STRUCTURE", "X", "Point defence."),
+            new Role("AntiAir", RoleMode.Structure,
+                "Tags.DEFENCE * Tags.ANTI_AIR * Tags.STRUCTURE", "C", "Anti-air turret."),
+            new Role("TorpedoLauncher", RoleMode.Structure,
+                "Tags.DEFENCE * Tags.ANTI_NAVAL * Tags.STRUCTURE", "Ctrl-X", "Torpedo launcher."),
+            new Role("Shield", RoleMode.Structure,
+                "Tags.SHIELD * Tags.STRUCTURE", "T", "Shield generator."),
+            new Role("Artillery", RoleMode.Structure,
+                "Tags.ARTILLERY * Tags.STRUCTURE", "K", "Artillery emplacement."),
+            new Role("Wall", RoleMode.Structure,
+                "Tags.WALL", "O", "Wall segment."),
+
+            new Role("Radar", RoleMode.Structure,
+                "Tags.RADAR * Tags.STRUCTURE", "R", "Radar."),
+            new Role("Sonar", RoleMode.Structure,
+                "Tags.SONAR * Tags.STRUCTURE", "Ctrl-R", "Sonar."),
+
+            new Role("LandTechCentre", RoleMode.Structure,
+                "Tags.LAND_TECH_CENTRE", "B", "Land tech centre."),
+            new Role("AirTechCentre", RoleMode.Structure,
+                "Tags.AIR_TECH_CENTRE", "Ctrl-B", "Air tech centre."),
+            new Role("NavalTechCentre", RoleMode.Structure,
+                "Tags.NAVAL_TECH_CENTRE", "Ctrl-N", "Naval tech centre."),
+
+            // ---- Units: what a factory queues ----
+            new Role("Engineer", RoleMode.Unit,
+                "Tags.ENGINEER * Tags.MOBILE", "W", "Engineer."),
+            new Role("Scout", RoleMode.Unit,
+                "Tags.SCOUT * Tags.MOBILE", "E", "Scout (land or air, whichever this factory builds)."),
+
+            new Role("Tank", RoleMode.Unit,
+                "Tags.TANK * Tags.MOBILE * Tags.LAND", "R", "Tank."),
+            // Frigate, destroyer and battleship are one role played across
+            // three tiers, so they cycle on a single key like everything else.
+            new Role("Warship", RoleMode.Unit,
+                "Tags.FRIGATE + Tags.DESTROYER + Tags.BATTLESHIP", "R", "Warship."),
+
+            new Role("Raider", RoleMode.Unit,
+                "Tags.RAIDER * Tags.MOBILE", "Q", "Raider."),
+            new Role("Submarine", RoleMode.Unit,
+                "Tags.SUBMARINE", "Q", "Submarine."),
+
+            new Role("MobileAntiAir", RoleMode.Unit,
+                "Tags.ANTI_AIR * Tags.MOBILE * Tags.LAND", "Y", "Mobile anti-air."),
+            new Role("Fighter", RoleMode.Unit,
+                "Tags.FIGHTER * Tags.MOBILE", "Y", "Air-superiority fighter."),
+
+            new Role("MobileArtillery", RoleMode.Unit,
+                "Tags.ARTILLERY * Tags.MOBILE", "K", "Mobile artillery."),
+            new Role("Sniper", RoleMode.Unit,
+                "Tags.SNIPER * Tags.MOBILE", "O", "Sniper."),
+            // GUNSHIP on its own also covers transports and some scouts, which
+            // both carry it; the combat ones are the ones that shoot ground.
+            new Role("Gunship", RoleMode.Unit,
+                "Tags.GUNSHIP * Tags.ANTI_SURFACE * Tags.MOBILE", "T", "Gunship."),
+            new Role("Bomber", RoleMode.Unit,
+                "Tags.BOMBER * Tags.MOBILE", "X", "Bomber."),
+            new Role("TorpedoBomber", RoleMode.Unit,
+                "Tags.TORPEDO_BOMBER", "C", "Torpedo bomber."),
+            new Role("Transport", RoleMode.Unit,
+                "Tags.TRANSPORT * Tags.MOBILE", "N", "Transport."),
+        };
+    }
+}
