@@ -80,6 +80,79 @@ namespace SanctuaryHud
         internal static List<Rect> _iconUvRects;
         private static bool _loggedAtlasWait;
 
+        // ---- unit sprites (the build menu's own art) ----------------------
+        //
+        // Distinct from the strategic icon atlas above. Those are the map
+        // symbols; these are the per-template `.sansprite` assets the build and
+        // selection panels draw, loaded through the game's own pipeline into a
+        // registry keyed by AssetID. SanctuaryUI.Utils.TryGetLoadedSprite is
+        // the public way in, and EM.Core.AssetID is a struct wrapping exactly
+        // the uint that Lua reports as `general.foregroundIconID.index` (or
+        // `backgroundIconID` for the land/air/water plate behind it).
+
+        private static MethodInfo _tryGetSprite;
+        private static Type _assetIdType;
+        private static bool _spriteBridgeTried;
+        private static readonly Dictionary<uint, Sprite> _spriteCache = new Dictionary<uint, Sprite>();
+
+        private static void ResolveSpriteBridge()
+        {
+            if (_spriteBridgeTried) return;
+            _spriteBridgeTried = true;
+            try
+            {
+                var types = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(a => !a.IsDynamic).SelectMany(GetTypesSafe).ToList();
+                _assetIdType = types.FirstOrDefault(t => t.FullName == "EM.Core.AssetID");
+                _tryGetSprite = types.FirstOrDefault(t => t.FullName == "SanctuaryUI.Utils")
+                    ?.GetMethod("TryGetLoadedSprite", BindingFlags.Public | BindingFlags.Static);
+                if (_tryGetSprite == null || _assetIdType == null)
+                    _log?.LogWarning("Unit sprite lookup unavailable; callers fall back to text.");
+            }
+            catch (Exception e)
+            {
+                _log?.LogWarning($"Unit sprite lookup failed to resolve ({e.Message}).");
+            }
+        }
+
+        /// Each match reloads the sprites through Engine.LoadSprite, so last
+        /// match's AssetIDs are not safe to assume still valid.
+        internal static void ClearSpriteCache() => _spriteCache.Clear();
+
+        /// The game's own sprite for an AssetID index, or null.
+        internal static Sprite ResolveSprite(uint index)
+        {
+            if (index == 0) return null;
+            if (_spriteCache.TryGetValue(index, out var cached)) return cached;
+
+            ResolveSpriteBridge();
+            Sprite sprite = null;
+            if (_tryGetSprite != null && _assetIdType != null)
+            {
+                try
+                {
+                    var args = new[] { Activator.CreateInstance(_assetIdType, index), null };
+                    if (_tryGetSprite.Invoke(null, args) is bool ok && ok) sprite = args[1] as Sprite;
+                }
+                catch { /* one bad id must not take the caller down */ }
+            }
+            _spriteCache[index] = sprite;
+            return sprite;
+        }
+
+        /// Draws one in IMGUI. A Sprite's pixels are a window into a packed
+        /// atlas, so the draw has to be told which corner of the texture.
+        /// `fraction` clips it horizontally, for showing one running off an edge.
+        internal static void DrawSprite(Rect rect, uint index, float fraction = 1f)
+        {
+            var sprite = ResolveSprite(index);
+            var tex = sprite == null ? null : sprite.texture;
+            if (tex == null) return;
+            var tr = sprite.textureRect;
+            GUI.DrawTextureWithTexCoords(rect, tex,
+                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width * fraction / tex.width, tr.height / tex.height));
+        }
+
         private static void ResolveIconAtlas()
         {
             try

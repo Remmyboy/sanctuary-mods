@@ -11,17 +11,28 @@ The UI mods are presentation-side only: they never touch the game's Lua tree
 tick between players), so a modded client stays lobby-compatible with unmodded
 players. The exceptions are called out in their own sections below.
 
-| Project | DLL | What it does |
+Every release ships two zips. **Standalone** is everything — BepInEx, the mod
+loader and the mod — for a clean install; extract it into the game's `engine`
+folder. **ModManager** is just the mod, for an install that already has the
+[Mod Manager](#modmanager); it appears under UI Mods and can be switched on and
+off from there. Each mod builds to `<name>.dll`, and the project link is its
+source.
+
+| Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
-| [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
-| [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
-| [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
-| [CameraUtilities](CameraUtilities/) | `CameraUtilities.dll` | Switches off icons, range rings, order lines and the UI, for cinematics |
-| [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
-| [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | `ModLoader.dll` | Loads and hot-reloads every mod above from `SanctuaryMods` |
+| [SanctuaryHud](SanctuaryHud/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.6.0) | Economy strip + commander widget |
+| [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
+| [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
+| [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
+| [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
+| [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
+| [CameraUtilities](CameraUtilities/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.0) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
+| [ModManager](ModManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.2.0) | Mods page in the front menu: mod toggles, settings, Lua overlays |
+| [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
+| [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
+
+[All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
+has no release of its own yet; build it from source if you need it.
 
 ## SanctuaryHud
 
@@ -102,6 +113,32 @@ the upgrade button — so the host validates and replicates it like any other
 order, and no files change, so the lobby hash is untouched. What it costs you
 is that an assist click now spends alloy.
 
+### Paused until the engineer arrives
+
+Sending five engineers to five extractors starts five upgrades at once, and the
+economy goes flat while every one of them crawls. With `AssistPausesUpgrade`
+(default on) each upgrade started this way is **paused as soon as it starts**
+and released when its engineer actually turns up — so the cost is spread over
+the walk instead of landing all at once, and an engineer that gets killed on
+the way never spends anything at all.
+
+The pause has to lag the queueing by about a second (`AssistPauseSeconds`): the
+upgrade is not registered as in progress on the frame it is requested, and
+pausing before then does nothing. Each entry waits out that delay, checks the
+upgrade really took, and is dropped if it did not. Arrival is the engineer
+getting within its own `construction.range` plus `AssistPauseRadius` of the
+extractor, measured in the ground plane so a slope cannot hide it. A cancelled
+upgrade releases the pause on its way out, so nothing is ever left stopped with
+no explanation — and neither is unloading the mod.
+
+Pausing goes through `RequestUnitsToggle`, which takes explicit unit ids, so
+none of this disturbs your selection. The watch runs five times a second from
+the C# side, because a second's granularity would be visible on both halves.
+
+One thing to know: if the engineer never arrives — killed, or re-tasked — the
+extractor stays paused with the upgrade queued. That is the safe failure (it
+costs nothing), but it is yours to unpause.
+
 The hook is a runtime wrapper around the client's `IssueAssistOrder`:
 `inputActions.lua` binds the key to
 `Import("client/inputEventsFunctions.lua").IssueAssistOrder()`, resolved at
@@ -116,6 +153,181 @@ its replacement as a second entity, present from the moment the upgrade
 starts and already wearing the higher tier's icon — so a T1 mid-upgrade would
 otherwise read as a finished T2. The T1 stays until the upgrade lands and is
 the one carrying the upgrade adornment, so it is what fills the UPGRADING row.
+
+## BuildHotkeys
+
+One hotkey per **role** rather than per panel slot, so the same key means the
+same thing whichever faction you are playing, and pressing it again walks down
+the tiers.
+
+The game's own construction hotkeys are nine fixed letters resolved by tag
+category, first displayed match wins (`constructionPanelHotkeys.lua`). That
+leaves two gaps: you cannot reach a *specific* unit — the T1 and T3 tank are
+both `Tags.TANK`, so only one of them has a key — and whole categories have no
+key at all. Shields, artillery, air and naval factories, tech centres, walls
+and storage all render their button with `?` on it.
+
+**A role is a tag expression**, not a list of template ids, which is what makes
+it faction-agnostic for free. `PointDefence` is
+`DEFENCE * ANTI_SURFACE * STRUCTURE`; that resolves to `ues1001` for EDA,
+`ucs1001` for Chosen and `ugs1001` for Guard without naming any of them. The
+three factions share 77 of their ~99 roles, and the T1–T3 core — factories,
+point defence, anti-air, radar, energy, extractors, tech centres — is
+essentially universal, so one table covers everyone.
+
+**Tier cycling falls out of the templates.** Each one carries its own gating
+(`BUILDABLE_BY_T2_ENGINEER` and friends), so `GetBuildableTags` already returns
+exactly what the selected builder can make. Intersect that with the role, sort
+by tech tier descending, and the first press gives you the best you can
+currently build. Where a faction lacks a tier the cycle is simply shorter:
+only Chosen has a T3 point defence, so **X** gives them T3 → T2 → T1 and
+everyone else T2 → T1. No per-faction configuration anywhere.
+
+Cycling continues while the previous press is still uncommitted — its template
+sitting on the cursor — which has no time limit, since you may be lining a
+placement up. Placing it, cancelling, or changing selection starts the cycle
+over. A factory never enters build mode, so repeat presses there queue another
+of the same rather than walking the cycle; FAF instead resets its cycle on a
+timer, which is what makes its factories cycle too, and `Cycle.Seconds` (0 by
+default, 1.1 to match FAF) turns that on here.
+
+**Escape clears the build queue** of every selected factory, as it does in FAF,
+rather than opening the pause menu. Each entry goes out exactly as a
+right-click on its queue button would — the host request first, since it reads
+the queue by index, then the local prediction. With nothing queued the key
+falls through untouched, so escape still opens the menu; and because there is
+no getter for panel visibility, only a setter, the mod mirrors the menu's state
+by watching that setter (which the menu's own close button goes through too) so
+escape still *closes* the menu rather than clearing a queue behind it.
+`Cancel.ClearFactoryQueue` rebinds or blanks it.
+
+Holding **Shift** queues five, as the stock hotkeys do. Holding **Alt** walks
+the cycle backwards, as it does in FAF — and a *fresh* Alt press opens at the
+far end, which makes it the direct route to the cheapest option: the T1 factory
+you mean to upgrade later, rather than the T3 one the forward cycle opens on.
+
+**Several roles can share a key**, merging into one cycle ranked by tier first
+and role order second. That does two jobs at once. Where the roles cannot
+coexist it reads as "first one that applies": **R** is the land factory's tank
+and the naval factory's warship, and no factory builds both. Where they can
+coexist it reads as a round-robin: **W** is land, air, then naval factory off
+repeated presses, each at its best tier, before the cycle drops a tier and
+comes round again — one key for the whole decision instead of three. Splitting
+them back onto separate keys is just a config edit.
+
+Note the ordering that falls out of this for a high-tier engineer: W gives the
+T3 land factory before the T1 one, so placing a cheap T1 factory to upgrade
+later takes several presses. If that reads wrong in play, the fix is a
+per-role "prefer lowest tier" flag rather than a change to the cycle.
+
+Roles stop at T3 on purpose. The experimentals above are faction-specific
+one-offs that want their own keys — without the cap, Guard's T4 Experimental
+Generator (`ugs4621`, tagged `ENERGY_PRODUCTION`) would sit at the top of the
+energy cycle and a tap of **D** would try to start one.
+
+**The unit keys follow Zulan's**, the Forged Alliance hotbuild layout that FAF
+later absorbed: mnemonic, and the same letter reused across domains, because a
+factory only ever builds one of them.
+
+| Key | Land factory | Air factory | Naval factory |
+| --- | --- | --- | --- |
+| **E** | engineer | | |
+| **S** | scout | scout | submarine |
+| **T** | tank | transport | |
+| **B** | raider | bomber | battleship |
+| **F** | | fighter | frigate |
+| **D** | | | destroyer |
+| **G** | | gunship | |
+| **O** | | torpedo bomber | |
+| **R** | mobile artillery | | |
+| **N** | mobile anti-air | | |
+| **V** | sniper | | |
+
+That reuse is the same "roles sharing a key" merge described above, resolved by
+whichever factory is selected. Two departures: Zulan's gives each warship class
+its own key rather than walking a line of tiers, so frigate/destroyer/battleship
+are split rather than cycled; and **V** for the sniper is ours, since Zulan's has
+no sniper and its V is a mobile shield with no shared-tier equivalent here. Its
+cruiser, carrier, missile launcher, amphibious tank and stealth field have no
+counterpart in Sanctuary's shared roles either, so those keys are simply unused.
+
+Structure keys are not Zulan's — its structure layout is not something we could
+verify — and keep the stock construction letters where they already fit
+(W/E/S/D/X/C/R).
+
+Every role's key is a config entry, so they are all rebindable from the F8 mod
+manager in the game's own hotkey format (`G`, `Ctrl-G`, `Ctrl-Alt-G`); blank
+unbinds. Where a unit key lands on an order key — **G** is Repair, **F**
+attack-move, **V** reclaim — nothing is lost: the role only claims the press
+when a factory is selected and has something to build, and orders like repair
+and reclaim mean nothing to a factory. Any other selection falls straight
+through to the order, because Construction runs at a higher group priority and
+returning `false` lets the event carry on. `M` is left unbound, so the stock
+"upgrade structure" hotkey still works.
+
+**The construction buttons relabel themselves.** Each one draws its hotkey in
+the corner, filled from `constructionPanelHotkeys.GetHotkeyForTemplate` —
+`constructionPanel` holds the module table rather than the function and looks
+the field up per button, so replacing it relabels every button with the key
+that actually builds it. Modifiers compress to one character (`^S` for
+`Ctrl-S`) to fit where a single letter went. Anything no role claims keeps the
+stock answer, which is usually the `?` it shows today.
+
+**An overlay shows what you just picked.** A cycle is otherwise invisible
+until you place something — you cannot tell whether W→W landed on the air
+factory or on a lower-tier land one. So each press publishes its whole cycle
+and a strip appears: every option in that key's
+cycle left to right in the order further presses reach them, drawn with
+the same art the build menu uses — each unit's icon over the domain plate
+behind it (`backgroundIconID`, keyed on `iconUIType`: land, air, water,
+amphibious), so the strip reads like a slice of the panel rather than floating
+cut-outs, and land/air/naval separate at a glance. The live one is lit and
+underlined, the rest faded.
+
+A long cycle shows **one tech tier at a time** rather than all of it: a T3
+engineer's factory key is nine entries once naval factories are in, which would
+span the screen at this icon size. A small `T3` / `T2` label then names the
+band you are in — the key itself gets no column, since you just pressed it —
+and the next entry leans half into view past the right edge, which says "there
+is more" without asking anyone to read a count. No peek on the final band is
+itself the signal that the cycle ends there, and with the whole cycle on screen
+the tier label goes too, since it would read as applying to a strip that spans
+tiers. Banding is by tier rather than by a fixed block of
+three, because a block would straddle two tiers whenever a faction lacks a
+domain at one of them — Chosen's T3 point defence, which nobody else has, is
+enough to shift every block after it. A cycle that already fits is shown whole:
+point defence is one entry per tier, and banding that would leave a single icon
+on screen. `Overlay.MaxShown` (default 3) caps a band.
+
+`Overlay.ShowNames` adds a caption underneath naming the entry
+you are on ("Tier 1: Land Factory") — off by default, since the art usually
+carries it and the name is only needed to separate two tiers that share a
+sprite.
+
+Those icons are *not* the strategic icon atlas the commander widget samples;
+they are per-template `.sansprite` assets loaded through the game's own
+pipeline into a registry keyed by `AssetID`. `SanctuaryUI.Utils`
+`.TryGetLoadedSprite` is the way in, and `EM.Core.AssetID` wraps exactly the
+`uint` that Lua reports as `general.foregroundIconID.index`, so the panel
+passes that index across and resolves the real `Sprite` — drawn through its
+`textureRect`, since each one is a window into a packed atlas. If the lookup
+ever goes missing the overlay just lists names.
+
+The strip fades a couple of seconds after the last press,
+and is drawn rather than built from `GUI.Window`, so it can never swallow a
+click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`,
+`Overlay.IconSize` (40), `Overlay.MaxShown` and `Overlay.PosY` (860, just clear
+of the build panel) control it.
+
+Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
+client still joins unmodded lobbies. The binding is a runtime insert into
+`inputSystem.lua`'s `LoadedActionMap` (which `CallAction` reads live on every
+event, so it takes effect immediately and is restored on unload), and the build
+goes through `constructionPanel.lua`'s own `ConstructionClickFunction` — the
+same observer check, the same local prediction and the same host-validated
+command a button click sends. Returning `false` when nothing matched lets the
+key fall through to whatever it normally does, and because chat disables every
+action group but `MouseControls`, typing already suppresses these for free.
 
 ## LadderReporter
 

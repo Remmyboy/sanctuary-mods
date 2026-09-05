@@ -23,7 +23,7 @@ namespace SanctuaryHud
     // Furnace carries the same strategic icon and nothing on the render entity
     // separates the two — so the T3 row is "tier-3 alloy structures".
     // Assisting an extractor to start its upgrade lives in AssistUpgrade.cs.
-    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.3.0")]
     public partial class EcoManagerPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
