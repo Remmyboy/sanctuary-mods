@@ -3,3 +3,6 @@ obj/
 *.user
 release/
 *.zip
+
+# Worktrees live here; only .claude/skills is shared.
+.claude/worktrees/

@@ -630,6 +630,31 @@ deploys to `BepInEx\plugins`, because BepInEx is what loads *it* (see
 [ModLoader](#modloader)). So `dotnet build` — of one project or the whole
 `SanctuaryMods.sln` — is the entire iteration loop, no game restart.
 
+### Cutting a release
+
+[tools/pack-release.ps1](tools/pack-release.ps1) builds a mod's two zips and,
+with `-Publish`, creates the GitHub release:
+
+```powershell
+pwsh -NoProfile -File tools/pack-release.ps1 -Mod EcoManager -Body body.txt
+```
+
+Version and display name come from the mod's `[BepInPlugin]` attribute, so that
+attribute is the only place a version is written and a release cannot disagree
+with what the game reports. `-Body` is plain text that lands in the `README.txt`
+of both zips verbatim. Output goes to `release/` (gitignored), staged through a
+temp folder so packing never disturbs a running game.
+
+The BepInEx tree is copied from your own install by allowlist — never
+`BepInEx\config\` wholesale, which holds your per-mod settings — plus the
+vendored [tools/BepInEx.cfg](tools/BepInEx.cfg), which carries the
+`HideManagerGameObject = true` that Sanctuary requires. Both zips are then
+checked for the paths they must contain and for stray config before the script
+will publish, and publishing refuses if the tag already exists.
+
+The full checklist, including what *not* to re-release, is in
+[.claude/skills/release-mod](.claude/skills/release-mod/SKILL.md).
+
 ## Setup
 
 1. Install the .NET SDK (8+).
