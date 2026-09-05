@@ -11,17 +11,27 @@ The UI mods are presentation-side only: they never touch the game's Lua tree
 tick between players), so a modded client stays lobby-compatible with unmodded
 players. The exceptions are called out in their own sections below.
 
-| Project | DLL | What it does |
+Every release ships two zips. **Standalone** is everything — BepInEx, the mod
+loader and the mod — for a clean install; extract it into the game's `engine`
+folder. **ModManager** is just the mod, for an install that already has the
+[Mod Manager](#modmanager); it appears under UI Mods and can be switched on and
+off from there. Each mod builds to `<name>.dll`, and the project link is its
+source.
+
+| Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
-| [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
-| [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
-| [BuildHotkeys](BuildHotkeys/) | `BuildHotkeys.dll` | One hotkey per *role*, same key every faction, cycling by tier |
-| [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
-| [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
-| [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | `ModLoader.dll` | Loads and hot-reloads every mod above from `SanctuaryMods` |
+| [SanctuaryHud](SanctuaryHud/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.6.0) | Economy strip + commander widget |
+| [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
+| [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
+| [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
+| [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
+| [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
+| [ModManager](ModManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.2.0) | Mods page in the front menu: mod toggles, settings, Lua overlays |
+| [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
+| [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
+
+[All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
+has no release of its own yet; build it from source if you need it.
 
 ## SanctuaryHud
 
