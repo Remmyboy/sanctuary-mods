@@ -15,7 +15,7 @@ players. The exceptions are called out in their own sections below.
 | --- | --- | --- |
 | [SanctuaryHud](SanctuaryHud/) | `SanctuaryHud.dll` | Economy strip + commander widget |
 | [IdleEngineers](IdleEngineers/) | `IdleEngineers.dll` | Clickable idle-engineer panel |
-| [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
+| [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | `BuildHotkeys.dll` | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
@@ -101,6 +101,32 @@ and `UpdateQueueAmount` command the construction panel sends when you click
 the upgrade button — so the host validates and replicates it like any other
 order, and no files change, so the lobby hash is untouched. What it costs you
 is that an assist click now spends alloy.
+
+### Paused until the engineer arrives
+
+Sending five engineers to five extractors starts five upgrades at once, and the
+economy goes flat while every one of them crawls. With `AssistPausesUpgrade`
+(default on) each upgrade started this way is **paused as soon as it starts**
+and released when its engineer actually turns up — so the cost is spread over
+the walk instead of landing all at once, and an engineer that gets killed on
+the way never spends anything at all.
+
+The pause has to lag the queueing by about a second (`AssistPauseSeconds`): the
+upgrade is not registered as in progress on the frame it is requested, and
+pausing before then does nothing. Each entry waits out that delay, checks the
+upgrade really took, and is dropped if it did not. Arrival is the engineer
+getting within its own `construction.range` plus `AssistPauseRadius` of the
+extractor, measured in the ground plane so a slope cannot hide it. A cancelled
+upgrade releases the pause on its way out, so nothing is ever left stopped with
+no explanation — and neither is unloading the mod.
+
+Pausing goes through `RequestUnitsToggle`, which takes explicit unit ids, so
+none of this disturbs your selection. The watch runs five times a second from
+the C# side, because a second's granularity would be visible on both halves.
+
+One thing to know: if the engineer never arrives — killed, or re-tasked — the
+extractor stays paused with the upgrade queued. That is the safe failure (it
+costs nothing), but it is yours to unpause.
 
 The hook is a runtime wrapper around the client's `IssueAssistOrder`:
 `inputActions.lua` binds the key to
