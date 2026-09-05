@@ -249,6 +249,11 @@ and both views agree.
 - **Health bars** — every health and progress bar.
 - **Game UI** — the whole HUD. This mod's own panel is Unity IMGUI rather than
   the game's UI, so it stays up and F4 still gets everything back.
+- **Unit draw distance** — how far the camera can get before units stop being
+  drawn at all. The game stops drawing anything mobile past 100 world units
+  and structures past 160, which is why a zoomed-out battle is nothing but
+  strategic icons; set a larger figure and the models keep going. This is the
+  one setting here that isn't live — see below.
 
 Presentation-side only: these are all client rendering flags the client's own
 Lua already drives, so no simulation state is touched, no hashed file changes,
@@ -288,6 +293,27 @@ game's own draw run with the all-armies view off and nothing selected — it
 clears, finds nothing to draw, and stops. `SetOrderDraw` is wrapped alongside
 purely to remember what the append key last asked for, so it can be handed
 straight back.
+
+**Draw distance is the exception**, and the only part of this mod that is a
+Harmony patch rather than Lua. Every renderable entity carries an LOD component
+holding up to six levels, each with a render distance; the culling system picks
+the first level the camera is still inside, and past the last one the entity
+simply isn't drawn. Units and structures are given exactly one level — 100 for
+anything mobile, 160 for anything that isn't — so past that they are gone and
+only the icon is left. Nothing exposes those numbers at runtime: the culling
+system is a Burst job, and Lua has no setter for them. They exist in a
+patchable, managed form in exactly one place, the point where a match's Lua
+templates are turned into render prefabs, so that is where the mod raises them.
+
+Two things follow. The distances are baked into the prefabs as a match loads,
+so a change only takes effect when the next match or replay starts — the panel
+says "next match" when what you've set isn't what the current one got. And only
+single-level chains are touched: that's what a unit or structure has, and its
+one distance is purely a cull distance with nothing cheaper to fall back to.
+Props keep a real chain with an impostor on the end, so raising theirs would
+hold full-detail meshes on screen at range; they're left as the game built them.
+Worth knowing that units have no cheaper level either, so a wide shot of a big
+battle now draws every model at full detail.
 
 Unloading the mod, or switching it off on the Mods page, takes the wrapper back
 off and puts every flag back. A fresh match brings a fresh Lua state, so the

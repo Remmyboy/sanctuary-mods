@@ -67,6 +67,9 @@ namespace SanctuaryHud.CameraUtils
             _installed = false;
             _pushed = null;
             CameraHeight = -1f;
+            // The next match rebuilds its render prefabs from scratch, so
+            // whatever draw distance this one was given is gone with it.
+            DrawDistance.Forget();
         }
 
         internal static void Poll(float dt, BepInEx.Logging.ManualLogSource log)

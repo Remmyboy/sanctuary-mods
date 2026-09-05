@@ -1,6 +1,7 @@
 using System;
 using BepInEx;
 using BepInEx.Configuration;
+using HarmonyLib;
 using UnityEngine;
 
 namespace SanctuaryHud.CameraUtils
@@ -17,8 +18,11 @@ namespace SanctuaryHud.CameraUtils
     // truth — the panel writes to them, so a change either way persists and
     // both views agree.
     //
-    // The work itself is in RenderState; this is the config, the hotkey and
-    // the panel.
+    // It also raises how far out units keep being drawn, which is the one
+    // setting here that isn't live — see DrawDistance.
+    //
+    // The work itself is in RenderState and DrawDistance; this is the config,
+    // the hotkey and the panel.
     [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.1.0")]
     public class CameraUtilitiesPlugin : BaseUnityPlugin
     {
@@ -34,6 +38,9 @@ namespace SanctuaryHud.CameraUtils
         private ConfigEntry<bool> _cfgPlannedBuilds;
         private ConfigEntry<bool> _cfgHealthBars;
         private ConfigEntry<bool> _cfgGameUi;
+        private ConfigEntry<float> _cfgDrawDistance;
+
+        private Harmony _harmony;
 
         private bool _open;
         private Rect _rect = new Rect(12, 420, 0, 0);
@@ -72,6 +79,21 @@ namespace SanctuaryHud.CameraUtils
             _cfgGameUi = Config.Bind("Cinematic", "HideGameUI", false,
                 "Hide the game's whole UI HUD. This mod's own panel stays up, so the hotkey still gets it back.");
 
+            _cfgDrawDistance = Config.Bind("Rendering", "UnitDrawDistance", 0f,
+                "Smallest distance from the camera at which a unit or structure may stop being drawn, in world units. 0 leaves the game alone, which stops drawing mobile units past 100 and structures past 160. Takes effect when a match or replay starts, and only units and structures are affected — props keep their own level-of-detail chain.");
+
+            try
+            {
+                _harmony = new Harmony("com.sanctuarydb.camerautilities." + Guid.NewGuid().ToString("N").Substring(0, 8));
+                DrawDistance.ApplyPatch(_harmony, Logger);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError($"Camera Utilities: the draw-distance patch failed, so units will fade as usual. Everything else still works: {e}");
+                _harmony?.UnpatchSelf();
+                _harmony = null;
+            }
+
             _rect.x = _cfgPosX.Value;
             _rect.y = _cfgPosY.Value;
 
@@ -84,6 +106,7 @@ namespace SanctuaryHud.CameraUtils
             // Unloading the mod has to leave the client as the game had it:
             // the wrapper comes off RenderUpdate and every flag goes back.
             RenderState.Uninstall();
+            _harmony?.UnpatchSelf();
         }
 
         private void Update()
@@ -99,6 +122,7 @@ namespace SanctuaryHud.CameraUtils
             RenderState.HidePlannedBuildings = _cfgPlannedBuilds.Value;
             RenderState.HideHealthBars = _cfgHealthBars.Value;
             RenderState.HideGameUi = _cfgGameUi.Value;
+            DrawDistance.Wanted = _cfgDrawDistance.Value;
 
             RenderState.Poll(Time.unscaledDeltaTime, Logger);
 
@@ -192,6 +216,24 @@ namespace SanctuaryHud.CameraUtils
             _cfgPlannedBuilds.Value = Toggle(_cfgPlannedBuilds.Value, "PLANNED BUILDS", GUILayout.Width(118));
             GUILayout.EndHorizontal();
 
+            GUILayout.Space(4);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("UNIT DRAW DISTANCE", _stHead);
+            GUILayout.FlexibleSpace();
+            // The distances are baked into the render prefabs as a match's
+            // templates load, so a change here is not live — say so rather
+            // than letting the button look broken.
+            if (DrawDistance.Applied != _cfgDrawDistance.Value) GUILayout.Label("next match", _stDim);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("-", _stButton, GUILayout.Width(28))) StepDrawDistance(-250f);
+            var distance = _cfgDrawDistance.Value;
+            GUILayout.Label(distance <= 0f ? "game default" : $"{distance:0}", _stValue, GUILayout.Width(96));
+            if (GUILayout.Button("+", _stButton, GUILayout.Width(28))) StepDrawDistance(250f);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("OFF", _stButton, GUILayout.Width(44))) _cfgDrawDistance.Value = 0f;
+            GUILayout.EndHorizontal();
+
             GUILayout.Space(2);
             if (GUILayout.Button("SHOW EVERYTHING", _stButton)) ShowEverything();
 
@@ -201,6 +243,11 @@ namespace SanctuaryHud.CameraUtils
         private void StepThreshold(float delta)
         {
             _cfgIconHeight.Value = Mathf.Clamp(Mathf.Round((_cfgIconHeight.Value + delta) / 10f) * 10f, 0f, 1000f);
+        }
+
+        private void StepDrawDistance(float delta)
+        {
+            _cfgDrawDistance.Value = Mathf.Clamp(Mathf.Round((_cfgDrawDistance.Value + delta) / 250f) * 250f, 0f, 10000f);
         }
 
         private void ShowEverything()
