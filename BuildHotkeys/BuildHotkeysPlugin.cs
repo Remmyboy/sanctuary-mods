@@ -102,7 +102,7 @@ namespace SanctuaryHud
                 "After a build hotkey, show what it picked and the rest of that key's cycle.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
                 "How long the overlay stays up after the last press.");
-            _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 48f,
+            _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 40f,
                 "Size of each icon in the overlay, in 1080p-logical pixels.");
             _cfgOverlayMax = Config.Bind("Overlay", "MaxShown", 3,
                 "Most icons to show at once. The overlay shows one tech tier of the cycle at a time — " +
@@ -110,8 +110,9 @@ namespace SanctuaryHud
             _cfgOverlayNames = Config.Bind("Overlay", "ShowNames", false,
                 "Caption the overlay with the name of the entry you are on, e.g. \"Tier 1: Land Factory\". " +
                 "Off by default — the icons carry it, and the name is only needed to tell two tiers apart.");
-            _cfgOverlayY = Config.Bind("Overlay", "PosY", 700f,
-                "Overlay's distance from the top of the screen, in 1080p-logical pixels. " +
+            _cfgOverlayY = Config.Bind("Overlay", "PosY", 810f,
+                "Overlay's distance from the top of the screen, in 1080p-logical pixels — 810 sits it at " +
+                "three quarters of the way down, where FAF hotbuild puts its own cycle strip. " +
                 "It is always centred horizontally.");
 
             foreach (var role in Roles.All)

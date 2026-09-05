@@ -267,7 +267,8 @@ ever goes missing the overlay just lists names.
 The strip fades a couple of seconds after the last press,
 and is drawn rather than built from `GUI.Window`, so it can never swallow a
 click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`,
-`Overlay.IconSize`, `Overlay.MaxShown` and `Overlay.PosY` control it.
+`Overlay.IconSize` (40), `Overlay.MaxShown` and `Overlay.PosY` (810 — three
+quarters of the way down, where FAF hotbuild puts its own strip) control it.
 
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into
