@@ -191,9 +191,21 @@ until you place something — you cannot tell whether W→W landed on the air
 factory or on a lower-tier land one. So each press publishes its whole cycle
 and a small panel lists it: the live entry lit with the key beside it, the
 rest of the options dimmed underneath, in the order further presses will reach
-them. Entries are the game's own `displayName`, which reads "Tier 3: Land
-Factory" — the tier is the ambiguity worth resolving, and a strategic icon
-would not show it. The panel fades a couple of seconds after the last press,
+them. Each row carries the same button art the build menu uses, next to the
+game's own `displayName` ("Tier 3: Land Factory") — the icon to recognise it
+by, the name because the tier is the ambiguity worth resolving and the art is
+often shared across tiers.
+
+Those icons are *not* the strategic icon atlas the commander widget samples;
+they are per-template `.sansprite` assets loaded through the game's own
+pipeline into a registry keyed by `AssetID`. `SanctuaryUI.Utils`
+`.TryGetLoadedSprite` is the way in, and `EM.Core.AssetID` wraps exactly the
+`uint` that Lua reports as `general.foregroundIconID.index`, so the panel
+passes that index across and resolves the real `Sprite` — drawn through its
+`textureRect`, since each one is a window into a packed atlas. If the lookup
+ever goes missing the overlay just lists names.
+
+The panel fades a couple of seconds after the last press,
 and is drawn rather than built from `GUI.Window`, so it can never swallow a
 click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`
 and `Overlay.PosY` control it.

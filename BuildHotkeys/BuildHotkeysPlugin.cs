@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -52,6 +53,7 @@ namespace SanctuaryHud
         private string _cycleKey;
         private int _cycleIndex;
         private string[] _cycleNames;
+        private uint[] _cycleIcons;
         private float _cycleAt = -999f;
 
         /// Base key names the game's `Key` enum accepts (enums.lua). Modifier
@@ -129,12 +131,13 @@ namespace SanctuaryHud
             var previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
-            const float rowH = 22f, padX = 10f, padY = 7f, chipW = 34f, width = 268f;
+            const float rowH = 28f, padX = 10f, padY = 7f, chipW = 32f, iconSize = 24f, width = 300f;
             var height = padY * 2f + rowH * _cycleNames.Length;
             var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
             var y = _cfgOverlayY.Value;
 
             GUI.DrawTexture(new Rect(x, y, width, height), _texPanel);
+            var previousColour = GUI.color;
 
             for (var i = 0; i < _cycleNames.Length; i++)
             {
@@ -146,7 +149,17 @@ namespace SanctuaryHud
                     GUI.DrawTexture(new Rect(x, rowY, 3f, rowH), _texWhite);
                     GUI.Label(new Rect(x + padX, rowY, chipW, rowH), _cycleKey, _stCycleKey);
                 }
-                GUI.Label(new Rect(x + padX + chipW, rowY, width - padX - chipW, rowH),
+
+                // Options you have not landed on are faded, so the live one
+                // reads at a glance without having to find the highlight.
+                var iconX = x + padX + chipW;
+                GUI.color = live ? Color.white : new Color(1f, 1f, 1f, 0.35f);
+                if (_cycleIcons != null && i < _cycleIcons.Length)
+                    DrawSprite(new Rect(iconX, rowY + (rowH - iconSize) * 0.5f, iconSize, iconSize), _cycleIcons[i]);
+                GUI.color = previousColour;
+
+                var textX = iconX + iconSize + 7f;
+                GUI.Label(new Rect(textX, rowY, x + width - padX - textX, rowH),
                     _cycleNames[i], live ? _stCycleOn : _stCycleOff);
             }
 
@@ -226,9 +239,84 @@ namespace SanctuaryHud
             _cycleSeq = seq;
             _cycleKey = parts[1];
             int.TryParse(parts[2], out _cycleIndex);
-            _cycleNames = new string[parts.Length - 3];
-            Array.Copy(parts, 3, _cycleNames, 0, _cycleNames.Length);
+
+            var n = parts.Length - 3;
+            _cycleNames = new string[n];
+            _cycleIcons = new uint[n];
+            for (var i = 0; i < n; i++)
+            {
+                var entry = parts[i + 3];
+                var tilde = entry.LastIndexOf('~');
+                if (tilde < 0) { _cycleNames[i] = entry; continue; }
+                _cycleNames[i] = entry.Substring(0, tilde);
+                uint.TryParse(entry.Substring(tilde + 1), out _cycleIcons[i]);
+            }
             _cycleAt = Time.unscaledTime;
+        }
+
+        // ---- build-menu icons ---------------------------------------------
+
+        private static MethodInfo _tryGetSprite;
+        private static Type _assetIdType;
+        private static bool _spriteBridgeTried;
+        private readonly Dictionary<uint, Sprite> _spriteCache = new Dictionary<uint, Sprite>();
+
+        /// The build buttons' art is not the strategic icon atlas HudCore
+        /// samples for the commander widget — those are `.sansprite` assets
+        /// loaded through the game's own pipeline into a registry keyed by
+        /// AssetID. SanctuaryUI.Utils.TryGetLoadedSprite is the public way in,
+        /// and EM.Core.AssetID is a struct wrapping the very uint the Lua side
+        /// reports as `foregroundIconID.index`.
+        private static void ResolveSpriteBridge()
+        {
+            if (_spriteBridgeTried) return;
+            _spriteBridgeTried = true;
+            try
+            {
+                var types = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(a => !a.IsDynamic).SelectMany(GetTypesSafe).ToList();
+                _assetIdType = types.FirstOrDefault(t => t.FullName == "EM.Core.AssetID");
+                _tryGetSprite = types.FirstOrDefault(t => t.FullName == "SanctuaryUI.Utils")
+                    ?.GetMethod("TryGetLoadedSprite", BindingFlags.Public | BindingFlags.Static);
+                if (_tryGetSprite == null || _assetIdType == null)
+                    _log?.LogWarning("Build hotkeys: sprite lookup unavailable; the overlay will list names only.");
+            }
+            catch (Exception e)
+            {
+                _log?.LogWarning($"Build hotkeys: sprite lookup failed to resolve ({e.Message}); names only.");
+            }
+        }
+
+        private Sprite ResolveSprite(uint index)
+        {
+            if (index == 0) return null;
+            if (_spriteCache.TryGetValue(index, out var cached)) return cached;
+
+            ResolveSpriteBridge();
+            Sprite sprite = null;
+            if (_tryGetSprite != null && _assetIdType != null)
+            {
+                try
+                {
+                    var args = new[] { Activator.CreateInstance(_assetIdType, index), null };
+                    if (_tryGetSprite.Invoke(null, args) is bool ok && ok) sprite = args[1] as Sprite;
+                }
+                catch { /* one bad id must not take the overlay down */ }
+            }
+            _spriteCache[index] = sprite;
+            return sprite;
+        }
+
+        /// Draws a Sprite in IMGUI: its pixels are a window into a packed
+        /// atlas, so the draw has to be told which corner of the texture.
+        private void DrawSprite(Rect rect, uint index)
+        {
+            var sprite = ResolveSprite(index);
+            var tex = sprite == null ? null : sprite.texture;
+            if (tex == null) return;
+            var tr = sprite.textureRect;
+            GUI.DrawTextureWithTexCoords(rect, tex,
+                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width / tex.width, tr.height / tex.height));
         }
 
         /// True while our binding is still live in the VM the game is running.
@@ -360,6 +448,9 @@ namespace SanctuaryHud
                 _installed = true;
                 _installedSignature = signature;
                 _builds = 0;
+                // Each match reloads the sprites through Engine.LoadSprite, so
+                // last match's AssetIDs are not safe to assume still valid.
+                _spriteCache.Clear();
 
                 foreach (var pair in layout.OrderBy(p => p.Key, StringComparer.Ordinal))
                 {
@@ -549,13 +640,23 @@ if not __SdbBuildHotkeys then
     -- and every option in order. Led by the press counter so two presses that
     -- land on the same entry still read as two distinct events.
     __SdbBuildHotkeysCount = __SdbBuildHotkeysCount + 1
-    local names = {}
+    local entries = {}
     for i = 1, #cands do
-      local tp = __Templates.Units[cands[i]]
-      names[i] = (tp and tp.general and tp.general.displayName) or cands[i]
+      local g = __Templates.Units[cands[i]]
+      g = g and g.general
+      -- foregroundIconID is the build-menu button art (UnitTemplateIDToIconID,
+      -- one sprite per template); strategicIconID is the map symbol, which is
+      -- shared across tiers and so cannot tell a T1 factory from a T3 one.
+      -- tonumber because the FFI hands back a uint32 cdata, which would
+      -- otherwise concatenate as '1234ULL'.
+      local icon = 0
+      if g and g.foregroundIconID and g.foregroundIconID.index then
+        icon = tonumber(g.foregroundIconID.index) or 0
+      end
+      entries[i] = ((g and g.displayName) or cands[i]) .. '~' .. string.format('%d', icon)
     end
     __SdbBuildHotkeysCycle = __SdbBuildHotkeysCount .. '|' .. key .. '|' .. idx
-      .. '|' .. table.concat(names, '|')
+      .. '|' .. table.concat(entries, '|')
 
     -- The panel's own click handler: it wraps the file-local
     -- ExecuteConstructionAction, so this is exactly a button click.
