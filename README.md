@@ -192,7 +192,20 @@ factory or on a lower-tier land one. So each press publishes its whole cycle
 and a strip appears: the key named once on the left, then every option in that
 key's cycle left to right in the order further presses reach them, drawn with
 the same button art the build menu uses. The live one is lit and underlined,
-the rest faded. `Overlay.ShowNames` adds a caption underneath naming the entry
+the rest faded.
+
+A long cycle shows **one tech tier at a time** rather than all of it: a T3
+engineer's factory key is nine entries once naval factories are in, which would
+span the screen at this icon size. The chip then names the band you are in
+(`T3`, then `T2` as you cycle past it) and a `+N` on the right says how much
+cycle is left beyond it. Banding is by tier rather than by a fixed block of
+three, because a block would straddle two tiers whenever a faction lacks a
+domain at one of them — Chosen's T3 point defence, which nobody else has, is
+enough to shift every block after it. A cycle that already fits is shown whole:
+point defence is one entry per tier, and banding that would leave a single icon
+on screen. `Overlay.MaxShown` (default 3) caps a band.
+
+`Overlay.ShowNames` adds a caption underneath naming the entry
 you are on ("Tier 1: Land Factory") — off by default, since the art usually
 carries it and the name is only needed to separate two tiers that share a
 sprite.
@@ -209,7 +222,7 @@ ever goes missing the overlay just lists names.
 The strip fades a couple of seconds after the last press,
 and is drawn rather than built from `GUI.Window`, so it can never swallow a
 click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`,
-`Overlay.IconSize` and `Overlay.PosY` control it.
+`Overlay.IconSize`, `Overlay.MaxShown` and `Overlay.PosY` control it.
 
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into

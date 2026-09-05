@@ -42,6 +42,7 @@ namespace SanctuaryHud
         private ConfigEntry<float> _cfgOverlaySeconds;
         private ConfigEntry<float> _cfgOverlayY;
         private ConfigEntry<float> _cfgOverlayIcon;
+        private ConfigEntry<int> _cfgOverlayMax;
         private ConfigEntry<bool> _cfgOverlayNames;
 
         private bool _installed;
@@ -56,6 +57,7 @@ namespace SanctuaryHud
         private int _cycleIndex;
         private string[] _cycleNames;
         private uint[] _cycleIcons;
+        private int[] _cycleTiers;
         private float _cycleAt = -999f;
 
         /// Base key names the game's `Key` enum accepts (enums.lua). Modifier
@@ -95,6 +97,9 @@ namespace SanctuaryHud
                 "How long the overlay stays up after the last press.");
             _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 64f,
                 "Size of each icon in the overlay, in 1080p-logical pixels.");
+            _cfgOverlayMax = Config.Bind("Overlay", "MaxShown", 3,
+                "Most icons to show at once. The overlay shows one tech tier of the cycle at a time — " +
+                "the T3 options, then the T2 ones as you cycle past them — and this caps a single tier.");
             _cfgOverlayNames = Config.Bind("Overlay", "ShowNames", false,
                 "Caption the overlay with the name of the entry you are on, e.g. \"Tier 1: Land Factory\". " +
                 "Off by default — the icons carry it, and the name is only needed to tell two tiers apart.");
@@ -115,7 +120,7 @@ namespace SanctuaryHud
 
         private void OnDestroy() => Remove();
 
-        private GUIStyle _stCycleKey, _stCycleCaption;
+        private GUIStyle _stCycleKey, _stCycleTier, _stCycleCaption;
 
         /// Shows what the last press actually picked and the rest of that key's
         /// cycle, as a strip of the same art the build menu uses: the live one
@@ -131,6 +136,7 @@ namespace SanctuaryHud
             if (_stCycleKey == null)
             {
                 _stCycleKey = new GUIStyle { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 0.68f, 0.25f) } };
+                _stCycleTier = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 1f, 1f, 0.45f) } };
                 _stCycleCaption = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             }
 
@@ -140,12 +146,43 @@ namespace SanctuaryHud
 
             var icon = Mathf.Clamp(_cfgOverlayIcon.Value, 16f, 256f);
             var captioned = _cfgOverlayNames.Value;
-            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 34f, captionH = 22f;
+            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 40f, captionH = 22f, moreW = 26f;
+
+            var total = _cycleNames.Length;
+            var liveIndex = Mathf.Clamp(_cycleIndex - 1, 0, total - 1);
+
+            // A short cycle is shown whole — point defence is one entry per
+            // tier, and banding that would leave a single icon on screen.
+            // Only once the cycle outgrows the cap does it show a tier at a
+            // time: a T3 engineer's factory key is nine entries with naval in,
+            // which at this icon size would span the screen. The candidate list
+            // is sorted by tier, so a band is the contiguous run around the
+            // live entry sharing its tier — and that, rather than a fixed block
+            // of N, is the grouping that reads right, since a block would
+            // straddle two tiers whenever a faction lacks a domain at one.
+            var cap = Mathf.Max(1, _cfgOverlayMax.Value);
+            int first = 0, last = total - 1;
+            if (total > cap)
+            {
+                first = last = liveIndex;
+                if (_cycleTiers != null && _cycleTiers.Length == total)
+                {
+                    var tier = _cycleTiers[liveIndex];
+                    while (first > 0 && _cycleTiers[first - 1] == tier) first--;
+                    while (last < total - 1 && _cycleTiers[last + 1] == tier) last++;
+                }
+                if (last - first + 1 > cap)
+                {
+                    first = Mathf.Clamp(liveIndex - cap / 2, first, last - cap + 1);
+                    last = first + cap - 1;
+                }
+            }
+            var shown = last - first + 1;
+            var hidden = total - shown;
 
             var cellW = icon + cellPad * 2f;
             var cellH = icon + cellPad * 2f;
-            var count = _cycleNames.Length;
-            var width = padX * 2f + chipW + cellW * count;
+            var width = padX * 2f + chipW + cellW * shown + (hidden > 0 ? moreW : 0f);
             var height = padY * 2f + cellH + (captioned ? captionH : 0f);
 
             var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
@@ -155,14 +192,27 @@ namespace SanctuaryHud
             var previousColour = GUI.color;
 
             // The whole strip belongs to one key, so it is named once, off to
-            // the left where it can never sit on top of the art.
-            GUI.Label(new Rect(x + padX, y + padY, chipW, cellH), _cycleKey, _stCycleKey);
-
-            for (var i = 0; i < count; i++)
+            // the left where it can never sit on top of the art. The tier under
+            // it says which band you are looking at.
+            var banded = hidden > 0 && _cycleTiers != null && _cycleTiers.Length == total;
+            if (banded)
             {
-                var cellX = x + padX + chipW + i * cellW;
+                GUI.Label(new Rect(x + padX, y + padY + 2f, chipW, cellH * 0.55f), _cycleKey, _stCycleKey);
+                GUI.Label(new Rect(x + padX, y + padY + cellH * 0.5f, chipW, cellH * 0.45f),
+                    "T" + _cycleTiers[liveIndex], _stCycleTier);
+            }
+            else
+            {
+                // Whole cycle on screen, so there is no band to name — the tier
+                // label would just look like it applied to the strip.
+                GUI.Label(new Rect(x + padX, y + padY, chipW, cellH), _cycleKey, _stCycleKey);
+            }
+
+            for (var i = first; i <= last; i++)
+            {
+                var cellX = x + padX + chipW + (i - first) * cellW;
                 var cellY = y + padY;
-                var live = i + 1 == _cycleIndex;
+                var live = i == liveIndex;
 
                 if (live)
                 {
@@ -178,12 +228,14 @@ namespace SanctuaryHud
                 GUI.color = previousColour;
             }
 
+            // Says the cycle carries on past this band, so a key that looks
+            // like it only has three options does not read as the whole story.
+            if (hidden > 0)
+                GUI.Label(new Rect(x + width - padX - moreW, y + padY, moreW, cellH), "+" + hidden, _stCycleTier);
+
             if (captioned)
-            {
-                var live = _cycleIndex - 1;
                 GUI.Label(new Rect(x, y + height - captionH - 3f, width, captionH),
-                    live >= 0 && live < count ? _cycleNames[live] : "", _stCycleCaption);
-            }
+                    _cycleNames[liveIndex], _stCycleCaption);
 
             GUI.matrix = previousMatrix;
         }
@@ -262,16 +314,22 @@ namespace SanctuaryHud
             _cycleKey = parts[1];
             int.TryParse(parts[2], out _cycleIndex);
 
+            // Each entry is name~icon~tier. Split from the right so a name
+            // containing a tilde cannot shift the numeric fields.
             var n = parts.Length - 3;
             _cycleNames = new string[n];
             _cycleIcons = new uint[n];
+            _cycleTiers = new int[n];
             for (var i = 0; i < n; i++)
             {
                 var entry = parts[i + 3];
-                var tilde = entry.LastIndexOf('~');
-                if (tilde < 0) { _cycleNames[i] = entry; continue; }
-                _cycleNames[i] = entry.Substring(0, tilde);
-                uint.TryParse(entry.Substring(tilde + 1), out _cycleIcons[i]);
+                _cycleNames[i] = entry;
+                var last = entry.LastIndexOf('~');
+                var prev = last > 0 ? entry.LastIndexOf('~', last - 1) : -1;
+                if (prev < 0) continue;
+                _cycleNames[i] = entry.Substring(0, prev);
+                uint.TryParse(entry.Substring(prev + 1, last - prev - 1), out _cycleIcons[i]);
+                int.TryParse(entry.Substring(last + 1), out _cycleTiers[i]);
             }
             _cycleAt = Time.unscaledTime;
         }
@@ -676,6 +734,7 @@ if not __SdbBuildHotkeys then
         icon = tonumber(g.foregroundIconID.index) or 0
       end
       entries[i] = ((g and g.displayName) or cands[i]) .. '~' .. string.format('%d', icon)
+        .. '~' .. string.format('%d', techOf(cands[i]))
     end
     __SdbBuildHotkeysCycle = __SdbBuildHotkeysCount .. '|' .. key .. '|' .. idx
       .. '|' .. table.concat(entries, '|')
