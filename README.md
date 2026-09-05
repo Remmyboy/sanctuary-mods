@@ -26,6 +26,7 @@ source.
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
+| [CameraUtilities](CameraUtilities/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.0) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.2.0) | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
@@ -429,6 +430,109 @@ with; the game's own list greys out mismatches. Playback is a normal client,
 so the other mods in this repo behave as they would in a match and follow
 the focused army. A recorded change of sim speed by the host would override
 the speed slider for a moment; the panel re-applies its value.
+
+## CameraUtilities
+
+Takes the game's overlays off the picture, one at a time, for recording
+cinematics — or just for a cleaner view. Every switch is in two places: the
+mod's settings on the **Mods** page, and a small in-match panel on **F4**,
+because during a shot you don't want to leave the game to change one. The
+config entries are the single source of truth, so a change either way persists
+and both views agree.
+
+- **Strategic icons** — three ways: always, never, or only above a camera
+  height. The last is the interesting one: icons are what you want at
+  strategic zoom and exactly what you don't want in a close shot, so
+  `WHEN FAR` keeps them until you dive in and drops them below the threshold
+  (100 world units by default — the panel shows the live camera height next to
+  the setting so you can pick one against the shot you're framing). This is
+  the rule the game's own `rendering.lua` carries a TODO for.
+- **Intel ranges** — the vision, fog-of-war, radar, sonar, omni and
+  counter-intel rings.
+- **Attack ranges** — direct, indirect, anti-air, anti-naval and counter.
+- **Build ranges** — build and assist, so a screen full of engineers stops
+  drawing circles.
+- **Order lines** — the lines and markers drawn for whatever is selected:
+  move, build, attack, assist, reclaim, and the whole-army view of them the
+  append key brings up.
+- **Planned buildings** — the outlines of buildings an engineer or commander
+  has queued but not started. They come back on their own the moment
+  construction begins.
+- **Health bars** — every health and progress bar.
+- **Game UI** — the whole HUD. This mod's own panel is Unity IMGUI rather than
+  the game's UI, so it stays up and F4 still gets everything back.
+- **Unit draw distance** — how far the camera can get before units stop being
+  drawn at all. The game stops drawing anything mobile past 100 world units
+  and structures past 160, which is why a zoomed-out battle is nothing but
+  strategic icons; set a larger figure and the models keep going. This is the
+  one setting here that isn't live — see below.
+
+Presentation-side only: these are all client rendering flags the client's own
+Lua already drives, so no simulation state is touched, no hashed file changes,
+and a client running this is lobby-compatible with unmodded players.
+
+**How it holds.** The flags have to be re-asserted — the game rewrites the icon
+flag every render update, and units spawn with their rings on — so rather than
+pushing a chunk across the FFI at frame rate, one chunk installs a small agent
+in the client VM and C# pushes the wanted state only when it changes. The agent
+wraps `rendering.RenderUpdate` (a field on the module table `clientMain` calls
+through, so replacing it intercepts every frame without editing a file) and
+runs after the game's own call:
+
+- **icons** are the two engine calls above, per frame, so they follow the
+  camera without lagging it;
+- **range rings** are a per-unit, per-material flag the game itself never
+  writes — it only moves the per-unit master, on intel and selection changes,
+  which ANDs with ours — so a sweep four times a second is enough to catch
+  units as they appear, and it skips any unit already at the wanted mask;
+- **planned buildings** are ordinary client units with no build progress —
+  placement ghosts — so the same sweep switches their renderer off. Only ever
+  ones that are ours and visible right now, and only ever back on for ones the
+  mod itself hid: writing the renderer on for a unit the game had hidden would
+  reveal it;
+- **health bars** go through the *global* bar scale, where 0 means don't
+  render, because the per-unit master is rewritten every tick by
+  `ClientUnit:UpdateProgressBars`;
+- **the UI HUD** has a toggle and no getter, so the agent keeps its own belief
+  of the state and only toggles on a change.
+
+Order lines are the odd one out, because they aren't a flag: the order manager
+tears down last tick's line and marker prefabs and rebuilds them from scratch
+every tick, drawing either every army's orders (while the append key is held)
+or the selected units' own. Skipping its draw would leave the previous tick's
+prefabs on screen forever, so instead the mod wraps `DebugDraw` and lets the
+game's own draw run with the all-armies view off and nothing selected — it
+clears, finds nothing to draw, and stops. `SetOrderDraw` is wrapped alongside
+purely to remember what the append key last asked for, so it can be handed
+straight back.
+
+**Draw distance is the exception**, and the only part of this mod that is a
+Harmony patch rather than Lua. Every renderable entity carries an LOD component
+holding up to six levels, each with a render distance; the culling system picks
+the first level the camera is still inside, and past the last one the entity
+simply isn't drawn. Units and structures are given exactly one level — 100 for
+anything mobile, 160 for anything that isn't — so past that they are gone and
+only the icon is left. Nothing exposes those numbers at runtime: the culling
+system is a Burst job, and Lua has no setter for them. They exist in a
+patchable, managed form in exactly one place, the point where a match's Lua
+templates are turned into render prefabs, so that is where the mod raises them.
+
+Two things follow. The distances are baked into the prefabs as a match loads,
+so a change only takes effect when the next match or replay starts — the panel
+says "next match" when what you've set isn't what the current one got. And only
+single-level chains are touched: that's what a unit or structure has, and its
+one distance is purely a cull distance with nothing cheaper to fall back to.
+Props keep a real chain with an impostor on the end, so raising theirs would
+hold full-detail meshes on screen at range; they're left as the game built them.
+Worth knowing that units have no cheaper level either, so a wide shot of a big
+battle now draws every model at full detail.
+
+Unloading the mod, or switching it off on the Mods page, takes the wrapper back
+off and puts every flag back. A fresh match brings a fresh Lua state, so the
+agent reinstalls itself; a hot reload of the DLL finds it already there and
+re-wraps without stacking (the version global carries a hash of the install
+chunk, so an edit to it forces a reinstall rather than leaving the last build's
+agent running).
 
 ## ModManager
 

@@ -1,6 +1,6 @@
 ---
 name: release-mod
-description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, LadderReporter, ReplayManager, ModManager, ModLoader). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
+description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
 ---
 
 # Releasing a mod
