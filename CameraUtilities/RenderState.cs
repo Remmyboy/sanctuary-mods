@@ -115,6 +115,12 @@ namespace SanctuaryHud.CameraUtils
                 CameraHeight = h;
             }
 
+            var scale = GetLuaGlobal(BarScaleGlobal);
+            if (scale != null && float.TryParse(scale, NumberStyles.Float, CultureInfo.InvariantCulture, out var s) && s > 0f)
+            {
+                _barScale = s;
+            }
+
             var err = GetLuaGlobal(ErrorGlobal);
             if (!string.IsNullOrEmpty(err) && err != _lastErr)
             {
@@ -137,6 +143,12 @@ namespace SanctuaryHud.CameraUtils
         private const string VersionGlobal = "__CameraUtilsVersion";
         private const string HeightGlobal = "__CameraUtilsHeight";
         private const string ErrorGlobal = "__CameraUtilsErr";
+        private const string BarScaleGlobal = "__CameraUtilsBarScale";
+
+        /// The game's own progress bar scale, kept here because the Lua state
+        /// it was read from does not survive into the next match but the
+        /// engine-side scale it describes does.
+        private static float _barScale;
 
         private static string Lua(bool value) => value ? "true" : "false";
 
@@ -144,6 +156,10 @@ namespace SanctuaryHud.CameraUtils
         {
             var inv = CultureInfo.InvariantCulture;
             return "if __CameraUtils then local S = __CameraUtils " +
+                   // Seed the fresh match's agent with the scale we learned in
+                   // an earlier one, so a match that starts with bars already
+                   // hidden still knows what to put back.
+                   (_barScale > 0f ? $"S.barScale = {_barScale.ToString("0.###", inv)} " : "") +
                    $"S.icons = {(int)Icons} S.height = {HideIconsBelow.ToString("0.##", inv)} " +
                    $"S.intel = {Lua(HideIntel)} S.attack = {Lua(HideAttack)} S.build = {Lua(HideBuild)} " +
                    $"S.orders = {Lua(HideOrderLines)} S.ghosts = {Lua(HidePlannedBuildings)} " +
@@ -188,12 +204,11 @@ namespace SanctuaryHud.CameraUtils
             "  local BUILD = { [M.Build] = 1, [M.Assist] = 1 } " +
             // Weak keys, so a dead unit takes its entry with it.
             "  S.applied = S.applied or setmetatable({}, { __mode = 'k' }) " +
-            // Both of these are compared against the wanted flag to decide
-            // whether to act, so they have to start at "not hidden" — left nil
-            // the first sweep reads as a change and toggles the UI off, and
-            // overwrites the bar scale, with nothing having been asked for.
+            // Compared against the wanted flag to decide whether to toggle, so
+            // it has to start at "not hidden": left nil, the first sweep reads
+            // as a change and hides the UI with nothing having been asked for.
+            // A fresh match builds a fresh HUD, so visible is the right guess.
             "  if S.uiHidden == nil then S.uiHidden = false end " +
-            "  if S.barsHidden == nil then S.barsHidden = false end " +
             "  S.hiddenGhosts = S.hiddenGhosts or setmetatable({}, { __mode = 'k' }) " +
             "  S.sweep = function() " +
             "    local mask = (S.intel and 1 or 0) + (S.attack and 2 or 0) + (S.build and 4 or 0) " +
@@ -239,14 +254,27 @@ namespace SanctuaryHud.CameraUtils
             "        end " +
             "      end " +
             "    end " +
-            "    if S.bars ~= S.barsHidden then " +
-            "      if S.bars then " +
-            "        if not S.barScale then local _, v = Engine.GetProgressBarScaling() S.barScale = v end " +
-            "        Engine.SetProgressBarScaling(0) " +
-            "      else " +
-            "        Engine.SetProgressBarScaling(S.barScale or 1) " +
+            // The bar scale is the one thing here that is an engine global
+            // rather than per-match state: it survives into the next match,
+            // while this table does not. So reconcile against the live value
+            // every sweep instead of trusting a remembered "already hidden",
+            // and never take 0 for the game's own scale — a match that starts
+            // with it still zeroed would otherwise record 0 as the value to
+            // restore, and Lua counts 0 as true, so `or 1` does not catch it.
+            "    local _, barScale = Engine.GetProgressBarScaling() " +
+            "    if barScale then " +
+            "      if barScale > 0 then " +
+            // Any non-zero scale is a real one, whoever set it, so adopt it as
+            // the thing to put back rather than pinning whatever we remember.
+            "        S.barScale = barScale " +
+            "        if S.bars then Engine.SetProgressBarScaling(0) end " +
+            "      elseif not S.bars then " +
+            // Zeroed without us asking, so it is ours to undo — including a
+            // match that inherited the zero from the last one, which is why
+            // the live 0 is never read back as the scale to restore.
+            "        Engine.SetProgressBarScaling(S.barScale and S.barScale > 0 and S.barScale or 1) " +
             "      end " +
-            "      S.barsHidden = S.bars " +
+            "      _G." + BarScaleGlobal + " = tostring(S.barScale or '') " +
             "    end " +
             "    if S.ui ~= S.uiHidden then Engine.ToggleUIHUD() S.uiHidden = S.ui end " +
             "    _G." + HeightGlobal + " = string.format('%.0f', Engine.GetCameraWorldSpaceHeight()) " +

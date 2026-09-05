@@ -26,7 +26,7 @@ source.
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
-| [CameraUtilities](CameraUtilities/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.0) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
+| [CameraUtilities](CameraUtilities/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.2.0) | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
@@ -492,7 +492,12 @@ runs after the game's own call:
   reveal it;
 - **health bars** go through the *global* bar scale, where 0 means don't
   render, because the per-unit master is rewritten every tick by
-  `ClientUnit:UpdateProgressBars`;
+  `ClientUnit:UpdateProgressBars`. That scale is the one thing here that
+  outlives a match while the agent holding it does not, so the sweep
+  reconciles against the live value rather than against a remembered "already
+  hidden", and never reads a zero back as the scale to restore — a match that
+  inherited the zero from the last one would otherwise record it as the
+  game's own value and keep the bars off for good (0.1.1 fixed exactly that);
 - **the UI HUD** has a toggle and no getter, so the agent keeps its own belief
   of the state and only toggles on a change.
 

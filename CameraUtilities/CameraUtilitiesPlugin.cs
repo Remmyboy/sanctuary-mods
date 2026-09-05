@@ -23,7 +23,7 @@ namespace SanctuaryHud.CameraUtils
     //
     // The work itself is in RenderState and DrawDistance; this is the config,
     // the hotkey and the panel.
-    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.1.0")]
+    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.1.1")]
     public class CameraUtilitiesPlugin : BaseUnityPlugin
     {
         private ConfigEntry<KeyCode> _cfgToggleKey;
