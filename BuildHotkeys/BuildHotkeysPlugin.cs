@@ -38,6 +38,7 @@ namespace SanctuaryHud
             new Dictionary<string, ConfigEntry<string>>();
         private ConfigEntry<bool> _cfgEnabled;
 
+        private ConfigEntry<float> _cfgCycleSeconds;
         private ConfigEntry<bool> _cfgOverlay;
         private ConfigEntry<float> _cfgOverlaySeconds;
         private ConfigEntry<float> _cfgOverlayY;
@@ -57,6 +58,7 @@ namespace SanctuaryHud
         private int _cycleIndex;
         private string[] _cycleNames;
         private uint[] _cycleIcons;
+        private uint[] _cycleBgs;
         private int[] _cycleTiers;
         private float _cycleAt = -999f;
 
@@ -91,6 +93,11 @@ namespace SanctuaryHud
 
             _cfgEnabled = Config.Bind("General", "Enabled", true,
                 "Master switch. Off restores the game's own construction hotkeys.");
+            _cfgCycleSeconds = Config.Bind("Cycle", "Seconds", 1.1f,
+                "How long a key keeps cycling after a press, matching FAF hotbuild's cycle reset time. " +
+                "A structure ignores this while its template is still on the cursor. A factory has no such " +
+                "state, so this is what lets repeat presses there walk the cycle; once the window lapses the " +
+                "key queues another of whatever it last chose. Set 0 to only ever queue on repeat.");
             _cfgOverlay = Config.Bind("Overlay", "Show", true,
                 "After a build hotkey, show what it picked and the rest of that key's cycle.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
@@ -233,8 +240,9 @@ namespace SanctuaryHud
                 // Options not landed on are faded, so the live one reads at a
                 // glance without having to hunt for the highlight.
                 GUI.color = live ? Color.white : new Color(1f, 1f, 1f, 0.3f);
-                if (_cycleIcons != null && i < _cycleIcons.Length)
-                    DrawSprite(new Rect(cellX + cellPad, cellY + cellPad, icon, icon), _cycleIcons[i]);
+                var art = new Rect(cellX + cellPad, cellY + cellPad, icon, icon);
+                if (_cycleBgs != null && i < _cycleBgs.Length) DrawSprite(art, _cycleBgs[i]);
+                if (_cycleIcons != null && i < _cycleIcons.Length) DrawSprite(art, _cycleIcons[i]);
                 GUI.color = previousColour;
             }
 
@@ -245,8 +253,10 @@ namespace SanctuaryHud
             {
                 var peekX = x + padX + chipW + shown * cellW;
                 GUI.color = new Color(1f, 1f, 1f, 0.18f);
-                DrawSprite(new Rect(peekX + cellPad, y + padY + cellPad, icon * PeekFraction, icon),
-                    _cycleIcons[last + 1], PeekFraction);
+                var peekArt = new Rect(peekX + cellPad, y + padY + cellPad, icon * PeekFraction, icon);
+                if (_cycleBgs != null && last + 1 < _cycleBgs.Length)
+                    DrawSprite(peekArt, _cycleBgs[last + 1], PeekFraction);
+                DrawSprite(peekArt, _cycleIcons[last + 1], PeekFraction);
                 GUI.color = previousColour;
             }
 
@@ -311,7 +321,7 @@ namespace SanctuaryHud
         }
 
         private string Signature() =>
-            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray());
+            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value;
 
         /// Reads the cycle the last press landed in: press counter, key, live
         /// index, then every option in order. The counter leads so two presses
@@ -331,22 +341,24 @@ namespace SanctuaryHud
             _cycleKey = parts[1];
             int.TryParse(parts[2], out _cycleIndex);
 
-            // Each entry is name~icon~tier. Split from the right so a name
-            // containing a tilde cannot shift the numeric fields.
+            // Each entry is name~icon~tier~background. The three numbers are
+            // taken from the right so a name containing a tilde cannot shift
+            // them; whatever is left is the name.
             var n = parts.Length - 3;
             _cycleNames = new string[n];
             _cycleIcons = new uint[n];
             _cycleTiers = new int[n];
+            _cycleBgs = new uint[n];
             for (var i = 0; i < n; i++)
             {
-                var entry = parts[i + 3];
-                _cycleNames[i] = entry;
-                var last = entry.LastIndexOf('~');
-                var prev = last > 0 ? entry.LastIndexOf('~', last - 1) : -1;
-                if (prev < 0) continue;
-                _cycleNames[i] = entry.Substring(0, prev);
-                uint.TryParse(entry.Substring(prev + 1, last - prev - 1), out _cycleIcons[i]);
-                int.TryParse(entry.Substring(last + 1), out _cycleTiers[i]);
+                var fields = parts[i + 3].Split('~');
+                _cycleNames[i] = parts[i + 3];
+                if (fields.Length < 4) continue;
+                var cut = fields.Length - 3;
+                _cycleNames[i] = string.Join("~", fields, 0, cut);
+                uint.TryParse(fields[cut], out _cycleIcons[i]);
+                int.TryParse(fields[cut + 1], out _cycleTiers[i]);
+                uint.TryParse(fields[cut + 2], out _cycleBgs[i]);
             }
             _cycleAt = Time.unscaledTime;
         }
@@ -442,6 +454,7 @@ namespace SanctuaryHud
             internal string Hotkey;   // what LoadedActionMap is keyed on
             internal string RoleKey;  // the canonical key roles are grouped under
             internal bool Shift;      // queue five, as the stock hotkeys do
+            internal bool Reverse;    // walk the cycle backwards, as Alt does in FAF
         }
 
         /// Canonicalises a configured key into the exact strings the input
@@ -482,18 +495,21 @@ namespace SanctuaryHud
                 return false;
             }
 
-            string Compose(bool withShift) =>
-                (ctrl ? "Ctrl-" : "") + (withShift ? "Shift-" : "") + (alt ? "Alt-" : "") + match;
+            string Compose(bool withShift, bool withAlt) =>
+                (ctrl ? "Ctrl-" : "") + (withShift ? "Shift-" : "") + (withAlt ? "Alt-" : "") + match;
 
-            roleKey = Compose(shift);
-            bindings = new List<Binding> { new Binding { Hotkey = roleKey, RoleKey = roleKey, Shift = shift } };
-
-            // Mirror the stock behaviour where Shift means "queue five" — but
-            // only when the binding did not already claim Shift for itself.
-            if (!shift)
+            roleKey = Compose(shift, alt);
+            bindings = new List<Binding>
             {
-                bindings.Add(new Binding { Hotkey = Compose(true), RoleKey = roleKey, Shift = true });
-            }
+                new Binding { Hotkey = roleKey, RoleKey = roleKey, Shift = shift, Reverse = false },
+            };
+
+            // Shift means "queue five", as the stock hotkeys do; Alt walks the
+            // cycle backwards, as it does in FAF hotbuild. Each is only added
+            // when the configured key has not already claimed that modifier.
+            if (!shift) bindings.Add(new Binding { Hotkey = Compose(true, alt), RoleKey = roleKey, Shift = true });
+            if (!alt) bindings.Add(new Binding { Hotkey = Compose(shift, true), RoleKey = roleKey, Shift = shift, Reverse = true });
+            if (!shift && !alt) bindings.Add(new Binding { Hotkey = Compose(true, true), RoleKey = roleKey, Shift = true, Reverse = true });
             return true;
         }
 
@@ -533,11 +549,13 @@ namespace SanctuaryHud
             }
 
             var bindingEntries = bindings.Values.Select(b =>
-                "{hk=" + Quote(b.Hotkey) + ",key=" + Quote(b.RoleKey) + ",shift=" + (b.Shift ? "true" : "false") + "}");
+                "{hk=" + Quote(b.Hotkey) + ",key=" + Quote(b.RoleKey) + ",shift=" + (b.Shift ? "true" : "false") +
+                ",rev=" + (b.Reverse ? "true" : "false") + "}");
 
             var chunk = InstallChunk
                 .Replace("__ROLES__", string.Join(",", roleEntries.ToArray()))
-                .Replace("__BINDINGS__", string.Join(",", bindingEntries.ToArray()));
+                .Replace("__BINDINGS__", string.Join(",", bindingEntries.ToArray()))
+                .Replace("__CYCLE__", Mathf.Max(0f, _cfgCycleSeconds.Value).ToString(System.Globalization.CultureInfo.InvariantCulture));
 
             try
             {
@@ -619,6 +637,7 @@ if not __SdbBuildHotkeys then
   if not grp then error('BuildHotkeys: no Construction action group to bind into') end
   BH.grp = grp
   BH.NIL = {}
+  BH.cycleSeconds = __CYCLE__
   BH.roles = { __ROLES__ }
 
   BH.byKey = {}
@@ -694,7 +713,7 @@ if not __SdbBuildHotkeys then
     return out
   end
 
-  local function fire(key, shift)
+  local function fire(key, shift, reverse)
     local units = SS.GetSelectedEntities()
     if not units then return false end
 
@@ -702,7 +721,13 @@ if not __SdbBuildHotkeys then
     -- everything else that can build queues units.
     local engineerTags = Tags.COMMAND + Tags.ENGINEER + Tags.ENGINEERING_STATION
     local isEngineer, isFactory, buildable = false, false, {}
+    -- Count and lowest id identify the selection without depending on pairs
+    -- order, which is not stable across the fresh table each call returns.
+    local selCount, selMin = 0, 0
     for _, u in pairs(units) do
+      selCount = selCount + 1
+      local uid = u.id and u.id.index
+      if uid and (selMin == 0 or uid < selMin) then selMin = uid end
       local t = buildQueueUtils.GetBuildableTags(u)
       if next(t) then
         if engineerTags[u.tp.general.tpId] then isEngineer = true else isFactory = true end
@@ -720,18 +745,33 @@ if not __SdbBuildHotkeys then
     local cands = candidates(list, buildable, want)
     if #cands == 0 then return false end
 
-    -- Cycle only while the previous press is still uncommitted, i.e. its
-    -- template is still on the cursor. Placing it, cancelling, or changing
-    -- selection drops us back to the start. A factory never enters build mode,
-    -- so repeat presses there queue more of the same rather than walking the
-    -- cycle.
-    local idx, st = 1, BH.state
-    if st.key == key and st.mode == want
-       and BM.GetBuildMode() and BM.GetBuildTpId() == st.tpId then
-      idx = (st.index % #cands) + 1
+    -- Two ways a press continues the previous one rather than restarting it.
+    -- A structure is still uncommitted while its template sits on the cursor,
+    -- which has no time limit — you may be lining up a placement. A factory
+    -- never enters build mode, so it gets FAF hotbuild's rule instead: repeat
+    -- presses cycle while they keep coming, and once the window lapses the key
+    -- queues another of whatever it last chose. Setting the window to 0 drops
+    -- back to queue-on-repeat only.
+    local now = (os and os.clock) and os.clock() or nil
+    local sig = selCount .. ':' .. selMin
+    local st = BH.state
+    local sameTarget = st.key == key and st.mode == want and st.sig == sig
+    local continuing = sameTarget and (
+      (BM.GetBuildMode() and BM.GetBuildTpId() == st.tpId)
+      or (now and st.t and BH.cycleSeconds > 0 and (now - st.t) < BH.cycleSeconds))
+
+    local idx
+    if continuing then
+      if reverse then idx = ((st.index - 2) % #cands) + 1
+      else idx = (st.index % #cands) + 1 end
+    else
+      -- A fresh reverse press opens at the far end, which makes Alt the direct
+      -- way to the cheapest option — the T1 factory you mean to upgrade later,
+      -- rather than the T3 one the forward cycle opens on.
+      idx = reverse and #cands or 1
     end
     local tpId = cands[idx]
-    BH.state = { key = key, mode = want, index = idx, tpId = tpId }
+    BH.state = { key = key, mode = want, index = idx, tpId = tpId, sig = sig, t = now }
 
     -- Publish the whole cycle for the overlay: which key, which entry is live,
     -- and every option in order. Led by the press counter so two presses that
@@ -750,8 +790,15 @@ if not __SdbBuildHotkeys then
       if g and g.foregroundIconID and g.foregroundIconID.index then
         icon = tonumber(g.foregroundIconID.index) or 0
       end
+      -- backgroundIconID is the domain plate the build buttons sit on, picked
+      -- by iconUIType (land / air / water / amphibious). Same art, so the
+      -- overlay reads like the panel rather than like floating cut-outs.
+      local bg = 0
+      if g and g.backgroundIconID and g.backgroundIconID.index then
+        bg = tonumber(g.backgroundIconID.index) or 0
+      end
       entries[i] = ((g and g.displayName) or cands[i]) .. '~' .. string.format('%d', icon)
-        .. '~' .. string.format('%d', techOf(cands[i]))
+        .. '~' .. string.format('%d', techOf(cands[i])) .. '~' .. string.format('%d', bg)
     end
     __SdbBuildHotkeysCycle = __SdbBuildHotkeysCount .. '|' .. key .. '|' .. idx
       .. '|' .. table.concat(entries, '|')
@@ -764,8 +811,8 @@ if not __SdbBuildHotkeys then
     return true
   end
 
-  BH.Fire = function(key, shift)
-    local ok, res = pcall(fire, key, shift)
+  BH.Fire = function(key, shift, reverse)
+    local ok, res = pcall(fire, key, shift, reverse)
     if not ok then Warn('BuildHotkeys: ' .. tostring(res)) return false end
     return res
   end
@@ -775,7 +822,7 @@ if not __SdbBuildHotkeys then
   -- through to whatever the key normally does.
   for _, b in ipairs({ __BINDINGS__ }) do
     if BH.saved[b.hk] == nil then BH.saved[b.hk] = grp[b.hk] or BH.NIL end
-    grp[b.hk] = { press = function() return BH.Fire(b.key, b.shift) end }
+    grp[b.hk] = { press = function() return BH.Fire(b.key, b.shift, b.rev) end }
   end
 
   __SdbBuildHotkeys = BH

@@ -146,11 +146,18 @@ currently build. Where a faction lacks a tier the cycle is simply shorter:
 only Chosen has a T3 point defence, so **X** gives them T3 → T2 → T1 and
 everyone else T2 → T1. No per-faction configuration anywhere.
 
-Cycling only continues while the previous press is still uncommitted — the
-template is still on the cursor. Placing it, cancelling, or changing selection
-drops back to the highest tier. A factory never enters build mode, so repeat
-presses there queue more of the same instead of walking down the tiers, and
-holding **Shift** queues five exactly as the stock hotkeys do.
+A press continues the previous one in either of two ways. A structure is still
+uncommitted while its template sits on the cursor, and that has no time limit —
+you may be lining a placement up. A factory has no such state, so it takes FAF
+hotbuild's rule instead: repeat presses cycle while they keep coming, and once
+`Cycle.Seconds` (1.1, FAF's own default) lapses the key queues another of
+whatever it last chose. Set it to 0 to only ever queue on repeat. Changing
+selection restarts the cycle either way.
+
+Holding **Shift** queues five, as the stock hotkeys do. Holding **Alt** walks
+the cycle backwards, as it does in FAF — and a *fresh* Alt press opens at the
+far end, which makes it the direct route to the cheapest option: the T1 factory
+you mean to upgrade later, rather than the T3 one the forward cycle opens on.
 
 **Several roles can share a key**, merging into one cycle ranked by tier first
 and role order second. That does two jobs at once. Where the roles cannot
@@ -224,8 +231,11 @@ until you place something — you cannot tell whether W→W landed on the air
 factory or on a lower-tier land one. So each press publishes its whole cycle
 and a strip appears: the key named once on the left, then every option in that
 key's cycle left to right in the order further presses reach them, drawn with
-the same button art the build menu uses. The live one is lit and underlined,
-the rest faded.
+the same art the build menu uses — each unit's icon over the domain plate
+behind it (`backgroundIconID`, keyed on `iconUIType`: land, air, water,
+amphibious), so the strip reads like a slice of the panel rather than floating
+cut-outs, and land/air/naval separate at a glance. The live one is lit and
+underlined, the rest faded.
 
 A long cycle shows **one tech tier at a time** rather than all of it: a T3
 engineer's factory key is nine entries once naval factories are in, which would
