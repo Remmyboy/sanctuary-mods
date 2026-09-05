@@ -186,6 +186,18 @@ that actually builds it. Modifiers compress to one character (`^S` for
 `Ctrl-S`) to fit where a single letter went. Anything no role claims keeps the
 stock answer, which is usually the `?` it shows today.
 
+**An overlay names what you just picked.** A cycle is otherwise invisible
+until you place something — you cannot tell whether W→W landed on the air
+factory or on a lower-tier land one. So each press publishes its whole cycle
+and a small panel lists it: the live entry lit with the key beside it, the
+rest of the options dimmed underneath, in the order further presses will reach
+them. Entries are the game's own `displayName`, which reads "Tier 3: Land
+Factory" — the tier is the ambiguity worth resolving, and a strategic icon
+would not show it. The panel fades a couple of seconds after the last press,
+and is drawn rather than built from `GUI.Window`, so it can never swallow a
+click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`
+and `Overlay.PosY` control it.
+
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into
 `inputSystem.lua`'s `LoadedActionMap` (which `CallAction` reads live on every

@@ -37,10 +37,22 @@ namespace SanctuaryHud
             new Dictionary<string, ConfigEntry<string>>();
         private ConfigEntry<bool> _cfgEnabled;
 
+        private ConfigEntry<bool> _cfgOverlay;
+        private ConfigEntry<float> _cfgOverlaySeconds;
+        private ConfigEntry<float> _cfgOverlayY;
+
         private bool _installed;
         private float _accum;
+        private float _cyclePoll;
         private string _installedSignature;
         private int _builds;
+
+        // The cycle the last press landed in, for the overlay.
+        private int _cycleSeq = -1;
+        private string _cycleKey;
+        private int _cycleIndex;
+        private string[] _cycleNames;
+        private float _cycleAt = -999f;
 
         /// Base key names the game's `Key` enum accepts (enums.lua). Modifier
         /// keys themselves are excluded — binding a build to bare Ctrl would
@@ -73,6 +85,13 @@ namespace SanctuaryHud
 
             _cfgEnabled = Config.Bind("General", "Enabled", true,
                 "Master switch. Off restores the game's own construction hotkeys.");
+            _cfgOverlay = Config.Bind("Overlay", "Show", true,
+                "After a build hotkey, show what it picked and the rest of that key's cycle.");
+            _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
+                "How long the overlay stays up after the last press.");
+            _cfgOverlayY = Config.Bind("Overlay", "PosY", 700f,
+                "Overlay's distance from the top of the screen, in 1080p-logical pixels. " +
+                "It is always centred horizontally.");
 
             foreach (var role in Roles.All)
             {
@@ -87,12 +106,72 @@ namespace SanctuaryHud
 
         private void OnDestroy() => Remove();
 
+        private GUIStyle _stCycleKey, _stCycleOn, _stCycleOff;
+
+        /// Shows what the last press actually picked, with the rest of that
+        /// key's cycle under it so the next press is predictable. Drawn, never
+        /// interactive — no GUI.Window or Button, so it cannot swallow a click
+        /// meant for the battlefield underneath.
+        private void OnGUI()
+        {
+            if (!_cfgOverlay.Value || _cycleNames == null || _cycleNames.Length == 0) return;
+            if (Time.unscaledTime - _cycleAt > Mathf.Max(0.2f, _cfgOverlaySeconds.Value)) return;
+
+            EnsureStyles();
+            if (_stCycleOn == null)
+            {
+                _stCycleKey = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(1f, 0.68f, 0.25f) } };
+                _stCycleOn = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
+                _stCycleOff = new GUIStyle { fontSize = 12, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(1f, 1f, 1f, 0.38f) } };
+            }
+
+            var scale = Screen.height / 1080f;
+            var previousMatrix = GUI.matrix;
+            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+
+            const float rowH = 22f, padX = 10f, padY = 7f, chipW = 34f, width = 268f;
+            var height = padY * 2f + rowH * _cycleNames.Length;
+            var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
+            var y = _cfgOverlayY.Value;
+
+            GUI.DrawTexture(new Rect(x, y, width, height), _texPanel);
+
+            for (var i = 0; i < _cycleNames.Length; i++)
+            {
+                var rowY = y + padY + i * rowH;
+                var live = i + 1 == _cycleIndex;
+                if (live)
+                {
+                    GUI.DrawTexture(new Rect(x, rowY, width, rowH), _texRowHover);
+                    GUI.DrawTexture(new Rect(x, rowY, 3f, rowH), _texWhite);
+                    GUI.Label(new Rect(x + padX, rowY, chipW, rowH), _cycleKey, _stCycleKey);
+                }
+                GUI.Label(new Rect(x + padX + chipW, rowY, width - padX - chipW, rowH),
+                    _cycleNames[i], live ? _stCycleOn : _stCycleOff);
+            }
+
+            GUI.matrix = previousMatrix;
+        }
+
         private void Update()
         {
             if (!_cfgEnabled.Value)
             {
                 if (_installed) Remove();
                 return;
+            }
+
+            // The overlay has to keep up with keypresses, so it polls far more
+            // often than the once-a-second install upkeep below. Both are a
+            // lua_getglobal, which is cheap; parsing only happens on a change.
+            if (_installed && _cfgOverlay.Value)
+            {
+                _cyclePoll += Time.unscaledDeltaTime;
+                if (_cyclePoll >= 0.05f)
+                {
+                    _cyclePoll = 0f;
+                    PollCycle();
+                }
             }
 
             _accum += Time.unscaledDeltaTime;
@@ -129,6 +208,28 @@ namespace SanctuaryHud
 
         private string Signature() =>
             string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray());
+
+        /// Reads the cycle the last press landed in: press counter, key, live
+        /// index, then every option in order. The counter leads so two presses
+        /// that resolve to the same entry still register as separate events —
+        /// otherwise an identical string would look like nothing had happened
+        /// and the overlay would not come back.
+        private void PollCycle()
+        {
+            var raw = GetLuaGlobal("__SdbBuildHotkeysCycle");
+            if (raw == null) return;
+
+            var parts = raw.Split('|');
+            if (parts.Length < 4) return;
+            if (!int.TryParse(parts[0], out var seq) || seq == _cycleSeq) return;
+
+            _cycleSeq = seq;
+            _cycleKey = parts[1];
+            int.TryParse(parts[2], out _cycleIndex);
+            _cycleNames = new string[parts.Length - 3];
+            Array.Copy(parts, 3, _cycleNames, 0, _cycleNames.Length);
+            _cycleAt = Time.unscaledTime;
+        }
 
         /// True while our binding is still live in the VM the game is running.
         /// Polling a global rather than trusting the flag means a match that
@@ -443,12 +544,24 @@ if not __SdbBuildHotkeys then
     end
     local tpId = cands[idx]
     BH.state = { key = key, mode = want, index = idx, tpId = tpId }
+
+    -- Publish the whole cycle for the overlay: which key, which entry is live,
+    -- and every option in order. Led by the press counter so two presses that
+    -- land on the same entry still read as two distinct events.
+    __SdbBuildHotkeysCount = __SdbBuildHotkeysCount + 1
+    local names = {}
+    for i = 1, #cands do
+      local tp = __Templates.Units[cands[i]]
+      names[i] = (tp and tp.general and tp.general.displayName) or cands[i]
+    end
+    __SdbBuildHotkeysCycle = __SdbBuildHotkeysCount .. '|' .. key .. '|' .. idx
+      .. '|' .. table.concat(names, '|')
+
     -- The panel's own click handler: it wraps the file-local
     -- ExecuteConstructionAction, so this is exactly a button click.
     CP.ConstructionClickFunction(
       { mouseClickType = UIMouseClickType.Left, isShiftHeld = shift },
       { tpId = tpId, isFactory = isFactory, selectedUnits = units })
-    __SdbBuildHotkeysCount = __SdbBuildHotkeysCount + 1
     return true
   end
 
@@ -483,6 +596,7 @@ if __SdbBuildHotkeys then
   if BH.CH and BH.origLabel then BH.CH.GetHotkeyForTemplate = BH.origLabel end
   __SdbBuildHotkeys = nil
   __SdbBuildHotkeysCount = nil
+  __SdbBuildHotkeysCycle = nil
 end";
     }
 }
