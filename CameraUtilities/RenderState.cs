@@ -38,6 +38,8 @@ namespace SanctuaryHud.CameraUtils
         internal static bool HideIntel;
         internal static bool HideAttack;
         internal static bool HideBuild;
+        internal static bool HideOrderLines;
+        internal static bool HidePlannedBuildings;
         internal static bool HideHealthBars;
         internal static bool HideGameUi;
 
@@ -141,6 +143,7 @@ namespace SanctuaryHud.CameraUtils
             return "if __CameraUtils then local S = __CameraUtils " +
                    $"S.icons = {(int)Icons} S.height = {HideIconsBelow.ToString("0.##", inv)} " +
                    $"S.intel = {Lua(HideIntel)} S.attack = {Lua(HideAttack)} S.build = {Lua(HideBuild)} " +
+                   $"S.orders = {Lua(HideOrderLines)} S.ghosts = {Lua(HidePlannedBuildings)} " +
                    $"S.bars = {Lua(HideHealthBars)} S.ui = {Lua(HideGameUi)} " +
                    // Apply straight away rather than waiting for the next
                    // sweep, so a click in the panel reads as instant.
@@ -165,11 +168,13 @@ namespace SanctuaryHud.CameraUtils
         //   "do not render" — is the one that sticks.
         // - Game UI: Engine.ToggleUIHUD has no getter, so we keep our own
         //   belief of it and only ever toggle on a change.
+        // - Order lines and planned buildings: see the two blocks below.
         private const string InstallTemplate =
             "local ok, err = pcall(function() " +
             "  local S = _G.__CameraUtils " +
             "  if not S then " +
-            "    S = { icons = 0, height = 100, intel = false, attack = false, build = false, bars = false, ui = false } " +
+            "    S = { icons = 0, height = 100, intel = false, attack = false, build = false, " +
+            "          orders = false, ghosts = false, bars = false, ui = false } " +
             "    _G.__CameraUtils = S " +
             "  end " +
             "  local M = RangeRingMaterial " +
@@ -186,8 +191,13 @@ namespace SanctuaryHud.CameraUtils
             // overwrites the bar scale, with nothing having been asked for.
             "  if S.uiHidden == nil then S.uiHidden = false end " +
             "  if S.barsHidden == nil then S.barsHidden = false end " +
+            "  S.hiddenGhosts = S.hiddenGhosts or setmetatable({}, { __mode = 'k' }) " +
             "  S.sweep = function() " +
             "    local mask = (S.intel and 1 or 0) + (S.attack and 2 or 0) + (S.build and 4 or 0) " +
+            // Nothing hidden and nothing left to put back: skip the ghost test
+            // entirely rather than asking every unit its build progress.
+            "    local ghostSweep = S.ghosts or next(S.hiddenGhosts) ~= nil " +
+            "    local focus = ghostSweep and GetFocusArmy() or nil " +
             "    for _, u in pairs(__Entities.Units) do " +
             "      local rings = u.rangeRings " +
             "      local was = S.applied[u] " +
@@ -204,6 +214,26 @@ namespace SanctuaryHud.CameraUtils
             "          end " +
             "        end " +
             "        S.applied[u] = mask " +
+            "      end " +
+            // A building that is queued but not started is a real client unit
+            // with no build progress — a placement ghost — so hiding its
+            // renderer takes the outline off the map. Only ever hide one that
+            // is ours (or everything, when observing) and is on screen now,
+            // and only ever re-show one we hid ourselves: writing the renderer
+            // back on for a unit the game had hidden would reveal it.
+            "      if ghostSweep then " +
+            "        local isGhost = u.IsPlacementGhost and u:IsPlacementGhost() " +
+            "        if S.ghosts then " +
+            "          if isGhost and not S.hiddenGhosts[u] and (focus == -1 or IsFocused(u.armyId)) then " +
+            "            local _, on = Engine.GetRendererEnabled(u.localId) " +
+            "            if on then Engine.SetRendererEnabled(u.localId, false) S.hiddenGhosts[u] = true end " +
+            "          end " +
+            "        elseif S.hiddenGhosts[u] then " +
+            // Once it starts building the game takes the renderer back itself
+            // (OnPromoteToUnit), so only a still-queued one needs putting back.
+            "          if isGhost then Engine.SetRendererEnabled(u.localId, true) end " +
+            "          S.hiddenGhosts[u] = nil " +
+            "        end " +
             "      end " +
             "    end " +
             "    if S.bars ~= S.barsHidden then " +
@@ -238,9 +268,42 @@ namespace SanctuaryHud.CameraUtils
             "    local ok2, err2 = pcall(tick) " +
             "    if not ok2 then _G." + ErrorGlobal + " = tostring(err2) end " +
             "  end " +
+            // Order lines and markers: the manager redraws them from scratch
+            // every tick in DebugDraw, which clears the last tick's prefabs
+            // first and then draws either every army's orders (while the
+            // append key is held) or the selected units' own. So the way to
+            // draw none without leaving the last tick's behind is to let its
+            // own draw run with the all-armies view off and nothing selected —
+            // it clears, finds nothing to draw, and stops. SetOrderDraw is
+            // wrapped only to remember what the append key last asked for, so
+            // it can be handed straight back.
+            "  local orders = Import('client/managers/orders/clientOrderManager.lua') " +
+            "  local selection = Import('client/input/selectionSystem.lua') " +
+            "  S.ordersWanted = S.ordersWanted or false " +
+            "  S.origDebugDraw = S.origDebugDraw or orders.DebugDraw " +
+            "  S.origSetOrderDraw = S.origSetOrderDraw or orders.SetOrderDraw " +
+            "  local nothingSelected = function() return {} end " +
+            "  orders.SetOrderDraw = function(v) S.ordersWanted = v and true or false S.origSetOrderDraw(v) end " +
+            "  orders.DebugDraw = function(...) " +
+            "    if not S.orders then return S.origDebugDraw(...) end " +
+            "    S.origSetOrderDraw(false) " +
+            "    local origSelected = selection.GetSelectedUnits " +
+            "    selection.GetSelectedUnits = nothingSelected " +
+            "    local ok2, err2 = pcall(S.origDebugDraw, ...) " +
+            "    selection.GetSelectedUnits = origSelected " +
+            "    S.origSetOrderDraw(S.ordersWanted) " +
+            "    if not ok2 then _G." + ErrorGlobal + " = tostring(err2) end " +
+            "  end " +
             "  S.restore = function() " +
             "    pcall(function() Import('client/rendering/rendering.lua').RenderUpdate = S.origRenderUpdate end) " +
-            "    S.icons = 0 S.intel = false S.attack = false S.build = false S.bars = false S.ui = false " +
+            "    pcall(function() " +
+            "      local om = Import('client/managers/orders/clientOrderManager.lua') " +
+            "      om.DebugDraw = S.origDebugDraw " +
+            "      om.SetOrderDraw = S.origSetOrderDraw " +
+            "      S.origSetOrderDraw(S.ordersWanted) " +
+            "    end) " +
+            "    S.icons = 0 S.intel = false S.attack = false S.build = false " +
+            "    S.orders = false S.ghosts = false S.bars = false S.ui = false " +
             "    pcall(S.sweep) " +
             "    _G.__CameraUtils = nil " +
             "    _G." + VersionGlobal + " = nil " +

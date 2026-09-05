@@ -18,7 +18,7 @@ players. The exceptions are called out in their own sections below.
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
-| [CameraUtilities](CameraUtilities/) | `CameraUtilities.dll` | Switches off icons, range rings, health bars and the UI, for cinematics |
+| [CameraUtilities](CameraUtilities/) | `CameraUtilities.dll` | Switches off icons, range rings, order lines and the UI, for cinematics |
 | [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | `ModLoader.dll` | Loads and hot-reloads every mod above from `SanctuaryMods` |
@@ -240,6 +240,12 @@ and both views agree.
 - **Attack ranges** — direct, indirect, anti-air, anti-naval and counter.
 - **Build ranges** — build and assist, so a screen full of engineers stops
   drawing circles.
+- **Order lines** — the lines and markers drawn for whatever is selected:
+  move, build, attack, assist, reclaim, and the whole-army view of them the
+  append key brings up.
+- **Planned buildings** — the outlines of buildings an engineer or commander
+  has queued but not started. They come back on their own the moment
+  construction begins.
 - **Health bars** — every health and progress bar.
 - **Game UI** — the whole HUD. This mod's own panel is Unity IMGUI rather than
   the game's UI, so it stays up and F4 still gets everything back.
@@ -262,11 +268,26 @@ runs after the game's own call:
   writes — it only moves the per-unit master, on intel and selection changes,
   which ANDs with ours — so a sweep four times a second is enough to catch
   units as they appear, and it skips any unit already at the wanted mask;
+- **planned buildings** are ordinary client units with no build progress —
+  placement ghosts — so the same sweep switches their renderer off. Only ever
+  ones that are ours and visible right now, and only ever back on for ones the
+  mod itself hid: writing the renderer on for a unit the game had hidden would
+  reveal it;
 - **health bars** go through the *global* bar scale, where 0 means don't
   render, because the per-unit master is rewritten every tick by
   `ClientUnit:UpdateProgressBars`;
 - **the UI HUD** has a toggle and no getter, so the agent keeps its own belief
   of the state and only toggles on a change.
+
+Order lines are the odd one out, because they aren't a flag: the order manager
+tears down last tick's line and marker prefabs and rebuilds them from scratch
+every tick, drawing either every army's orders (while the append key is held)
+or the selected units' own. Skipping its draw would leave the previous tick's
+prefabs on screen forever, so instead the mod wraps `DebugDraw` and lets the
+game's own draw run with the all-armies view off and nothing selected — it
+clears, finds nothing to draw, and stops. `SetOrderDraw` is wrapped alongside
+purely to remember what the append key last asked for, so it can be handed
+straight back.
 
 Unloading the mod, or switching it off on the Mods page, takes the wrapper back
 off and puts every flag back. A fresh match brings a fresh Lua state, so the

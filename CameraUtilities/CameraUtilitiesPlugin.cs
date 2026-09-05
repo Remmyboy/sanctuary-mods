@@ -6,8 +6,9 @@ using UnityEngine;
 namespace SanctuaryHud.CameraUtils
 {
     // Switches off the bits of the game the camera draws over the world —
-    // strategic icons, intel and attack range rings, health bars, the UI HUD —
-    // for recording cinematics, or just for a cleaner picture.
+    // strategic icons, range rings, order lines, planned buildings, health
+    // bars, the UI HUD — for recording cinematics, or just for a cleaner
+    // picture.
     //
     // Every switch is in two places: the mod's settings on the front menu's
     // Mods page (bound config entries, so they show up there for free), and a
@@ -29,6 +30,8 @@ namespace SanctuaryHud.CameraUtils
         private ConfigEntry<bool> _cfgIntel;
         private ConfigEntry<bool> _cfgAttack;
         private ConfigEntry<bool> _cfgBuild;
+        private ConfigEntry<bool> _cfgOrderLines;
+        private ConfigEntry<bool> _cfgPlannedBuilds;
         private ConfigEntry<bool> _cfgHealthBars;
         private ConfigEntry<bool> _cfgGameUi;
 
@@ -59,6 +62,11 @@ namespace SanctuaryHud.CameraUtils
             _cfgBuild = Config.Bind("Ranges", "HideBuildRanges", false,
                 "Hide the build and assist range rings.");
 
+            _cfgOrderLines = Config.Bind("Orders", "HideOrderLines", false,
+                "Hide the order lines and markers drawn for the selected units — move, build, attack, assist, reclaim — and the whole-army view of them the append key brings up.");
+            _cfgPlannedBuilds = Config.Bind("Orders", "HidePlannedBuildings", false,
+                "Hide the outlines of buildings that are queued but not started yet. They come back on their own the moment construction begins.");
+
             _cfgHealthBars = Config.Bind("Cinematic", "HideHealthBars", false,
                 "Hide every health and progress bar.");
             _cfgGameUi = Config.Bind("Cinematic", "HideGameUI", false,
@@ -87,6 +95,8 @@ namespace SanctuaryHud.CameraUtils
             RenderState.HideIntel = _cfgIntel.Value;
             RenderState.HideAttack = _cfgAttack.Value;
             RenderState.HideBuild = _cfgBuild.Value;
+            RenderState.HideOrderLines = _cfgOrderLines.Value;
+            RenderState.HidePlannedBuildings = _cfgPlannedBuilds.Value;
             RenderState.HideHealthBars = _cfgHealthBars.Value;
             RenderState.HideGameUi = _cfgGameUi.Value;
 
@@ -177,6 +187,10 @@ namespace SanctuaryHud.CameraUtils
             _cfgHealthBars.Value = Toggle(_cfgHealthBars.Value, "HEALTH BARS", GUILayout.Width(118));
             _cfgGameUi.Value = Toggle(_cfgGameUi.Value, "GAME UI", GUILayout.Width(118));
             GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            _cfgOrderLines.Value = Toggle(_cfgOrderLines.Value, "ORDER LINES", GUILayout.Width(118));
+            _cfgPlannedBuilds.Value = Toggle(_cfgPlannedBuilds.Value, "PLANNED BUILDS", GUILayout.Width(118));
+            GUILayout.EndHorizontal();
 
             GUILayout.Space(2);
             if (GUILayout.Button("SHOW EVERYTHING", _stButton)) ShowEverything();
@@ -195,6 +209,8 @@ namespace SanctuaryHud.CameraUtils
             _cfgIntel.Value = false;
             _cfgAttack.Value = false;
             _cfgBuild.Value = false;
+            _cfgOrderLines.Value = false;
+            _cfgPlannedBuilds.Value = false;
             _cfgHealthBars.Value = false;
             _cfgGameUi.Value = false;
         }
