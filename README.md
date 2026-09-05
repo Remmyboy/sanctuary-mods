@@ -18,6 +18,7 @@ players. The exceptions are called out in their own sections below.
 | [EcoManager](EcoManager/) | `EcoManager.dll` | Alloy extractors by tier, plus upgrades in progress |
 | [LadderReporter](LadderReporter/) | `LadderReporter.dll` | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | `ReplayManager.dll` | Watch the game's replays fog-free from any seat, with every economy |
+| [CameraUtilities](CameraUtilities/) | `CameraUtilities.dll` | Switches off icons, range rings, health bars and the UI, for cinematics |
 | [ModManager](ModManager/) | `ModManager.dll` | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | `MapLocalFiles.dll` | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | `ModLoader.dll` | Loads and hot-reloads every mod above from `SanctuaryMods` |
@@ -217,6 +218,62 @@ with; the game's own list greys out mismatches. Playback is a normal client,
 so the other mods in this repo behave as they would in a match and follow
 the focused army. A recorded change of sim speed by the host would override
 the speed slider for a moment; the panel re-applies its value.
+
+## CameraUtilities
+
+Takes the game's overlays off the picture, one at a time, for recording
+cinematics — or just for a cleaner view. Every switch is in two places: the
+mod's settings on the **Mods** page, and a small in-match panel on **F4**,
+because during a shot you don't want to leave the game to change one. The
+config entries are the single source of truth, so a change either way persists
+and both views agree.
+
+- **Strategic icons** — three ways: always, never, or only above a camera
+  height. The last is the interesting one: icons are what you want at
+  strategic zoom and exactly what you don't want in a close shot, so
+  `WHEN FAR` keeps them until you dive in and drops them below the threshold
+  (100 world units by default — the panel shows the live camera height next to
+  the setting so you can pick one against the shot you're framing). This is
+  the rule the game's own `rendering.lua` carries a TODO for.
+- **Intel ranges** — the vision, fog-of-war, radar, sonar, omni and
+  counter-intel rings.
+- **Attack ranges** — direct, indirect, anti-air, anti-naval and counter.
+- **Build ranges** — build and assist, so a screen full of engineers stops
+  drawing circles.
+- **Health bars** — every health and progress bar.
+- **Game UI** — the whole HUD. This mod's own panel is Unity IMGUI rather than
+  the game's UI, so it stays up and F4 still gets everything back.
+
+Presentation-side only: these are all client rendering flags the client's own
+Lua already drives, so no simulation state is touched, no hashed file changes,
+and a client running this is lobby-compatible with unmodded players.
+
+**How it holds.** The flags have to be re-asserted — the game rewrites the icon
+flag every render update, and units spawn with their rings on — so rather than
+pushing a chunk across the FFI at frame rate, one chunk installs a small agent
+in the client VM and C# pushes the wanted state only when it changes. The agent
+wraps `rendering.RenderUpdate` (a field on the module table `clientMain` calls
+through, so replacing it intercepts every frame without editing a file) and
+runs after the game's own call:
+
+- **icons** are the two engine calls above, per frame, so they follow the
+  camera without lagging it;
+- **range rings** are a per-unit, per-material flag the game itself never
+  writes — it only moves the per-unit master, on intel and selection changes,
+  which ANDs with ours — so a sweep four times a second is enough to catch
+  units as they appear, and it skips any unit already at the wanted mask;
+- **health bars** go through the *global* bar scale, where 0 means don't
+  render, because the per-unit master is rewritten every tick by
+  `ClientUnit:UpdateProgressBars`;
+- **the UI HUD** has a toggle and no getter, so the agent keeps its own belief
+  of the state and only toggles on a change.
+
+Unloading the mod, or switching it off on the Mods page, takes the wrapper back
+off and puts every flag back. A fresh match brings a fresh Lua state, so the
+agent reinstalls itself; a hot reload of the DLL finds it already there and
+re-wraps without stacking (the version global carries a hash of the install
+chunk, so an edit to it forces a reinstall rather than leaving the last build's
+agent running).
 
 ## ModManager
 
