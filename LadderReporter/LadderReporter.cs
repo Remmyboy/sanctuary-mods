@@ -37,7 +37,7 @@ namespace SanctuaryHud
     // ladder's shape. Skirmish vs AI, LAN, observers and team games are
     // recognised and left alone. The server ignores reports for games that
     // aren't an open ladder match, so playing unranked with a friend is fine.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.2.1")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.2.3")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
