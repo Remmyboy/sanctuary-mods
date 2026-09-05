@@ -265,8 +265,8 @@ stock answer, which is usually the `?` it shows today.
 **An overlay shows what you just picked.** A cycle is otherwise invisible
 until you place something — you cannot tell whether W→W landed on the air
 factory or on a lower-tier land one. So each press publishes its whole cycle
-and a strip appears: the key named once on the left, then every option in that
-key's cycle left to right in the order further presses reach them, drawn with
+and a strip appears: every option in that key's
+cycle left to right in the order further presses reach them, drawn with
 the same art the build menu uses — each unit's icon over the domain plate
 behind it (`backgroundIconID`, keyed on `iconUIType`: land, air, water,
 amphibious), so the strip reads like a slice of the panel rather than floating
@@ -275,11 +275,13 @@ underlined, the rest faded.
 
 A long cycle shows **one tech tier at a time** rather than all of it: a T3
 engineer's factory key is nine entries once naval factories are in, which would
-span the screen at this icon size. The chip then names the band you are in
-(`T3`, then `T2` as you cycle past it) and the next entry leans half into view
-past the right edge, which says "there is more" without asking anyone to read a
-count. No peek on the final band is itself the signal that the cycle ends
-there. Banding is by tier rather than by a fixed block of
+span the screen at this icon size. A small `T3` / `T2` label then names the
+band you are in — the key itself gets no column, since you just pressed it —
+and the next entry leans half into view past the right edge, which says "there
+is more" without asking anyone to read a count. No peek on the final band is
+itself the signal that the cycle ends there, and with the whole cycle on screen
+the tier label goes too, since it would read as applying to a strip that spans
+tiers. Banding is by tier rather than by a fixed block of
 three, because a block would straddle two tiers whenever a faction lacks a
 domain at one of them — Chosen's T3 point defence, which nobody else has, is
 enough to shift every block after it. A cycle that already fits is shown whole:
@@ -303,8 +305,8 @@ ever goes missing the overlay just lists names.
 The strip fades a couple of seconds after the last press,
 and is drawn rather than built from `GUI.Window`, so it can never swallow a
 click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`,
-`Overlay.IconSize` (40), `Overlay.MaxShown` and `Overlay.PosY` (810 — three
-quarters of the way down, where FAF hotbuild puts its own strip) control it.
+`Overlay.IconSize` (40), `Overlay.MaxShown` and `Overlay.PosY` (860, just clear
+of the build panel) control it.
 
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into

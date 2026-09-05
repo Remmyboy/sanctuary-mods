@@ -54,7 +54,6 @@ namespace SanctuaryHud
 
         // The cycle the last press landed in, for the overlay.
         private int _cycleSeq = -1;
-        private string _cycleKey;
         private int _cycleIndex;
         private string[] _cycleNames;
         private uint[] _cycleIcons;
@@ -114,10 +113,9 @@ namespace SanctuaryHud
             _cfgOverlayNames = Config.Bind("Overlay", "ShowNames", false,
                 "Caption the overlay with the name of the entry you are on, e.g. \"Tier 1: Land Factory\". " +
                 "Off by default — the icons carry it, and the name is only needed to tell two tiers apart.");
-            _cfgOverlayY = Config.Bind("Overlay", "PosY", 810f,
-                "Overlay's distance from the top of the screen, in 1080p-logical pixels — 810 sits it at " +
-                "three quarters of the way down, where FAF hotbuild puts its own cycle strip. " +
-                "It is always centred horizontally.");
+            _cfgOverlayY = Config.Bind("Overlay", "PosY", 860f,
+                "Overlay's distance from the top of the screen, in 1080p-logical pixels, sitting just clear of " +
+                "the build panel. It is always centred horizontally.");
 
             foreach (var role in Roles.All)
             {
@@ -135,7 +133,7 @@ namespace SanctuaryHud
         /// How much of the next entry leans into view past the band edge.
         private const float PeekFraction = 0.45f;
 
-        private GUIStyle _stCycleKey, _stCycleTier, _stCycleCaption;
+        private GUIStyle _stCycleTier, _stCycleCaption;
 
         /// Shows what the last press actually picked and the rest of that key's
         /// cycle, as a strip of the same art the build menu uses: the live one
@@ -148,9 +146,8 @@ namespace SanctuaryHud
             if (Time.unscaledTime - _cycleAt > Mathf.Max(0.2f, _cfgOverlaySeconds.Value)) return;
 
             EnsureStyles();
-            if (_stCycleKey == null)
+            if (_stCycleTier == null)
             {
-                _stCycleKey = new GUIStyle { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 0.68f, 0.25f) } };
                 _stCycleTier = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 1f, 1f, 0.45f) } };
                 _stCycleCaption = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             }
@@ -161,7 +158,7 @@ namespace SanctuaryHud
 
             var icon = Mathf.Clamp(_cfgOverlayIcon.Value, 16f, 256f);
             var captioned = _cfgOverlayNames.Value;
-            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 40f, captionH = 22f;
+            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 26f, captionH = 22f;
 
             var total = _cycleNames.Length;
             var liveIndex = Mathf.Clamp(_cycleIndex - 1, 0, total - 1);
@@ -202,9 +199,16 @@ namespace SanctuaryHud
             // the cycle ends there.
             var peek = last < total - 1;
 
+            // The key itself is not worth a column — you just pressed it. Only
+            // the tier earns the space, and only while banding is hiding the
+            // rest of the cycle; with the whole thing on screen the label would
+            // read as applying to a strip that spans tiers.
+            var banded = hidden > 0 && _cycleTiers != null && _cycleTiers.Length == total;
+            var chip = banded ? chipW : 0f;
+
             var cellW = icon + cellPad * 2f;
             var cellH = icon + cellPad * 2f;
-            var width = padX * 2f + chipW + cellW * shown + (peek ? cellW * PeekFraction : 0f);
+            var width = padX * 2f + chip + cellW * shown + (peek ? cellW * PeekFraction : 0f);
             var height = padY * 2f + cellH + (captioned ? captionH : 0f);
 
             var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
@@ -213,26 +217,13 @@ namespace SanctuaryHud
             GUI.DrawTexture(new Rect(x, y, width, height), _texPanel);
             var previousColour = GUI.color;
 
-            // The whole strip belongs to one key, so it is named once, off to
-            // the left where it can never sit on top of the art. The tier under
-            // it says which band you are looking at.
-            var banded = hidden > 0 && _cycleTiers != null && _cycleTiers.Length == total;
             if (banded)
-            {
-                GUI.Label(new Rect(x + padX, y + padY + 2f, chipW, cellH * 0.55f), _cycleKey, _stCycleKey);
-                GUI.Label(new Rect(x + padX, y + padY + cellH * 0.5f, chipW, cellH * 0.45f),
+                GUI.Label(new Rect(x + padX, y + padY, chipW, cellH),
                     "T" + _cycleTiers[liveIndex], _stCycleTier);
-            }
-            else
-            {
-                // Whole cycle on screen, so there is no band to name — the tier
-                // label would just look like it applied to the strip.
-                GUI.Label(new Rect(x + padX, y + padY, chipW, cellH), _cycleKey, _stCycleKey);
-            }
 
             for (var i = first; i <= last; i++)
             {
-                var cellX = x + padX + chipW + (i - first) * cellW;
+                var cellX = x + padX + chip + (i - first) * cellW;
                 var cellY = y + padY;
                 var live = i == liveIndex;
 
@@ -256,7 +247,7 @@ namespace SanctuaryHud
             // as the whole story.
             if (peek && _cycleIcons != null && last + 1 < _cycleIcons.Length)
             {
-                var peekX = x + padX + chipW + shown * cellW;
+                var peekX = x + padX + chip + shown * cellW;
                 GUI.color = new Color(1f, 1f, 1f, 0.18f);
                 var peekArt = new Rect(peekX + cellPad, y + padY + cellPad, icon * PeekFraction, icon);
                 if (_cycleBgs != null && last + 1 < _cycleBgs.Length)
@@ -343,7 +334,6 @@ namespace SanctuaryHud
             if (!int.TryParse(parts[0], out var seq) || seq == _cycleSeq) return;
 
             _cycleSeq = seq;
-            _cycleKey = parts[1];
             int.TryParse(parts[2], out _cycleIndex);
 
             // Each entry is name~icon~tier~background. The three numbers are
