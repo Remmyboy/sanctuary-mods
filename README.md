@@ -171,11 +171,44 @@ one-offs that want their own keys — without the cap, Guard's T4 Experimental
 Generator (`ugs4621`, tagged `ENERGY_PRODUCTION`) would sit at the top of the
 energy cycle and a tap of **D** would try to start one.
 
+**The unit keys follow Zulan's**, the Forged Alliance hotbuild layout that FAF
+later absorbed: mnemonic, and the same letter reused across domains, because a
+factory only ever builds one of them.
+
+| Key | Land factory | Air factory | Naval factory |
+| --- | --- | --- | --- |
+| **E** | engineer | | |
+| **S** | scout | scout | submarine |
+| **T** | tank | transport | |
+| **B** | raider | bomber | battleship |
+| **F** | | fighter | frigate |
+| **D** | | | destroyer |
+| **G** | | gunship | |
+| **O** | | torpedo bomber | |
+| **R** | mobile artillery | | |
+| **N** | mobile anti-air | | |
+| **V** | sniper | | |
+
+That reuse is the same "roles sharing a key" merge described above, resolved by
+whichever factory is selected. Two departures: Zulan's gives each warship class
+its own key rather than walking a line of tiers, so frigate/destroyer/battleship
+are split rather than cycled; and **V** for the sniper is ours, since Zulan's has
+no sniper and its V is a mobile shield with no shared-tier equivalent here. Its
+cruiser, carrier, missile launcher, amphibious tank and stealth field have no
+counterpart in Sanctuary's shared roles either, so those keys are simply unused.
+
+Structure keys are not Zulan's — its structure layout is not something we could
+verify — and keep the stock construction letters where they already fit
+(W/E/S/D/X/C/R).
+
 Every role's key is a config entry, so they are all rebindable from the F8 mod
 manager in the game's own hotkey format (`G`, `Ctrl-G`, `Ctrl-Alt-G`); blank
-unbinds. Defaults keep the stock construction letters where they already fit
-(W/E/S/D/X/C/R) and take only free keys otherwise (Q, T, B, K, N, O), so no
-order key is stolen — **G** is still Repair. `M` is left alone, so the stock
+unbinds. Where a unit key lands on an order key — **G** is Repair, **F**
+attack-move, **V** reclaim — nothing is lost: the role only claims the press
+when a factory is selected and has something to build, and orders like repair
+and reclaim mean nothing to a factory. Any other selection falls straight
+through to the order, because Construction runs at a higher group priority and
+returning `false` lets the event carry on. `M` is left unbound, so the stock
 "upgrade structure" hotkey still works.
 
 **The construction buttons relabel themselves.** Each one draws its hotkey in
@@ -197,8 +230,10 @@ the rest faded.
 A long cycle shows **one tech tier at a time** rather than all of it: a T3
 engineer's factory key is nine entries once naval factories are in, which would
 span the screen at this icon size. The chip then names the band you are in
-(`T3`, then `T2` as you cycle past it) and a `+N` on the right says how much
-cycle is left beyond it. Banding is by tier rather than by a fixed block of
+(`T3`, then `T2` as you cycle past it) and the next entry leans half into view
+past the right edge, which says "there is more" without asking anyone to read a
+count. No peek on the final band is itself the signal that the cycle ends
+there. Banding is by tier rather than by a fixed block of
 three, because a block would straddle two tiers whenever a faction lacks a
 domain at one of them — Chosen's T3 point defence, which nobody else has, is
 enough to shift every block after it. A cycle that already fits is shown whole:

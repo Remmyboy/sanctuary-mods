@@ -95,7 +95,7 @@ namespace SanctuaryHud
                 "After a build hotkey, show what it picked and the rest of that key's cycle.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
                 "How long the overlay stays up after the last press.");
-            _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 64f,
+            _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 48f,
                 "Size of each icon in the overlay, in 1080p-logical pixels.");
             _cfgOverlayMax = Config.Bind("Overlay", "MaxShown", 3,
                 "Most icons to show at once. The overlay shows one tech tier of the cycle at a time — " +
@@ -119,6 +119,9 @@ namespace SanctuaryHud
         }
 
         private void OnDestroy() => Remove();
+
+        /// How much of the next entry leans into view past the band edge.
+        private const float PeekFraction = 0.45f;
 
         private GUIStyle _stCycleKey, _stCycleTier, _stCycleCaption;
 
@@ -146,7 +149,7 @@ namespace SanctuaryHud
 
             var icon = Mathf.Clamp(_cfgOverlayIcon.Value, 16f, 256f);
             var captioned = _cfgOverlayNames.Value;
-            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 40f, captionH = 22f, moreW = 26f;
+            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 40f, captionH = 22f;
 
             var total = _cycleNames.Length;
             var liveIndex = Mathf.Clamp(_cycleIndex - 1, 0, total - 1);
@@ -180,9 +183,16 @@ namespace SanctuaryHud
             var shown = last - first + 1;
             var hidden = total - shown;
 
+            // Rather than count what is left, let the next entry run off the
+            // edge: half an icon says "there is more" without asking anyone to
+            // read a number. Only forwards, and only when there really is a
+            // next one — no peek on the final band is itself the signal that
+            // the cycle ends there.
+            var peek = last < total - 1;
+
             var cellW = icon + cellPad * 2f;
             var cellH = icon + cellPad * 2f;
-            var width = padX * 2f + chipW + cellW * shown + (hidden > 0 ? moreW : 0f);
+            var width = padX * 2f + chipW + cellW * shown + (peek ? cellW * PeekFraction : 0f);
             var height = padY * 2f + cellH + (captioned ? captionH : 0f);
 
             var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
@@ -228,10 +238,17 @@ namespace SanctuaryHud
                 GUI.color = previousColour;
             }
 
-            // Says the cycle carries on past this band, so a key that looks
-            // like it only has three options does not read as the whole story.
-            if (hidden > 0)
-                GUI.Label(new Rect(x + width - padX - moreW, y + padY, moreW, cellH), "+" + hidden, _stCycleTier);
+            // The next entry, cut off mid-icon: the cycle carries on past this
+            // band, so a key that looks like it has three options does not read
+            // as the whole story.
+            if (peek && _cycleIcons != null && last + 1 < _cycleIcons.Length)
+            {
+                var peekX = x + padX + chipW + shown * cellW;
+                GUI.color = new Color(1f, 1f, 1f, 0.18f);
+                DrawSprite(new Rect(peekX + cellPad, y + padY + cellPad, icon * PeekFraction, icon),
+                    _cycleIcons[last + 1], PeekFraction);
+                GUI.color = previousColour;
+            }
 
             if (captioned)
                 GUI.Label(new Rect(x, y + height - captionH - 3f, width, captionH),
@@ -389,14 +406,14 @@ namespace SanctuaryHud
 
         /// Draws a Sprite in IMGUI: its pixels are a window into a packed
         /// atlas, so the draw has to be told which corner of the texture.
-        private void DrawSprite(Rect rect, uint index)
+        private void DrawSprite(Rect rect, uint index, float fraction = 1f)
         {
             var sprite = ResolveSprite(index);
             var tex = sprite == null ? null : sprite.texture;
             if (tex == null) return;
             var tr = sprite.textureRect;
             GUI.DrawTextureWithTexCoords(rect, tex,
-                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width / tex.width, tr.height / tex.height));
+                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width * fraction / tex.width, tr.height / tex.height));
         }
 
         /// True while our binding is still live in the VM the game is running.

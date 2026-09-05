@@ -118,42 +118,57 @@ namespace SanctuaryHud
                 "Tags.NAVAL_TECH_CENTRE", "Ctrl-N", "Naval tech centre."),
 
             // ---- Units: what a factory queues ----
+            //
+            // These follow the FAF hotbuild layout that grew out of Zulan's:
+            // mnemonic, and the same letter reused across domains because a
+            // factory only ever builds one of them. S is scout or submarine,
+            // T is tank or transport, B is raider, bomber or battleship, F is
+            // fighter or frigate — which is exactly what roles sharing a key
+            // already do here, resolved by whichever factory is selected.
             new Role("Engineer", RoleMode.Unit,
-                "Tags.ENGINEER * Tags.MOBILE", "W", "Engineer."),
+                "Tags.ENGINEER * Tags.MOBILE", "E", "Engineer."),
             new Role("Scout", RoleMode.Unit,
-                "Tags.SCOUT * Tags.MOBILE", "E", "Scout (land or air, whichever this factory builds)."),
+                "Tags.SCOUT * Tags.MOBILE", "S", "Scout (land or air, whichever this factory builds)."),
 
             new Role("Tank", RoleMode.Unit,
-                "Tags.TANK * Tags.MOBILE * Tags.LAND", "R", "Tank."),
-            // Frigate, destroyer and battleship are one role played across
-            // three tiers, so they cycle on a single key like everything else.
-            new Role("Warship", RoleMode.Unit,
-                "Tags.FRIGATE + Tags.DESTROYER + Tags.BATTLESHIP", "R", "Warship."),
+                "Tags.TANK * Tags.MOBILE * Tags.LAND", "T", "Tank."),
+            new Role("Transport", RoleMode.Unit,
+                "Tags.TRANSPORT * Tags.MOBILE", "T", "Transport."),
 
+            // Zulan's gives each warship class its own key rather than walking
+            // a line of tiers, so frigate/destroyer/battleship are split.
             new Role("Raider", RoleMode.Unit,
-                "Tags.RAIDER * Tags.MOBILE", "Q", "Raider."),
+                "Tags.RAIDER * Tags.MOBILE", "B", "Raider — the light, fast land unit."),
+            new Role("Bomber", RoleMode.Unit,
+                "Tags.BOMBER * Tags.MOBILE", "B", "Bomber."),
+            new Role("Battleship", RoleMode.Unit,
+                "Tags.BATTLESHIP", "B", "Battleship."),
+
+            new Role("Fighter", RoleMode.Unit,
+                "Tags.FIGHTER * Tags.MOBILE", "F", "Air-superiority fighter."),
+            new Role("Frigate", RoleMode.Unit,
+                "Tags.FRIGATE", "F", "Frigate."),
+
             new Role("Submarine", RoleMode.Unit,
-                "Tags.SUBMARINE", "Q", "Submarine."),
+                "Tags.SUBMARINE", "S", "Submarine."),
+            new Role("Destroyer", RoleMode.Unit,
+                "Tags.DESTROYER", "D", "Destroyer."),
 
             new Role("MobileAntiAir", RoleMode.Unit,
-                "Tags.ANTI_AIR * Tags.MOBILE * Tags.LAND", "Y", "Mobile anti-air."),
-            new Role("Fighter", RoleMode.Unit,
-                "Tags.FIGHTER * Tags.MOBILE", "Y", "Air-superiority fighter."),
-
+                "Tags.ANTI_AIR * Tags.MOBILE * Tags.LAND", "N", "Mobile anti-air."),
             new Role("MobileArtillery", RoleMode.Unit,
-                "Tags.ARTILLERY * Tags.MOBILE", "K", "Mobile artillery."),
-            new Role("Sniper", RoleMode.Unit,
-                "Tags.SNIPER * Tags.MOBILE", "O", "Sniper."),
+                "Tags.ARTILLERY * Tags.MOBILE", "R", "Mobile artillery."),
             // GUNSHIP on its own also covers transports and some scouts, which
             // both carry it; the combat ones are the ones that shoot ground.
             new Role("Gunship", RoleMode.Unit,
-                "Tags.GUNSHIP * Tags.ANTI_SURFACE * Tags.MOBILE", "T", "Gunship."),
-            new Role("Bomber", RoleMode.Unit,
-                "Tags.BOMBER * Tags.MOBILE", "X", "Bomber."),
+                "Tags.GUNSHIP * Tags.ANTI_SURFACE * Tags.MOBILE", "G", "Gunship."),
             new Role("TorpedoBomber", RoleMode.Unit,
-                "Tags.TORPEDO_BOMBER", "C", "Torpedo bomber."),
-            new Role("Transport", RoleMode.Unit,
-                "Tags.TRANSPORT * Tags.MOBILE", "N", "Transport."),
+                "Tags.TORPEDO_BOMBER", "O", "Torpedo bomber."),
+            // Sanctuary-only: Zulan's has no sniper, and its V is the mobile
+            // shield, which has no shared-tier equivalent here. Reclaim still
+            // works on V for anything that is not a factory.
+            new Role("Sniper", RoleMode.Unit,
+                "Tags.SNIPER * Tags.MOBILE", "V", "Sniper."),
         };
     }
 }
