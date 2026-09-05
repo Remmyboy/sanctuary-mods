@@ -38,6 +38,7 @@ namespace SanctuaryHud
             new Dictionary<string, ConfigEntry<string>>();
         private ConfigEntry<bool> _cfgEnabled;
 
+        private ConfigEntry<string> _cfgCancelKey;
         private ConfigEntry<float> _cfgCycleSeconds;
         private ConfigEntry<bool> _cfgOverlay;
         private ConfigEntry<float> _cfgOverlaySeconds;
@@ -93,11 +94,15 @@ namespace SanctuaryHud
 
             _cfgEnabled = Config.Bind("General", "Enabled", true,
                 "Master switch. Off restores the game's own construction hotkeys.");
-            _cfgCycleSeconds = Config.Bind("Cycle", "Seconds", 1.1f,
-                "How long a key keeps cycling after a press, matching FAF hotbuild's cycle reset time. " +
-                "A structure ignores this while its template is still on the cursor. A factory has no such " +
-                "state, so this is what lets repeat presses there walk the cycle; once the window lapses the " +
-                "key queues another of whatever it last chose. Set 0 to only ever queue on repeat.");
+            _cfgCancelKey = Config.Bind("Cancel", "ClearFactoryQueue", "Escape",
+                "Cancels the build queue of every selected factory, as escape does in FAF. With nothing " +
+                "queued -- or the pause menu already open -- the key falls through to whatever it normally " +
+                "does, so escape still opens the menu. Blank to unbind.");
+            _cfgCycleSeconds = Config.Bind("Cycle", "Seconds", 0f,
+                "How long a key keeps cycling after a press, the way FAF hotbuild's cycle reset time does " +
+                "(theirs is 1.1). Off by default: a structure already cycles for as long as its template is " +
+                "on the cursor, and this only adds anything for factories, where it would turn a second press " +
+                "into \"cycle\" instead of \"queue another\". Set 1.1 to match FAF.");
             _cfgOverlay = Config.Bind("Overlay", "Show", true,
                 "After a build hotkey, show what it picked and the rest of that key's cycle.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
@@ -322,7 +327,7 @@ namespace SanctuaryHud
         }
 
         private string Signature() =>
-            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value;
+            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value;
 
         /// Reads the cycle the last press landed in: press counter, key, live
         /// index, then every option in order. The counter leads so two presses
@@ -541,7 +546,14 @@ namespace SanctuaryHud
                 names.Add(role.Name);
             }
 
-            if (roleEntries.Count == 0)
+            // Canonicalised the same way a role key is, but bound on its own:
+            // no Shift or Alt variants, since it takes no count and has no
+            // cycle to walk.
+            var cancelKey = "";
+            if (TryBindings(_cfgCancelKey.Value, "ClearFactoryQueue", out var canonicalCancel, out _))
+                cancelKey = canonicalCancel;
+
+            if (roleEntries.Count == 0 && cancelKey.Length == 0)
             {
                 Logger.LogWarning("Build hotkeys: nothing bound — every role's key is blank or invalid.");
                 _installed = true;
@@ -556,7 +568,8 @@ namespace SanctuaryHud
             var chunk = InstallChunk
                 .Replace("__ROLES__", string.Join(",", roleEntries.ToArray()))
                 .Replace("__BINDINGS__", string.Join(",", bindingEntries.ToArray()))
-                .Replace("__CYCLE__", Mathf.Max(0f, _cfgCycleSeconds.Value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                .Replace("__CYCLE__", Mathf.Max(0f, _cfgCycleSeconds.Value).ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("__CANCELKEY__", Quote(cancelKey));
 
             try
             {
@@ -572,6 +585,8 @@ namespace SanctuaryHud
                 {
                     Logger.LogInfo($"Build hotkeys: {pair.Key} -> {string.Join(", ", pair.Value.ToArray())}");
                 }
+                if (cancelKey.Length > 0)
+                    Logger.LogInfo($"Build hotkeys: {cancelKey} -> clear selected factories' build queue");
                 Logger.LogInfo($"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys.");
             }
             catch (Exception e)
@@ -812,6 +827,54 @@ if not __SdbBuildHotkeys then
     return true
   end
 
+  -- Escape has to keep closing the pause menu, and there is no getter for
+  -- panel visibility — only a setter. So mirror it by watching that setter,
+  -- which every caller goes through, the menu's own close button included.
+  BH.menuOpen = false
+  BH.origSetVis = Engine.UI_SetPanelVisibility
+  Engine.UI_SetPanelVisibility = function(panelType, visible)
+    if panelType == UIPanelType.PauseMenu then BH.menuOpen = visible and true or false end
+    return BH.origSetVis(panelType, visible)
+  end
+
+  -- Cancel every selected factory's build queue, the way FAF's escape does.
+  -- Each entry goes out exactly as a right-click on its queue button would:
+  -- the host request first, because it reads the queue by index, then the
+  -- local prediction that removes it.
+  local function clearQueues()
+    if BH.menuOpen or IsObserver() then return false end
+    local units = SS.GetSelectedEntities()
+    if not units then return false end
+
+    local BQ = Import('common/commands/definitions/buildQueue.lua')
+    local cleared = false
+    for _, u in pairs(units) do
+      local q = u.predictedBuildQueue
+      if u.id and q and next(q) and Tags.FACTORY[u.tp.general.tpId] then
+        -- Backwards, so removing one cannot shift the indices still to come.
+        for i = #q, 1, -1 do
+          local item = q[i]
+          if item and item.count and item.count > 0 then
+            local qid = next(item.queueItemIds)
+            u.buildQueuePendingOperations = u.buildQueuePendingOperations or {}
+            table.insert(u.buildQueuePendingOperations,
+              { deltaAmount = -item.count, queueItemId = qid, tpID = item.tpId })
+            BQ.RequestQueueAmountForUnits({ u }, item.tpId, -item.count, i)
+            buildQueueUtils.ModifyBuildQueue(u, qid, item.tpId, -item.count, true)
+            cleared = true
+          end
+        end
+      end
+    end
+    return cleared
+  end
+
+  BH.Cancel = function()
+    local ok, res = pcall(clearQueues)
+    if not ok then Warn('BuildHotkeys cancel: ' .. tostring(res)) return false end
+    return res
+  end
+
   BH.Fire = function(key, shift, reverse)
     local ok, res = pcall(fire, key, shift, reverse)
     if not ok then Warn('BuildHotkeys: ' .. tostring(res)) return false end
@@ -824,6 +887,15 @@ if not __SdbBuildHotkeys then
   for _, b in ipairs({ __BINDINGS__ }) do
     if BH.saved[b.hk] == nil then BH.saved[b.hk] = grp[b.hk] or BH.NIL end
     grp[b.hk] = { press = function() return BH.Fire(b.key, b.shift, b.rev) end }
+  end
+
+  -- Returning false when there was no queue to clear lets the press carry on
+  -- to the GameMenu group, which has no priority set and so sits below this
+  -- one — so escape still opens the pause menu with nothing selected.
+  BH.cancelKey = __CANCELKEY__
+  if BH.cancelKey ~= '' then
+    if BH.saved[BH.cancelKey] == nil then BH.saved[BH.cancelKey] = grp[BH.cancelKey] or BH.NIL end
+    grp[BH.cancelKey] = { press = function() return BH.Cancel() end }
   end
 
   __SdbBuildHotkeys = BH
@@ -841,6 +913,7 @@ if __SdbBuildHotkeys then
     end
   end
   if BH.CH and BH.origLabel then BH.CH.GetHotkeyForTemplate = BH.origLabel end
+  if BH.origSetVis then Engine.UI_SetPanelVisibility = BH.origSetVis end
   __SdbBuildHotkeys = nil
   __SdbBuildHotkeysCount = nil
   __SdbBuildHotkeysCycle = nil

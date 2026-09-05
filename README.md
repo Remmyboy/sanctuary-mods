@@ -146,13 +146,23 @@ currently build. Where a faction lacks a tier the cycle is simply shorter:
 only Chosen has a T3 point defence, so **X** gives them T3 → T2 → T1 and
 everyone else T2 → T1. No per-faction configuration anywhere.
 
-A press continues the previous one in either of two ways. A structure is still
-uncommitted while its template sits on the cursor, and that has no time limit —
-you may be lining a placement up. A factory has no such state, so it takes FAF
-hotbuild's rule instead: repeat presses cycle while they keep coming, and once
-`Cycle.Seconds` (1.1, FAF's own default) lapses the key queues another of
-whatever it last chose. Set it to 0 to only ever queue on repeat. Changing
-selection restarts the cycle either way.
+Cycling continues while the previous press is still uncommitted — its template
+sitting on the cursor — which has no time limit, since you may be lining a
+placement up. Placing it, cancelling, or changing selection starts the cycle
+over. A factory never enters build mode, so repeat presses there queue another
+of the same rather than walking the cycle; FAF instead resets its cycle on a
+timer, which is what makes its factories cycle too, and `Cycle.Seconds` (0 by
+default, 1.1 to match FAF) turns that on here.
+
+**Escape clears the build queue** of every selected factory, as it does in FAF,
+rather than opening the pause menu. Each entry goes out exactly as a
+right-click on its queue button would — the host request first, since it reads
+the queue by index, then the local prediction. With nothing queued the key
+falls through untouched, so escape still opens the menu; and because there is
+no getter for panel visibility, only a setter, the mod mirrors the menu's state
+by watching that setter (which the menu's own close button goes through too) so
+escape still *closes* the menu rather than clearing a queue behind it.
+`Cancel.ClearFactoryQueue` rebinds or blanks it.
 
 Holding **Shift** queues five, as the stock hotkeys do. Holding **Alt** walks
 the cycle backwards, as it does in FAF — and a *fresh* Alt press opens at the
