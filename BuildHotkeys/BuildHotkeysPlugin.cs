@@ -41,6 +41,8 @@ namespace SanctuaryHud
         private ConfigEntry<bool> _cfgOverlay;
         private ConfigEntry<float> _cfgOverlaySeconds;
         private ConfigEntry<float> _cfgOverlayY;
+        private ConfigEntry<float> _cfgOverlayIcon;
+        private ConfigEntry<bool> _cfgOverlayNames;
 
         private bool _installed;
         private float _accum;
@@ -91,6 +93,11 @@ namespace SanctuaryHud
                 "After a build hotkey, show what it picked and the rest of that key's cycle.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
                 "How long the overlay stays up after the last press.");
+            _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 64f,
+                "Size of each icon in the overlay, in 1080p-logical pixels.");
+            _cfgOverlayNames = Config.Bind("Overlay", "ShowNames", false,
+                "Caption the overlay with the name of the entry you are on, e.g. \"Tier 1: Land Factory\". " +
+                "Off by default — the icons carry it, and the name is only needed to tell two tiers apart.");
             _cfgOverlayY = Config.Bind("Overlay", "PosY", 700f,
                 "Overlay's distance from the top of the screen, in 1080p-logical pixels. " +
                 "It is always centred horizontally.");
@@ -108,59 +115,74 @@ namespace SanctuaryHud
 
         private void OnDestroy() => Remove();
 
-        private GUIStyle _stCycleKey, _stCycleOn, _stCycleOff;
+        private GUIStyle _stCycleKey, _stCycleCaption;
 
-        /// Shows what the last press actually picked, with the rest of that
-        /// key's cycle under it so the next press is predictable. Drawn, never
-        /// interactive — no GUI.Window or Button, so it cannot swallow a click
-        /// meant for the battlefield underneath.
+        /// Shows what the last press actually picked and the rest of that key's
+        /// cycle, as a strip of the same art the build menu uses: the live one
+        /// lit, the others faded, left to right in the order further presses
+        /// reach them. Drawn, never interactive — no GUI.Window or Button, so
+        /// it cannot swallow a click meant for the battlefield underneath.
         private void OnGUI()
         {
             if (!_cfgOverlay.Value || _cycleNames == null || _cycleNames.Length == 0) return;
             if (Time.unscaledTime - _cycleAt > Mathf.Max(0.2f, _cfgOverlaySeconds.Value)) return;
 
             EnsureStyles();
-            if (_stCycleOn == null)
+            if (_stCycleKey == null)
             {
-                _stCycleKey = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(1f, 0.68f, 0.25f) } };
-                _stCycleOn = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
-                _stCycleOff = new GUIStyle { fontSize = 12, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(1f, 1f, 1f, 0.38f) } };
+                _stCycleKey = new GUIStyle { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 0.68f, 0.25f) } };
+                _stCycleCaption = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             }
 
             var scale = Screen.height / 1080f;
             var previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
-            const float rowH = 28f, padX = 10f, padY = 7f, chipW = 32f, iconSize = 24f, width = 300f;
-            var height = padY * 2f + rowH * _cycleNames.Length;
+            var icon = Mathf.Clamp(_cfgOverlayIcon.Value, 16f, 256f);
+            var captioned = _cfgOverlayNames.Value;
+            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 34f, captionH = 22f;
+
+            var cellW = icon + cellPad * 2f;
+            var cellH = icon + cellPad * 2f;
+            var count = _cycleNames.Length;
+            var width = padX * 2f + chipW + cellW * count;
+            var height = padY * 2f + cellH + (captioned ? captionH : 0f);
+
             var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
             var y = _cfgOverlayY.Value;
 
             GUI.DrawTexture(new Rect(x, y, width, height), _texPanel);
             var previousColour = GUI.color;
 
-            for (var i = 0; i < _cycleNames.Length; i++)
+            // The whole strip belongs to one key, so it is named once, off to
+            // the left where it can never sit on top of the art.
+            GUI.Label(new Rect(x + padX, y + padY, chipW, cellH), _cycleKey, _stCycleKey);
+
+            for (var i = 0; i < count; i++)
             {
-                var rowY = y + padY + i * rowH;
+                var cellX = x + padX + chipW + i * cellW;
+                var cellY = y + padY;
                 var live = i + 1 == _cycleIndex;
+
                 if (live)
                 {
-                    GUI.DrawTexture(new Rect(x, rowY, width, rowH), _texRowHover);
-                    GUI.DrawTexture(new Rect(x, rowY, 3f, rowH), _texWhite);
-                    GUI.Label(new Rect(x + padX, rowY, chipW, rowH), _cycleKey, _stCycleKey);
+                    GUI.DrawTexture(new Rect(cellX, cellY, cellW, cellH), _texRowHover);
+                    GUI.DrawTexture(new Rect(cellX, cellY + cellH - 3f, cellW, 3f), _texWhite);
                 }
 
-                // Options you have not landed on are faded, so the live one
-                // reads at a glance without having to find the highlight.
-                var iconX = x + padX + chipW;
-                GUI.color = live ? Color.white : new Color(1f, 1f, 1f, 0.35f);
+                // Options not landed on are faded, so the live one reads at a
+                // glance without having to hunt for the highlight.
+                GUI.color = live ? Color.white : new Color(1f, 1f, 1f, 0.3f);
                 if (_cycleIcons != null && i < _cycleIcons.Length)
-                    DrawSprite(new Rect(iconX, rowY + (rowH - iconSize) * 0.5f, iconSize, iconSize), _cycleIcons[i]);
+                    DrawSprite(new Rect(cellX + cellPad, cellY + cellPad, icon, icon), _cycleIcons[i]);
                 GUI.color = previousColour;
+            }
 
-                var textX = iconX + iconSize + 7f;
-                GUI.Label(new Rect(textX, rowY, x + width - padX - textX, rowH),
-                    _cycleNames[i], live ? _stCycleOn : _stCycleOff);
+            if (captioned)
+            {
+                var live = _cycleIndex - 1;
+                GUI.Label(new Rect(x, y + height - captionH - 3f, width, captionH),
+                    live >= 0 && live < count ? _cycleNames[live] : "", _stCycleCaption);
             }
 
             GUI.matrix = previousMatrix;

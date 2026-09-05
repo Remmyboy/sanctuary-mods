@@ -186,15 +186,16 @@ that actually builds it. Modifiers compress to one character (`^S` for
 `Ctrl-S`) to fit where a single letter went. Anything no role claims keeps the
 stock answer, which is usually the `?` it shows today.
 
-**An overlay names what you just picked.** A cycle is otherwise invisible
+**An overlay shows what you just picked.** A cycle is otherwise invisible
 until you place something — you cannot tell whether W→W landed on the air
 factory or on a lower-tier land one. So each press publishes its whole cycle
-and a small panel lists it: the live entry lit with the key beside it, the
-rest of the options dimmed underneath, in the order further presses will reach
-them. Each row carries the same button art the build menu uses, next to the
-game's own `displayName` ("Tier 3: Land Factory") — the icon to recognise it
-by, the name because the tier is the ambiguity worth resolving and the art is
-often shared across tiers.
+and a strip appears: the key named once on the left, then every option in that
+key's cycle left to right in the order further presses reach them, drawn with
+the same button art the build menu uses. The live one is lit and underlined,
+the rest faded. `Overlay.ShowNames` adds a caption underneath naming the entry
+you are on ("Tier 1: Land Factory") — off by default, since the art usually
+carries it and the name is only needed to separate two tiers that share a
+sprite.
 
 Those icons are *not* the strategic icon atlas the commander widget samples;
 they are per-template `.sansprite` assets loaded through the game's own
@@ -205,10 +206,10 @@ passes that index across and resolves the real `Sprite` — drawn through its
 `textureRect`, since each one is a window into a packed atlas. If the lookup
 ever goes missing the overlay just lists names.
 
-The panel fades a couple of seconds after the last press,
+The strip fades a couple of seconds after the last press,
 and is drawn rather than built from `GUI.Window`, so it can never swallow a
-click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`
-and `Overlay.PosY` control it.
+click meant for the battlefield under it. `Overlay.Show`, `Overlay.Seconds`,
+`Overlay.IconSize` and `Overlay.PosY` control it.
 
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into
