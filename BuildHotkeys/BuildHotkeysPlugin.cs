@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -369,70 +368,6 @@ namespace SanctuaryHud
             _cycleAt = Time.unscaledTime;
         }
 
-        // ---- build-menu icons ---------------------------------------------
-
-        private static MethodInfo _tryGetSprite;
-        private static Type _assetIdType;
-        private static bool _spriteBridgeTried;
-        private readonly Dictionary<uint, Sprite> _spriteCache = new Dictionary<uint, Sprite>();
-
-        /// The build buttons' art is not the strategic icon atlas HudCore
-        /// samples for the commander widget — those are `.sansprite` assets
-        /// loaded through the game's own pipeline into a registry keyed by
-        /// AssetID. SanctuaryUI.Utils.TryGetLoadedSprite is the public way in,
-        /// and EM.Core.AssetID is a struct wrapping the very uint the Lua side
-        /// reports as `foregroundIconID.index`.
-        private static void ResolveSpriteBridge()
-        {
-            if (_spriteBridgeTried) return;
-            _spriteBridgeTried = true;
-            try
-            {
-                var types = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic).SelectMany(GetTypesSafe).ToList();
-                _assetIdType = types.FirstOrDefault(t => t.FullName == "EM.Core.AssetID");
-                _tryGetSprite = types.FirstOrDefault(t => t.FullName == "SanctuaryUI.Utils")
-                    ?.GetMethod("TryGetLoadedSprite", BindingFlags.Public | BindingFlags.Static);
-                if (_tryGetSprite == null || _assetIdType == null)
-                    _log?.LogWarning("Build hotkeys: sprite lookup unavailable; the overlay will list names only.");
-            }
-            catch (Exception e)
-            {
-                _log?.LogWarning($"Build hotkeys: sprite lookup failed to resolve ({e.Message}); names only.");
-            }
-        }
-
-        private Sprite ResolveSprite(uint index)
-        {
-            if (index == 0) return null;
-            if (_spriteCache.TryGetValue(index, out var cached)) return cached;
-
-            ResolveSpriteBridge();
-            Sprite sprite = null;
-            if (_tryGetSprite != null && _assetIdType != null)
-            {
-                try
-                {
-                    var args = new[] { Activator.CreateInstance(_assetIdType, index), null };
-                    if (_tryGetSprite.Invoke(null, args) is bool ok && ok) sprite = args[1] as Sprite;
-                }
-                catch { /* one bad id must not take the overlay down */ }
-            }
-            _spriteCache[index] = sprite;
-            return sprite;
-        }
-
-        /// Draws a Sprite in IMGUI: its pixels are a window into a packed
-        /// atlas, so the draw has to be told which corner of the texture.
-        private void DrawSprite(Rect rect, uint index, float fraction = 1f)
-        {
-            var sprite = ResolveSprite(index);
-            var tex = sprite == null ? null : sprite.texture;
-            if (tex == null) return;
-            var tr = sprite.textureRect;
-            GUI.DrawTextureWithTexCoords(rect, tex,
-                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width * fraction / tex.width, tr.height / tex.height));
-        }
 
         /// True while our binding is still live in the VM the game is running.
         /// Polling a global rather than trusting the flag means a match that
@@ -579,7 +514,7 @@ namespace SanctuaryHud
                 _builds = 0;
                 // Each match reloads the sprites through Engine.LoadSprite, so
                 // last match's AssetIDs are not safe to assume still valid.
-                _spriteCache.Clear();
+                ClearSpriteCache();
 
                 foreach (var pair in layout.OrderBy(p => p.Key, StringComparer.Ordinal))
                 {
