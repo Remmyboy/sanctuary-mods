@@ -26,7 +26,7 @@ source.
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
-| [CameraUtilities](CameraUtilities/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
+| [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.2.0) | Mods page in the front menu: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
@@ -458,6 +458,10 @@ and both views agree.
 - **Planned buildings** — the outlines of buildings an engineer or commander
   has queued but not started. They come back on their own the moment
   construction begins.
+- **Alloy spots** — the marker on a deposit with no extractor on it yet.
+  Switching it back off hands the decision to the game's own
+  `RecalculateRendering` rather than forcing every marker on, so a spot that
+  gained an extractor meanwhile stays hidden, as it should.
 - **Health bars** — every health and progress bar.
 - **Game UI** — the whole HUD. This mod's own panel is Unity IMGUI rather than
   the game's UI, so it stays up and F4 still gets everything back.
