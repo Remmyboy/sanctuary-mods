@@ -40,6 +40,7 @@ namespace SanctuaryHud.CameraUtils
         internal static bool HideBuild;
         internal static bool HideOrderLines;
         internal static bool HidePlannedBuildings;
+        internal static bool HideAlloySpots;
         internal static bool HideHealthBars;
         internal static bool HideGameUi;
 
@@ -163,6 +164,7 @@ namespace SanctuaryHud.CameraUtils
                    $"S.icons = {(int)Icons} S.height = {HideIconsBelow.ToString("0.##", inv)} " +
                    $"S.intel = {Lua(HideIntel)} S.attack = {Lua(HideAttack)} S.build = {Lua(HideBuild)} " +
                    $"S.orders = {Lua(HideOrderLines)} S.ghosts = {Lua(HidePlannedBuildings)} " +
+                   $"S.spots = {Lua(HideAlloySpots)} " +
                    $"S.bars = {Lua(HideHealthBars)} S.ui = {Lua(HideGameUi)} " +
                    // Apply straight away rather than waiting for the next
                    // sweep, so a click in the panel reads as instant.
@@ -193,7 +195,7 @@ namespace SanctuaryHud.CameraUtils
             "  local S = _G.__CameraUtils " +
             "  if not S then " +
             "    S = { icons = 0, height = 100, intel = false, attack = false, build = false, " +
-            "          orders = false, ghosts = false, bars = false, ui = false } " +
+            "          orders = false, ghosts = false, spots = false, bars = false, ui = false } " +
             "    _G.__CameraUtils = S " +
             "  end " +
             "  local M = RangeRingMaterial " +
@@ -210,6 +212,10 @@ namespace SanctuaryHud.CameraUtils
             // A fresh match builds a fresh HUD, so visible is the right guess.
             "  if S.uiHidden == nil then S.uiHidden = false end " +
             "  S.hiddenGhosts = S.hiddenGhosts or setmetatable({}, { __mode = 'k' }) " +
+            // The marker on an undeveloped alloy deposit. The table is created
+            // once per match and mutated in place as spots are registered, so
+            // holding it is enough to see every spot that ever appears.
+            "  local resourceSpots = Import('common/resourceSpot.lua').resourceSpots " +
             "  S.sweep = function() " +
             "    local mask = (S.intel and 1 or 0) + (S.attack and 2 or 0) + (S.build and 4 or 0) " +
             // Nothing hidden and nothing left to put back: skip the ghost test
@@ -261,6 +267,20 @@ namespace SanctuaryHud.CameraUtils
             // and never take 0 for the game's own scale — a match that starts
             // with it still zeroed would otherwise record 0 as the value to
             // restore, and Lua counts 0 as true, so `or 1` does not catch it.
+            // Hiding goes through the spot's own setter, which no-ops once it
+            // is already off, so re-asserting each sweep costs nothing and
+            // catches spots registered later. Showing hands the decision back
+            // to the game's own RecalculateRendering rather than forcing them
+            // on, because a spot with an extractor built on it stays hidden.
+            "    if S.spots or S.spotsHidden then " +
+            "      for _, spot in pairs(resourceSpots) do " +
+            "        if spot.SetVisualMarkerEnabled then " +
+            "          if S.spots then spot:SetVisualMarkerEnabled(false) " +
+            "          else spot:RecalculateRendering() end " +
+            "        end " +
+            "      end " +
+            "      S.spotsHidden = S.spots " +
+            "    end " +
             "    local _, barScale = Engine.GetProgressBarScaling() " +
             "    if barScale then " +
             "      if barScale > 0 then " +
@@ -334,7 +354,7 @@ namespace SanctuaryHud.CameraUtils
             "      S.origSetOrderDraw(S.ordersWanted) " +
             "    end) " +
             "    S.icons = 0 S.intel = false S.attack = false S.build = false " +
-            "    S.orders = false S.ghosts = false S.bars = false S.ui = false " +
+            "    S.orders = false S.ghosts = false S.spots = false S.bars = false S.ui = false " +
             "    pcall(S.sweep) " +
             "    _G.__CameraUtils = nil " +
             "    _G." + VersionGlobal + " = nil " +

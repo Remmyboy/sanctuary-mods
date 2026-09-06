@@ -36,6 +36,7 @@ namespace SanctuaryHud.CameraUtils
         private ConfigEntry<bool> _cfgBuild;
         private ConfigEntry<bool> _cfgOrderLines;
         private ConfigEntry<bool> _cfgPlannedBuilds;
+        private ConfigEntry<bool> _cfgAlloySpots;
         private ConfigEntry<bool> _cfgHealthBars;
         private ConfigEntry<bool> _cfgGameUi;
         private ConfigEntry<float> _cfgDrawDistance;
@@ -73,6 +74,9 @@ namespace SanctuaryHud.CameraUtils
                 "Hide the order lines and markers drawn for the selected units — move, build, attack, assist, reclaim — and the whole-army view of them the append key brings up.");
             _cfgPlannedBuilds = Config.Bind("Orders", "HidePlannedBuildings", false,
                 "Hide the outlines of buildings that are queued but not started yet. They come back on their own the moment construction begins.");
+
+            _cfgAlloySpots = Config.Bind("Markers", "HideAlloySpotMarkers", false,
+                "Hide the marker drawn on an alloy deposit that has no extractor on it yet. The game already hides one once an extractor covers it, and that stays true when this is switched back off.");
 
             _cfgHealthBars = Config.Bind("Cinematic", "HideHealthBars", false,
                 "Hide every health and progress bar.");
@@ -120,6 +124,7 @@ namespace SanctuaryHud.CameraUtils
             RenderState.HideBuild = _cfgBuild.Value;
             RenderState.HideOrderLines = _cfgOrderLines.Value;
             RenderState.HidePlannedBuildings = _cfgPlannedBuilds.Value;
+            RenderState.HideAlloySpots = _cfgAlloySpots.Value;
             RenderState.HideHealthBars = _cfgHealthBars.Value;
             RenderState.HideGameUi = _cfgGameUi.Value;
             DrawDistance.Wanted = _cfgDrawDistance.Value;
@@ -208,13 +213,14 @@ namespace SanctuaryHud.CameraUtils
             _cfgBuild.Value = Toggle(_cfgBuild.Value, "BUILD", GUILayout.Width(76));
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            _cfgHealthBars.Value = Toggle(_cfgHealthBars.Value, "HEALTH BARS", GUILayout.Width(118));
-            _cfgGameUi.Value = Toggle(_cfgGameUi.Value, "GAME UI", GUILayout.Width(118));
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
             _cfgOrderLines.Value = Toggle(_cfgOrderLines.Value, "ORDER LINES", GUILayout.Width(118));
             _cfgPlannedBuilds.Value = Toggle(_cfgPlannedBuilds.Value, "PLANNED BUILDS", GUILayout.Width(118));
             GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            _cfgAlloySpots.Value = Toggle(_cfgAlloySpots.Value, "ALLOY SPOTS", GUILayout.Width(118));
+            _cfgHealthBars.Value = Toggle(_cfgHealthBars.Value, "HEALTH BARS", GUILayout.Width(118));
+            GUILayout.EndHorizontal();
+            _cfgGameUi.Value = Toggle(_cfgGameUi.Value, "GAME UI");
 
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
@@ -258,6 +264,7 @@ namespace SanctuaryHud.CameraUtils
             _cfgBuild.Value = false;
             _cfgOrderLines.Value = false;
             _cfgPlannedBuilds.Value = false;
+            _cfgAlloySpots.Value = false;
             _cfgHealthBars.Value = false;
             _cfgGameUi.Value = false;
         }
