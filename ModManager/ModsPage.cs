@@ -555,16 +555,22 @@ namespace SanctuaryHud
             sw.isInteractable = true;
             sw.onValueChanged.AddListener(v => onChanged(v));
 
-            // An invisible graphic on the row itself makes it a click target.
-            if (go.GetComponent<Graphic>() == null)
+            // The click target: the row's own Button if the game gave it
+            // one, else a Button on the label (which spans the row bar the
+            // switch). A Selectable already on the row makes AddComponent
+            // hand back null, hence the fallback.
+            var btn = go.GetComponent<Button>();
+            if (btn == null)
             {
-                var hit = go.AddComponent<Image>();
-                hit.color = Color.clear;
-                hit.raycastTarget = true;
+                tmp.raycastTarget = true;
+                btn = text.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
             }
-            var btn = go.AddComponent<Button>();
-            btn.transition = Selectable.Transition.None;
-            btn.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
+            if (btn != null)
+            {
+                btn.transition = Selectable.Transition.None;
+                btn.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
+            }
+            else _log.LogWarning($"Section '{name}': no click target could be added ({string.Join(", ", go.GetComponents<Component>().Select(c => c.GetType().Name))}).");
             Place(go, list);
             return tmp;
         }
