@@ -551,8 +551,10 @@ and Lua Mods. The page is the game's own Settings screen, cloned and refilled:
 the tab bar, the switch rows, the text fields (a settings slider's input box,
 widened), the headings and the buttons are all the game's Beam UI widgets, so
 it looks like the rest of the menu and follows any restyling the game does.
-It lives in the menu canvas, so there is no in-match UI; UI mod toggles and
-settings changes made in the menu apply immediately anyway.
+**F8** also opens the same page full-screen during a match (over the menu
+background, the way the pause menu's Settings does); closing it returns to
+the game. UI mod toggles and settings changes apply immediately; Lua mod
+toggles are locked until you leave the match.
 
 It manages two kinds of mods:
 

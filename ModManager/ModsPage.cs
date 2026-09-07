@@ -20,8 +20,10 @@ namespace SanctuaryHud
     // heading, the buttons), so it matches the game exactly and follows any
     // restyling the game does.
     //
-    // The page lives in the menu canvas, so it exists only while the front
-    // menu does; there is no in-match UI.
+    // The page lives in the menu canvas. That canvas survives into a match
+    // (the pause menu's Settings button opens the same Settings screen
+    // there), so the hotkey opens the page full-screen mid-match too, over
+    // the menu background, and closing it returns to whatever was showing.
     internal sealed class ModsPage
     {
         private const string HarmonyId = "com.sanctuarydb.modmanager.page";
@@ -39,6 +41,12 @@ namespace SanctuaryHud
         private Transform _uiList, _luaList;
         private string _pluginSignature = "";
         private bool _sidebarRegistered;
+
+        // The InterfaceManager window that was up when the page opened
+        // (Main in the front menu, None during a match), restored on close.
+        private InterfaceManager.Window _returnWindow = InterfaceManager.Window.Main;
+        private static readonly AccessTools.FieldRef<InterfaceManager, InterfaceManager.Window> CurrentWindow =
+            AccessTools.FieldRefAccess<InterfaceManager, InterfaceManager.Window>("currentWindow");
 
         // Templates lifted out of the cloned Settings screen before its
         // lists are emptied. They sit under an inactive holder so a clone can
@@ -59,14 +67,31 @@ namespace SanctuaryHud
 
         public bool IsOpen => _page != null && _page.activeSelf;
 
-        /// True while the front menu is showing (or our page is).
+        /// True while the front menu is showing, during a match, or while
+        /// our page is up. Not from the lobby, loading or Settings screens:
+        /// the page would replace them, and they are not ours to restore.
         public bool CanOpen
         {
             get
             {
                 if (IsOpen) return true;
+                if (_page == null || InterfaceManager.Instance == null) return false;
                 var mmi = MainMenuInterface.Instance;
-                return mmi != null && mmi.gameObject.activeInHierarchy && _page != null;
+                if (mmi != null && mmi.gameObject.activeInHierarchy) return true;
+                return InMatch;
+            }
+        }
+
+        /// The game hands the menu canvas over to the match by transitioning
+        /// to Window.None once the map has loaded; the in-game UI manager
+        /// only exists during a match.
+        private static bool InMatch
+        {
+            get
+            {
+                var im = InterfaceManager.Instance;
+                return im != null && CurrentWindow(im) == InterfaceManager.Window.None
+                       && SanctuaryUI.SanctuaryUIManager.Instance != null;
             }
         }
 
@@ -118,8 +143,17 @@ namespace SanctuaryHud
             if (_page == null) return;
             var im = InterfaceManager.Instance;
             if (im == null) return;
+            _returnWindow = CurrentWindow(im);
+            // Mid-match the pause menu may be up; it does the same before
+            // handing over to the Settings screen.
+            if (InMatch)
+            {
+                try { SanctuaryUI.SanctuaryUIManager.Instance.SetPanelVisibility(SanctuaryUI.UIPanelType.PauseMenu, false); }
+                catch (Exception e) { _log.LogWarning($"Could not hide the pause menu: {e.Message}"); }
+            }
             // Hides every game interface (and, via the prefix, ours) without
-            // showing another one; then ours goes on top of the background.
+            // showing another one; then ours goes on top of the background,
+            // which also covers the game when opened mid-match.
             im.TransitionTo(InterfaceManager.Window.Background);
             _page.SetActive(true);
             RebuildUiTab();
@@ -130,7 +164,7 @@ namespace SanctuaryHud
         {
             if (_page != null) _page.SetActive(false);
             var im = InterfaceManager.Instance;
-            if (im != null) im.TransitionTo(InterfaceManager.Window.Main);
+            if (im != null) im.TransitionTo(_returnWindow);
         }
 
         public void Destroy()
