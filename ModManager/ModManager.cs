@@ -77,6 +77,11 @@ namespace SanctuaryHud
             public string Name;
             public Type Type;
             public BaseUnityPlugin Instance;
+            // The last instance's ConfigFile, kept after it is unloaded: the
+            // entries stay bound and writes still go to the file, which the
+            // next instance reads on load, so settings are editable while
+            // the mod is off.
+            public ConfigFile Config;
             public bool Enabled => Instance != null;
         }
 
@@ -331,15 +336,17 @@ namespace SanctuaryHud
                 }
                 entry.Type = comp.GetType();
                 entry.Instance = comp;
+                if (comp.Config != null) entry.Config = comp.Config;
                 if (applyDisabled && disabled.Contains(meta.GUID)) SetPluginEnabled(entry, false, persist: false);
             }
         }
 
-        /// Everything the mod bound, or an empty list for an unloaded mod.
+        /// Everything the mod bound: from the running instance, or from the
+        /// ConfigFile its last instance left behind while it is off.
         internal static ConfigEntryBase[] ConfigEntriesOf(PluginEntry plugin)
         {
 #pragma warning disable CS0618 // GetConfigEntries is obsolete, but the Values replacement is not in this BepInEx.
-            return plugin.Instance?.Config?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
+            return (plugin.Instance?.Config ?? plugin.Config)?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
 #pragma warning restore CS0618
         }
 
@@ -350,6 +357,7 @@ namespace SanctuaryHud
                 try
                 {
                     entry.Instance = (BaseUnityPlugin)gameObject.AddComponent(entry.Type);
+                    if (entry.Instance.Config != null) entry.Config = entry.Instance.Config;
                     _log.LogInfo($"Plugin '{entry.Name}' loaded.");
                 }
                 catch (Exception e)

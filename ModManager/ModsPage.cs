@@ -555,24 +555,19 @@ namespace SanctuaryHud
             sw.isInteractable = true;
             sw.onValueChanged.AddListener(v => onChanged(v));
 
-            // The click target: the row's own Button. The game wires its
-            // inspector onClick to flip the switch (click anywhere on a
-            // settings row), so the event is replaced wholesale, persistent
-            // listeners included, and the row folds instead. The switch
-            // itself still toggles through its own pointer handler.
-            var btn = go.GetComponent<Button>();
-            if (btn == null)
+            // The click target: the row's SettingsElement, the Beam widget
+            // that takes clicks anywhere on a settings row (with hover
+            // highlight and sound). Its inspector onClick flips the switch,
+            // so the event is replaced wholesale, persistent listeners
+            // included, and the row folds instead. The switch still toggles
+            // through its own pointer handler, which the row never sees.
+            var element = go.GetComponent<SettingsElement>();
+            if (element != null)
             {
-                tmp.raycastTarget = true;
-                btn = text.GetComponent<Button>() ?? text.gameObject.AddComponent<Button>();
+                element.onClick = new UnityEngine.Events.UnityEvent();
+                element.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
             }
-            if (btn != null)
-            {
-                btn.transition = Selectable.Transition.None;
-                btn.onClick = new Button.ButtonClickedEvent();
-                btn.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
-            }
-            else _log.LogWarning($"Section '{name}': no click target could be added ({string.Join(", ", go.GetComponents<Component>().Select(c => c.GetType().Name))}).");
+            else _log.LogWarning($"Section '{name}': the row has no SettingsElement, so it cannot fold.");
             Place(go, list);
             return tmp;
         }
@@ -672,9 +667,6 @@ namespace SanctuaryHud
                     on =>
                     {
                         _owner.SetPluginEnabled(p, on);
-                        // Switching a mod on is the moment its settings are
-                        // wanted; off, and there is nothing left to show.
-                        if (on) _expanded.Add(p.Guid); else _expanded.Remove(p.Guid);
                         RebuildPluginGroup(p);
                     },
                     () =>
@@ -720,7 +712,6 @@ namespace SanctuaryHud
         /// doesn't take until it parses.
         private void FillPluginGroup(ModManagerPlugin.PluginEntry plugin, Transform group)
         {
-            if (!plugin.Enabled) return;
             List<ConfigEntryBase> entries;
             try { entries = ModManagerPlugin.ConfigEntriesOf(plugin).ToList(); }
             catch (Exception e)
