@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using BepInEx.Configuration;
 using EM.Core;
+using EM.DOTS.Engine.Loader;
 using EM.Network;
 using EM.Network.Lobby;
 using EM.UI;
@@ -232,6 +233,11 @@ namespace SanctuaryHud
                 }
             }
 
+            // A replay closed for a countdown that never became a launch
+            // (cancelled, or the pair went manual): stop reporting on its
+            // behalf once the menu has had ample time to come back.
+            if (_leavingReplay && _phase == Phase.Idle && Time.realtimeSinceStartup - _leaveRequestedAt > 60f) ForgetReplayQuit();
+
             if (_phase != Phase.Idle)
             {
                 _settingsAccum += dt;
@@ -255,20 +261,60 @@ namespace SanctuaryHud
 
         private bool MockMode => !string.IsNullOrWhiteSpace(_cfgMmMockFile.Value);
 
-        // What the site needs to know about where we are. Only `menu` is
-        // launchable.
+        // What the site needs to know about where we are: menu, lobby,
+        // loading, ingame or replay. The site decides which of those it will
+        // launch into; this side can launch from menu, lobby (leaving it) and
+        // replay (closing it).
         private string CurrentState()
         {
             // Watching a replay looks like a match to the economy signal and
-            // like the menu when it's paused; it is neither, and never
-            // launchable.
-            // The site accepts only the four states below, and none but
-            // `menu` is launchable, so a replay reports as in a game.
-            if (NetworkManager.IsReplayPlayback) return "ingame";
+            // like the menu when it's paused; it is neither.
+            if (NetworkManager.IsReplayPlayback) return "replay";
+            // A replay this side is closing for a match: the scene reload
+            // and the economy signal's five-second tail would read as a
+            // game, and the menu is back as soon as the new UI is up.
+            if (_leavingReplay) return MenuIsBack() ? "menu" : "replay";
             if (InMatch) return "ingame";
             if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby && LobbyManager.IsInLobby) return "loading";
             if (LobbyManager.IsInLobby) return "lobby";
             return "menu";
+        }
+
+        // ---- leaving a replay --------------------------------------------------
+
+        // A replay gives way to a match (nothing is lost by closing one).
+        // The game's own quit path tears it down and reloads the menu scene,
+        // which brings a fresh InterfaceManager; that instance appearing is
+        // how "the menu is back" is known. No dependency on ReplayManager:
+        // the flag is the engine loader's.
+        private bool _leavingReplay;
+        private InterfaceManager _leaveOldUi;
+        private float _leaveRequestedAt;
+        private float _menuBackSince = -1f;
+
+        private void QuitReplay()
+        {
+            if (_leavingReplay) return;
+            Logger.LogInfo("Matchmaking: closing the replay for the ladder match.");
+            _leavingReplay = true;
+            _leaveOldUi = InterfaceManager.Instance;
+            _leaveRequestedAt = Time.realtimeSinceStartup;
+            _menuBackSince = -1f;
+            EngineLoader.isGameRestartRequested = true;
+        }
+
+        private bool MenuIsBack()
+        {
+            if (NetworkManager.IsReplayPlayback || LobbyManager.IsInLobby) return false;
+            var ui = InterfaceManager.Instance;
+            return ui != null && ui != _leaveOldUi && EngineLoader.Instance != null;
+        }
+
+        private void ForgetReplayQuit()
+        {
+            _leavingReplay = false;
+            _leaveOldUi = null;
+            _menuBackSince = -1f;
         }
 
         // ---- session ---------------------------------------------------------
@@ -435,6 +481,7 @@ namespace SanctuaryHud
                 // The site no longer has a match for us. If we were mid-launch
                 // that's a cancel we never saw.
                 if (_phase != Phase.Idle && _phase != Phase.Started) Abort("The match was cancelled.", null);
+                if (_phase == Phase.Idle) ForgetReplayQuit();
                 _match = null;
                 return;
             }
@@ -452,9 +499,17 @@ namespace SanctuaryHud
                     _match = m;
                     if (isNew)
                     {
-                        Overlay("MATCH FOUND", m.Mode == "auto"
-                            ? $"vs {opponent} on {MapName(m.Map)}. Launching when the site's countdown ends."
-                            : $"vs {opponent}. {(isHost ? "You're hosting" : "They're hosting")}, see the site.", 20f);
+                        // A replay is closed now rather than at launch: the
+                        // scene reload takes a few seconds, and the
+                        // countdown has them to spare where the site's
+                        // lobby-creation window doesn't.
+                        var closingReplay = m.Mode == "auto" && NetworkManager.IsReplayPlayback;
+                        if (closingReplay) QuitReplay();
+                        Overlay("MATCH FOUND", m.Mode != "auto"
+                            ? $"vs {opponent}. {(isHost ? "You're hosting" : "They're hosting")}, see the site."
+                            : closingReplay
+                                ? $"vs {opponent} on {MapName(m.Map)}. Closing the replay; launching when the site's countdown ends."
+                                : $"vs {opponent} on {MapName(m.Map)}. Launching when the site's countdown ends.", 20f);
                     }
                     break;
 
@@ -494,10 +549,12 @@ namespace SanctuaryHud
                         Overlay(m.Status == "cancelled" ? "MATCH CANCELLED" : "LAUNCH FAILED",
                             string.IsNullOrEmpty(m.Reason) ? "" : m.Reason, 20f);
                     }
+                    if (_phase == Phase.Idle) ForgetReplayQuit();
                     _match = null;
                     break;
 
                 case "done":
+                    if (_phase == Phase.Idle) ForgetReplayQuit();
                     _match = null;
                     break;
             }
@@ -512,8 +569,9 @@ namespace SanctuaryHud
             // Any menu screen is fine (settings, the lobby browser, the
             // profile page all count as `menu`). A game that is already
             // playing or loading one is left alone; a lobby the player is
-            // sitting in is left for them, below.
+            // sitting in is left for them, and a replay closed, below.
             var state = CurrentState();
+            if (state == "replay") QuitReplay();   // no-op if the countdown already did
             if (state == "ingame")
             {
                 Abort("The match launched while this game was in a match or a replay.", "in a game");
@@ -560,6 +618,12 @@ namespace SanctuaryHud
                 }
                 return;
             }
+            if (state == "replay")
+            {
+                Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: closing the replay...", 120f);
+                SetPhase(Phase.Leaving);
+                return;
+            }
             StartLobby(m, isHost);
         }
 
@@ -567,6 +631,7 @@ namespace SanctuaryHud
         // Runs from the menu, either straight away or once Leaving is done.
         private void StartLobby(MmMatch m, bool isHost)
         {
+            ForgetReplayQuit();
             var me = LocalSteamId;
             var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
             Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: {(isHost ? "creating the lobby" : "waiting for the host's lobby")}...", 120f);
@@ -695,7 +760,18 @@ namespace SanctuaryHud
             switch (_phase)
             {
                 case Phase.Leaving:
-                    if (!LobbyManager.IsInLobby) StartLobby(m, m.Host == me);
+                    if (_leavingReplay)
+                    {
+                        // Give the fresh menu a second to settle before
+                        // asking it for a lobby.
+                        if (MenuIsBack())
+                        {
+                            if (_menuBackSince < 0) _menuBackSince = now;
+                            else if (now - _menuBackSince >= 1f) StartLobby(m, m.Host == me);
+                        }
+                        else if (now - _leaveRequestedAt > Limit(30f)) Abort("The replay didn't close in time.", "stuck in replay");
+                    }
+                    else if (!LobbyManager.IsInLobby) StartLobby(m, m.Host == me);
                     else if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby)
                     {
                         Abort("Your lobby started its game before this one could leave it.", "loading a game");
@@ -854,6 +930,7 @@ namespace SanctuaryHud
                 catch (Exception e) { Logger.LogWarning($"Matchmaking: leaving the lobby failed: {e.Message}"); }
             }
             _lobbyIsOurs = false;
+            ForgetReplayQuit();
             Logger.LogInfo($"Matchmaking: {message}");
             Overlay("MATCH NOT LAUNCHED", message + " You can host a game manually from the site's instructions.", 40f);
             SetPhase(Phase.Idle);
