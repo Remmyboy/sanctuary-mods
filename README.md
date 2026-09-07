@@ -20,7 +20,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.7.0) | Economy strip in the game's own style, optionally replacing the built-in bars, plus the commander widget |
+| [SanctuaryHud](SanctuaryHud/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.7.1) | Economy strip in the game's own style, optionally replacing the built-in bars, plus the commander widget |
 | [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |

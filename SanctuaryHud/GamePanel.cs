@@ -4,6 +4,7 @@ using System.Linq;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace SanctuaryHud
 {
@@ -135,10 +136,11 @@ namespace SanctuaryHud
             _appliedTo = panel;
             try
             {
-                var groups = Groups(panel, out var keep);
-                if (groups == null) return;
-                foreach (var group in groups) HideGroup(group, keep, panel.transform);
-                log?.LogInfo($"Built-in economy readouts hidden ({_hidden.Count} object(s)).");
+                var keep = Keep(panel);
+                if (keep == null) return;
+                HideAllBut(panel.transform, keep);
+                log?.LogInfo($"Built-in economy panel hidden ({_hidden.Count} object(s)), keeping {keep.Count} control(s):");
+                DumpSubtree(panel.transform, 0, log);
             }
             catch (Exception e)
             {
@@ -156,42 +158,49 @@ namespace SanctuaryHud
             _appliedTo = null;
         }
 
-        private static List<List<Transform>> Groups(Component panel, out List<Transform> keep)
+        // What survives: the panel's controls. The menu and pause buttons the
+        // panel names, plus every other clickable in it (the help button is
+        // not a field) and the version text.
+        private static List<Transform> Keep(Component panel)
         {
-            keep = null;
             if (!(panel is EconomyPanelUI eco)) return null;
-            keep = new Component[] { eco.menuBtn, eco.pauseBtn, eco.versionText, eco.itemContainer }
+            var keep = new Component[] { eco.menuBtn, eco.pauseBtn, eco.versionText }
                 .Where(c => c != null).Select(c => c.transform).ToList();
-            return new List<List<Transform>>
+            foreach (var selectable in panel.GetComponentsInChildren<Selectable>(true))
             {
-                Members(eco.alloyBar, eco.alloyNet, eco.alloyStorageMax, eco.alloyStorageValue,
-                        eco.alloyGeneratedIncome, eco.alloyExpense, eco.alloyHarvestIncome, eco.alloyHarvestTotal),
-                Members(eco.energyBar, eco.energyNet, eco.energyStorageMax, eco.energyStorageValue,
-                        eco.energyGeneneratedIncome, eco.energyExpense, eco.energyHarvestIncome, eco.energyHarvestTotal),
-            };
+                if (selectable != null && !keep.Contains(selectable.transform)) keep.Add(selectable.transform);
+            }
+            return keep;
         }
 
-        private static List<Transform> Members(params Component[] parts) =>
-            parts.Where(p => p != null).Select(p => p.transform).Distinct().ToList();
-
-        // Hide the smallest ancestor holding the whole group (the resource's
-        // block, frame and all) unless it would take the menu buttons or the
-        // panel root with it, in which case hide the elements one by one and
-        // leave the frame.
-        private static void HideGroup(List<Transform> members, List<Transform> keep, Transform root)
+        // Hide everything in the panel that holds no control: walk top-down
+        // and switch off the highest node on every branch that leads to no
+        // kept item. That takes the gauges, their ring art, labels and the
+        // frame with them, and leaves the buttons with whatever they sit on.
+        // (Hiding just the readout elements left the empty dials around
+        // them, which was the worse look.)
+        private static void HideAllBut(Transform node, List<Transform> keep)
         {
-            if (members.Count == 0) return;
-
-            var lca = members[0];
-            while (lca != null && lca != root && !members.All(m => m.IsChildOf(lca))) lca = lca.parent;
-
-            var safe = lca != null && lca != root && !keep.Any(k => k.IsChildOf(lca));
-            if (safe)
+            for (var i = 0; i < node.childCount; i++)
             {
-                Hide(lca.gameObject);
-                return;
+                var child = node.GetChild(i);
+                if (keep.Any(k => k == child)) continue;
+                if (keep.Any(k => k.IsChildOf(child))) HideAllBut(child, keep);
+                else Hide(child.gameObject);
             }
-            foreach (var m in members) Hide(m.gameObject);
+        }
+
+        /// The panel's tree, once, into the log: what got hidden and what
+        /// stayed, so the next tweak to this rule has something to go on.
+        private static void DumpSubtree(Transform node, int depth, BepInEx.Logging.ManualLogSource log)
+        {
+            if (depth > 8) return;
+            var components = string.Join(",", node.GetComponents<Component>()
+                .Where(c => c != null).Select(c => c.GetType().Name)
+                .Where(n => n != "RectTransform" && n != "CanvasRenderer"));
+            log?.LogInfo($"  {new string(' ', depth * 2)}{node.name}{(node.gameObject.activeSelf ? "" : " (hidden)")} {{{components}}}");
+            if (!node.gameObject.activeSelf) return;
+            for (var i = 0; i < node.childCount; i++) DumpSubtree(node.GetChild(i), depth + 1, log);
         }
 
         private static void Hide(GameObject go)
