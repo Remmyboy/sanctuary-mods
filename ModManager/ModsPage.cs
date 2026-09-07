@@ -57,6 +57,11 @@ namespace SanctuaryHud
         // Per-plugin settings group, so toggling one plugin rebuilds only its
         // own rows and the switch just clicked keeps its animation.
         private readonly Dictionary<string, Transform> _pluginGroups = new Dictionary<string, Transform>();
+        private readonly Dictionary<string, TMP_Text> _sectionLabels = new Dictionary<string, TMP_Text>();
+
+        // Mods whose settings are unfolded; everything starts folded so the
+        // tab is one row per mod until you open the one you want.
+        private readonly HashSet<string> _expanded = new HashSet<string>();
 
         public ModsPage(ModManagerPlugin owner, BepInEx.Logging.ManualLogSource log)
         {
@@ -528,6 +533,45 @@ namespace SanctuaryHud
             Place(go, list);
         }
 
+        /// A mod's section header: the switch row restyled as a heading,
+        /// with the on/off switch inline and the rest of the row a button
+        /// that folds the mod's settings away or back. The switch is a
+        /// child button, so a click on it does not reach the row.
+        private TMP_Text SectionRow(Transform list, string name, bool isOn, bool expanded,
+            Action<bool> onChanged, Func<bool> onToggleExpand)
+        {
+            var go = Spawn(_tSwitchRow);
+            go.name = "Section " + name;
+            var text = go.transform.Find("Text");
+            var tmp = text.GetComponent<TMP_Text>();
+            tmp.fontSize *= 1.25f;
+            var um = text.GetComponent<UIManagerText>();
+            if (um != null) um.fontType = UIManagerText.FontType.Semibold;
+            else tmp.fontStyle = FontStyles.Bold;
+            tmp.text = SectionLabel(name, expanded);
+
+            var sw = go.transform.Find("Switch").GetComponent<SwitchManager>();
+            sw.isOn = isOn;
+            sw.isInteractable = true;
+            sw.onValueChanged.AddListener(v => onChanged(v));
+
+            // An invisible graphic on the row itself makes it a click target.
+            if (go.GetComponent<Graphic>() == null)
+            {
+                var hit = go.AddComponent<Image>();
+                hit.color = Color.clear;
+                hit.raycastTarget = true;
+            }
+            var btn = go.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None;
+            btn.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
+            Place(go, list);
+            return tmp;
+        }
+
+        private static string SectionLabel(string name, bool expanded) =>
+            (expanded ? "<alpha=#80>-</alpha>  " : "<alpha=#80>+</alpha>  ") + name;
+
         /// A switch row without the switch: a label with an optional value
         /// on the right.
         private void InfoRow(Transform list, string label, string value = null)
@@ -601,8 +645,8 @@ namespace SanctuaryHud
             _pluginSignature = PluginSignature();
             Clear(_uiList);
             _pluginGroups.Clear();
+            _sectionLabels.Clear();
 
-            Heading(_uiList, "UI mods can be switched on and off freely, even mid-match");
             if (_owner.Plugins.Count == 0)
             {
                 InfoRow(_uiList, "No UI mods loaded");
@@ -616,11 +660,22 @@ namespace SanctuaryHud
                 if (!first) Line(_uiList);
                 first = false;
                 var p = plugin;
-                SwitchRow(_uiList, p.Name, p.Enabled, true, on =>
-                {
-                    _owner.SetPluginEnabled(p, on);
-                    RebuildPluginGroup(p);
-                });
+                _sectionLabels[p.Guid] = SectionRow(_uiList, p.Name, p.Enabled, _expanded.Contains(p.Guid),
+                    on =>
+                    {
+                        _owner.SetPluginEnabled(p, on);
+                        // Switching a mod on is the moment its settings are
+                        // wanted; off, and there is nothing left to show.
+                        if (on) _expanded.Add(p.Guid); else _expanded.Remove(p.Guid);
+                        RebuildPluginGroup(p);
+                    },
+                    () =>
+                    {
+                        if (!_expanded.Add(p.Guid)) _expanded.Remove(p.Guid);
+                        var expanded = _expanded.Contains(p.Guid);
+                        if (_pluginGroups.TryGetValue(p.Guid, out var g) && g != null) g.gameObject.SetActive(expanded);
+                        return expanded;
+                    });
 
                 var group = new GameObject("Settings " + p.Guid, typeof(RectTransform)).transform;
                 var vl = group.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -632,6 +687,7 @@ namespace SanctuaryHud
                 var fit = group.gameObject.AddComponent<ContentSizeFitter>();
                 fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
                 group.SetParent(_uiList, false);
+                group.gameObject.SetActive(_expanded.Contains(p.Guid));
                 _pluginGroups[p.Guid] = group;
                 FillPluginGroup(p, group);
             }
@@ -643,6 +699,9 @@ namespace SanctuaryHud
             if (!_pluginGroups.TryGetValue(plugin.Guid, out var group) || group == null) { RebuildUiTab(); return; }
             Clear(group);
             FillPluginGroup(plugin, group);
+            group.gameObject.SetActive(_expanded.Contains(plugin.Guid));
+            if (_sectionLabels.TryGetValue(plugin.Guid, out var label) && label != null)
+                label.text = SectionLabel(plugin.Name, _expanded.Contains(plugin.Guid));
             _pluginSignature = PluginSignature();
         }
 

@@ -576,13 +576,15 @@ they desync mid-game), and toggling is blocked while in a lobby or match. A
 sample mod, `SanctuaryMods\ExamplePinkArmy`, turns army slot 1 hot pink as a
 smoke test (safe to delete).
 
-**UI mods** — the DLLs, every mod in this repo — are listed with toggles: off
+**UI mods** — the DLLs, every mod in this repo — each get a section headed
+by the mod's name with its on/off switch inline. Sections start folded, one
+row per mod; clicking a header unfolds that mod's settings beneath it. Off
 destroys the plugin component (its `OnDestroy` unpatches Harmony, so it is a
 genuine unload) and on adds it back. They never enter the Lua hash, so they
 are safe to flip any time, even mid-match, and the disabled set persists
 across restarts.
 
-Each loaded mod's settings follow its row — panel positions, the commander
+Each loaded mod's settings sit in its section — panel positions, the commander
 zoom factor, `AssistStartsUpgrade`, hotkeys, anything a mod binds. The list
 is read from the mod's BepInEx `ConfigFile`, so a mod's settings appear here
 simply by being bound, with no work in the manager. Booleans get the game's
