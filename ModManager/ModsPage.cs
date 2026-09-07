@@ -555,10 +555,11 @@ namespace SanctuaryHud
             sw.isInteractable = true;
             sw.onValueChanged.AddListener(v => onChanged(v));
 
-            // The click target: the row's own Button if the game gave it
-            // one, else a Button on the label (which spans the row bar the
-            // switch). A Selectable already on the row makes AddComponent
-            // hand back null, hence the fallback.
+            // The click target: the row's own Button. The game wires its
+            // inspector onClick to flip the switch (click anywhere on a
+            // settings row), so the event is replaced wholesale, persistent
+            // listeners included, and the row folds instead. The switch
+            // itself still toggles through its own pointer handler.
             var btn = go.GetComponent<Button>();
             if (btn == null)
             {
@@ -568,6 +569,7 @@ namespace SanctuaryHud
             if (btn != null)
             {
                 btn.transition = Selectable.Transition.None;
+                btn.onClick = new Button.ButtonClickedEvent();
                 btn.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
             }
             else _log.LogWarning($"Section '{name}': no click target could be added ({string.Join(", ", go.GetComponents<Component>().Select(c => c.GetType().Name))}).");
@@ -576,7 +578,7 @@ namespace SanctuaryHud
         }
 
         private static string SectionLabel(string name, bool expanded) =>
-            (expanded ? "<alpha=#80>-</alpha>  " : "<alpha=#80>+</alpha>  ") + name;
+            (expanded ? "-  " : "+  ") + name; // TMP has no closing alpha tag, so no dimming here
 
         /// A switch row without the switch: a label with an optional value
         /// on the right.
@@ -780,7 +782,7 @@ namespace SanctuaryHud
             {
                 var m = mod;
                 var files = $"{m.LuaCount} lua" + (m.SantpCount > 0 ? $", {m.SantpCount} santp — not hash-checked" : "");
-                SwitchRow(_luaList, $"{m.Name}   <alpha=#80>{files}</alpha>", m.Enabled, !locked, on =>
+                SwitchRow(_luaList, $"{m.Name}   <alpha=#80>{files}", m.Enabled, !locked, on =>
                 {
                     _owner.SetModEnabled(m, on);
                     RebuildLuaTab();
