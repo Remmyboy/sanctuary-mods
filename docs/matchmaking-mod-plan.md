@@ -31,14 +31,22 @@ Lives in the existing `LadderReporter` project (renamed in the README to
 
 ## Behaviour
 
-### Session and heartbeat
+### Session and the local bridge
 
-- On load, and whenever a call returns `401`: mint a ticket (existing code),
-  `POST /api/mm/session`, keep the token.
-- Every 5 s while the game runs: `POST /api/mm/heartbeat` with the state,
-  derived from what the mod can see — `menu` (no lobby, no match), `lobby`
-  (`LobbyManager.IsInLobby`), `loading` / `ingame` (client engine
-  initialised; `InMatch` once the economy stream is flowing).
+> Since 0.3.0 the 5 s heartbeat is gone. The mod listens on
+> `127.0.0.1:27555` (`LocalBridge.cs`) and the SanctuaryDB page in the
+> player's browser reads `GET /status` and pushes the match object with
+> `POST /match`; the page relays the state to the site inside its own
+> polls. Full design: `docs/local-bridge.md` in the site repo. The rest of
+> this section describes the original heartbeat for the record.
+
+- When the first real match is pushed, and whenever a call returns `401`:
+  mint a ticket (existing code), `POST /api/mm/session`, keep the token.
+  It is only used for the session id, events and the result report.
+- The state the page reads is derived from what the mod can see — `menu`
+  (no lobby, no match), `lobby` (`LobbyManager.IsInLobby`), `loading` /
+  `ingame` (client engine initialised; `InMatch` once the economy stream
+  is flowing).
 - The game already runs with `Application.runInBackground = true` (checked
   on 2026-09-03 from a running playtest build), so a minimised or unfocused
   game keeps polling with no help from the mod. The mod asserts it anyway
@@ -46,7 +54,7 @@ Lives in the existing `LadderReporter` project (renamed in the README to
 
 ### Launch state machine
 
-Driven entirely by the `match` object in the heartbeat response. The site
+Driven entirely by the `match` object the page pushes (`POST /match`). The site
 owns the countdown and the cancel, and decides the mode when it pairs: the
 mod acts only on `mode: auto` with `status: launch`. A `manual` match is
 today's flow; the mod's only job there is the result report, plus an
@@ -68,7 +76,7 @@ Launching (host):
      CanStartGame(): RequestStartGame(); event started
 Launching (joiner):
   1. restore/focus the game window
-  2. wait for match.sessionId (comes via the heartbeat)
+  2. wait for match.sessionId (comes with the page's next push)
   3. JoinSessionFromInvite(sessionId); event joined when IsInLobby
   4. SetMemberFaction / SetMemberArmyID(slots[me]) / SetMemberIsReady(true)
   5. the host starts; the loading screen follows
@@ -79,7 +87,7 @@ Abort: leave the lobby if in one, show the reason in the overlay with a
 
 Local timeouts mirror the site's (lobby creation 20 s, joiner arrival 30 s,
 start 60 s); on expiry the mod posts `failed` with a detail and aborts, so
-both sides converge even if one heartbeat is late.
+both sides converge even if one push is late.
 
 Guards before acting on `launch`: the map file exists under the game
 install (else `failed: map missing`), the faction and slot are valid, and
@@ -109,14 +117,16 @@ so the site can close the match and tie the result to it.
 
 ### Config
 
-`Matchmaking.Enabled` (default on), `Endpoint` base URL (shared with
-reporting), `HeartbeatSeconds` (5). All editable from the F8 window like
-every other setting.
+`Matchmaking.Enabled` (default on), `BaseUrl` (the site), `LocalPort`
+(27555, the loopback port the page talks to), `DevOrigins` (extra web
+origins allowed to talk to the mod, for a site dev server). All editable
+from the F8 window like every other setting.
 
 ## Testing without the site
 
 A `Matchmaking.MockFile` setting: when set, the mod reads the match object
-from that JSON file instead of the heartbeat. Two people with the game open
+from that JSON file every 5 s in place of what the page would push (a
+`POST /match` is refused with 409 while it is set). Two people with the game open
 can then test the whole launch flow (one file says `host`, the other
 `joiner`; the joiner's file is edited to add the `sessionId` the host logs).
 It's also how I'll test the host half alone against a friend's manual join.
