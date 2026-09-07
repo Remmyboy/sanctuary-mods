@@ -37,7 +37,7 @@ namespace SanctuaryHud
     // ladder's shape. Skirmish vs AI, LAN, observers and team games are
     // recognised and left alone. The server ignores reports for games that
     // aren't an open ladder match, so playing unranked with a friend is fine.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.2.3")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.3.0")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -169,7 +169,7 @@ namespace SanctuaryHud
         private void Update()
         {
             // Matchmaking first and on its own: a fault in the shared HUD
-            // polling must not starve the heartbeat, or vice versa.
+            // polling must not starve the launch state machine, or vice versa.
             try { UpdateMatchmaking(); }
             catch (Exception e)
             {

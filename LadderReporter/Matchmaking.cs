@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using BepInEx.Configuration;
 using EM.Core;
+using EM.DOTS.Engine.Loader;
 using EM.Network;
 using EM.Network.Lobby;
 using EM.UI;
@@ -23,38 +24,43 @@ namespace SanctuaryHud
 {
     // Ladder matchmaking: the in-game half of "queue on the site, get launched
     // into the game". The site pairs players, picks the map, factions, slots
-    // and host, and runs the countdown; this side heartbeats so the site knows
-    // the game is open, and when a match reaches `launch` it creates or joins
-    // the lobby, sets its own seat, and (as host) starts the game — no lobby
-    // interaction from either player. Nobody is required to have this: the
-    // site only picks the auto path when both sides are heartbeating.
+    // and host, and runs the countdown; when a match reaches `launch` this
+    // side creates or joins the lobby, sets its own seat, and (as host)
+    // starts the game — no lobby interaction from either player. Nobody is
+    // required to have this: the site only picks the auto path when both
+    // sides have the game open in the menu with the mod.
     //
-    // Everything here is driven by the match object the heartbeat returns
-    // (see docs/matchmaking-site-plan.md). A local timeout mirrors each of
-    // the site's, so both sides converge even when a heartbeat is late.
+    // The site never calls the mod: the SanctuaryDB page in the player's
+    // browser does, over the loopback listener in LocalBridge.cs. The page
+    // reads the game's state there and relays it inside the polls it already
+    // makes, and hands the match object over when there is one. Everything
+    // here is driven by that match object (see docs/matchmaking-site-plan.md
+    // and the site's docs/local-bridge.md). A local timeout mirrors each of
+    // the site's, so both sides converge even when a push is late. The only
+    // calls the mod makes to the site itself are the rare ones that carry a
+    // bearer token: the session id, progress events and the result report.
     public partial class LadderReporterPlugin
     {
-        private const string ModVersion = "0.2.3";
+        private const string ModVersion = "0.3.0";
 
         private ConfigEntry<bool> _cfgMmEnabled;
         private ConfigEntry<string> _cfgMmBaseUrl;
-        private ConfigEntry<float> _cfgMmHeartbeat;
         private ConfigEntry<string> _cfgMmMockFile;
 
         // Session with the site: one Steam ticket becomes a bearer token.
+        // Minted lazily, when the first real match arrives, so a player who
+        // never queues never asks Steam for a ticket.
         private string _mmToken;
         private bool _mmSessionInFlight;
         private float _mmNextSessionTry;
 
-        // Heartbeat.
-        private float _mmHbAccum;
-        private bool _mmHbInFlight;
-        private bool _mmQueued;
-        private string _mmLastHbError;
-        private float _mmLastHbErrorAt = -999f;
+        private string _mmLastHttpError;
+        private float _mmLastHttpErrorAt = -999f;
+        private float _mockAccum;
+        private float _cfgReloadAccum;
 
         // The match being acted on.
-        private enum Phase { Idle, HostCreating, HostWaiting, JoinerWaiting, JoinerJoining, JoinerInLobby, Started }
+        private enum Phase { Idle, Leaving, HostCreating, HostWaiting, JoinerWaiting, JoinerJoining, JoinerInLobby, Started }
         private Phase _phase = Phase.Idle;
         private MmMatch _match;
         private float _phaseSince;
@@ -71,7 +77,6 @@ namespace SanctuaryHud
         private float _overlayUntil;
 
         private bool _runInBackgroundWas;
-        private int _cfgReloadAccum;
 
         // Mock testing is two people coordinating by hand, so every wait
         // stretches to ten minutes there; the live limits mirror the site's.
@@ -118,16 +123,16 @@ namespace SanctuaryHud
         private void AwakeMatchmaking()
         {
             _cfgMmEnabled = Config.Bind("Matchmaking", "Enabled", true,
-                "Let the ladder launch you straight into a matchmade game. While the game is open in the main " +
-                "menu the mod tells the site so; when both players in a match have it, the site counts down and " +
-                "the mods create and join the lobby and start the game. Nothing changes for players without it.");
+                "Let the ladder launch you straight into a matchmade game. The SanctuaryDB page in your browser " +
+                "sees that the game is open in the main menu; when both players in a match have it, the site " +
+                "counts down and the mods create and join the lobby and start the game. Nothing changes for " +
+                "players without it.");
             _cfgMmBaseUrl = Config.Bind("Matchmaking", "BaseUrl", "https://www.sanctuarydb.net",
                 "The ladder site. Endpoints are under /api/mm/.");
-            _cfgMmHeartbeat = Config.Bind("Matchmaking", "HeartbeatSeconds", 5f,
-                "How often to tell the site the game is open (and to check for a match).");
             _cfgMmMockFile = Config.Bind("Matchmaking", "MockFile", "",
-                "For testing without the site: a JSON file holding the match object. Read instead of the " +
-                "heartbeat; session and event posts are logged, not sent.");
+                "For testing without the site: a JSON file holding the match object. Read every few seconds " +
+                "in place of what the page would push; session and event posts are logged, not sent.");
+            AwakeBridge();
 
             // The game already runs in the background (checked on the playtest
             // build), so a minimised window keeps polling; assert it anyway
@@ -164,6 +169,7 @@ namespace SanctuaryHud
 
         private void DestroyMatchmaking()
         {
+            StopBridge();
             LobbyManager.OnLobbyCreated -= OnMmLobbyCreated;
             LobbyManager.OnKicked -= OnMmKicked;
             _mmHarmony?.UnpatchSelf();
@@ -186,23 +192,51 @@ namespace SanctuaryHud
 
         private void UpdateMatchmaking()
         {
-            if (_cfgMmEnabled == null || !_cfgMmEnabled.Value) return;
+            if (_cfgMmEnabled == null) return;
             var dt = Time.unscaledDeltaTime;
 
-            _mmHbAccum += dt;
-            if (_mmHbAccum >= Mathf.Max(2f, _cfgMmHeartbeat.Value))
+            // Re-read the config file so a tester without the F8 window can
+            // set MockFile (or flip Enabled) by editing it, no restart.
+            _cfgReloadAccum += dt;
+            if (_cfgReloadAccum >= 15f)
             {
-                _mmHbAccum = 0f;
-                // Re-read the config file so a tester without the F8 window
-                // can set MockFile (or flip Enabled) by editing it, no restart.
-                _cfgReloadAccum += 1;
-                if (_cfgReloadAccum >= 3)
-                {
-                    _cfgReloadAccum = 0;
-                    try { Config.Reload(); } catch { }
-                }
-                Heartbeat();
+                _cfgReloadAccum = 0f;
+                try { Config.Reload(); } catch { }
             }
+
+            // The listener starts and stops with the Enabled flag, so this
+            // runs even while disabled; everything below it doesn't.
+            UpdateBridge();
+            if (!_cfgMmEnabled.Value) return;
+
+            if (MockMode)
+            {
+                _mockAccum += dt;
+                if (_mockAccum >= 5f)
+                {
+                    _mockAccum = 0f;
+                    try { ApplyMatch(ReadMock()); }
+                    catch (Exception e) { Logger.LogWarning($"Matchmaking (mock): {e.Message}"); }
+                }
+            }
+            else if (_mmToken == null && NeedsSession(_match))
+            {
+                // An auto match is on and the site posts (session id,
+                // events) need the token; keep asking until it comes.
+                // EnsureSession throttles itself.
+                if (UsingSteam) EnsureSession();
+                else if (!_loggedNoSteam)
+                {
+                    _loggedNoSteam = true;
+                    Logger.LogWarning("Matchmaking: a match arrived but Steam isn't up (backend " +
+                                      $"{LobbyManager.Backend?.GetType().Name ?? "none"}, initialised {SteamManager.IsSteamInitialized}).");
+                }
+            }
+
+            // A replay closed for a countdown that never became a launch
+            // (cancelled, or the pair went manual): stop reporting on its
+            // behalf once the menu has had ample time to come back.
+            if (_leavingReplay && _phase == Phase.Idle && Time.realtimeSinceStartup - _leaveRequestedAt > 60f) ForgetReplayQuit();
 
             if (_phase != Phase.Idle)
             {
@@ -227,50 +261,63 @@ namespace SanctuaryHud
 
         private bool MockMode => !string.IsNullOrWhiteSpace(_cfgMmMockFile.Value);
 
-        // What the site needs to know about where we are. Only `menu` is
-        // launchable.
+        // What the site needs to know about where we are: menu, lobby,
+        // loading, ingame or replay. The site decides which of those it will
+        // launch into; this side can launch from menu, lobby (leaving it) and
+        // replay (closing it).
         private string CurrentState()
         {
             // Watching a replay looks like a match to the economy signal and
-            // like the menu when it's paused; it is neither, and never
-            // launchable.
-            // The site accepts only the four states below, and none but
-            // `menu` is launchable, so a replay reports as in a game.
-            if (NetworkManager.IsReplayPlayback) return "ingame";
+            // like the menu when it's paused; it is neither.
+            if (NetworkManager.IsReplayPlayback) return "replay";
+            // A replay this side is closing for a match: the scene reload
+            // and the economy signal's five-second tail would read as a
+            // game, and the menu is back as soon as the new UI is up.
+            if (_leavingReplay) return MenuIsBack() ? "menu" : "replay";
             if (InMatch) return "ingame";
             if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby && LobbyManager.IsInLobby) return "loading";
             if (LobbyManager.IsInLobby) return "lobby";
             return "menu";
         }
 
-        // ---- session + heartbeat ---------------------------------------------
+        // ---- leaving a replay --------------------------------------------------
 
-        private void Heartbeat()
+        // A replay gives way to a match (nothing is lost by closing one).
+        // The game's own quit path tears it down and reloads the menu scene,
+        // which brings a fresh InterfaceManager; that instance appearing is
+        // how "the menu is back" is known. No dependency on ReplayManager:
+        // the flag is the engine loader's.
+        private bool _leavingReplay;
+        private InterfaceManager _leaveOldUi;
+        private float _leaveRequestedAt;
+        private float _menuBackSince = -1f;
+
+        private void QuitReplay()
         {
-            if (MockMode)
-            {
-                try { ApplyMatch(ReadMock()); }
-                catch (Exception e) { Logger.LogWarning($"Matchmaking (mock): {e.Message}"); }
-                return;
-            }
-            if (!UsingSteam)
-            {
-                if (!_loggedNoSteam)
-                {
-                    _loggedNoSteam = true;
-                    Logger.LogWarning("Matchmaking: waiting for Steam (backend " +
-                                      $"{LobbyManager.Backend?.GetType().Name ?? "none"}, initialised {SteamManager.IsSteamInitialized}).");
-                }
-                return;
-            }
-            if (_mmHbInFlight) return;
-            if (_mmToken == null)
-            {
-                EnsureSession();
-                return;
-            }
-            StartCoroutine(HeartbeatRoutine());
+            if (_leavingReplay) return;
+            Logger.LogInfo("Matchmaking: closing the replay for the ladder match.");
+            _leavingReplay = true;
+            _leaveOldUi = InterfaceManager.Instance;
+            _leaveRequestedAt = Time.realtimeSinceStartup;
+            _menuBackSince = -1f;
+            EngineLoader.isGameRestartRequested = true;
         }
+
+        private bool MenuIsBack()
+        {
+            if (NetworkManager.IsReplayPlayback || LobbyManager.IsInLobby) return false;
+            var ui = InterfaceManager.Instance;
+            return ui != null && ui != _leaveOldUi && EngineLoader.Instance != null;
+        }
+
+        private void ForgetReplayQuit()
+        {
+            _leavingReplay = false;
+            _leaveOldUi = null;
+            _menuBackSince = -1f;
+        }
+
+        // ---- session ---------------------------------------------------------
 
         private bool _loggedNoSteam;
         private float _mmSessionStarted;
@@ -335,73 +382,19 @@ namespace SanctuaryHud
             req.Dispose();
         }
 
-        private string _lastSentState;
-        private float _slowestHb;
         private string _loggedMatchKey;
 
-        private IEnumerator HeartbeatRoutine()
+        // The page pushes the same match every few seconds; one line per
+        // change of id, status or mode is enough to follow a launch in the log.
+        private void LogMatchOnce(MmMatch match)
         {
-            _mmHbInFlight = true;
-            var state = CurrentState();
-            if (state != _lastSentState)
-            {
-                Logger.LogInfo($"Matchmaking: state {_lastSentState ?? "(none)"} -> {state}");
-                _lastSentState = state;
-            }
-            var body = new JObject
-            {
-                ["state"] = state,
-                ["gameVersion"] = Application.version,
-                ["modVersion"] = ModVersion,
-            };
-            var started = Time.realtimeSinceStartup;
-            var req = Post("/api/mm/heartbeat", body, _mmToken);
-            yield return req.SendWebRequest();
-            _mmHbInFlight = false;
-            var took = Time.realtimeSinceStartup - started;
-            // The site treats a heartbeat older than 15 s as gone; say when
-            // the round trip alone is eating into that.
-            if (took > 3f && took > _slowestHb)
-            {
-                _slowestHb = took;
-                Logger.LogWarning($"Matchmaking: heartbeat took {took:0.0} s (slowest so far).");
-            }
-
-            if (req.result == UnityWebRequest.Result.Success)
-            {
-                try
-                {
-                    var o = JObject.Parse(req.downloadHandler.text);
-                    _mmQueued = (bool?)o["queued"] ?? false;
-                    var match = MmMatch.Parse(o["match"] as JObject);
-                    if (match != null)
-                    {
-                        var key = match.Id + ":" + match.Status + ":" + match.Mode;
-                        if (key != _loggedMatchKey)
-                        {
-                            _loggedMatchKey = key;
-                            Logger.LogInfo($"Matchmaking: match {match.Id} mode={match.Mode} status={match.Status} " +
-                                           $"host={(match.Host == LocalSteamId ? "me" : match.Host)} " +
-                                           $"joiner={(match.Joiner == LocalSteamId ? "me" : match.Joiner)} map={match.Map} " +
-                                           $"session={match.SessionId} reason={match.Reason ?? "-"}");
-                        }
-                    }
-                    ApplyMatch(match);
-                }
-                catch (Exception e)
-                {
-                    Logger.LogWarning($"Matchmaking: heartbeat reply unreadable: {e.Message}");
-                }
-            }
-            else if ((int)req.responseCode == 401)
-            {
-                _mmToken = null;   // expired; the next heartbeat signs in again
-            }
-            else
-            {
-                LogHttp("heartbeat", req);
-            }
-            req.Dispose();
+            var key = match.Id + ":" + match.Status + ":" + match.Mode;
+            if (key == _loggedMatchKey) return;
+            _loggedMatchKey = key;
+            Logger.LogInfo($"Matchmaking: match {match.Id} mode={match.Mode} status={match.Status} " +
+                           $"host={(match.Host == LocalSteamId ? "me" : match.Host)} " +
+                           $"joiner={(match.Joiner == LocalSteamId ? "me" : match.Joiner)} map={match.Map} " +
+                           $"session={match.SessionId} reason={match.Reason ?? "-"}");
         }
 
         private UnityWebRequest Post(string path, JObject body, string token)
@@ -416,15 +409,15 @@ namespace SanctuaryHud
             return req;
         }
 
-        // Don't spam the log at heartbeat rate while the site is down.
+        // Don't repeat the same failure while the site is down.
         private void LogHttp(string what, UnityWebRequest req)
         {
             var msg = (int)req.responseCode > 0
                 ? $"{req.responseCode}: {Truncate(req.downloadHandler?.text, 160)}"
                 : req.error;
-            if (msg == _mmLastHbError && Time.realtimeSinceStartup - _mmLastHbErrorAt < 300f) return;
-            _mmLastHbError = msg;
-            _mmLastHbErrorAt = Time.realtimeSinceStartup;
+            if (msg == _mmLastHttpError && Time.realtimeSinceStartup - _mmLastHttpErrorAt < 300f) return;
+            _mmLastHttpError = msg;
+            _mmLastHttpErrorAt = Time.realtimeSinceStartup;
             Logger.LogWarning($"Matchmaking: {what} failed, {msg}");
         }
 
@@ -435,9 +428,24 @@ namespace SanctuaryHud
                 Logger.LogInfo($"Matchmaking (mock): would POST {path} {body.ToString(Newtonsoft.Json.Formatting.None)}");
                 yield break;
             }
-            if (_mmToken == null) yield break;
+            // The token is minted when the match first arrives, which is
+            // normally seconds before anything here needs it; give the Steam
+            // ticket and the session exchange a moment rather than dropping
+            // the post.
+            var waitUntil = Time.realtimeSinceStartup + 15f;
+            while (_mmToken == null && Time.realtimeSinceStartup < waitUntil)
+            {
+                if (UsingSteam) EnsureSession();
+                yield return new WaitForSecondsRealtime(0.5f);
+            }
+            if (_mmToken == null)
+            {
+                Logger.LogWarning($"Matchmaking: {what} not sent, no ladder session.");
+                yield break;
+            }
             var req = Post(path, body, _mmToken);
             yield return req.SendWebRequest();
+            if ((int)req.responseCode == 401) _mmToken = null;   // expired; the next post signs in again
             if (req.result != UnityWebRequest.Result.Success) LogHttp(what, req);
             req.Dispose();
         }
@@ -473,6 +481,7 @@ namespace SanctuaryHud
                 // The site no longer has a match for us. If we were mid-launch
                 // that's a cancel we never saw.
                 if (_phase != Phase.Idle && _phase != Phase.Started) Abort("The match was cancelled.", null);
+                if (_phase == Phase.Idle) ForgetReplayQuit();
                 _match = null;
                 return;
             }
@@ -490,9 +499,17 @@ namespace SanctuaryHud
                     _match = m;
                     if (isNew)
                     {
-                        Overlay("MATCH FOUND", m.Mode == "auto"
-                            ? $"vs {opponent} on {MapName(m.Map)}. Launching when the site's countdown ends."
-                            : $"vs {opponent}. {(isHost ? "You're hosting" : "They're hosting")}, see the site.", 20f);
+                        // A replay is closed now rather than at launch: the
+                        // scene reload takes a few seconds, and the
+                        // countdown has them to spare where the site's
+                        // lobby-creation window doesn't.
+                        var closingReplay = m.Mode == "auto" && NetworkManager.IsReplayPlayback;
+                        if (closingReplay) QuitReplay();
+                        Overlay("MATCH FOUND", m.Mode != "auto"
+                            ? $"vs {opponent}. {(isHost ? "You're hosting" : "They're hosting")}, see the site."
+                            : closingReplay
+                                ? $"vs {opponent} on {MapName(m.Map)}. Closing the replay; launching when the site's countdown ends."
+                                : $"vs {opponent} on {MapName(m.Map)}. Launching when the site's countdown ends.", 20f);
                     }
                     break;
 
@@ -532,10 +549,12 @@ namespace SanctuaryHud
                         Overlay(m.Status == "cancelled" ? "MATCH CANCELLED" : "LAUNCH FAILED",
                             string.IsNullOrEmpty(m.Reason) ? "" : m.Reason, 20f);
                     }
+                    if (_phase == Phase.Idle) ForgetReplayQuit();
                     _match = null;
                     break;
 
                 case "done":
+                    if (_phase == Phase.Idle) ForgetReplayQuit();
                     _match = null;
                     break;
             }
@@ -547,9 +566,20 @@ namespace SanctuaryHud
             _launchSince = Time.realtimeSinceStartup;
             _lobbyIsOurs = false;
 
-            if (CurrentState() != "menu")
+            // Any menu screen is fine (settings, the lobby browser, the
+            // profile page all count as `menu`). A game that is already
+            // playing or loading one is left alone; a lobby the player is
+            // sitting in is left for them, and a replay closed, below.
+            var state = CurrentState();
+            if (state == "replay") QuitReplay();   // no-op if the countdown already did
+            if (state == "ingame")
             {
-                Abort("The match launched while this game wasn't in the main menu.", "not in the main menu");
+                Abort("The match launched while this game was in a match or a replay.", "in a game");
+                return;
+            }
+            if (state == "loading")
+            {
+                Abort("The match launched while this game was loading another one.", "loading a game");
                 return;
             }
             if (!MapExists(m.Map))
@@ -565,6 +595,44 @@ namespace SanctuaryHud
             }
 
             RestoreWindow();
+            var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
+
+            if (state == "lobby")
+            {
+                // The player queued on purpose, so their current lobby gives
+                // way (as the host, that closes it for everyone in it).
+                // Leaving a Steam lobby isn't instant, and creating or
+                // joining another while it is still attached fails, so the
+                // launch continues from TickMatch once the game is out.
+                Logger.LogInfo("Matchmaking: leaving the current lobby for the ladder match.");
+                Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: leaving your current lobby...", 120f);
+                SetPhase(Phase.Leaving);
+                try
+                {
+                    LobbyManager.LeaveLobby();
+                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Main);
+                }
+                catch (Exception e)
+                {
+                    Abort("Couldn't leave your current lobby: " + e.Message, "leave failed: " + e.Message);
+                }
+                return;
+            }
+            if (state == "replay")
+            {
+                Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: closing the replay...", 120f);
+                SetPhase(Phase.Leaving);
+                return;
+            }
+            StartLobby(m, isHost);
+        }
+
+        // Host: create the lobby; joiner: wait for (or join) the host's.
+        // Runs from the menu, either straight away or once Leaving is done.
+        private void StartLobby(MmMatch m, bool isHost)
+        {
+            ForgetReplayQuit();
+            var me = LocalSteamId;
             var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
             Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: {(isHost ? "creating the lobby" : "waiting for the host's lobby")}...", 120f);
 
@@ -677,8 +745,9 @@ namespace SanctuaryHud
             var inPhase = now - _phaseSince;
             var me = LocalSteamId;
 
-            // The game left the lobby for loading: launched.
-            if (_phase != Phase.Started && _phase != Phase.Idle && LobbyManager.IsInLobby &&
+            // The game left the lobby for loading: launched. (Not while
+            // Leaving: a lobby loading then is the old one starting a game.)
+            if (_phase != Phase.Started && _phase != Phase.Idle && _phase != Phase.Leaving && LobbyManager.IsInLobby &&
                 LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby)
             {
                 PostEvent("started");
@@ -690,6 +759,26 @@ namespace SanctuaryHud
 
             switch (_phase)
             {
+                case Phase.Leaving:
+                    if (_leavingReplay)
+                    {
+                        // Give the fresh menu a second to settle before
+                        // asking it for a lobby.
+                        if (MenuIsBack())
+                        {
+                            if (_menuBackSince < 0) _menuBackSince = now;
+                            else if (now - _menuBackSince >= 1f) StartLobby(m, m.Host == me);
+                        }
+                        else if (now - _leaveRequestedAt > Limit(30f)) Abort("The replay didn't close in time.", "stuck in replay");
+                    }
+                    else if (!LobbyManager.IsInLobby) StartLobby(m, m.Host == me);
+                    else if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby)
+                    {
+                        Abort("Your lobby started its game before this one could leave it.", "loading a game");
+                    }
+                    else if (inPhase > Limit(10f)) Abort("Couldn't leave your current lobby in time.", "stuck in lobby");
+                    break;
+
                 case Phase.HostCreating:
                     if (inPhase > Limit(20f)) Abort("The lobby took too long to create.", "lobby timeout");
                     break;
@@ -841,6 +930,7 @@ namespace SanctuaryHud
                 catch (Exception e) { Logger.LogWarning($"Matchmaking: leaving the lobby failed: {e.Message}"); }
             }
             _lobbyIsOurs = false;
+            ForgetReplayQuit();
             Logger.LogInfo($"Matchmaking: {message}");
             Overlay("MATCH NOT LAUNCHED", message + " You can host a game manually from the site's instructions.", 40f);
             SetPhase(Phase.Idle);

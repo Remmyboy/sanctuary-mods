@@ -24,7 +24,7 @@ source.
 | [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
-| [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
+| [LadderReporter](LadderReporter/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.0) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.3.0) | Mods page in the menu and on F8 in a match: mod toggles, settings, Lua overlays |
@@ -362,29 +362,38 @@ players are reported; skirmish, LAN, observers and team games are recognised
 and left alone.
 
 **Matchmaking.** The site pairs queued players, picks map, factions, slots
-and host, and runs the countdown. While the game is open the mod heartbeats
-(`POST /api/mm/heartbeat`, every 5 s, with a bearer token from one Steam
-ticket) so the site knows who has the game in the main menu with the mod.
-Nobody needs the mod to queue: the site only picks the automatic path when
-*both* players are heartbeating, and falls back to today's manual hosting
-otherwise. When a match reaches `launch`:
+and host, and runs the countdown. The mod never polls the site: it listens
+on `127.0.0.1:27555` (loopback only, `Matchmaking.LocalPort`), and the
+SanctuaryDB page in the player's browser asks it every couple of seconds
+what the game is doing (`GET /status`), relays that inside the polls the
+page already makes, and hands the match object over when there is one
+(`POST /match`). Only requests from `https://www.sanctuarydb.net` (plus
+`Matchmaking.DevOrigins` for a dev server) are answered, so no other web
+page can push a match into the game; a game left open in the menu costs the
+site nothing. Nobody needs the mod to queue: the site only picks the
+automatic path when *both* players' games are seen in the main menu with
+the mod, and falls back to today's manual hosting otherwise. The mod's own
+calls to the site (session id, progress events, the result) carry a bearer
+token from one Steam ticket, minted when the first match arrives. When a
+match reaches `launch`:
 
 - the host's mod creates the lobby on the assigned map (`CreateLobby`),
   moves the UI to it, posts the session ID to the site, seats itself
   (faction, slot, ready), kicks anyone who isn't the assigned opponent, and
   starts the game as soon as the joiner is seated and ready;
-- the joiner's mod sees the session ID on its next heartbeat and joins by ID
-  through the same public entry point Steam "join game" uses
+- the joiner's mod sees the session ID on the page's next push and joins by
+  ID through the same public entry point Steam "join game" uses
   (`InterfaceManager.JoinSessionFromInvite`), then seats itself.
 
 Both bring the game window back if it's minimised or buried (a `user32`
 restore, with a taskbar flash when Windows refuses focus), post progress
 events, and mirror the site's timeouts locally so both sides converge if a
-heartbeat is late. Any failure leaves the lobby, tells the player why in a
+push is late. Any failure leaves the lobby, tells the player why in a
 small overlay, and points at manual hosting. A matchmade game's result
 report carries its `matchId` so the site can close the match.
 
-Everything the site side needs is in [docs/matchmaking-site-plan.md](docs/matchmaking-site-plan.md).
+Everything the site side needs is in [docs/matchmaking-site-plan.md](docs/matchmaking-site-plan.md)
+and the site repo's `docs/local-bridge.md`.
 To test the launch flow without the site, point `Matchmaking.MockFile` (F8
 window) at a copy of [docs/matchmaking-mock-host.json](docs/matchmaking-mock-host.json)
 or [matchmaking-mock-joiner.json](docs/matchmaking-mock-joiner.json); `"me"`
