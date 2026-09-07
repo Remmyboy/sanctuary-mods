@@ -52,7 +52,7 @@ namespace SanctuaryHud
         // lists are emptied. They sit under an inactive holder so a clone can
         // be configured before its Awake runs (Awake fires on reparenting
         // into the live list).
-        private GameObject _tHeading, _tLine, _tSpacer, _tSwitchRow, _tTextRow, _tButtonRow;
+        private GameObject _tHeading, _tLine, _tSpacer, _tSwitchRow, _tTextRow, _tButtonRow, _tSliderRow, _tSelectorRow;
 
         // Per-plugin settings group, so toggling one plugin rebuilds only its
         // own rows and the switch just clicked keeps its animation.
@@ -268,8 +268,15 @@ namespace SanctuaryHud
             _tSpacer = TakeTemplate(_uiList, "Spacer", "Spacer");
             _tTextRow = TakeTemplate(_uiList, "UI Scale", "TextRow");
             _tButtonRow = TakeTemplate(_uiList, "ApplyButton", "ButtonRow");
+            _tSelectorRow = TakeTemplate(_uiList, "Window Mode", "SelectorRow");
+            PrepareSelectorTemplate(_tSelectorRow);
             _tSwitchRow = TakeTemplate(_luaList, "EdgePanToggle", "SwitchRow");
+            // The slider row is a second copy of UI Scale, taken before the
+            // text template strips the slider out of the first.
+            _tSliderRow = Object.Instantiate(_tTextRow, _templates);
+            _tSliderRow.name = "SliderRow";
             PrepareSwitchTemplate(_tSwitchRow);
+            PrepareSliderTemplate(_tSliderRow);
             PrepareTextTemplate(_tTextRow);
             PrepareButtonTemplate(_tButtonRow);
             Clear(_uiList);
@@ -405,6 +412,67 @@ namespace SanctuaryHud
                 tmp.margin = new Vector4(12f, 0f, 12f, 0f);
                 tmp.overflowMode = TextOverflowModes.Overflow;
             }
+        }
+
+        /// The slider row stays a slider: the game's settings binding goes,
+        /// the Beam slider and its value box stay. The box is driven here
+        /// (SliderInput, which synced it to the game's own setting, goes
+        /// too), so a typed number moves the slider and vice versa.
+        private static void PrepareSliderTemplate(GameObject row)
+        {
+            Object.DestroyImmediate(row.GetComponent<SettingsDescription>());
+            Object.DestroyImmediate(row.GetComponent<SliderInputHandler>());
+            var slider = row.transform.Find("Slider");
+            var sm = slider.GetComponent<SliderManager>();
+            sm.saveValue = false;
+            sm.invokeOnEnable = false;
+            sm.useRoundValue = true;
+            sm.usePercent = false;
+            var input = slider.Find("Text Input");
+            if (input != null)
+            {
+                Object.DestroyImmediate(input.GetComponent<SliderInput>());
+                var field = input.GetComponent<TMP_InputField>();
+                field.contentType = TMP_InputField.ContentType.DecimalNumber;
+            }
+        }
+
+        /// The selector row (the game's Window Mode row: a label and a
+        /// left/right chooser, which is how the settings screen offers a
+        /// fixed list) with the game's setting binding removed. Items are
+        /// filled per row.
+        private static void PrepareSelectorTemplate(GameObject row)
+        {
+            Object.DestroyImmediate(row.GetComponent<SettingsDescription>());
+            Object.DestroyImmediate(row.GetComponent<SelectorInputHandler>());
+            var text = row.transform.Find("Text");
+            if (text != null) Object.DestroyImmediate(text.GetComponent<LocalizedObject>());
+            var selector = row.GetComponentInChildren<HorizontalSelector>(true);
+            Object.DestroyImmediate(selector.GetComponent<LocalizedObject>());
+            selector.saveSelected = false;
+            selector.invokeOnAwake = false;
+            selector.useLocalization = false;
+            selector.loopSelection = true;
+            selector.items.Clear();
+        }
+
+        /// A fixed choice: the game's own left/right selector. Options are
+        /// shown as given; `selected` is the index shown first.
+        private void SelectorRow(Transform list, string label, IList<string> options, int selected, Action<int> onChanged)
+        {
+            var go = Spawn(_tSelectorRow);
+            go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
+            var selector = go.GetComponentInChildren<HorizontalSelector>(true);
+            selector.items.Clear();
+            foreach (var o in options) selector.items.Add(new HorizontalSelector.Item { itemTitle = o });
+            selector.defaultIndex = Mathf.Clamp(selected, 0, Math.Max(0, options.Count - 1));
+            selector.index = selector.defaultIndex;
+            selector.onValueChanged.AddListener(i => onChanged(i));
+            // Awake runs on placement (the templates sit inactive) and
+            // initialises from the items above; a second pass is harmless
+            // and covers a template that was already awake.
+            Place(go, list);
+            selector.InitializeSelector();
         }
 
         private static void PrepareButtonTemplate(GameObject row)
@@ -621,6 +689,40 @@ namespace SanctuaryHud
             Place(go, list);
         }
 
+        /// A slider with a value box, for a setting that declares a range.
+        /// Whole numbers when the setting is integral; otherwise a tenth.
+        private void SliderRow(Transform list, string label, float min, float max, float value, bool whole, Action<float> onChanged)
+        {
+            var go = Spawn(_tSliderRow);
+            go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
+            var sliderT = go.transform.Find("Slider");
+            var sm = sliderT.GetComponent<SliderManager>();
+            var slider = sliderT.GetComponent<Slider>();
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.wholeNumbers = whole;
+            slider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
+            var field = sliderT.Find("Text Input")?.GetComponent<TMP_InputField>();
+            string Show(float v) => whole ? Mathf.RoundToInt(v).ToString() : v.ToString("0.#");
+            if (field != null) field.SetTextWithoutNotify(Show(slider.value));
+            sm.onValueChanged.AddListener(v =>
+            {
+                if (field != null) field.SetTextWithoutNotify(Show(v));
+                onChanged(v);
+            });
+            if (field != null)
+            {
+                field.onEndEdit.AddListener(s =>
+                {
+                    if (float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v))
+                        slider.value = Mathf.Clamp(v, min, max);   // fires the listener above, which rewrites the box
+                    else field.SetTextWithoutNotify(Show(slider.value));
+                });
+            }
+            Place(go, list);
+            sm.UpdateUI();
+        }
+
         private void ButtonRow(Transform list, string text, Action onClick)
         {
             var go = Spawn(_tButtonRow);
@@ -728,6 +830,20 @@ namespace SanctuaryHud
                 if (e.SettingType == typeof(bool))
                 {
                     SwitchRow(group, label, e.BoxedValue is bool b && b, true, v => e.BoxedValue = v);
+                }
+                else if (e.Description.AcceptableValues is AcceptableValueList<string> sl && sl.AcceptableValues.Length > 0)
+                {
+                    var options = sl.AcceptableValues;
+                    var current = Array.IndexOf(options, e.BoxedValue as string);
+                    SelectorRow(group, label, options, current < 0 ? 0 : current, i => e.BoxedValue = options[i]);
+                }
+                else if (e.Description.AcceptableValues is AcceptableValueRange<int> ir)
+                {
+                    SliderRow(group, label, ir.MinValue, ir.MaxValue, Convert.ToSingle(e.BoxedValue), true, v => e.BoxedValue = Mathf.RoundToInt(v));
+                }
+                else if (e.Description.AcceptableValues is AcceptableValueRange<float> fr)
+                {
+                    SliderRow(group, label, fr.MinValue, fr.MaxValue, Convert.ToSingle(e.BoxedValue), false, v => e.BoxedValue = v);
                 }
                 else
                 {
