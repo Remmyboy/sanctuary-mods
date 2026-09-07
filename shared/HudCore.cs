@@ -326,6 +326,13 @@ namespace SanctuaryHud
             Time.realtimeSinceStartup - _lastEcoRealtime < 5f ||
             (Time.realtimeSinceStartup - _lastEcoRealtime < 3600f && EcoPanelVisible());
 
+        /// True while the host's economy stream has gone quiet mid-match,
+        /// which is what a pause looks like from here: the postfix fires
+        /// every tick otherwise, identical values or not. Anything that
+        /// measures progress against real time should freeze while this is
+        /// set rather than read the silence as a stall.
+        internal static bool Paused => InMatch && Time.realtimeSinceStartup - _lastEcoRealtime > 0.75f;
+
         // ---- idle-builder polling (reflection over Unity.Entities) --------
 
         private static Type _iconElemType;
@@ -449,15 +456,25 @@ namespace SanctuaryHud
             if (_luaStateReady == null || !_luaStateReady()) return null;
             try
             {
+                // Exactly one focused army is a player; a replay's all-armies
+                // view marks every army focused, and an observer with no seat
+                // has none. Neither owns anything, so neither gets a colour,
+                // and everything downstream (idle rows, commander, alerts)
+                // stays quiet rather than reporting for both sides.
                 RunLua(
                     "__SdbOwn = '' " +
+                    "local own, n = nil, 0 " +
                     "for id, a in pairs(Armies or {}) do " +
-                    "  if a.focused and a.color then " +
-                    "    __SdbOwn = string.format('%f,%f,%f', a.color.x, a.color.y, a.color.z) " +
-                    "  end " +
+                    "  if a.focused and not a.civilian then n = n + 1 own = a end " +
+                    "end " +
+                    "if n == 1 and own.color then " +
+                    "  __SdbOwn = string.format('%f,%f,%f', own.color.x, own.color.y, own.color.z) " +
                     "end");
 
                 var raw = _getLuaGlobal("__SdbOwn");
+                // The client answered (possibly "nobody"): that answer stands,
+                // and the lobby-derived guess below must not overrule it.
+                _luaOwnerAnswered = raw != null;
                 if (string.IsNullOrEmpty(raw)) return null;
 
                 var parts = raw.Split(',');
@@ -489,13 +506,18 @@ namespace SanctuaryHud
         }
 
         private static bool _loggedOwnColour;
+        private static bool _luaOwnerAnswered;
 
         private static Vector4? LocalArmyColour()
         {
             // Prefer the game's own answer; the lobby-derived guess is only a
-            // fallback for when the Lua bridge isn't available.
+            // fallback for when the Lua bridge isn't available. When the
+            // client did answer and named nobody (an observer, or a replay's
+            // all-armies view) that is final: the lobby would otherwise hand
+            // back the recording player's seat and alert for them.
             var fromLua = FocusedArmyColourFromLua();
             if (fromLua != null) return fromLua;
+            if (_luaOwnerAnswered) return null;
 
             try
             {
@@ -887,23 +909,46 @@ namespace SanctuaryHud
 
                 if (_getPairedGlobalMi == null || _getHealthMi == null) return;
                 var pairedComponent = _getPairedGlobalMi.Invoke(em, new[] { entity });
-                var globalId = _pairedGlobalField.GetValue(pairedComponent);
-
-                var args = new[] { globalId, null };
-                _getHealthMi.Invoke(null, args);
-                _commanderHealth = Convert.ToSingle(args[1] ?? 0f);
-
-                if (_getMaxHealthMi != null)
-                {
-                    var maxArgs = new[] { globalId, null };
-                    _getMaxHealthMi.Invoke(null, maxArgs);
-                    _commanderMaxHealth = Convert.ToSingle(maxArgs[1] ?? 0f);
-                }
+                _commanderGlobalId = _pairedGlobalField.GetValue(pairedComponent);
+                ReadCommanderHealth(_commanderGlobalId);
             }
             catch
             {
                 // Keep the last known values rather than flickering to zero.
             }
+        }
+
+        /// The commander's sim-side id, kept so the health can be re-read
+        /// between the once-a-second ECS polls (the alerts want damage
+        /// noticed within a quarter second, not a second later).
+        private static object _commanderGlobalId;
+
+        /// Re-reads the commander's health off its cached global id. False
+        /// when there is no commander on record or the engine refuses the
+        /// id (the entity is gone); the last values are kept either way.
+        internal static bool RefreshCommanderHealth()
+        {
+            if (_commanderLocalIndex < 0 || _commanderGlobalId == null || _getHealthMi == null) return false;
+            try { return ReadCommanderHealth(_commanderGlobalId); }
+            catch { return false; }
+        }
+
+        private static bool ReadCommanderHealth(object globalId)
+        {
+            var args = new[] { globalId, null };
+            var code = _getHealthMi.Invoke(null, args);
+            // EngineErrorCode.Success is 0; anything else means the id no
+            // longer names a live entity and the value is meaningless.
+            if (code != null && Convert.ToInt32(code) != 0) return false;
+            _commanderHealth = Convert.ToSingle(args[1] ?? 0f);
+
+            if (_getMaxHealthMi != null)
+            {
+                var maxArgs = new[] { globalId, null };
+                _getMaxHealthMi.Invoke(null, maxArgs);
+                _commanderMaxHealth = Convert.ToSingle(maxArgs[1] ?? 0f);
+            }
+            return true;
         }
 
         /// Selects the commander and flies the camera to it, reusing the same
