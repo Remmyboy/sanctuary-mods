@@ -59,7 +59,7 @@ namespace SanctuaryHud
         private float _cfgReloadAccum;
 
         // The match being acted on.
-        private enum Phase { Idle, HostCreating, HostWaiting, JoinerWaiting, JoinerJoining, JoinerInLobby, Started }
+        private enum Phase { Idle, Leaving, HostCreating, HostWaiting, JoinerWaiting, JoinerJoining, JoinerInLobby, Started }
         private Phase _phase = Phase.Idle;
         private MmMatch _match;
         private float _phaseSince;
@@ -509,9 +509,19 @@ namespace SanctuaryHud
             _launchSince = Time.realtimeSinceStartup;
             _lobbyIsOurs = false;
 
-            if (CurrentState() != "menu")
+            // Any menu screen is fine (settings, the lobby browser, the
+            // profile page all count as `menu`). A game that is already
+            // playing or loading one is left alone; a lobby the player is
+            // sitting in is left for them, below.
+            var state = CurrentState();
+            if (state == "ingame")
             {
-                Abort("The match launched while this game wasn't in the main menu.", "not in the main menu");
+                Abort("The match launched while this game was in a match or a replay.", "in a game");
+                return;
+            }
+            if (state == "loading")
+            {
+                Abort("The match launched while this game was loading another one.", "loading a game");
                 return;
             }
             if (!MapExists(m.Map))
@@ -527,6 +537,37 @@ namespace SanctuaryHud
             }
 
             RestoreWindow();
+            var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
+
+            if (state == "lobby")
+            {
+                // The player queued on purpose, so their current lobby gives
+                // way (as the host, that closes it for everyone in it).
+                // Leaving a Steam lobby isn't instant, and creating or
+                // joining another while it is still attached fails, so the
+                // launch continues from TickMatch once the game is out.
+                Logger.LogInfo("Matchmaking: leaving the current lobby for the ladder match.");
+                Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: leaving your current lobby...", 120f);
+                SetPhase(Phase.Leaving);
+                try
+                {
+                    LobbyManager.LeaveLobby();
+                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Main);
+                }
+                catch (Exception e)
+                {
+                    Abort("Couldn't leave your current lobby: " + e.Message, "leave failed: " + e.Message);
+                }
+                return;
+            }
+            StartLobby(m, isHost);
+        }
+
+        // Host: create the lobby; joiner: wait for (or join) the host's.
+        // Runs from the menu, either straight away or once Leaving is done.
+        private void StartLobby(MmMatch m, bool isHost)
+        {
+            var me = LocalSteamId;
             var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
             Overlay("LAUNCHING", $"vs {opponent} on {MapName(m.Map)}: {(isHost ? "creating the lobby" : "waiting for the host's lobby")}...", 120f);
 
@@ -639,8 +680,9 @@ namespace SanctuaryHud
             var inPhase = now - _phaseSince;
             var me = LocalSteamId;
 
-            // The game left the lobby for loading: launched.
-            if (_phase != Phase.Started && _phase != Phase.Idle && LobbyManager.IsInLobby &&
+            // The game left the lobby for loading: launched. (Not while
+            // Leaving: a lobby loading then is the old one starting a game.)
+            if (_phase != Phase.Started && _phase != Phase.Idle && _phase != Phase.Leaving && LobbyManager.IsInLobby &&
                 LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby)
             {
                 PostEvent("started");
@@ -652,6 +694,15 @@ namespace SanctuaryHud
 
             switch (_phase)
             {
+                case Phase.Leaving:
+                    if (!LobbyManager.IsInLobby) StartLobby(m, m.Host == me);
+                    else if (LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby)
+                    {
+                        Abort("Your lobby started its game before this one could leave it.", "loading a game");
+                    }
+                    else if (inPhase > Limit(10f)) Abort("Couldn't leave your current lobby in time.", "stuck in lobby");
+                    break;
+
                 case Phase.HostCreating:
                     if (inPhase > Limit(20f)) Abort("The lobby took too long to create.", "lobby timeout");
                     break;

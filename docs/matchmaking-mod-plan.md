@@ -91,8 +91,12 @@ both sides converge even if one push is late.
 
 Guards before acting on `launch`: the map file exists under the game
 install (else `failed: map missing`), the faction and slot are valid, and
-the mod is in `menu`. A `launch` seen while in a lobby or game is reported
-as `failed: not in the main menu` rather than acted on.
+the game is not in a match, a replay or loading one (`failed: in a game` /
+`loading a game`). Any menu screen is fine. A `launch` seen while sitting
+in a lobby goes through a `Leaving` phase first (since 0.3.0): the mod
+leaves that lobby (as its host, that closes it), waits up to 10 s for the
+game to confirm, then continues into the host or joiner path. The site's
+launchable rule has to accept `lobby` for that to ever happen.
 
 ### Window restore
 
