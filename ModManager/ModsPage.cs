@@ -20,8 +20,10 @@ namespace SanctuaryHud
     // heading, the buttons), so it matches the game exactly and follows any
     // restyling the game does.
     //
-    // The page lives in the menu canvas, so it exists only while the front
-    // menu does; there is no in-match UI.
+    // The page lives in the menu canvas. That canvas survives into a match
+    // (the pause menu's Settings button opens the same Settings screen
+    // there), so the hotkey opens the page full-screen mid-match too, over
+    // the menu background, and closing it returns to whatever was showing.
     internal sealed class ModsPage
     {
         private const string HarmonyId = "com.sanctuarydb.modmanager.page";
@@ -40,6 +42,12 @@ namespace SanctuaryHud
         private string _pluginSignature = "";
         private bool _sidebarRegistered;
 
+        // The InterfaceManager window that was up when the page opened
+        // (Main in the front menu, None during a match), restored on close.
+        private InterfaceManager.Window _returnWindow = InterfaceManager.Window.Main;
+        private static readonly AccessTools.FieldRef<InterfaceManager, InterfaceManager.Window> CurrentWindow =
+            AccessTools.FieldRefAccess<InterfaceManager, InterfaceManager.Window>("currentWindow");
+
         // Templates lifted out of the cloned Settings screen before its
         // lists are emptied. They sit under an inactive holder so a clone can
         // be configured before its Awake runs (Awake fires on reparenting
@@ -49,6 +57,11 @@ namespace SanctuaryHud
         // Per-plugin settings group, so toggling one plugin rebuilds only its
         // own rows and the switch just clicked keeps its animation.
         private readonly Dictionary<string, Transform> _pluginGroups = new Dictionary<string, Transform>();
+        private readonly Dictionary<string, TMP_Text> _sectionLabels = new Dictionary<string, TMP_Text>();
+
+        // Mods whose settings are unfolded; everything starts folded so the
+        // tab is one row per mod until you open the one you want.
+        private readonly HashSet<string> _expanded = new HashSet<string>();
 
         public ModsPage(ModManagerPlugin owner, BepInEx.Logging.ManualLogSource log)
         {
@@ -59,14 +72,31 @@ namespace SanctuaryHud
 
         public bool IsOpen => _page != null && _page.activeSelf;
 
-        /// True while the front menu is showing (or our page is).
+        /// True while the front menu is showing, during a match, or while
+        /// our page is up. Not from the lobby, loading or Settings screens:
+        /// the page would replace them, and they are not ours to restore.
         public bool CanOpen
         {
             get
             {
                 if (IsOpen) return true;
+                if (_page == null || InterfaceManager.Instance == null) return false;
                 var mmi = MainMenuInterface.Instance;
-                return mmi != null && mmi.gameObject.activeInHierarchy && _page != null;
+                if (mmi != null && mmi.gameObject.activeInHierarchy) return true;
+                return InMatch;
+            }
+        }
+
+        /// The game hands the menu canvas over to the match by transitioning
+        /// to Window.None once the map has loaded; the in-game UI manager
+        /// only exists during a match.
+        private static bool InMatch
+        {
+            get
+            {
+                var im = InterfaceManager.Instance;
+                return im != null && CurrentWindow(im) == InterfaceManager.Window.None
+                       && SanctuaryUI.SanctuaryUIManager.Instance != null;
             }
         }
 
@@ -118,8 +148,17 @@ namespace SanctuaryHud
             if (_page == null) return;
             var im = InterfaceManager.Instance;
             if (im == null) return;
+            _returnWindow = CurrentWindow(im);
+            // Mid-match the pause menu may be up; it does the same before
+            // handing over to the Settings screen.
+            if (InMatch)
+            {
+                try { SanctuaryUI.SanctuaryUIManager.Instance.SetPanelVisibility(SanctuaryUI.UIPanelType.PauseMenu, false); }
+                catch (Exception e) { _log.LogWarning($"Could not hide the pause menu: {e.Message}"); }
+            }
             // Hides every game interface (and, via the prefix, ours) without
-            // showing another one; then ours goes on top of the background.
+            // showing another one; then ours goes on top of the background,
+            // which also covers the game when opened mid-match.
             im.TransitionTo(InterfaceManager.Window.Background);
             _page.SetActive(true);
             RebuildUiTab();
@@ -130,7 +169,7 @@ namespace SanctuaryHud
         {
             if (_page != null) _page.SetActive(false);
             var im = InterfaceManager.Instance;
-            if (im != null) im.TransitionTo(InterfaceManager.Window.Main);
+            if (im != null) im.TransitionTo(_returnWindow);
         }
 
         public void Destroy()
@@ -494,6 +533,48 @@ namespace SanctuaryHud
             Place(go, list);
         }
 
+        /// A mod's section header: the switch row restyled as a heading,
+        /// with the on/off switch inline and the rest of the row a button
+        /// that folds the mod's settings away or back. The switch is a
+        /// child button, so a click on it does not reach the row.
+        private TMP_Text SectionRow(Transform list, string name, bool isOn, bool expanded,
+            Action<bool> onChanged, Func<bool> onToggleExpand)
+        {
+            var go = Spawn(_tSwitchRow);
+            go.name = "Section " + name;
+            var text = go.transform.Find("Text");
+            var tmp = text.GetComponent<TMP_Text>();
+            tmp.fontSize *= 1.25f;
+            var um = text.GetComponent<UIManagerText>();
+            if (um != null) um.fontType = UIManagerText.FontType.Semibold;
+            else tmp.fontStyle = FontStyles.Bold;
+            tmp.text = SectionLabel(name, expanded);
+
+            var sw = go.transform.Find("Switch").GetComponent<SwitchManager>();
+            sw.isOn = isOn;
+            sw.isInteractable = true;
+            sw.onValueChanged.AddListener(v => onChanged(v));
+
+            // The click target: the row's SettingsElement, the Beam widget
+            // that takes clicks anywhere on a settings row (with hover
+            // highlight and sound). Its inspector onClick flips the switch,
+            // so the event is replaced wholesale, persistent listeners
+            // included, and the row folds instead. The switch still toggles
+            // through its own pointer handler, which the row never sees.
+            var element = go.GetComponent<SettingsElement>();
+            if (element != null)
+            {
+                element.onClick = new UnityEngine.Events.UnityEvent();
+                element.onClick.AddListener(() => tmp.text = SectionLabel(name, onToggleExpand()));
+            }
+            else _log.LogWarning($"Section '{name}': the row has no SettingsElement, so it cannot fold.");
+            Place(go, list);
+            return tmp;
+        }
+
+        private static string SectionLabel(string name, bool expanded) =>
+            (expanded ? "-  " : "+  ") + name; // TMP has no closing alpha tag, so no dimming here
+
         /// A switch row without the switch: a label with an optional value
         /// on the right.
         private void InfoRow(Transform list, string label, string value = null)
@@ -567,8 +648,8 @@ namespace SanctuaryHud
             _pluginSignature = PluginSignature();
             Clear(_uiList);
             _pluginGroups.Clear();
+            _sectionLabels.Clear();
 
-            Heading(_uiList, "UI mods can be switched on and off freely, even mid-match");
             if (_owner.Plugins.Count == 0)
             {
                 InfoRow(_uiList, "No UI mods loaded");
@@ -582,11 +663,19 @@ namespace SanctuaryHud
                 if (!first) Line(_uiList);
                 first = false;
                 var p = plugin;
-                SwitchRow(_uiList, p.Name, p.Enabled, true, on =>
-                {
-                    _owner.SetPluginEnabled(p, on);
-                    RebuildPluginGroup(p);
-                });
+                _sectionLabels[p.Guid] = SectionRow(_uiList, p.Name, p.Enabled, _expanded.Contains(p.Guid),
+                    on =>
+                    {
+                        _owner.SetPluginEnabled(p, on);
+                        RebuildPluginGroup(p);
+                    },
+                    () =>
+                    {
+                        if (!_expanded.Add(p.Guid)) _expanded.Remove(p.Guid);
+                        var expanded = _expanded.Contains(p.Guid);
+                        if (_pluginGroups.TryGetValue(p.Guid, out var g) && g != null) g.gameObject.SetActive(expanded);
+                        return expanded;
+                    });
 
                 var group = new GameObject("Settings " + p.Guid, typeof(RectTransform)).transform;
                 var vl = group.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -598,6 +687,7 @@ namespace SanctuaryHud
                 var fit = group.gameObject.AddComponent<ContentSizeFitter>();
                 fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
                 group.SetParent(_uiList, false);
+                group.gameObject.SetActive(_expanded.Contains(p.Guid));
                 _pluginGroups[p.Guid] = group;
                 FillPluginGroup(p, group);
             }
@@ -609,6 +699,9 @@ namespace SanctuaryHud
             if (!_pluginGroups.TryGetValue(plugin.Guid, out var group) || group == null) { RebuildUiTab(); return; }
             Clear(group);
             FillPluginGroup(plugin, group);
+            group.gameObject.SetActive(_expanded.Contains(plugin.Guid));
+            if (_sectionLabels.TryGetValue(plugin.Guid, out var label) && label != null)
+                label.text = SectionLabel(plugin.Name, _expanded.Contains(plugin.Guid));
             _pluginSignature = PluginSignature();
         }
 
@@ -619,7 +712,6 @@ namespace SanctuaryHud
         /// doesn't take until it parses.
         private void FillPluginGroup(ModManagerPlugin.PluginEntry plugin, Transform group)
         {
-            if (!plugin.Enabled) return;
             List<ConfigEntryBase> entries;
             try { entries = ModManagerPlugin.ConfigEntriesOf(plugin).ToList(); }
             catch (Exception e)
@@ -681,7 +773,7 @@ namespace SanctuaryHud
             {
                 var m = mod;
                 var files = $"{m.LuaCount} lua" + (m.SantpCount > 0 ? $", {m.SantpCount} santp — not hash-checked" : "");
-                SwitchRow(_luaList, $"{m.Name}   <alpha=#80>{files}</alpha>", m.Enabled, !locked, on =>
+                SwitchRow(_luaList, $"{m.Name}   <alpha=#80>{files}", m.Enabled, !locked, on =>
                 {
                     _owner.SetModEnabled(m, on);
                     RebuildLuaTab();

@@ -27,7 +27,7 @@ source.
 | [LadderReporter](LadderReporter/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.2.3) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.2.0) | Mods page in the front menu: mod toggles, settings, Lua overlays |
+| [ModManager](ModManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.3.0) | Mods page in the menu and on F8 in a match: mod toggles, settings, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
@@ -568,8 +568,10 @@ and Lua Mods. The page is the game's own Settings screen, cloned and refilled:
 the tab bar, the switch rows, the text fields (a settings slider's input box,
 widened), the headings and the buttons are all the game's Beam UI widgets, so
 it looks like the rest of the menu and follows any restyling the game does.
-It lives in the menu canvas, so there is no in-match UI; UI mod toggles and
-settings changes made in the menu apply immediately anyway.
+**F8** also opens the same page full-screen during a match (over the menu
+background, the way the pause menu's Settings does); closing it returns to
+the game. UI mod toggles and settings changes apply immediately; Lua mod
+toggles are locked until you leave the match.
 
 It manages two kinds of mods:
 
@@ -591,13 +593,15 @@ they desync mid-game), and toggling is blocked while in a lobby or match. A
 sample mod, `SanctuaryMods\ExamplePinkArmy`, turns army slot 1 hot pink as a
 smoke test (safe to delete).
 
-**UI mods** — the DLLs, every mod in this repo — are listed with toggles: off
+**UI mods** — the DLLs, every mod in this repo — each get a section headed
+by the mod's name with its on/off switch inline. Sections start folded, one
+row per mod; clicking a header unfolds that mod's settings beneath it. Off
 destroys the plugin component (its `OnDestroy` unpatches Harmony, so it is a
 genuine unload) and on adds it back. They never enter the Lua hash, so they
 are safe to flip any time, even mid-match, and the disabled set persists
 across restarts.
 
-Each loaded mod's settings follow its row — panel positions, the commander
+Each loaded mod's settings sit in its section — panel positions, the commander
 zoom factor, `AssistStartsUpgrade`, hotkeys, anything a mod binds. The list
 is read from the mod's BepInEx `ConfigFile`, so a mod's settings appear here
 simply by being bound, with no work in the manager. Booleans get the game's

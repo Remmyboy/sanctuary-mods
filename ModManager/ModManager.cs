@@ -26,7 +26,7 @@ namespace SanctuaryHud
     // Toggling is blocked while in a lobby or match: the VMs snapshot the
     // cache at match launch, and swapping content under a live session would
     // change the hash out from under the lobby's compatibility check.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.3.0")]
     public class ModManagerPlugin : BaseUnityPlugin
     {
         private static BepInEx.Logging.ManualLogSource _log;
@@ -77,6 +77,11 @@ namespace SanctuaryHud
             public string Name;
             public Type Type;
             public BaseUnityPlugin Instance;
+            // The last instance's ConfigFile, kept after it is unloaded: the
+            // entries stay bound and writes still go to the file, which the
+            // next instance reads on load, so settings are editable while
+            // the mod is off.
+            public ConfigFile Config;
             public bool Enabled => Instance != null;
         }
 
@@ -110,8 +115,8 @@ namespace SanctuaryHud
         private ConfigEntry<string> _cfgEnabled;
 
         // The UI: a "Mods" entry in the front menu's sidebar opening a page
-        // built from the game's own settings screen. It lives in the menu
-        // canvas, so there is no UI during a match.
+        // built from the game's own settings screen. The hotkey opens the
+        // same page full-screen during a match.
         private ModsPage _page;
         private string _hashVanilla = "";
         private string _hashNow = "";
@@ -123,7 +128,7 @@ namespace SanctuaryHud
         private void Awake()
         {
             _log = Logger;
-            _cfgToggleKey = Config.Bind("UI", "ToggleKey", KeyCode.F8, "Key that opens/closes the Mods page in the front menu.");
+            _cfgToggleKey = Config.Bind("UI", "ToggleKey", KeyCode.F8, "Key that opens/closes the Mods page, in the front menu or during a match.");
             _cfgEnabled = Config.Bind("Mods", "Enabled", "",
                 "Semicolon-separated mod folder names (under SanctuaryMods) applied at startup.");
             _cfgDisabledPlugins = Config.Bind("Plugins", "Disabled", "",
@@ -152,8 +157,8 @@ namespace SanctuaryHud
             catch (Exception e) { _log.LogWarning($"Mod manager restore on unload failed: {e.Message}"); }
         }
 
-        /// The hotkey: opens or closes the page while the front menu is up,
-        /// nothing elsewhere.
+        /// The hotkey: opens or closes the page from the front menu or a
+        /// match, nothing from the lobby or loading screens.
         internal void ToggleUi()
         {
             if (_page != null && _page.CanOpen) _page.Toggle();
@@ -331,15 +336,17 @@ namespace SanctuaryHud
                 }
                 entry.Type = comp.GetType();
                 entry.Instance = comp;
+                if (comp.Config != null) entry.Config = comp.Config;
                 if (applyDisabled && disabled.Contains(meta.GUID)) SetPluginEnabled(entry, false, persist: false);
             }
         }
 
-        /// Everything the mod bound, or an empty list for an unloaded mod.
+        /// Everything the mod bound: from the running instance, or from the
+        /// ConfigFile its last instance left behind while it is off.
         internal static ConfigEntryBase[] ConfigEntriesOf(PluginEntry plugin)
         {
 #pragma warning disable CS0618 // GetConfigEntries is obsolete, but the Values replacement is not in this BepInEx.
-            return plugin.Instance?.Config?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
+            return (plugin.Instance?.Config ?? plugin.Config)?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
 #pragma warning restore CS0618
         }
 
@@ -350,6 +357,7 @@ namespace SanctuaryHud
                 try
                 {
                     entry.Instance = (BaseUnityPlugin)gameObject.AddComponent(entry.Type);
+                    if (entry.Instance.Config != null) entry.Config = entry.Instance.Config;
                     _log.LogInfo($"Plugin '{entry.Name}' loaded.");
                 }
                 catch (Exception e)
