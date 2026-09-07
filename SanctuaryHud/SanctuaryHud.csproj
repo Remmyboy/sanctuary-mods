@@ -8,4 +8,14 @@
     <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The strip borrows the game's typeface from its TextMeshPro font
+         asset (see GamePanel.cs), which needs TMP on top of the shared
+         references. -->
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
 </Project>

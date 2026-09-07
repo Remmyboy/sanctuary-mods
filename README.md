@@ -20,7 +20,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.6.0) | Economy strip + commander widget |
+| [SanctuaryHud](SanctuaryHud/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.7.0) | Economy strip in the game's own style, optionally replacing the built-in bars, plus the commander widget |
 | [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
@@ -49,6 +49,23 @@ has no release of its own yet; build it from source if you need it.
   showing it would just mirror the income back at you (`+12 −12`) and hide the
   shortfall. Net stays on actual spend, since that is what really moves the
   store.
+
+  The rates are smoothed every frame on real elapsed time towards the latest
+  update, with a fixed quarter-second time constant, so the strip trails the
+  game's own panel by the same small amount at any frame rate, and income and
+  net trail it by the same amount as each other. Storage is never smoothed.
+  The strip stays up through a pause: the game's economy panel being visible
+  counts as "in a match" even while the stream is silent.
+- **Looks**: the strip takes the game's typeface (Rajdhani, off its
+  TextMeshPro asset when the build keeps the source font; Bahnschrift on
+  Windows otherwise) and the alloy/energy tints off the game's own panel, on
+  the same near-black blue with an accent-blue hairline as the front menu.
+  Numbers abbreviate exactly as the game's readouts do (`1.2K` above 999).
+- **Hide the game's own bars** (`Overlay · HideGameEconomyBars`, off by
+  default, in the Mod Manager's settings): switches off the built-in alloy
+  and energy readouts so the strip is the only economy display. The menu and
+  pause buttons that share the panel stay. They come back whenever the
+  overlay is hidden with **F10**, and when the mod unloads.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.

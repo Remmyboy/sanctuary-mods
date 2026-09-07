@@ -244,7 +244,7 @@ namespace SanctuaryHud
             _log?.LogInfo($"Economy hook: patched {patched} method(s).");
         }
 
-        internal static void EconomyValuesPostfix(object[] __args)
+        internal static void EconomyValuesPostfix(object __instance, object[] __args)
         {
             var box = __args?.FirstOrDefault(a => a != null && a.GetType().Name.Contains("UIEconomyValues"));
             if (box == null) return;
@@ -257,18 +257,74 @@ namespace SanctuaryHud
                 var v = f.GetValue(box);
                 snapshot[f.Name] = v is IConvertible c ? Convert.ToSingle(c) : 0f;
             }
-            lock (_ecoLock) _eco = snapshot;
+            lock (_ecoLock)
+            {
+                // The patch lands on both SetAlloyValues and SetEnergyValues,
+                // which the game calls back to back with the same struct, so
+                // every Lua update arrives here twice. Count it once, so a
+                // consumer smoothing per update runs at the real data rate.
+                if (!SameSnapshot(_eco, snapshot)) _ecoSequence++;
+                _eco = snapshot;
+            }
+            if (__instance is Component panel) _ecoPanel = panel;
             // The host streams economy continuously during a match and never
             // outside one, so this doubles as the "am I in a game?" signal.
             _lastEcoRealtime = Time.realtimeSinceStartup;
         }
 
+        private static bool SameSnapshot(Dictionary<string, float> a, Dictionary<string, float> b)
+        {
+            if (a == null || b == null || a.Count != b.Count) return false;
+            foreach (var kv in a)
+            {
+                if (!b.TryGetValue(kv.Key, out var v) || v != kv.Value) return false;
+            }
+            return true;
+        }
+
         private static float _lastEcoRealtime = -999f;
 
-        /// True while economy updates are still arriving. The grace period
-        /// covers pauses and loading hitches without leaving the HUD stranded
-        /// on the menu after a match ends.
-        internal static bool InMatch => Time.realtimeSinceStartup - _lastEcoRealtime < 5f;
+        /// Bumps whenever the economy snapshot changes, so a consumer can
+        /// tell "first data of a match" and "new data" from a re-read. It
+        /// does not tick on every update: a steady economy sends identical
+        /// snapshots ten times a second, so never step a filter on this.
+        internal static int _ecoSequence;
+
+        /// The game's own EconomyPanelUI, caught from the postfix. Its
+        /// visibility is the game's idea of "in a match", which unlike the
+        /// stream itself survives a pause of any length. Also what the HUD
+        /// hides when asked to replace the built-in readouts.
+        internal static Component _ecoPanel;
+        private static PropertyInfo _ecoPanelVisible;
+        private static bool _ecoPanelVisibleResolved;
+
+        private static bool EcoPanelVisible()
+        {
+            var panel = _ecoPanel;
+            if (panel == null) return false;   // Unity null: destroyed with the scene
+            try
+            {
+                if (!_ecoPanelVisibleResolved)
+                {
+                    _ecoPanelVisibleResolved = true;
+                    _ecoPanelVisible = panel.GetType().GetProperty("IsVisible", BindingFlags.Public | BindingFlags.Instance);
+                }
+                if (_ecoPanelVisible == null) return false;
+                return panel.gameObject.activeInHierarchy && _ecoPanelVisible.GetValue(panel) is bool b && b;
+            }
+            catch { return false; }
+        }
+
+        /// True while the game is in a match. The economy stream is the
+        /// primary signal, with a grace period for loading hitches; the
+        /// game's economy panel staying visible carries it through a pause,
+        /// where the stream stops for as long as the pause lasts (the HUD
+        /// used to drop out five seconds into every pause while the game's
+        /// own readouts stayed put). Lua hides that panel when the match
+        /// ends, and the scene change destroys it.
+        internal static bool InMatch =>
+            Time.realtimeSinceStartup - _lastEcoRealtime < 5f ||
+            (Time.realtimeSinceStartup - _lastEcoRealtime < 3600f && EcoPanelVisible());
 
         // ---- idle-builder polling (reflection over Unity.Entities) --------
 

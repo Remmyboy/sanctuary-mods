@@ -19,7 +19,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.6.0")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.7.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -27,6 +27,7 @@ namespace SanctuaryHud
         // ---- config ----
         private ConfigEntry<bool> _cfgVisible;
         private ConfigEntry<KeyCode> _cfgToggleKey;
+        private ConfigEntry<bool> _cfgHideBuiltIn;
 
         private bool _visible = true;
 
@@ -36,6 +37,9 @@ namespace SanctuaryHud
 
             _cfgVisible = Config.Bind("Overlay", "Visible", true, "Show the overlay.");
             _cfgToggleKey = Config.Bind("Overlay", "ToggleKey", KeyCode.F10, "Key that shows/hides the overlay.");
+            _cfgHideBuiltIn = Config.Bind("Overlay", "HideGameEconomyBars", false,
+                "Hide the game's own alloy and energy readouts at the top of the screen, so the strip is the only economy display. " +
+                "The menu and pause buttons stay. They come back whenever the overlay is hidden or the mod is unloaded.");
             _cfgCommanderZoom = Config.Bind("Commander", "JumpZoomFactor", 0.5f,
                 "How wide the camera sits after jumping to the commander, as a fraction of the current camera height. " +
                 "Higher = further out. 0.5 keeps roughly your current zoom.");
@@ -56,9 +60,11 @@ namespace SanctuaryHud
         }
 
         // Hot reload (or the mod manager) destroys and recreates the plugin;
-        // drop our patches so the reloaded copy doesn't stack a second postfix.
+        // drop our patches so the reloaded copy doesn't stack a second postfix,
+        // and give the game its readouts back.
         private void OnDestroy()
         {
+            GamePanel.Restore();
             _harmony?.UnpatchSelf();
         }
 
@@ -74,6 +80,77 @@ namespace SanctuaryHud
             if (Input.GetKeyDown(KeyCode.F9)) DumpHierarchy();
 
             SharedTick();
+            StepSmoothing();
+
+            // The built-in readouts only go while the strip is standing in for
+            // them: overlay on, in a match, option set. Anything else restores.
+            GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && _cfgHideBuiltIn.Value, _log);
+        }
+
+        // ---- economy smoothing --------------------------------------------
+
+        /// Smoothed [income, demand, spend] per resource. Filtered once per
+        /// frame on real elapsed time towards the latest update, with a fixed
+        /// time constant, so the readout is the same at 30 fps and 240 fps
+        /// and both halves of the strip trail the game's own numbers by the
+        /// same small amount. (It used to step on every IMGUI event, which
+        /// is two or more per frame and varies with input, so the lag
+        /// depended on the frame rate.)
+        ///
+        /// It must step every frame, not only when an update changes: the
+        /// spend jumps when a factory starts and then holds exactly steady,
+        /// and a filter that only moved on changes froze a third of the way
+        /// there (50 showed as 16) until something else in the stream moved.
+        private static readonly Dictionary<string, float[]> _smooth = new Dictionary<string, float[]>();
+        private static int _seenSequence = -1;
+
+        /// Time constant of the filter, in seconds. Short: the aim is to take
+        /// the edge off bursty reclaim, not to trail the game's numbers.
+        private const float SmoothTau = 0.25f;
+
+        private static void StepSmoothing()
+        {
+            Dictionary<string, float> eco;
+            lock (_ecoLock) eco = _eco;
+            if (eco == null)
+            {
+                // Between matches: forget the last game's rates so the next
+                // one doesn't open on them.
+                if (_smooth.Count > 0) _smooth.Clear();
+                _seenSequence = -1;
+                return;
+            }
+
+            // Snap on the first update of a match, where sliding in from
+            // zero would itself be a visible disagreement with the game.
+            var sequence = _ecoSequence;
+            var first = _seenSequence < 0;
+            _seenSequence = sequence;
+            var dt = Mathf.Clamp(Time.unscaledDeltaTime, 0f, 1f);
+            var alpha = first ? 1f : 1f - Mathf.Exp(-dt / SmoothTau);
+
+            foreach (var key in new[] { "alloy", "energy" })
+            {
+                float V(string name) => eco.TryGetValue(key + name, out var v) ? v : 0f;
+                // GeneratedIncome already includes harvest: economy.lua sets
+                // res.income = generation + harvest, and that is what Lua ships
+                // as GeneratedIncome. Adding HarvestIncome on top would
+                // double-count reclaim — it only looks harmless today because
+                // economyPanel.lua assigns alloyHarvestIncome twice in one
+                // table constructor (real value, then 0 beside a TODO), so the
+                // zero wins and it always arrives empty.
+                var income = V("GeneratedIncome");
+                // Lua sends these negated (economyPanel.lua): RequestedTotal is
+                // "how much we wanted to spend", RequestedStalled "how much we
+                // actually spent".
+                var demand = -V("RequestedTotal");
+                var spend = -V("RequestedStalled");
+
+                if (!_smooth.TryGetValue(key, out var s)) _smooth[key] = s = new float[3];
+                s[0] += (income - s[0]) * alpha;
+                s[1] += (demand - s[1]) * alpha;
+                s[2] += (spend - s[2]) * alpha;
+            }
         }
 
         // ---- drawing ------------------------------------------------------
@@ -82,6 +159,7 @@ namespace SanctuaryHud
         {
             if (!_visible || !InMatch) return;
             EnsureStyles();
+            EnsureGameStyle();
 
             var scale = Screen.height / 1080f;
             var previousMatrix = GUI.matrix;
@@ -96,17 +174,81 @@ namespace SanctuaryHud
 
         private const float StripHeight = 48f;
 
-        /// Smoothed [income, spend, net] per resource, so the readout doesn't
-        /// jitter with per-tick noise.
-        private static readonly Dictionary<string, float[]> _smooth = new Dictionary<string, float[]>();
+        // The game's UI palette (Beam UI, as the front menu uses it): near-
+        // black blue panels with a hairline of accent blue.
+        private static readonly Color GamePanelColour = new Color(0.098f, 0.137f, 0.176f, 0.80f);   // #19232D
+        private static readonly Color GameAccent = new Color(0.239f, 0.686f, 1f);                    // #3DAFFF
+        private static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
 
-        /// Compact number formatting — these values run to millions.
+        private static Texture2D _texStrip;
+        private static bool _gameStyleReady;
+        private static Color _alloyTint = AlloyColour;
+        private static Color _energyTint = EnergyColour;
+
+        /// Once, in a match: put the game's typeface on the strip and take
+        /// its resource tints off the game's own panel, so the two read as
+        /// one UI. Falls back to the built-in styles piece by piece.
+        private void EnsureGameStyle()
+        {
+            if (_gameStyleReady) return;
+            _gameStyleReady = true;
+
+            _texStrip = MakeTexture(GamePanelColour);
+
+            var font = GamePanel.ResolveFont(_log);
+            if (font != null)
+            {
+                foreach (var style in new[] { _stStripLabel, _stStripValue, _stStripMax, _stStripIn, _stStripOut, _stStripNet, _stStripChip, _stCmdLabel })
+                {
+                    style.font = font;
+                }
+                // Rajdhani/Bahnschrift run narrower and lighter than the
+                // default face; a size up keeps the strip legible.
+                _stStripLabel.fontSize = 14;
+                _stStripValue.fontSize = 22;
+                _stStripMax.fontSize = 14;
+                _stStripIn.fontSize = 15;
+                _stStripOut.fontSize = 15;
+                _stStripNet.fontSize = 19;
+                _stStripChip.fontSize = 12;
+                _stCmdLabel.fontSize = 12;
+            }
+            _stStripMax.normal.textColor = MutedText;
+
+            var alloy = AlloyColour;
+            var energy = EnergyColour;
+            GamePanel.SampleColours(_ecoPanel, ref alloy, ref energy);
+            _alloyTint = alloy;
+            _energyTint = energy;
+        }
+
+        private static Texture2D MakeTexture(Color color)
+        {
+            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, color);
+            tex.Apply();
+            tex.hideFlags = HideFlags.HideAndDontSave;
+            return tex;
+        }
+
+        /// Number formatting, matching the game's own readouts (SignedTextElement:
+        /// K above 999, M above 999,999) so the two never disagree on the
+        /// same figure.
         private static string Fmt(float v)
         {
-            var a = Mathf.Abs(v);
-            if (a >= 1_000_000f) return (v / 1_000_000f).ToString("0.##") + "M";
-            if (a >= 10_000f) return (v / 1_000f).ToString("0.#") + "K";
-            return v.ToString("#,0");
+            var a = Mathf.Round(Mathf.Abs(v));
+            if (a > 999_999_999f) return (a / 1_000_000_000f).ToString("0.###") + "B";
+            if (a > 999_999f) return (a / 1_000_000f).ToString("0.##") + "M";
+            if (a > 999f) return (a / 1_000f).ToString("0.#") + "K";
+            return a.ToString("0");
+        }
+
+        private static void Fill(Rect rect, Color colour)
+        {
+            var previous = GUI.color;
+            GUI.color = colour;
+            GUI.DrawTexture(rect, _texWhite);
+            GUI.color = previous;
         }
 
         // Full-width strip: alloy on the left, energy on the right. Each half
@@ -120,14 +262,23 @@ namespace SanctuaryHud
             if (eco == null) return;
 
             var centre = width / 2f;
-            GUI.DrawTexture(new Rect(0, 0, width, StripHeight), _texPanel);
+            GUI.DrawTexture(new Rect(0, 0, width, StripHeight), _texStrip);
 
-            DrawStripHalf(eco, "alloy", "ALLOY", AlloyColour, 0f, centre);
-            DrawStripHalf(eco, "energy", "ENERGY", EnergyColour, centre, centre);
+            DrawStripHalf(eco, "alloy", "ALLOY", _alloyTint, 0f, centre);
+            DrawStripHalf(eco, "energy", "ENERGY", _energyTint, centre, centre);
 
-            // Hairline separators.
-            GUI.DrawTexture(new Rect(centre - 1, 6, 2, StripHeight - 12), _texBarBack);
-            GUI.DrawTexture(new Rect(0, StripHeight - 1, width, 1), _texBarBack);
+            // The game's panels sit on a hairline of accent blue; give the
+            // strip the same edge, with a short fade under it so it lifts
+            // off the map rather than ending in a hard line.
+            var accent = GameAccent;
+            accent.a = 0.35f;
+            Fill(new Rect(centre - 0.5f, 10f, 1f, StripHeight - 20f), accent);
+            accent.a = 0.6f;
+            Fill(new Rect(0, StripHeight - 1f, width, 1f), accent);
+            for (var i = 0; i < 4; i++)
+            {
+                Fill(new Rect(0, StripHeight + i, width, 1f), new Color(0f, 0f, 0f, 0.28f - i * 0.07f));
+            }
         }
 
         private void DrawStripHalf(Dictionary<string, float> eco, string key, string label, Color baseColour, float x, float w)
@@ -136,36 +287,23 @@ namespace SanctuaryHud
 
             var current = V("StorageCurrent");
             var limit = Mathf.Max(1f, V("StorageLimit"));
-            // GeneratedIncome already includes harvest: economy.lua sets
-            // res.income = generation + harvest, and that is what Lua ships as
-            // GeneratedIncome. Adding HarvestIncome on top would double-count
-            // reclaim — it only looks harmless today because economyPanel.lua
-            // assigns alloyHarvestIncome twice in one table constructor (real
-            // value, then 0 beside a TODO), so the zero wins and it always
-            // arrives empty. Take the combined figure and ignore the rest.
-            var incomeRaw = V("GeneratedIncome");
-            // Lua sends these negated (economyPanel.lua): RequestedTotal is
-            // "how much we wanted to spend", RequestedStalled "how much we
-            // actually spent".
             var wantedRaw = -V("RequestedTotal");
             var spendRaw = -V("RequestedStalled");
-            var netRaw = incomeRaw - spendRaw;
             var stalling = wantedRaw - spendRaw > 0.5f;
 
-            if (!_smooth.TryGetValue(key, out var s)) _smooth[key] = s = new float[3];
-            s[0] += (incomeRaw - s[0]) * 0.2f;
+            var s = _smooth.TryGetValue(key, out var smoothed) ? smoothed : new[] { V("GeneratedIncome"), wantedRaw, spendRaw };
+            var income = s[0];
             // The spend figure shows demand, not what the economy managed to
             // pay: while stalling those differ, and the useful number is what
             // your queue is asking for. Actual spend is capped by income, so
             // showing it just mirrors the income back at you (+12 −12) and
             // hides the shortfall. Off a stall the two are equal anyway.
-            s[1] += (wantedRaw - s[1]) * 0.2f;
-            s[2] += (netRaw - s[2]) * 0.15f;
-            var income = s[0];
             var demand = s[1];
             // Net stays on actual spend: it describes the store's real
             // movement, which is what the bar and the "empty in" chip need.
-            var net = s[2];
+            // Derived from the same filtered figures as the income, so the
+            // two never trail the game by different amounts.
+            var net = s[0] - s[2];
 
             const float pad = 16f;
             var inner = w - pad * 2f;
@@ -176,11 +314,11 @@ namespace SanctuaryHud
 
             var storageText = Fmt(current);
             var storageWidth = _stStripValue.CalcSize(new GUIContent(storageText)).x;
-            GUI.Label(new Rect(x + pad + 58f, 3f, storageWidth + 8f, 24f), storageText, _stStripValue);
-            GUI.Label(new Rect(x + pad + 58f + storageWidth + 8f, 8f, 90f, 18f), "/ " + Fmt(limit), _stStripMax);
+            GUI.Label(new Rect(x + pad + 66f, 2f, storageWidth + 8f, 26f), storageText, _stStripValue);
+            GUI.Label(new Rect(x + pad + 66f + storageWidth + 8f, 8f, 90f, 18f), "/ " + Fmt(limit), _stStripMax);
 
             // Right cluster: +in  −out  net.
-            var netText = (net >= 0f ? "+" : "−") + Fmt(Mathf.Abs(net)) + "/s";
+            var netText = (net >= 0f ? "+" : "−") + Fmt(net) + "/s";
             _stStripNet.normal.textColor = stalling ? DangerColour : net >= 0f ? GainColour : LossColour;
             GUI.Label(new Rect(x + w - pad - 108f, 4f, 108f, 22f), netText, _stStripNet);
 
@@ -188,19 +326,22 @@ namespace SanctuaryHud
             // Flag the spend figure while stalling, since it is then demand
             // you are not actually meeting rather than resources leaving the
             // store — the STALL chip below carries the size of the shortfall.
-            _stStripOut.normal.textColor = stalling ? DangerColour : new Color(1f, 0.55f, 0.5f, 0.95f);
+            _stStripOut.normal.textColor = stalling ? DangerColour : LossColour;
             GUI.Label(new Rect(x + w - pad - 108f - 76f, 7f, 70f, 18f), "−" + Fmt(demand), _stStripOut);
 
             // --- row 2: capacity bar ---
+            // A thin line in the resource colour on an accent-tinted track,
+            // the way the game draws its own gauges, rather than a block.
             var lengthFactor = Mathf.Clamp(0.45f + 0.15f * Mathf.Log10(limit / 400f), 0.45f, 1f);
-            var barRect = new Rect(x + pad, 32f, inner * lengthFactor, 9f);
-            GUI.DrawTexture(barRect, _texBarBack);
+            var barRect = new Rect(x + pad, 36f, inner * lengthFactor, 4f);
+            var track = GameAccent;
+            track.a = 0.14f;
+            Fill(barRect, track);
 
             var colour = FillColour(baseColour, current, net, stalling);
-            var previous = GUI.color;
-            GUI.color = colour;
-            GUI.DrawTexture(new Rect(barRect.x, barRect.y, barRect.width * Mathf.Clamp01(current / limit), barRect.height), _texWhite);
-            GUI.color = previous;
+            var fillWidth = barRect.width * Mathf.Clamp01(current / limit);
+            Fill(new Rect(barRect.x, barRect.y, fillWidth, barRect.height), colour);
+            if (fillWidth > 2f) Fill(new Rect(barRect.x + fillWidth - 1f, barRect.y - 1f, 1f, barRect.height + 2f), new Color(1f, 1f, 1f, 0.75f));
 
             // Warning chip rides at the end of the bar row.
             string chip = null;
@@ -208,15 +349,13 @@ namespace SanctuaryHud
             else if (net < -0.5f)
             {
                 var tte = current / -net;
-                if (tte < 120f) chip = "empty in " + tte.ToString("0") + "s";
+                if (tte < 120f) chip = "EMPTY IN " + tte.ToString("0") + "s";
             }
             if (chip != null)
             {
                 var chipWidth = _stStripChip.CalcSize(new GUIContent(chip)).x + 14f;
-                var chipRect = new Rect(x + w - pad - chipWidth, 30f, chipWidth, 14f);
-                GUI.color = stalling ? DangerColour : new Color(0.75f, 0.45f, 0.15f, 0.9f);
-                GUI.DrawTexture(chipRect, _texWhite);
-                GUI.color = previous;
+                var chipRect = new Rect(x + w - pad - chipWidth, 29f, chipWidth, 15f);
+                Fill(chipRect, stalling ? DangerColour : new Color(0.75f, 0.45f, 0.15f, 0.9f));
                 GUI.Label(chipRect, chip, _stStripChip);
             }
         }
@@ -248,8 +387,11 @@ namespace SanctuaryHud
             var rect = new Rect(width - w - 14f, StripHeight + 10f, w, h);
             var hover = rect.Contains(Event.current.mousePosition);
 
-            GUI.DrawTexture(rect, _texPanel);
+            GUI.DrawTexture(rect, _texStrip);
             if (hover) GUI.DrawTexture(rect, _texRowHover);
+            var edge = GameAccent;
+            edge.a = hover ? 0.8f : 0.45f;
+            Fill(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), edge);
 
             var frac = _commanderMaxHealth > 0f ? Mathf.Clamp01(_commanderHealth / _commanderMaxHealth) : 1f;
             var hurt = frac < 0.999f;
@@ -275,11 +417,12 @@ namespace SanctuaryHud
             }
 
             // Health bar.
-            var barRect = new Rect(rect.x + 10f, rect.yMax - 12f, rect.width - 20f, 6f);
-            GUI.DrawTexture(barRect, _texBarBack);
-            GUI.color = frac > 0.6f ? new Color(0.42f, 0.85f, 0.5f) : frac > 0.3f ? new Color(0.95f, 0.72f, 0.2f) : DangerColour;
-            GUI.DrawTexture(new Rect(barRect.x, barRect.y, barRect.width * frac, barRect.height), _texWhite);
-            GUI.color = previous;
+            var barRect = new Rect(rect.x + 10f, rect.yMax - 12f, rect.width - 20f, 4f);
+            var track = GameAccent;
+            track.a = 0.14f;
+            Fill(barRect, track);
+            Fill(new Rect(barRect.x, barRect.y, barRect.width * frac, barRect.height),
+                frac > 0.6f ? new Color(0.42f, 0.85f, 0.5f) : frac > 0.3f ? new Color(0.95f, 0.72f, 0.2f) : DangerColour);
 
             if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hover)
             {
