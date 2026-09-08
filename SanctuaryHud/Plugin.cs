@@ -110,8 +110,15 @@ namespace SanctuaryHud
             // The packs on disk plus the built-in tones, as a fixed list so
             // the Mod Manager offers them as a chooser rather than a text box.
             // Read once at load; a pack added later shows after a reload.
-            var packs = new List<string>(Alerts.AvailablePacks()) { "tones" };
-            var defaultPack = packs.Contains("caretaker") ? "caretaker" : packs[0];
+            // Shipped packs first, in preference order, then anything a
+            // player added, then the tones; the first present is the default.
+            var preferred = new[] { "machine", "announcer", "caretaker" };
+            var onDisk = new List<string>(Alerts.AvailablePacks());
+            var packs = new List<string>();
+            foreach (var p in preferred) if (onDisk.Remove(p)) packs.Add(p);
+            packs.AddRange(onDisk);
+            packs.Add("tones");
+            var defaultPack = packs[0];
             _cfgVoicePack = Config.Bind("Alerts", "VoicePack", defaultPack,
                 new ConfigDescription(
                     "Which voice speaks the alerts: a subfolder of SanctuaryMods\\SanctuaryHud\\sounds, or the built-in tones.",

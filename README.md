@@ -121,8 +121,12 @@ has no release of its own yet; build it from source if you need it.
   `commander-critical`, `structure-complete` and `structure-upgraded` WAVs
   (any PCM or float WAV, any rate or channel count), chosen with
   `Alerts · VoicePack`, a left/right chooser on the Mods page listing the
-  packs found at load plus `tones` for the built-in sounds; a loose WAV in
-  the sounds folder itself is the fallback for a line a pack lacks.
+  packs found at load plus `tones` for the built-in sounds. Three ship:
+  `machine` (a female-voiced synthetic combat AI, the default),
+  `announcer` (a military radio read) and `caretaker` (Sanctuary's own
+  intelligence, calm and vast), in that order, with any pack a player adds
+  after them; a loose WAV in the sounds folder itself is the fallback for a
+  line a pack lacks.
   `Alerts · Volume` is 0 to 100 like the game's own audio sliders, and
   shows as one on the Mods page. The game's audio runs through Wwise and a Unity AudioSource
   plays nothing in this build, so the mod goes round the engine: it

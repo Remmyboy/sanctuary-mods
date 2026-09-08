@@ -197,7 +197,7 @@ namespace SanctuaryHud
         /// Voice pack: a subfolder of the sounds folder. Set from config; an
         /// empty name, or one with no folder, falls through to files placed
         /// directly in the sounds folder, and then to the tones.
-        internal static string VoicePack = "caretaker";
+        internal static string VoicePack = "machine";
 
         /// The file to play for an alert, or null when there is none and the
         /// synthesised tone applies. The pack's folder wins over a loose file.
