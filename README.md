@@ -637,9 +637,21 @@ agent running).
 A **Mods** entry in the front menu's sidebar (the cube icon, just below
 Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods
 and Lua Mods. The page is the game's own Settings screen, cloned and refilled:
-the tab bar, the switch rows, the text fields (a settings slider's input box,
+the tab bar, the switch rows, the sliders (UI Scale's row), the left/right
+selectors (Window Mode's row), the text fields (a slider's input box,
 widened), the headings and the buttons are all the game's Beam UI widgets, so
 it looks like the rest of the menu and follows any restyling the game does.
+
+Each UI mod's settings are listed in the order the mod bound them, so an
+author's grouping is what the player reads: sections in first-appearance
+order under their own heading, entries as bound within each. A bool is a
+switch, a setting with an `AcceptableValueRange` a slider, one with an
+`AcceptableValueList` a selector, anything else a text box. Key names show
+as words (`HideGameEconomyBars` reads "Hide game economy bars"; `Eta`,
+`Ui`, `Url` and `Pos` are expanded). A section that is nothing but hotkeys
+(KeyCode settings, or strings whose description says "hotkey") is laid out
+two to a row, which is what keeps BuildHotkeys' structure and unit lists
+short.
 **F8** also opens the same page full-screen during a match (over the menu
 background, the way the pause menu's Settings does); closing it returns to
 the game. UI mod toggles and settings changes apply immediately; Lua mod
