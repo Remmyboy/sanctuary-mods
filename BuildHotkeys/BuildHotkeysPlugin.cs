@@ -30,12 +30,11 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.1.0")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.1.1")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
             new Dictionary<string, ConfigEntry<string>>();
-        private ConfigEntry<bool> _cfgEnabled;
 
         private ConfigEntry<string> _cfgCancelKey;
         private ConfigEntry<float> _cfgCycleSeconds;
@@ -90,8 +89,6 @@ namespace SanctuaryHud
         {
             _log ??= Logger;
 
-            _cfgEnabled = Config.Bind("General", "Enabled", true,
-                "Master switch. Off restores the game's own construction hotkeys.");
             _cfgCancelKey = Config.Bind("Cancel", "ClearFactoryQueue", "Escape",
                 "Cancels the build queue of every selected factory, as escape does in FAF. With nothing " +
                 "queued -- or the pause menu already open -- the key falls through to whatever it normally " +
@@ -265,11 +262,6 @@ namespace SanctuaryHud
 
         private void Update()
         {
-            if (!_cfgEnabled.Value)
-            {
-                if (_installed) Remove();
-                return;
-            }
 
             // The overlay has to keep up with keypresses, so it polls far more
             // often than the once-a-second install upkeep below. Both are a

@@ -52,7 +52,7 @@ namespace SanctuaryHud
         // lists are emptied. They sit under an inactive holder so a clone can
         // be configured before its Awake runs (Awake fires on reparenting
         // into the live list).
-        private GameObject _tHeading, _tLine, _tSpacer, _tSwitchRow, _tTextRow, _tButtonRow;
+        private GameObject _tHeading, _tLine, _tSpacer, _tSwitchRow, _tTextRow, _tButtonRow, _tSliderRow, _tSelectorRow;
 
         // Per-plugin settings group, so toggling one plugin rebuilds only its
         // own rows and the switch just clicked keeps its animation.
@@ -268,8 +268,15 @@ namespace SanctuaryHud
             _tSpacer = TakeTemplate(_uiList, "Spacer", "Spacer");
             _tTextRow = TakeTemplate(_uiList, "UI Scale", "TextRow");
             _tButtonRow = TakeTemplate(_uiList, "ApplyButton", "ButtonRow");
+            _tSelectorRow = TakeTemplate(_uiList, "Window Mode", "SelectorRow");
+            PrepareSelectorTemplate(_tSelectorRow);
             _tSwitchRow = TakeTemplate(_luaList, "EdgePanToggle", "SwitchRow");
+            // The slider row is a second copy of UI Scale, taken before the
+            // text template strips the slider out of the first.
+            _tSliderRow = Object.Instantiate(_tTextRow, _templates);
+            _tSliderRow.name = "SliderRow";
             PrepareSwitchTemplate(_tSwitchRow);
+            PrepareSliderTemplate(_tSliderRow);
             PrepareTextTemplate(_tTextRow);
             PrepareButtonTemplate(_tButtonRow);
             Clear(_uiList);
@@ -405,6 +412,67 @@ namespace SanctuaryHud
                 tmp.margin = new Vector4(12f, 0f, 12f, 0f);
                 tmp.overflowMode = TextOverflowModes.Overflow;
             }
+        }
+
+        /// The slider row stays a slider: the game's settings binding goes,
+        /// the Beam slider and its value box stay. The box is driven here
+        /// (SliderInput, which synced it to the game's own setting, goes
+        /// too), so a typed number moves the slider and vice versa.
+        private static void PrepareSliderTemplate(GameObject row)
+        {
+            Object.DestroyImmediate(row.GetComponent<SettingsDescription>());
+            Object.DestroyImmediate(row.GetComponent<SliderInputHandler>());
+            var slider = row.transform.Find("Slider");
+            var sm = slider.GetComponent<SliderManager>();
+            sm.saveValue = false;
+            sm.invokeOnEnable = false;
+            sm.useRoundValue = true;
+            sm.usePercent = false;
+            var input = slider.Find("Text Input");
+            if (input != null)
+            {
+                Object.DestroyImmediate(input.GetComponent<SliderInput>());
+                var field = input.GetComponent<TMP_InputField>();
+                field.contentType = TMP_InputField.ContentType.DecimalNumber;
+            }
+        }
+
+        /// The selector row (the game's Window Mode row: a label and a
+        /// left/right chooser, which is how the settings screen offers a
+        /// fixed list) with the game's setting binding removed. Items are
+        /// filled per row.
+        private static void PrepareSelectorTemplate(GameObject row)
+        {
+            Object.DestroyImmediate(row.GetComponent<SettingsDescription>());
+            Object.DestroyImmediate(row.GetComponent<SelectorInputHandler>());
+            var text = row.transform.Find("Text");
+            if (text != null) Object.DestroyImmediate(text.GetComponent<LocalizedObject>());
+            var selector = row.GetComponentInChildren<HorizontalSelector>(true);
+            Object.DestroyImmediate(selector.GetComponent<LocalizedObject>());
+            selector.saveSelected = false;
+            selector.invokeOnAwake = false;
+            selector.useLocalization = false;
+            selector.loopSelection = true;
+            selector.items.Clear();
+        }
+
+        /// A fixed choice: the game's own left/right selector. Options are
+        /// shown as given; `selected` is the index shown first.
+        private void SelectorRow(Transform list, string label, IList<string> options, int selected, Action<int> onChanged)
+        {
+            var go = Spawn(_tSelectorRow);
+            go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
+            var selector = go.GetComponentInChildren<HorizontalSelector>(true);
+            selector.items.Clear();
+            foreach (var o in options) selector.items.Add(new HorizontalSelector.Item { itemTitle = o });
+            selector.defaultIndex = Mathf.Clamp(selected, 0, Math.Max(0, options.Count - 1));
+            selector.index = selector.defaultIndex;
+            selector.onValueChanged.AddListener(i => onChanged(i));
+            // Awake runs on placement (the templates sit inactive) and
+            // initialises from the items above; a second pass is harmless
+            // and covers a template that was already awake.
+            Place(go, list);
+            selector.InitializeSelector();
         }
 
         private static void PrepareButtonTemplate(GameObject row)
@@ -621,6 +689,173 @@ namespace SanctuaryHud
             Place(go, list);
         }
 
+        /// A slider with a value box, for a setting that declares a range.
+        /// Whole numbers when the setting is integral; otherwise a tenth.
+        private void SliderRow(Transform list, string label, float min, float max, float value, bool whole, Action<float> onChanged)
+        {
+            var go = Spawn(_tSliderRow);
+            go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
+            var sliderT = go.transform.Find("Slider");
+            var sm = sliderT.GetComponent<SliderManager>();
+            var slider = sliderT.GetComponent<Slider>();
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.wholeNumbers = whole;
+            slider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
+            var field = sliderT.Find("Text Input")?.GetComponent<TMP_InputField>();
+            string Show(float v) => whole ? Mathf.RoundToInt(v).ToString() : v.ToString("0.#");
+            if (field != null) field.SetTextWithoutNotify(Show(slider.value));
+            sm.onValueChanged.AddListener(v =>
+            {
+                if (field != null) field.SetTextWithoutNotify(Show(v));
+                onChanged(v);
+            });
+            if (field != null)
+            {
+                field.onEndEdit.AddListener(s =>
+                {
+                    if (float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v))
+                        slider.value = Mathf.Clamp(v, min, max);   // fires the listener above, which rewrites the box
+                    else field.SetTextWithoutNotify(Show(slider.value));
+                });
+            }
+            Place(go, list);
+            sm.UpdateUI();
+        }
+
+        /// The row for one setting, by its type and declared constraints:
+        /// a switch for a bool, a selector for a value list, a slider for a
+        /// range, and a text box for the rest, committed through the entry's
+        /// own serializer so a half-typed value doesn't take until it parses.
+        private void SettingRow(Transform group, string label, ConfigEntryBase e)
+        {
+            if (e.SettingType == typeof(bool))
+            {
+                SwitchRow(group, label, e.BoxedValue is bool b && b, true, v => e.BoxedValue = v);
+            }
+            else if (e.Description.AcceptableValues is AcceptableValueList<string> sl && sl.AcceptableValues.Length > 0)
+            {
+                var options = sl.AcceptableValues;
+                var current = Array.IndexOf(options, e.BoxedValue as string);
+                SelectorRow(group, label, options, current < 0 ? 0 : current, i => e.BoxedValue = options[i]);
+            }
+            else if (e.Description.AcceptableValues is AcceptableValueRange<int> ir)
+            {
+                SliderRow(group, label, ir.MinValue, ir.MaxValue, Convert.ToSingle(e.BoxedValue), true, v => e.BoxedValue = Mathf.RoundToInt(v));
+            }
+            else if (e.Description.AcceptableValues is AcceptableValueRange<float> fr)
+            {
+                SliderRow(group, label, fr.MinValue, fr.MaxValue, Convert.ToSingle(e.BoxedValue), false, v => e.BoxedValue = v);
+            }
+            else
+            {
+                var t = Bind(e);
+                TextRow(group, label, t.Value, t.OnEdited, t.OnEndEdit);
+            }
+        }
+
+        private struct TextBinding
+        {
+            public string Value;
+            public Action<string> OnEdited;
+            public Func<string> OnEndEdit;
+        }
+
+        private static TextBinding Bind(ConfigEntryBase e) => new TextBinding
+        {
+            Value = e.GetSerializedValue(),
+            OnEdited = s => { try { e.SetSerializedValue(s); } catch { /* keep typing */ } },
+            OnEndEdit = () => { try { return e.GetSerializedValue(); } catch { return null; } },
+        };
+
+        /// A key binding: a KeyCode, or a string the mod describes as a hotkey.
+        private static bool IsHotkey(ConfigEntryBase e) =>
+            e.SettingType == typeof(KeyCode) ||
+            (e.SettingType == typeof(string) && (e.Description.Description ?? "").IndexOf("hotkey", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        /// Two text settings side by side on one row, for short values.
+        /// The row template has one label and one box; a second pair is
+        /// cloned in, and each pair takes half the row.
+        private void PairTextRow(Transform list, string labelA, TextBinding a, string labelB, TextBinding? b)
+        {
+            const float boxWidth = 170f;
+            var go = Spawn(_tTextRow);
+            var text = (RectTransform)go.transform.Find("Text");
+            var input = (RectTransform)go.transform.Find("Input");
+            var text2 = b == null ? null : (RectTransform)Object.Instantiate(text.gameObject, go.transform).transform;
+            var input2 = b == null ? null : (RectTransform)Object.Instantiate(input.gameObject, go.transform).transform;
+
+            void Half(RectTransform lbl, RectTransform box, float from, string label, TextBinding binding)
+            {
+                // Label spans its half up to the box; the box is right-aligned
+                // in the half at a fixed width.
+                lbl.anchorMin = new Vector2(from, 0f);
+                lbl.anchorMax = new Vector2(from + 0.5f, 1f);
+                lbl.pivot = new Vector2(0f, 0.5f);
+                lbl.offsetMin = new Vector2(from > 0f ? 20f : lbl.offsetMin.x, lbl.offsetMin.y);
+                lbl.offsetMax = new Vector2(-(boxWidth + 30f), lbl.offsetMax.y);
+                lbl.GetComponent<TMP_Text>().text = label;
+
+                box.anchorMin = new Vector2(from + 0.5f, box.anchorMin.y);
+                box.anchorMax = new Vector2(from + 0.5f, box.anchorMax.y);
+                box.pivot = new Vector2(1f, 0.5f);
+                box.anchoredPosition = new Vector2(from > 0f ? -20f : -20f, box.anchoredPosition.y);
+                box.sizeDelta = new Vector2(boxWidth, box.sizeDelta.y);
+
+                var field = box.Find("Text Input").GetComponent<TMP_InputField>();
+                field.SetTextWithoutNotify(binding.Value);
+                field.onValueChanged.AddListener(s => binding.OnEdited(s));
+                field.onEndEdit.AddListener(_ =>
+                {
+                    var canonical = binding.OnEndEdit();
+                    if (canonical != null && field.text != canonical) field.SetTextWithoutNotify(canonical);
+                });
+            }
+
+            Half(text, input, 0f, labelA, a);
+            if (b != null) Half(text2, input2, 0.5f, labelB, b.Value);
+            Place(go, list);
+        }
+
+        /// "HideGameEconomyBars" -> "Hide game economy bars", with the
+        /// acronyms and abbreviations the mods use kept readable.
+        private static readonly Dictionary<string, string> Words = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "eta", "ETA" }, { "ui", "UI" }, { "url", "URL" }, { "pos", "position" }, { "x", "X" }, { "y", "Y" },
+            { "mm", "matchmaking" }, { "cfg", "config" }, { "api", "API" }, { "id", "ID" }, { "vsync", "VSync" },
+        };
+
+        internal static string Humanise(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return "";
+            var parts = new List<string>();
+            var word = new System.Text.StringBuilder();
+            for (var i = 0; i < key.Length; i++)
+            {
+                var c = key[i];
+                // A digit after a single letter stays attached ("T1", "T3"),
+                // after a word it starts one ("Tier 4").
+                var digitEdge = i > 0 && char.IsDigit(c) != char.IsDigit(key[i - 1]) && !(char.IsDigit(c) && word.Length == 1);
+                var startsWord = word.Length > 0 && (
+                    (char.IsUpper(c) && (!char.IsUpper(key[i - 1]) || (i + 1 < key.Length && char.IsLower(key[i + 1])))) ||
+                    digitEdge ||
+                    c == '_' || c == ' ');
+                if (startsWord) { parts.Add(word.ToString()); word.Clear(); }
+                if (c != '_' && c != ' ') word.Append(c);
+            }
+            if (word.Length > 0) parts.Add(word.ToString());
+
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var p = parts[i];
+                if (Words.TryGetValue(p, out var fixedWord)) p = fixedWord;
+                else if (p.Length > 1 && p.ToUpperInvariant() == p) { /* an acronym, or T1: as written */ }
+                else p = p.ToLowerInvariant();
+                parts[i] = i == 0 && char.IsLower(p[0]) ? char.ToUpperInvariant(p[0]) + p.Substring(1) : p;
+            }
+            return string.Join(" ", parts);
+        }
+
         private void ButtonRow(Transform list, string text, Action onClick)
         {
             var go = Spawn(_tButtonRow);
@@ -721,20 +956,44 @@ namespace SanctuaryHud
             }
             if (entries.Count == 0) return;
 
-            foreach (var entry in entries.OrderBy(e => e.Definition.Section).ThenBy(e => e.Definition.Key))
+            // Settings come back in the order the mod bound them, which is
+            // the order its author meant them to be read in, so that order
+            // is kept: sections by first appearance, each under its own
+            // heading, and entries within a section as bound. Keys are shown
+            // as words ("HideGameEconomyBars" as "Hide game economy bars").
+            var sections = new List<string>();
+            var bySection = new Dictionary<string, List<ConfigEntryBase>>();
+            foreach (var e in entries)
             {
-                var e = entry;
-                var label = $"{e.Definition.Section}  ·  {e.Definition.Key}";
-                if (e.SettingType == typeof(bool))
+                var s = e.Definition.Section ?? "";
+                if (!bySection.TryGetValue(s, out var l)) { bySection[s] = l = new List<ConfigEntryBase>(); sections.Add(s); }
+                l.Add(e);
+            }
+
+            var first = true;
+            foreach (var section in sections)
+            {
+                var list = bySection[section];
+                if (!first) Line(group);
+                first = false;
+                if (sections.Count > 1 || !string.IsNullOrEmpty(section)) Heading(group, Humanise(section));
+
+                // A run of hotkeys reads better two to a line: the game's
+                // own key format is short, and a long column of them is what
+                // BuildHotkeys' structure and unit lists would otherwise be.
+                var keys = list.Where(IsHotkey).ToList();
+                if (keys.Count >= 4 && keys.Count == list.Count)
                 {
-                    SwitchRow(group, label, e.BoxedValue is bool b && b, true, v => e.BoxedValue = v);
+                    for (var i = 0; i < keys.Count; i += 2)
+                    {
+                        var a = keys[i];
+                        var b = i + 1 < keys.Count ? keys[i + 1] : null;
+                        PairTextRow(group, Humanise(a.Definition.Key), Bind(a), b == null ? null : Humanise(b.Definition.Key), b == null ? null : Bind(b));
+                    }
+                    continue;
                 }
-                else
-                {
-                    TextRow(group, label, e.GetSerializedValue(),
-                        s => { try { e.SetSerializedValue(s); } catch { /* keep typing */ } },
-                        () => { try { return e.GetSerializedValue(); } catch { return null; } });
-                }
+
+                foreach (var e in list) SettingRow(group, Humanise(e.Definition.Key), e);
             }
 
             var pl = plugin;

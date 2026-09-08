@@ -20,14 +20,14 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.7.1) | Economy strip in the game's own style, optionally replacing the built-in bars, plus the commander widget |
+| [SanctuaryHud](SanctuaryHud/) | [**0.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.8.0) | Economy strip in the game's own style, optionally replacing the built-in bars; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
-| [BuildHotkeys](BuildHotkeys/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.0) | One hotkey per *role*, same key every faction, cycling by tier |
+| [BuildHotkeys](BuildHotkeys/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.1) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.0) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.3.0) | Mods page in the menu and on F8 in a match: mod toggles, settings, Lua overlays |
+| [ModManager](ModManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.4.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
@@ -69,6 +69,73 @@ has no release of its own yet; build it from source if you need it.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.
+- **Reclaim values** over the map while **Left Alt** is held (`Reclaim ·
+  HoldKey`; `None` keeps them up permanently): the alloys left in every
+  wreck and harvestable prop the client knows about, drawn at the spot.
+  Values closer together on screen than `ClusterPixels` (110 at 1080p) are
+  summed into one figure at their value-weighted centre, so zoomed out a
+  battlefield reads as one number the way FAF's overlay groups it, rather
+  than a smear of digits. Energy shows as a smaller amber `E` line only where
+  it is the point. `MinValue` hides trivia. The prop table
+  (`__Entities.Props`) holds wrecks and map props alike with their template's
+  `economy.harvest`, and the host streams `reclaimProgress` as they are
+  eaten, so what is left is `harvest × (1 − progress / harvestTime)`. A
+  decayed wreck stays in that table with no render entity behind it, so each
+  is checked with `Engine.IsValidLocalID` before it counts. Positions are
+  cached Lua-side per prop; only the values are re-read, once a second.
+- **Build countdowns** (`BuildEta · Enabled`): under your structures still
+  under construction, upgrades included, a `m:ss` time-to-finish and a thin
+  progress bar. The rate is measured from successive progress samples
+  (half-second poll, filtered), so it reflects whatever is actually assisting;
+  before anything has been measured the template's own build time stands in.
+  When nothing has moved for a few seconds the figure stays and turns red,
+  since there is no better number; a pause (the economy stream going quiet)
+  freezes the clocks instead. Labels are placed soonest-first, one that
+  would overlap another is skipped, and `MaxLabels` (12) caps them, so a
+  busy base shows the handful nearest completion rather than a wall.
+- **Alerts** (`Alerts · …`): toasts top-centre under the strip, with a short
+  generated tone (no audio assets) at `Volume`. *Commander under attack* on
+  any health loss, re-sounding at most every eight seconds while it goes on;
+  *commander critical* once below `CriticalFraction` (35%), re-armed after
+  repair; *structure complete* when a countdown finishes. Clicking a commander
+  toast jumps to it like the widget does. Health is re-read four times a
+  second off the commander's cached sim id, since the once-a-second ECS poll
+  would make the alert a second late. All of it is for the active player
+  only: "own" means exactly one focused army, so a replay's all-armies view
+  (every army focused) and a seatless observer (none) get no commander
+  tracking, countdowns or alerts, rather than both sides' at once; watching
+  a replay from one seat gets that player's.
+
+  Which completions get a toast is one switch each under `CompleteToasts`,
+  by role (factory, radar, extractor, energy, defence, tech centre,
+  strategic, other) and separately for a fresh build and for an upgrade to
+  the next tier, plus `AnyTier4`. Defaults: factory and radar upgrades,
+  tech centres, strategic weapons and anything tier 4; not a new extractor
+  or generator. The role comes off the template's tags, the tier off
+  `general.techNumber`, and "upgrade" from the `upgrader` link the game keeps
+  on the new-tier entity while the upgrade runs (remembered, since the game
+  clears it the moment it lands). The built-in tones are synthesised: under
+  attack is a falling 520→390 Hz pair, critical three 330 Hz pulses,
+  complete a rising 660→880 Hz pair. Voice packs replace them: a subfolder
+  of `SanctuaryMods\SanctuaryHud\sounds\` holding `commander-under-attack`,
+  `commander-critical`, `structure-complete` and `structure-upgraded` WAVs
+  (any PCM or float WAV, any rate or channel count), chosen with
+  `Alerts · VoicePack`, a left/right chooser on the Mods page listing the
+  packs found at load plus `tones` for the built-in sounds. Three ship:
+  `machine` (a female-voiced synthetic combat AI, the default),
+  `announcer` (a military radio read) and `caretaker` (Sanctuary's own
+  intelligence, calm and vast), in that order, with any pack a player adds
+  after them; a loose WAV in the sounds folder itself is the fallback for a
+  line a pack lacks.
+  `Alerts · Volume` is 0 to 100 like the game's own audio sliders, and
+  shows as one on the Mods page. The game's audio runs through Wwise and a Unity AudioSource
+  plays nothing in this build, so the mod goes round the engine: it
+  renders each sound at the configured volume to a 16-bit WAV in
+  `BepInEx\cache\SanctuaryHud\` and plays that through the Windows
+  waveform API (`winmm` PlaySound), which the system mixer handles like
+  any other app's audio. Files under the project's `sounds` folder deploy
+  with the build and ship in the release zips. Sound is off by default
+  (`Alerts · Sound`); the toasts show regardless.
 
 Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
 
@@ -406,7 +473,7 @@ Makes the game's own replays watchable properly: any player's point of view
 or every army at once, the fog lifted, every army's economy with whole-game
 totals, and a transport with pause, speed, seek and rewind. Since the
 playtest update of 2026-09-04 the game records every match to
-`%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary Shattered Sun\Replays\*.sanreplay`
+`%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary\Replays\*.sanreplay`
 and plays them from the main menu's replay list; the panel appears whenever
 one is playing, and **F7** shows and hides it.
 
@@ -574,9 +641,21 @@ agent running).
 A **Mods** entry in the front menu's sidebar (the cube icon, just below
 Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods
 and Lua Mods. The page is the game's own Settings screen, cloned and refilled:
-the tab bar, the switch rows, the text fields (a settings slider's input box,
+the tab bar, the switch rows, the sliders (UI Scale's row), the left/right
+selectors (Window Mode's row), the text fields (a slider's input box,
 widened), the headings and the buttons are all the game's Beam UI widgets, so
 it looks like the rest of the menu and follows any restyling the game does.
+
+Each UI mod's settings are listed in the order the mod bound them, so an
+author's grouping is what the player reads: sections in first-appearance
+order under their own heading, entries as bound within each. A bool is a
+switch, a setting with an `AcceptableValueRange` a slider, one with an
+`AcceptableValueList` a selector, anything else a text box. Key names show
+as words (`HideGameEconomyBars` reads "Hide game economy bars"; `Eta`,
+`Ui`, `Url` and `Pos` are expanded). A section that is nothing but hotkeys
+(KeyCode settings, or strings whose description says "hotkey") is laid out
+two to a row, which is what keeps BuildHotkeys' structure and unit lists
+short.
 **F8** also opens the same page full-screen during a match (over the menu
 background, the way the pause menu's Settings does); closing it returns to
 the game. UI mod toggles and settings changes apply immediately; Lua mod

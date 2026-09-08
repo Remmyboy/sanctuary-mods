@@ -11,15 +11,17 @@ using static SanctuaryHud.HudCore;
 namespace SanctuaryHud
 {
     // Client-side HUD: the economy strip across the top and the commander
-    // widget top-right. Presentation-only: reads state the game already sends
-    // to the render side and draws an IMGUI overlay. Never touches the
-    // lobby-hashed Lua tree or the simulation.
+    // widget top-right, reclaim values and build countdowns drawn over the
+    // map (WorldOverlays.cs), and the commander alerts (Alerts.cs).
+    // Presentation-only: reads state the game already sends to the render
+    // side and draws an IMGUI overlay. Never touches the lobby-hashed Lua
+    // tree or the simulation.
     //
     // The idle-engineers panel, the alloy panel and the map-local file
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.7.1")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.8.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -28,6 +30,21 @@ namespace SanctuaryHud
         private ConfigEntry<bool> _cfgVisible;
         private ConfigEntry<KeyCode> _cfgToggleKey;
         private ConfigEntry<bool> _cfgHideBuiltIn;
+        private ConfigEntry<bool> _cfgReclaim;
+        private ConfigEntry<KeyCode> _cfgReclaimHoldKey;
+        private ConfigEntry<float> _cfgReclaimMinValue;
+        private ConfigEntry<float> _cfgReclaimCluster;
+        private ConfigEntry<bool> _cfgBuildEta;
+        private ConfigEntry<int> _cfgBuildEtaMax;
+        private ConfigEntry<bool> _cfgAlertAttacked;
+        private ConfigEntry<bool> _cfgAlertCritical;
+        private ConfigEntry<float> _cfgAlertCriticalAt;
+        private ConfigEntry<bool> _cfgAlertBuildComplete;
+        private ConfigEntry<bool> _cfgCompleteTier4;
+        private readonly Dictionary<string, ConfigEntry<bool>> _cfgCompleteRules = new Dictionary<string, ConfigEntry<bool>>();
+        private ConfigEntry<bool> _cfgAlertSound;
+        private ConfigEntry<int> _cfgAlertVolume;
+        private ConfigEntry<string> _cfgVoicePack;
 
         private bool _visible = true;
 
@@ -43,6 +60,69 @@ namespace SanctuaryHud
             _cfgCommanderZoom = Config.Bind("Commander", "JumpZoomFactor", 0.5f,
                 "How wide the camera sits after jumping to the commander, as a fraction of the current camera height. " +
                 "Higher = further out. 0.5 keeps roughly your current zoom.");
+
+            _cfgReclaim = Config.Bind("Reclaim", "Enabled", true,
+                "Draw the alloy (and energy) value of wrecks and harvestable props over the map. Zoomed out, nearby values are summed into one figure.");
+            _cfgReclaimHoldKey = Config.Bind("Reclaim", "HoldKey", KeyCode.LeftAlt,
+                "Only show reclaim values while this key is held. None = always shown.");
+            _cfgReclaimMinValue = Config.Bind("Reclaim", "MinValue", 5f,
+                "Hide figures below this many alloys (energy counts a tenth).");
+            _cfgReclaimCluster = Config.Bind("Reclaim", "ClusterPixels", 110f,
+                "How close two values can sit on screen before they are summed into one figure, in pixels at 1080p. Smaller = more, finer numbers.");
+
+            _cfgBuildEta = Config.Bind("BuildEta", "Enabled", true,
+                "Show a time-to-finish under each of your structures under construction (upgrades included). Turns red when nothing is building it.");
+            _cfgBuildEtaMax = Config.Bind("BuildEta", "MaxLabels", 12,
+                "At most this many countdowns at once, soonest first; ones that would overlap another are skipped.");
+
+            _cfgAlertAttacked = Config.Bind("Alerts", "CommanderUnderAttack", true,
+                "Toast and tone when the commander loses health. Click the toast to jump to it.");
+            _cfgAlertCritical = Config.Bind("Alerts", "CommanderCritical", true,
+                "Toast and tone once when the commander drops below the critical fraction; re-arms after it is repaired.");
+            _cfgAlertCriticalAt = Config.Bind("Alerts", "CriticalFraction", 0.35f,
+                "Health fraction that counts as critical.");
+            _cfgAlertBuildComplete = Config.Bind("Alerts", "StructureComplete", true,
+                "Toast when one of your structures finishes building. Which ones is set under CompleteToasts.");
+
+            // One switch per kind of completion, so the Mod Manager lists
+            // them as rows. Upgrades (a tier-1 factory becoming tier 2, a
+            // radar becoming the next tier) are the ones worth interrupting
+            // for; a fresh extractor or generator is not, by default.
+            _cfgCompleteTier4 = Config.Bind("CompleteToasts", "AnyTier4", true,
+                "Any tier-4 structure finishing, whatever it is.");
+            void Rule(string role, string label, bool newDefault, bool upgradeDefault)
+            {
+                _cfgCompleteRules[role + ".new"] = Config.Bind("CompleteToasts", label + "Built", newDefault, $"A new {label.ToLowerInvariant()} finishes building.");
+                _cfgCompleteRules[role + ".upgrade"] = Config.Bind("CompleteToasts", label + "Upgraded", upgradeDefault, $"A {label.ToLowerInvariant()} finishes upgrading to its next tier.");
+            }
+            Rule("factory", "Factory", false, true);
+            Rule("intel", "Radar", false, true);
+            Rule("extractor", "Extractor", false, false);
+            Rule("energy", "Energy", false, false);
+            Rule("defence", "Defence", false, false);
+            Rule("tech", "TechCentre", true, true);
+            Rule("strategic", "Strategic", true, true);
+            Rule("other", "Other", false, false);
+            _cfgAlertSound = Config.Bind("Alerts", "Sound", false,
+                "Play a sound with each alert: a voice line from the mod's sounds folder where one is shipped, else a short tone. Off by default; the toasts show either way.");
+            _cfgAlertVolume = Config.Bind("Alerts", "Volume", 50,
+                new ConfigDescription("Alert volume, 0 to 100, like the game's own audio sliders.", new AcceptableValueRange<int>(0, 100)));
+            // The packs on disk plus the built-in tones, as a fixed list so
+            // the Mod Manager offers them as a chooser rather than a text box.
+            // Read once at load; a pack added later shows after a reload.
+            // Shipped packs first, in preference order, then anything a
+            // player added, then the tones; the first present is the default.
+            var preferred = new[] { "machine", "announcer", "caretaker" };
+            var onDisk = new List<string>(Alerts.AvailablePacks());
+            var packs = new List<string>();
+            foreach (var p in preferred) if (onDisk.Remove(p)) packs.Add(p);
+            packs.AddRange(onDisk);
+            packs.Add("tones");
+            var defaultPack = packs[0];
+            _cfgVoicePack = Config.Bind("Alerts", "VoicePack", defaultPack,
+                new ConfigDescription(
+                    "Which voice speaks the alerts: a subfolder of SanctuaryMods\\SanctuaryHud\\sounds, or the built-in tones.",
+                    new AcceptableValueList<string>(packs.ToArray())));
 
             _visible = _cfgVisible.Value;
 
@@ -65,6 +145,7 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             GamePanel.Restore();
+            Alerts.Shutdown();
             _harmony?.UnpatchSelf();
         }
 
@@ -81,6 +162,22 @@ namespace SanctuaryHud
 
             SharedTick();
             StepSmoothing();
+
+            // Config is read every frame so the Mod Manager's settings page
+            // takes effect at once; the entries are cheap to read.
+            WorldOverlays.ReclaimEnabled = _cfgReclaim.Value;
+            WorldOverlays.BuildEtaEnabled = _cfgBuildEta.Value || _cfgAlertBuildComplete.Value;
+            Alerts.AttackedEnabled = _cfgAlertAttacked.Value;
+            Alerts.CriticalEnabled = _cfgAlertCritical.Value;
+            Alerts.CriticalFraction = Mathf.Clamp(_cfgAlertCriticalAt.Value, 0.05f, 0.9f);
+            Alerts.BuildCompleteEnabled = _cfgAlertBuildComplete.Value;
+            Alerts.CompleteAnyTier4 = _cfgCompleteTier4.Value;
+            foreach (var kv in _cfgCompleteRules) Alerts.CompleteRules[kv.Key] = kv.Value.Value;
+            Alerts.SoundEnabled = _cfgAlertSound.Value;
+            Alerts.Volume = _cfgAlertVolume.Value / 100f;
+            Alerts.VoicePack = _cfgVoicePack.Value;
+            WorldOverlays.Tick();
+            Alerts.Tick();
 
             // The built-in readouts only go while the strip is standing in for
             // them: overlay on, in a match, option set. Anything else restores.
@@ -165,9 +262,20 @@ namespace SanctuaryHud
             var previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var logicalWidth = Screen.width / scale;
+            var logicalHeight = Screen.height / scale;
+
+            // Map-anchored labels go first so the strip and widgets sit over
+            // them rather than the other way round.
+            var holdKey = _cfgReclaimHoldKey.Value;
+            if (_cfgReclaim.Value && (holdKey == KeyCode.None || Input.GetKey(holdKey)))
+            {
+                WorldOverlays.DrawReclaim(scale, logicalWidth, logicalHeight, _cfgReclaimCluster.Value, _cfgReclaimMinValue.Value);
+            }
+            if (_cfgBuildEta.Value) WorldOverlays.DrawBuildEtas(scale, logicalWidth, logicalHeight, _cfgBuildEtaMax.Value);
 
             DrawEconomyStrip(logicalWidth);
             DrawCommanderWidget(logicalWidth);
+            Alerts.Draw(logicalWidth, StripHeight + 12f, _texStrip);
 
             GUI.matrix = previousMatrix;
         }
@@ -213,6 +321,8 @@ namespace SanctuaryHud
                 _stStripChip.fontSize = 12;
                 _stCmdLabel.fontSize = 12;
             }
+            WorldOverlays.ApplyFont(font);
+            Alerts.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
 
             var alloy = AlloyColour;

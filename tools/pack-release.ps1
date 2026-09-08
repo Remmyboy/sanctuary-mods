@@ -99,6 +99,9 @@ function New-Zip($dir, $zip) {
 $mm = "$stage\mm"
 New-Item -ItemType Directory -Force -Path "$mm\SanctuaryMods\$Mod" | Out-Null
 Copy-Item "$stage\$Mod.dll" "$mm\SanctuaryMods\$Mod\$Mod.dll"
+# A mod may ship data next to its DLL (SanctuaryHud's alert sounds live in
+# <Mod>\sounds); anything under the project's sounds folder goes along.
+if (Test-Path "$repo\$Mod\sounds") { Copy-Item "$repo\$Mod\sounds" "$mm\SanctuaryMods\$Mod\sounds" -Recurse }
 $t = "Sanctuary $display $Version - Mod Manager add-in"
 @"
 $t
@@ -139,6 +142,7 @@ Copy-Item "$tools\BepInEx.cfg" "$sa\BepInEx\config\BepInEx.cfg"
 Copy-Item "$tools\SanctuaryMods-README.txt" "$sa\SanctuaryMods\README.txt"
 Copy-Item "$stage\ModLoader.dll" "$sa\BepInEx\plugins\ModLoader.dll"
 Copy-Item "$stage\$Mod.dll" "$sa\SanctuaryMods\$Mod\$Mod.dll"
+if (Test-Path "$repo\$Mod\sounds") { Copy-Item "$repo\$Mod\sounds" "$sa\SanctuaryMods\$Mod\sounds" -Recurse }
 $t = "Sanctuary $display $Version - Standalone"
 @"
 $t

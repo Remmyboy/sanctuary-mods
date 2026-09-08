@@ -14,4 +14,15 @@
     <Message Importance="high" Text="Deployed $(AssemblyName).dll to $(DeployPath)" />
   </Target>
 
+  <!-- Data a mod ships beside its DLL: anything under the project's sounds
+       folder (SanctuaryHud's alert sounds) is deployed to <mod>\sounds, and
+       tools\pack-release.ps1 puts the same folder in the release zips. -->
+  <ItemGroup>
+    <ModSoundFiles Include="$(MSBuildProjectDirectory)\sounds\**\*" />
+  </ItemGroup>
+  <Target Name="DeploySoundsToGame" AfterTargets="DeployToGame" Condition="Exists('$(GamePath)') And '@(ModSoundFiles)' != ''">
+    <Copy SourceFiles="@(ModSoundFiles)" DestinationFolder="$(DeployPath)\sounds\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Deployed sounds for $(AssemblyName)" />
+  </Target>
+
 </Project>
