@@ -26,9 +26,15 @@ namespace SanctuaryHud
     // Toggling is blocked while in a lobby or match: the VMs snapshot the
     // cache at match launch, and swapping content under a live session would
     // change the hash out from under the lobby's compatibility check.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.4.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.5.0")]
     public class ModManagerPlugin : BaseUnityPlugin
     {
+        /// Tells ModLoader 1.3+ that this manager lists the loader's registry,
+        /// so switched-off plugins can be held back before they start: they
+        /// still appear on the page and can be switched on again. The loader
+        /// looks for the field by name; its value is never read.
+        public const bool ListsLoaderRegistry = true;
+
         private static BepInEx.Logging.ManualLogSource _log;
 
         internal class ModEntry
@@ -61,22 +67,33 @@ namespace SanctuaryHud
         {
             ScanMods();
             if (!Locked) Reapply();
+            RefreshPlugins(applyDisabled: false);
         }
 
         internal void OpenModsFolder() => Application.OpenURL("file:///" + ModsRoot.Replace('\\', '/'));
 
         // ---- C# plugin toggles --------------------------------------------
-        // Everything BepInEx (or the hot-reload loader) attached to this same
-        // hidden manager GameObject. Disabling destroys the component — its
-        // OnDestroy unpatches Harmony, so it is a real unload — and enabling
-        // adds it back. C# plugins never enter the Lua hash, so unlike Lua
-        // mods these are safe to toggle any time, even mid-match.
+        // Every plugin on this same hidden manager GameObject: the ones the
+        // hot-reload loader manages, read from its registry, and any BepInEx
+        // loaded itself. Switching one off destroys its component (OnDestroy
+        // unpatches Harmony) and switching it on creates it again. That is a
+        // component teardown, not an unload: .NET can't unload an assembly
+        // from the running game, so the plugin's code and static state stay in
+        // memory until the game exits. With ModLoader 1.3+ a switched-off
+        // plugin is never started at all, and one whose DLL is deleted leaves
+        // the list. C# plugins never enter the Lua hash, so unlike Lua mods
+        // these are safe to toggle any time, even mid-match.
         internal class PluginEntry
         {
             public string Guid;
             public string Name;
             public Type Type;
             public BaseUnityPlugin Instance;
+            // The loader created it, so the loader starts and stops it.
+            public bool FromLoader;
+            // Switched off on this page, as opposed to destroyed from outside
+            // (an older loader tearing down a deleted DLL).
+            public bool SwitchedOff;
             // The last instance's ConfigFile, kept after it is unloaded: the
             // entries stay bound and writes still go to the file, which the
             // next instance reads on load, so settings are editable while
@@ -132,7 +149,8 @@ namespace SanctuaryHud
             _cfgEnabled = Config.Bind("Mods", "Enabled", "",
                 "Semicolon-separated mod folder names (under SanctuaryMods) applied at startup.");
             _cfgDisabledPlugins = Config.Bind("Plugins", "Disabled", "",
-                "Semicolon-separated GUIDs of C# plugins to unload at startup.");
+                "Semicolon-separated GUIDs of C# plugins switched off on the Mods page. ModLoader 1.3+ never starts " +
+                "these; an older loader starts them and the manager stops them straight away.");
 
             try { Directory.CreateDirectory(ModsRoot); }
             catch (Exception e) { _log.LogWarning($"Could not create {ModsRoot}: {e.Message}"); }
@@ -316,30 +334,75 @@ namespace SanctuaryHud
 
         private void RefreshPlugins(bool applyDisabled)
         {
-            var disabled = new HashSet<string>(
-                (_cfgDisabledPlugins.Value ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()),
-                StringComparer.OrdinalIgnoreCase);
+            var disabled = DisabledGuids();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var registry = LoaderRegistry.Resolve(_log);
 
+            // The loader's plugins, from DLLs on disk right now, running or
+            // held back. The loader held the switched-off ones back before
+            // they started, so there is nothing to apply after the fact.
+            var fromLoader = new HashSet<Type>();
+            if (registry != null)
+            {
+                foreach (var type in registry.PluginTypes())
+                {
+                    fromLoader.Add(type);
+                    var entry = Track(type, seen);
+                    if (entry == null) continue;
+                    entry.FromLoader = true;
+                    entry.Instance = registry.InstanceOf(type);
+                    entry.SwitchedOff = entry.Instance == null;
+                    if (entry.Instance != null && entry.Instance.Config != null) entry.Config = entry.Instance.Config;
+                }
+            }
+
+            // Everything else on the manager object: plugins BepInEx loaded
+            // itself, or every plugin under a loader older than 1.3. These can
+            // only be switched off once they are already running.
             foreach (var comp in GetComponents<BaseUnityPlugin>())
             {
-                if (ReferenceEquals(comp, this)) continue;
-                var meta = comp.GetType().GetCustomAttribute<BepInPlugin>();
-                if (meta == null) continue;
-                // Killing the loader would kill hot reload (and us with it).
-                if (meta.GUID == "com.sanctuarydb.modloader") continue;
-
-                var entry = _plugins.FirstOrDefault(p => string.Equals(p.Guid, meta.GUID, StringComparison.OrdinalIgnoreCase));
-                if (entry == null)
-                {
-                    entry = new PluginEntry { Guid = meta.GUID, Name = meta.Name };
-                    _plugins.Add(entry);
-                }
-                entry.Type = comp.GetType();
+                if (fromLoader.Contains(comp.GetType())) continue;
+                var entry = Track(comp.GetType(), seen);
+                if (entry == null) continue;
+                entry.FromLoader = false;
                 entry.Instance = comp;
+                entry.SwitchedOff = false;
                 if (comp.Config != null) entry.Config = comp.Config;
-                if (applyDisabled && disabled.Contains(meta.GUID)) SetPluginEnabled(entry, false, persist: false);
+                if (applyDisabled && disabled.Contains(entry.Guid)) SetPluginEnabled(entry, false, persist: false);
             }
+
+            // An entry nothing vouched for this pass is gone. The registry is
+            // the whole truth for the loader's plugins, so a deleted DLL's
+            // entry goes, Type and all, and can't be created again from
+            // memory. Anything else stays only while this page has it switched
+            // off; otherwise it was destroyed from outside.
+            _plugins.RemoveAll(p => !seen.Contains(p.Guid) && (p.FromLoader || !p.SwitchedOff));
         }
+
+        /// The entry for a plugin type, created on first sight and marked
+        /// seen. Null for the loader and the manager (switching either off
+        /// would leave nothing to switch it back on), for a type without
+        /// [BepInPlugin], and for a GUID already seen this pass.
+        private PluginEntry Track(Type type, HashSet<string> seen)
+        {
+            var meta = type.GetCustomAttribute<BepInPlugin>();
+            if (meta == null) return null;
+            if (meta.GUID == "com.sanctuarydb.modloader" || meta.GUID == "com.sanctuarydb.modmanager") return null;
+            if (!seen.Add(meta.GUID)) return null;
+            var entry = _plugins.FirstOrDefault(p => string.Equals(p.Guid, meta.GUID, StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+            {
+                entry = new PluginEntry { Guid = meta.GUID, Name = meta.Name };
+                _plugins.Add(entry);
+            }
+            entry.Type = type;
+            return entry;
+        }
+
+        private HashSet<string> DisabledGuids() => new HashSet<string>(
+            (_cfgDisabledPlugins.Value ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim()).Where(s => s.Length > 0),
+            StringComparer.OrdinalIgnoreCase);
 
         /// Everything the mod bound: from the running instance, or from the
         /// ConfigFile its last instance left behind while it is off.
@@ -352,13 +415,26 @@ namespace SanctuaryHud
 
         internal void SetPluginEnabled(PluginEntry entry, bool enable, bool persist = true)
         {
-            if (enable && entry.Instance == null && entry.Type != null)
+            var registry = entry.FromLoader ? LoaderRegistry.Resolve(_log) : null;
+            if (registry != null)
+            {
+                // The loader starts and stops its own plugins, and refuses a
+                // type it no longer has a DLL for.
+                var wasRunning = entry.Instance != null;
+                entry.Instance = registry.SetPluginEnabled(entry.Type, enable);
+                if (entry.Instance != null && entry.Instance.Config != null) entry.Config = entry.Instance.Config;
+                if (enable && entry.Instance == null)
+                    _log.LogWarning($"Plugin '{entry.Name}' could not be started; is its DLL still in SanctuaryMods?");
+                else if (wasRunning != (entry.Instance != null))
+                    _log.LogInfo($"Plugin '{entry.Name}' {(enable ? "started" : "stopped")}.");
+            }
+            else if (enable && entry.Instance == null && entry.Type != null)
             {
                 try
                 {
                     entry.Instance = (BaseUnityPlugin)gameObject.AddComponent(entry.Type);
                     if (entry.Instance.Config != null) entry.Config = entry.Instance.Config;
-                    _log.LogInfo($"Plugin '{entry.Name}' loaded.");
+                    _log.LogInfo($"Plugin '{entry.Name}' started.");
                 }
                 catch (Exception e)
                 {
@@ -369,11 +445,81 @@ namespace SanctuaryHud
             {
                 Destroy(entry.Instance); // its OnDestroy drops its Harmony patches
                 entry.Instance = null;
-                _log.LogInfo($"Plugin '{entry.Name}' unloaded.");
+                _log.LogInfo($"Plugin '{entry.Name}' stopped.");
             }
+            entry.SwitchedOff = entry.Instance == null;
             if (persist)
             {
-                _cfgDisabledPlugins.Value = string.Join(";", _plugins.Where(p => !p.Enabled).Select(p => p.Guid));
+                // A GUID switched off here whose DLL is away for now stays
+                // switched off when it comes back.
+                var known = new HashSet<string>(_plugins.Select(p => p.Guid), StringComparer.OrdinalIgnoreCase);
+                var off = DisabledGuids().Where(g => !known.Contains(g))
+                    .Concat(_plugins.Where(p => !p.Enabled).Select(p => p.Guid))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+                _cfgDisabledPlugins.Value = string.Join(";", off);
+            }
+        }
+
+        /// ModLoader 1.3+'s plugin registry, reached by reflection: the loader
+        /// is a separate assembly this one never references, so an older
+        /// loader without these methods leaves the manager on its component
+        /// scan instead of failing to load.
+        internal sealed class LoaderRegistry
+        {
+            private static LoaderRegistry _resolved;
+            private static bool _looked;
+
+            private readonly Func<Type[]> _pluginTypes;
+            private readonly Func<Type, BaseUnityPlugin> _instanceOf;
+            private readonly Func<Type, bool, BaseUnityPlugin> _setEnabled;
+
+            private LoaderRegistry(Func<Type[]> pluginTypes, Func<Type, BaseUnityPlugin> instanceOf, Func<Type, bool, BaseUnityPlugin> setEnabled)
+            {
+                _pluginTypes = pluginTypes;
+                _instanceOf = instanceOf;
+                _setEnabled = setEnabled;
+            }
+
+            internal Type[] PluginTypes() => _pluginTypes() ?? new Type[0];
+            internal BaseUnityPlugin InstanceOf(Type type) => _instanceOf(type);
+            internal BaseUnityPlugin SetPluginEnabled(Type type, bool enabled) => _setEnabled(type, enabled);
+
+            /// The registry, or null under an older loader. Looked up once per
+            /// copy of the manager; the loader never reloads.
+            internal static LoaderRegistry Resolve(BepInEx.Logging.ManualLogSource log)
+            {
+                if (_looked) return _resolved;
+                _looked = true;
+                try
+                {
+                    var loader = AppDomain.CurrentDomain.GetAssemblies()
+                        .Select(a => a.GetType("SanctuaryModLoader.LoaderPlugin", false))
+                        .FirstOrDefault(t => t != null);
+                    const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
+                    var types = loader?.GetMethod("PluginTypes", flags, null, Type.EmptyTypes, null);
+                    var instanceOf = loader?.GetMethod("InstanceOf", flags, null, new[] { typeof(Type) }, null);
+                    var setEnabled = loader?.GetMethod("SetPluginEnabled", flags, null, new[] { typeof(Type), typeof(bool) }, null);
+                    if (types != null && instanceOf != null && setEnabled != null)
+                    {
+                        _resolved = new LoaderRegistry(
+                            (Func<Type[]>)Delegate.CreateDelegate(typeof(Func<Type[]>), types),
+                            (Func<Type, BaseUnityPlugin>)Delegate.CreateDelegate(typeof(Func<Type, BaseUnityPlugin>), instanceOf),
+                            (Func<Type, bool, BaseUnityPlugin>)Delegate.CreateDelegate(typeof(Func<Type, bool, BaseUnityPlugin>), setEnabled));
+                        log.LogInfo("Mod manager: using the loader's plugin registry; switched-off plugins are never started.");
+                    }
+                    else
+                    {
+                        log.LogWarning("Mod manager: no ModLoader 1.3+ registry found, so switched-off plugins still start " +
+                                       "before they are stopped, and a deleted plugin can stay listed until restart. " +
+                                       "Updating ModLoader fixes both.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    _resolved = null;
+                    log.LogWarning($"Mod manager: the loader's plugin registry is unusable ({e.Message}); using the component scan.");
+                }
+                return _resolved;
             }
         }
 
@@ -392,10 +538,11 @@ namespace SanctuaryHud
             catch (Exception e) { _log.LogError($"Mods page: {e}"); }
 
             // Rescan periodically rather than once: each mod is its own
-            // hot-reloadable DLL now, so plugins (re)appear at any time — and
-            // a reload re-adds plugins the user has disabled, which the config
-            // then unloads again on the next scan. (Deferred off Awake anyway:
-            // the loader adds components in one pass and ours can run first.)
+            // hot-reloadable DLL, so plugins appear and go at any time. With
+            // ModLoader 1.3+ the loader holds switched-off plugins back itself;
+            // under an older loader a reload re-adds them and this scan stops
+            // them again. (Deferred off Awake anyway: the loader adds
+            // components in one pass and ours can run first.)
             _pluginScanAccum += Time.unscaledDeltaTime;
             if (_pluginScanAccum >= 2f)
             {
