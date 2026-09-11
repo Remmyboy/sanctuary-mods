@@ -12,8 +12,10 @@ A mod folder can hold either kind of mod, or both:
 Manage both from the Mods page in the front menu (the cube icon in the
 sidebar, or F8).
 
-UI mods (DLLs) are client-side C# and never affect multiplayer, so they can
-be toggled at any time, even mid-match.
+UI mods (DLLs) are client-side C# that never enters the lobby's Lua hash, so
+they can be toggled at any time, even mid-match. Like any BepInEx plugin
+they run as full-trust code inside the game, with your Windows account's
+permissions, so only install DLLs from a source you trust.
 
 Lua mods are overlaid in memory only - nothing on disk is touched - and take
 effect at the next match launch, so toggle them from the main menu rather
