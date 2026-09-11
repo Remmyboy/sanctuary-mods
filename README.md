@@ -33,9 +33,9 @@ source.
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.4.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
+| [ModManager](ModManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.5.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
+| [ModLoader](ModLoader/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -176,9 +176,10 @@ game's own HUD does: IMGUI would otherwise draw on top of them.
 
 ## IdleEngineers
 
-One clickable row per tech tier of idle engineers (plus a COMMANDER row and an
-ALL row) — clicking selects that group. Hidden entirely when nothing is idle;
-draggable, and its position persists.
+One clickable row per tech tier of idle engineers (plus a COM row for the
+commander and an ALL row) — clicking selects that group. Each row shows the
+unit's own build-menu art beside its label. Hidden entirely when nothing is
+idle; only as wide as what it is showing; draggable, and its position persists.
 
 **Idle factories** sit underneath (`Factories · Enabled`, on by default): a
 heading per type (LAND, AIR, NAVAL FACTORIES) with one row per tier beneath
@@ -194,9 +195,9 @@ that is upgrading, or paused with something queued, is not idle. The type is
 read from the client's tag tables (`LAND_FACTORY`, `AIR_FACTORY`,
 `NAVAL_FACTORY`) rather than the strategic icon, because the T3 naval
 factories ship with the air symbol and would otherwise file under AIR; the
-tier is the template's `general.techNumber`. That costs one more Lua query a
-second over your own army's units, the same shape as EcoManager's extractor
-lookup.
+tier is the template's `general.techNumber`. Factories are picked out in the
+same once-a-second sweep over your own army's units that finds EcoManager's
+extractors, and only while the setting is on.
 
 Idle state and unit identity come from the DOTS icon buffers rather than
 Harmony hooks, because the icon FFI receivers are Burst-compiled and cannot be
@@ -206,13 +207,29 @@ plumbing lives in [shared/HudCore.cs](shared/HudCore.cs), which is compiled
 into each mod that needs it — so each DLL is fully standalone, at the cost of
 each running its own copy of the once-a-second poll.
 
+The row art is *not* the strategic icon the poll identifies units by: that is
+the abstract map symbol, shared across factions and tiers, so it could never
+tell a T2 engineer from a T3 one. The build buttons draw a per-template
+`.sansprite` instead, loaded through the game's own pipeline into a registry
+keyed by `AssetID`. `SanctuaryUI.Utils.TryGetLoadedSprite` is the public way
+in, and `EM.Core.AssetID` wraps exactly the `uint` Lua reports as
+`general.foregroundIconID.index`, so the army sweep also keeps one
+representative template per row and hands its icon id to that lookup. Sprites
+are windows into a packed atlas, so each is drawn through its own
+`textureRect`. Art and label are both kept: the art is what you recognise, the
+label is what makes the tier certain. Art the game hasn't loaded yet is retried
+each second, and if the lookup is missing altogether the rows are just
+labelled.
+
 ## EcoManager
 
 A small **ALLOY** panel: one clickable row per extractor tier (T1/T2/T3, plus
 an ALL row), and — only while something is actually upgrading — an
 **UPGRADING** block underneath listing those by tier. Clicking any row selects
-that group. Hidden until you have your first extractor; draggable, position
-persists.
+that group. Rows carry the extractor's build-menu art beside the tier label,
+by the same route as the [idle rows](#idleengineers), and the panel is only as
+wide as its rows. Hidden until you have your first extractor; draggable,
+position persists.
 
 The tier comes off the strategic icon, `structure1_t{n}_alloy_normal`, which is
 uniform across all three factions. Upgrading state is the game's own upgrade

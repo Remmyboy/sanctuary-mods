@@ -48,14 +48,17 @@ namespace SanctuaryHud
             /// which case the row shows but can't select).
             public int Count;
             public readonly List<int> UnitIds = new List<int>();
+            /// This row's build-menu art, as an AssetID index (0 = none).
+            /// See ResolveSprite; filled from the Lua template data.
+            public uint IconId;
         }
 
         internal static readonly object _groupLock = new object();
         internal static List<IdleGroup> _idleGroups = new List<IdleGroup>();
 
         // ---- idle factories (for the IdleEngineers mod) ----
-        // Off unless the mod switches it on: identifying factories costs a Lua
-        // query per poll, so other assemblies' copies of this file never pay.
+        // Off unless the mod switches it on, so other assemblies' copies of
+        // this file never collect factory ids in their army sweep.
         internal static bool _trackIdleFactories = false;
         /// Ordered by domain (land, air, naval), then tier.
         internal static List<IdleGroup> _idleFactoryGroups = new List<IdleGroup>();
@@ -106,6 +109,13 @@ namespace SanctuaryHud
         private static Type _assetIdType;
         private static bool _spriteBridgeTried;
         private static readonly Dictionary<uint, Sprite> _spriteCache = new Dictionary<uint, Sprite>();
+        /// Ids the registry did not have. It only holds what the game has
+        /// already loaded, so a miss early in a match must not be permanent:
+        /// the ECS poll clears this once a second, which lets late art in
+        /// while sparing a reflected call per row per frame.
+        private static readonly HashSet<uint> _spriteMisses = new HashSet<uint>();
+        /// Misses already logged, so each id is reported once a match.
+        private static readonly HashSet<uint> _spriteMissReported = new HashSet<uint>();
 
         private static void ResolveSpriteBridge()
         {
@@ -129,13 +139,20 @@ namespace SanctuaryHud
 
         /// Each match reloads the sprites through Engine.LoadSprite, so last
         /// match's AssetIDs are not safe to assume still valid.
-        internal static void ClearSpriteCache() => _spriteCache.Clear();
+        internal static void ClearSpriteCache()
+        {
+            _spriteCache.Clear();
+            _spriteMisses.Clear();
+            _spriteMissReported.Clear();
+        }
 
-        /// The game's own sprite for an AssetID index, or null.
+        /// The game's own sprite for an AssetID index, or null while the game
+        /// has not loaded it (or when the bridge is missing entirely).
         internal static Sprite ResolveSprite(uint index)
         {
             if (index == 0) return null;
             if (_spriteCache.TryGetValue(index, out var cached)) return cached;
+            if (_spriteMisses.Contains(index)) return null;
 
             ResolveSpriteBridge();
             Sprite sprite = null;
@@ -148,9 +165,26 @@ namespace SanctuaryHud
                 }
                 catch { /* one bad id must not take the caller down */ }
             }
-            _spriteCache[index] = sprite;
+
+            if (sprite != null)
+            {
+                _spriteCache[index] = sprite;
+            }
+            else
+            {
+                _spriteMisses.Add(index);
+                // An id the registry has never heard of and one whose art has
+                // not loaded yet look the same on screen; only the log can
+                // tell them apart.
+                if (_tryGetSprite != null && _spriteMissReported.Add(index))
+                    _log?.LogInfo($"Build-menu art {index}: not in the loaded sprite registry (yet).");
+            }
             return sprite;
         }
+
+        /// Whether art for this id can be drawn right now. Panels ask so every
+        /// row shares one indent, rather than rows jumping as their art loads.
+        internal static bool HasSprite(uint index) => ResolveSprite(index) != null;
 
         /// Draws one in IMGUI. A Sprite's pixels are a window into a packed
         /// atlas, so the draw has to be told which corner of the texture.
@@ -1035,7 +1069,15 @@ namespace SanctuaryHud
                 var key = isCommander ? 0 : tier;
                 if (!groups.TryGetValue(key, out var group))
                 {
-                    group = new IdleGroup { Tier = key, Label = isCommander ? "COMMANDER" : $"T{tier}" };
+                    group = new IdleGroup
+                    {
+                        Tier = key,
+                        // "COM", not "COMMANDER": the row carries the
+                        // commander's own art, so the label only confirms it,
+                        // and the long word would set the panel's width alone.
+                        Label = isCommander ? "COM" : $"T{tier}",
+                        IconId = RowIcon(isCommander ? "cmd" : "eng" + tier),
+                    };
                     groups[key] = group;
                 }
                 group.Count++;
@@ -1072,50 +1114,7 @@ namespace SanctuaryHud
         // the upgrade adornment, so it is what fills the UPGRADING row.
         private static readonly HashSet<int> _extractorLocalIds = new HashSet<int>();
         private static bool _extractorIdsValid;
-        private static bool _loggedExtractorQueryFail;
-
-        private static void RefreshExtractorIds()
-        {
-            if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
-            try
-            {
-                if (!RunLua(
-                        "__SdbExtractors = '' " +
-                        "local out = {} " +
-                        "for _, a in pairs(Armies or {}) do " +
-                        "  if a.focused then " +
-                        "    for _, u in pairs(a.units or {}) do " +
-                        "      local li = u.localId and u.localId.index " +
-                        "      if li and u.tpId and Tags and Tags.ALLOYS_EXTRACTION and Tags.ALLOYS_EXTRACTION[u.tpId] " +
-                        "         and u.IsCompleted and u:IsCompleted() then " +
-                        "        out[#out+1] = li " +
-                        "      end " +
-                        "    end " +
-                        "  end " +
-                        "end " +
-                        "__SdbExtractors = table.concat(out, ',')"))
-                    return;
-
-                var raw = _getLuaGlobal("__SdbExtractors");
-                if (raw == null) return;
-
-                _extractorLocalIds.Clear();
-                // An empty string is a valid answer: no extractors yet.
-                foreach (var part in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (int.TryParse(part, out var id)) _extractorLocalIds.Add(id);
-                }
-                _extractorIdsValid = true;
-            }
-            catch (Exception e)
-            {
-                if (!_loggedExtractorQueryFail)
-                {
-                    _loggedExtractorQueryFail = true;
-                    _log.LogWarning($"Extractor lookup failed (the alloy panel will stay hidden): {e.Message}");
-                }
-            }
-        }
+        private static bool _loggedArmyLookupFail;
 
         // ---- factory identity, from the same tag tables ----
         // The strategic icon cannot give a factory's type: the T3 naval
@@ -1128,61 +1127,157 @@ namespace SanctuaryHud
         // Keyed by LocalID; the value is domain * 10 + tier.
         private static readonly Dictionary<int, int> _factoryKinds = new Dictionary<int, int>();
         private static bool _factoryKindsValid;
-        private static bool _loggedFactoryQueryFail;
 
-        private static void RefreshFactoryKinds()
+        // ---- row art, from the same sweep ----
+        // The rows are grouped by tier off the strategic icon, but that icon is
+        // the abstract map symbol, shared across factions and tiers, so it can
+        // only ever be labelled. The build-menu sprite lives on the template,
+        // which the ECS entity does not carry; Lua has both, so the sweep keeps
+        // one representative template per row and hands back its
+        // `foregroundIconID`, which ResolveSprite turns into the real Sprite.
+        // Keys are "cmd", "eng{tier}", "alloy{tier}" and "fac{domain}{tier}",
+        // matching how RecordIdle, RecordAlloy and RecordIdleFactory key rows.
+        private static readonly Dictionary<string, uint> _rowIcons = new Dictionary<string, uint>();
+        private static string _loggedRowIcons;
+
+        /// The build-menu art for a row, or 0 when Lua hasn't answered yet.
+        internal static uint RowIcon(string key) => _rowIcons.TryGetValue(key, out var id) ? id : 0u;
+
+        /// One sweep over our own army's units per poll: completed extractors,
+        /// factories by type and tier (only while a mod wants them), and a
+        /// representative template per panel row for its art.
+        private static void RefreshArmyLookups()
         {
             // A failed refresh shows no factory rows rather than last poll's.
             _factoryKindsValid = false;
-            if (!_trackIdleFactories) return;
             if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
             try
             {
                 if (!RunLua(
+                        "__SdbExtractors = '' " +
                         "__SdbFactories = '' " +
-                        "local out = {} " +
-                        "local kinds = { 'LAND_FACTORY', 'AIR_FACTORY', 'NAVAL_FACTORY' } " +
+                        "__SdbRowIcons = '' " +
+                        // Tags fills in as templates load, so early in a match
+                        // any of these can still be missing.
+                        "local T = Tags or {} " +
+                        "local ext, cmd = T.ALLOYS_EXTRACTION or {}, T.COMMAND or {} " +
+                        "local eng, stn = T.ENGINEER or {}, T.ENGINEERING_STATION or {} " +
+                        "local fac = { T.LAND_FACTORY or {}, T.AIR_FACTORY or {}, T.NAVAL_FACTORY or {} } " +
+                        "local tps = __Templates and __Templates.Units or {} " +
+                        "local function techOf(tp) " +
+                        "  local g = tps[tp] and tps[tp].general " +
+                        "  return tonumber(g and g.techNumber) or 1 " +
+                        "end " +
+                        $"local wantFactories = {(_trackIdleFactories ? "true" : "false")} " +
+                        "local out, facs, reps = {}, {}, {} " +
                         "for _, a in pairs(Armies or {}) do " +
                         "  if a.focused then " +
                         "    for _, u in pairs(a.units or {}) do " +
                         "      local li = u.localId and u.localId.index " +
-                        "      local tier = u.tp and u.tp.general and tonumber(u.tp.general.techNumber) " +
-                        "      if li and u.tpId and tier and Tags then " +
-                        "        for d, tag in ipairs(kinds) do " +
-                        "          if Tags[tag] and Tags[tag][u.tpId] then " +
-                        "            out[#out+1] = string.format('%d:%d', li, d * 10 + tier) " +
-                        "            break " +
+                        "      local tp = u.tpId " +
+                        "      if li and tp then " +
+                        "        local d = (fac[1][tp] and 1) or (fac[2][tp] and 2) or (fac[3][tp] and 3) " +
+                        "        if ext[tp] then " +
+                        "          if u.IsCompleted and u:IsCompleted() then " +
+                        "            out[#out+1] = li " +
+                        "            reps['alloy' .. techOf(tp)] = tp " +
                         "          end " +
+                        "        elseif cmd[tp] then " +
+                        "          reps['cmd'] = tp " +
+                        // Factories before engineers, so a factory that also
+                        // carries an engineer tag can never lend its art to
+                        // the engineer rows.
+                        "        elseif d then " +
+                        "          if wantFactories then " +
+                        "            local kind = d * 10 + techOf(tp) " +
+                        "            facs[#facs+1] = string.format('%d:%d', li, kind) " +
+                        "            reps['fac' .. kind] = tp " +
+                        "          end " +
+                        // Engineering stations are structures; the idle rows
+                        // list mobile engineers only, so the art must too.
+                        "        elseif eng[tp] and not stn[tp] then " +
+                        "          reps['eng' .. techOf(tp)] = tp " +
                         "        end " +
                         "      end " +
                         "    end " +
                         "  end " +
                         "end " +
-                        "__SdbFactories = table.concat(out, ',')"))
+                        "__SdbExtractors = table.concat(out, ',') " +
+                        "__SdbFactories = table.concat(facs, ',') " +
+                        // The art is a nicety and the ids are not, so an
+                        // unexpected template shape must not take the ids down.
+                        "pcall(function() " +
+                        "  local icons = {} " +
+                        "  for k, tp in pairs(reps) do " +
+                        "    local g = tps[tp] and tps[tp].general " +
+                        // foregroundIconID is the build-menu button art. The
+                        // FFI hands back uint32 cdata, which would concatenate
+                        // as '1234ULL', hence tonumber and string.format.
+                        "    local id = g and g.foregroundIconID and tonumber(g.foregroundIconID.index) or 0 " +
+                        "    if id ~= 0 then icons[#icons+1] = k .. '=' .. string.format('%d', id) end " +
+                        "  end " +
+                        // pairs() order changes between polls; sorted, the
+                        // string only changes when the answer does.
+                        "  table.sort(icons) " +
+                        "  __SdbRowIcons = table.concat(icons, '|') " +
+                        "end)"))
                     return;
 
-                var raw = _getLuaGlobal("__SdbFactories");
+                var raw = _getLuaGlobal("__SdbExtractors");
                 if (raw == null) return;
 
-                _factoryKinds.Clear();
-                // An empty string is a valid answer: no factories yet.
+                _extractorLocalIds.Clear();
+                // An empty string is a valid answer: no extractors yet.
                 foreach (var part in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    var colon = part.IndexOf(':');
-                    if (colon > 0 && int.TryParse(part.Substring(0, colon), out var id) &&
-                        int.TryParse(part.Substring(colon + 1), out var kind))
+                    if (int.TryParse(part, out var id)) _extractorLocalIds.Add(id);
+                }
+                _extractorIdsValid = true;
+
+                if (_trackIdleFactories)
+                {
+                    var factoriesRaw = _getLuaGlobal("__SdbFactories");
+                    if (factoriesRaw != null)
                     {
-                        _factoryKinds[id] = kind;
+                        _factoryKinds.Clear();
+                        // Empty is valid here too: no factories yet.
+                        foreach (var part in factoriesRaw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var colon = part.IndexOf(':');
+                            if (colon > 0 && int.TryParse(part.Substring(0, colon), out var id) &&
+                                int.TryParse(part.Substring(colon + 1), out var kind))
+                            {
+                                _factoryKinds[id] = kind;
+                            }
+                        }
+                        _factoryKindsValid = true;
                     }
                 }
-                _factoryKindsValid = true;
+
+                // Art is a nicety: without it the rows stay labelled.
+                var iconsRaw = _getLuaGlobal("__SdbRowIcons");
+                if (iconsRaw == null) return;
+                // What Lua found. The per-id sprite line says what the registry
+                // made of it, so a blank row can be pinned on one or the other.
+                if (iconsRaw != _loggedRowIcons)
+                {
+                    _loggedRowIcons = iconsRaw;
+                    _log.LogInfo($"Row art ids: {(iconsRaw.Length == 0 ? "(none)" : iconsRaw)}");
+                }
+                _rowIcons.Clear();
+                foreach (var part in iconsRaw.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var split = part.IndexOf('=');
+                    if (split > 0 && uint.TryParse(part.Substring(split + 1), out var icon))
+                        _rowIcons[part.Substring(0, split)] = icon;
+                }
             }
             catch (Exception e)
             {
-                if (!_loggedFactoryQueryFail)
+                if (!_loggedArmyLookupFail)
                 {
-                    _loggedFactoryQueryFail = true;
-                    _log.LogWarning($"Factory lookup failed (idle factories will stay hidden): {e.Message}");
+                    _loggedArmyLookupFail = true;
+                    _log.LogWarning($"Army lookup failed (the alloy panel and idle factories will stay hidden): {e.Message}");
                 }
             }
         }
@@ -1204,7 +1299,13 @@ namespace SanctuaryHud
 
                 if (!groups.TryGetValue(kind, out var group))
                 {
-                    group = new IdleGroup { Domain = kind / 10, Tier = kind % 10, Label = $"T{kind % 10}" };
+                    group = new IdleGroup
+                    {
+                        Domain = kind / 10,
+                        Tier = kind % 10,
+                        Label = $"T{kind % 10}",
+                        IconId = RowIcon("fac" + kind),
+                    };
                     groups[kind] = group;
                 }
                 group.Count++;
@@ -1262,7 +1363,7 @@ namespace SanctuaryHud
                 {
                     if (!into.TryGetValue(tier, out var group))
                     {
-                        group = new IdleGroup { Tier = tier, Label = $"T{tier}" };
+                        group = new IdleGroup { Tier = tier, Label = $"T{tier}", IconId = RowIcon("alloy" + tier) };
                         into[tier] = group;
                     }
                     group.Count++;
@@ -1418,13 +1519,15 @@ namespace SanctuaryHud
             if (_upgradeImageIndex < 0) TryResolveUpgradeImageIndex();
             if (_iconNamesByIndex == null) ResolveIconNames();
             if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();
+            // Give art that hadn't loaded a second ago another chance.
+            _spriteMisses.Clear();
 
             try
             {
                 var count = 0;
                 var allCount = 0;
                 var ownColour = LocalArmyColour();
-                RefreshExtractorIds();
+                RefreshArmyLookups();
                 var groups = new Dictionary<int, IdleGroup>();
                 var alloyGroups = new Dictionary<int, IdleGroup>();
                 var alloyUpgrading = new Dictionary<int, IdleGroup>();
@@ -1450,7 +1553,6 @@ namespace SanctuaryHud
                     _pollStatus = "no owner";
                     return;
                 }
-                RefreshFactoryKinds();
                 var componentType = _componentTypeReadOnly.Invoke(null, new object[] { _iconElemType });
                 var ctArray = Array.CreateInstance(componentType.GetType(), 1);
                 ctArray.SetValue(componentType, 0);
@@ -1603,7 +1705,8 @@ namespace SanctuaryHud
             {
                 // Leaving a match: drop everything so the next one starts clean
                 // rather than flashing the previous game's units.
-                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _idleFactoryCount > 0 || _alloyCount > 0)
+                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _idleFactoryCount > 0 || _alloyCount > 0 ||
+                    _rowIcons.Count > 0)
                 {
                     _commanderLocalIndex = -1;
                     _commanderIconIndex = -1;
@@ -1611,6 +1714,11 @@ namespace SanctuaryHud
                     _idleFactoryCount = 0;
                     _alloyCount = 0;
                     _alloyUpgradingCount = 0;
+                    // Each match reloads its sprites through Engine.LoadSprite,
+                    // so a reused id could otherwise draw last game's art.
+                    ClearSpriteCache();
+                    _rowIcons.Clear();
+                    _loggedRowIcons = null;
                     lock (_groupLock)
                     {
                         _idleGroups = new List<IdleGroup>();
@@ -1662,6 +1770,50 @@ namespace SanctuaryHud
         internal static GUIStyle _stStripLabel, _stStripValue, _stStripMax, _stStripIn, _stStripOut, _stStripNet, _stStripChip;
         internal static GUIStyle _stCmdLabel, _stCmdGlyph, _stSubHeading;
         internal static Texture2D _texPanel, _texBarBack, _texWhite, _texRowHover;
+
+        // Row geometry for the list panels, shared so they stack alike. The
+        // row is sized around its build-menu art rather than its 12px label.
+        internal const float RowHeight = 20f;
+        internal const float IconSize = 18f;
+
+        /// Where a row's three columns sit, and how wide that makes the panel.
+        internal struct RowLayout
+        {
+            /// Label x, from the row's left edge. Leaves room for the art when
+            /// any row has some, decided once for the whole panel: a row that
+            /// slid over when its own sprite loaded would read as a glitch.
+            public float Indent;
+            /// Count x, likewise: one column, so the numbers stack.
+            public float CountX;
+            public float Width;
+        }
+
+        /// Measures a panel from the rows it is about to draw. A fixed width is
+        /// always wrong one way or the other — dead space right of "T1 2", or
+        /// one long label from clipping — so ask the styles how wide the text is.
+        internal static RowLayout MeasureRows(List<IdleGroup> rows, bool withAllRow, int widestCount, bool roomForStatus)
+        {
+            var indent = 5f;
+            foreach (var row in rows)
+            {
+                if (!HasSprite(row.IconId)) continue;
+                indent = IconSize + 6f;
+                break;
+            }
+
+            var label = 0f;
+            foreach (var row in rows) label = Mathf.Max(label, _stRowLabel.CalcSize(new GUIContent(row.Label)).x);
+            if (withAllRow) label = Mathf.Max(label, _stRowLabel.CalcSize(new GUIContent("ALL")).x);
+
+            var countX = indent + label + 10f;
+            var count = _stRowCount.CalcSize(new GUIContent(widestCount.ToString())).x;
+            // 4px of window margin each side of the row, 8px past the count.
+            var width = countX + count + 16f;
+            // The poll-status note in the header is wider than any row, and only
+            // shows when something is wrong, so only then does it widen things.
+            if (roomForStatus) width = Mathf.Max(width, 152f);
+            return new RowLayout { Indent = indent, CountX = countX, Width = width };
+        }
 
         internal static readonly Color AlloyColour = new Color(0.16f, 0.75f, 0.72f, 0.92f);  // teal
         internal static readonly Color EnergyColour = new Color(0.9f, 0.68f, 0.16f, 0.92f);  // amber
