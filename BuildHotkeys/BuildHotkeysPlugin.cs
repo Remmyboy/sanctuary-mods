@@ -30,13 +30,14 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.1.1")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.2.0")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
             new Dictionary<string, ConfigEntry<string>>();
 
         private ConfigEntry<string> _cfgCancelKey;
+        private ConfigEntry<string> _cfgMenuKey;
         private ConfigEntry<float> _cfgCycleSeconds;
         private ConfigEntry<bool> _cfgOverlay;
         private ConfigEntry<float> _cfgOverlaySeconds;
@@ -90,16 +91,23 @@ namespace SanctuaryHud
             _log ??= Logger;
 
             _cfgCancelKey = Config.Bind("Cancel", "ClearFactoryQueue", "Escape",
-                "Cancels the build queue of every selected factory, as escape does in FAF. With nothing " +
-                "queued -- or the pause menu already open -- the key falls through to whatever it normally " +
-                "does, so escape still opens the menu. Blank to unbind.");
+                "Stops every selected factory, as escape does in FAF: the same order as the Stop button, so its " +
+                "build queue is cleared and an assist on another factory is dropped rather than left to refill it. " +
+                "With no selected factory queued or assisting -- or the pause menu already open -- the key falls " +
+                "through to whatever it normally does, so escape still opens the menu unless PauseMenuKey has " +
+                "moved it. Blank to unbind.");
+            _cfgMenuKey = Config.Bind("Menu", "PauseMenuKey", "Escape",
+                "Key that opens the pause menu, in the game's own format, e.g. F11 or Ctrl-M (not F1, which opens " +
+                "the game's debug menu). Moving it off escape leaves escape to stopping factories; escape still " +
+                "closes the menu once it is open. Escape or blank keeps the game's own binding.");
             _cfgCycleSeconds = Config.Bind("Cycle", "Seconds", 0f,
                 "How long a key keeps cycling after a press, the way FAF hotbuild's cycle reset time does " +
                 "(theirs is 1.1). Off by default: a structure already cycles for as long as its template is " +
                 "on the cursor, and this only adds anything for factories, where it would turn a second press " +
                 "into \"cycle\" instead of \"queue another\". Set 1.1 to match FAF.");
             _cfgOverlay = Config.Bind("Overlay", "Show", true,
-                "After a build hotkey, show what it picked and the rest of that key's cycle.");
+                "After a build hotkey, show what it picked and the rest of that key's cycle. A factory only " +
+                "cycles with Cycle.Seconds set, so without it the overlay shows just the pick.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
                 "How long the overlay stays up after the last press.");
             _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 40f,
@@ -309,7 +317,7 @@ namespace SanctuaryHud
         }
 
         private string Signature() =>
-            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value;
+            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value + "|menu=" + _cfgMenuKey.Value;
 
         /// Reads the cycle the last press landed in: press counter, key, live
         /// index, then every option in order. The counter leads so two presses
@@ -470,7 +478,13 @@ namespace SanctuaryHud
             if (TryBindings(_cfgCancelKey.Value, "ClearFactoryQueue", out var canonicalCancel, out _))
                 cancelKey = canonicalCancel;
 
-            if (roleEntries.Count == 0 && cancelKey.Length == 0)
+            // Escape is where the game already binds the menu, so only another
+            // key has anything to move.
+            var menuKey = "";
+            if (TryBindings(_cfgMenuKey.Value, "PauseMenuKey", out var canonicalMenu, out _) && canonicalMenu != "Escape")
+                menuKey = canonicalMenu;
+
+            if (roleEntries.Count == 0 && cancelKey.Length == 0 && menuKey.Length == 0)
             {
                 Logger.LogWarning("Build hotkeys: nothing bound — every role's key is blank or invalid.");
                 _installed = true;
@@ -486,7 +500,8 @@ namespace SanctuaryHud
                 .Replace("__ROLES__", string.Join(",", roleEntries.ToArray()))
                 .Replace("__BINDINGS__", string.Join(",", bindingEntries.ToArray()))
                 .Replace("__CYCLE__", Mathf.Max(0f, _cfgCycleSeconds.Value).ToString(System.Globalization.CultureInfo.InvariantCulture))
-                .Replace("__CANCELKEY__", Quote(cancelKey));
+                .Replace("__CANCELKEY__", Quote(cancelKey))
+                .Replace("__MENUKEY__", Quote(menuKey));
 
             try
             {
@@ -503,7 +518,9 @@ namespace SanctuaryHud
                     Logger.LogInfo($"Build hotkeys: {pair.Key} -> {string.Join(", ", pair.Value.ToArray())}");
                 }
                 if (cancelKey.Length > 0)
-                    Logger.LogInfo($"Build hotkeys: {cancelKey} -> clear selected factories' build queue");
+                    Logger.LogInfo($"Build hotkeys: {cancelKey} -> stop selected factories");
+                if (menuKey.Length > 0)
+                    Logger.LogInfo($"Build hotkeys: {menuKey} -> pause menu (escape only closes it)");
                 Logger.LogInfo($"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys.");
             }
             catch (Exception e)
@@ -710,9 +727,16 @@ if not __SdbBuildHotkeys then
     -- and every option in order. Led by the press counter so two presses that
     -- land on the same entry still read as two distinct events.
     __SdbBuildHotkeysCount = __SdbBuildHotkeysCount + 1
+    -- A factory with no cycle window never gets past its first pick — a repeat
+    -- press queues another of the same — so the rest of the list would only
+    -- show options that pressing again cannot reach. Show just the pick.
+    local shown, shownIdx = cands, idx
+    if want == 'u' and not (now and BH.cycleSeconds > 0) then
+      shown, shownIdx = { tpId }, 1
+    end
     local entries = {}
-    for i = 1, #cands do
-      local g = __Templates.Units[cands[i]]
+    for i = 1, #shown do
+      local g = __Templates.Units[shown[i]]
       g = g and g.general
       -- foregroundIconID is the build-menu button art (UnitTemplateIDToIconID,
       -- one sprite per template); strategicIconID is the map symbol, which is
@@ -730,10 +754,10 @@ if not __SdbBuildHotkeys then
       if g and g.backgroundIconID and g.backgroundIconID.index then
         bg = tonumber(g.backgroundIconID.index) or 0
       end
-      entries[i] = ((g and g.displayName) or cands[i]) .. '~' .. string.format('%d', icon)
-        .. '~' .. string.format('%d', techOf(cands[i])) .. '~' .. string.format('%d', bg)
+      entries[i] = ((g and g.displayName) or shown[i]) .. '~' .. string.format('%d', icon)
+        .. '~' .. string.format('%d', techOf(shown[i])) .. '~' .. string.format('%d', bg)
     end
-    __SdbBuildHotkeysCycle = __SdbBuildHotkeysCount .. '|' .. key .. '|' .. idx
+    __SdbBuildHotkeysCycle = __SdbBuildHotkeysCount .. '|' .. key .. '|' .. shownIdx
       .. '|' .. table.concat(entries, '|')
 
     -- The panel's own click handler: it wraps the file-local
@@ -754,41 +778,41 @@ if not __SdbBuildHotkeys then
     return BH.origSetVis(panelType, visible)
   end
 
-  -- Cancel every selected factory's build queue, the way FAF's escape does.
-  -- Each entry goes out exactly as a right-click on its queue button would:
-  -- the host request first, because it reads the queue by index, then the
-  -- local prediction that removes it.
-  local function clearQueues()
+  -- Stop every selected factory, the way FAF's escape does. This is the Stop
+  -- button's own order, not a queue edit: emptying the queue alone leaves a
+  -- factory that assists another one still slaved to it, and it pulls the next
+  -- item straight off that factory's queue. The host's ClearOrder drops the
+  -- assist along with the queue and the item in hand.
+  local function stopFactories()
     if BH.menuOpen or IsObserver() then return false end
-    local units = SS.GetSelectedEntities()
+    local units = SS.GetSelectedUnits()
     if not units then return false end
 
-    local BQ = Import('common/commands/definitions/buildQueue.lua')
-    local cleared = false
+    -- Factories only, and only our own: a tank sharing the selection keeps its
+    -- orders, where the Stop button would halt it too.
+    local army = GetFocusArmy()
+    local factories, busy = {}, false
     for _, u in pairs(units) do
-      local q = u.predictedBuildQueue
-      if u.id and q and next(q) and Tags.FACTORY[u.tp.general.tpId] then
-        -- Backwards, so removing one cannot shift the indices still to come.
-        for i = #q, 1, -1 do
-          local item = q[i]
-          if item and item.count and item.count > 0 then
-            local qid = next(item.queueItemIds)
-            u.buildQueuePendingOperations = u.buildQueuePendingOperations or {}
-            table.insert(u.buildQueuePendingOperations,
-              { deltaAmount = -item.count, queueItemId = qid, tpID = item.tpId })
-            BQ.RequestQueueAmountForUnits({ u }, item.tpId, -item.count, i)
-            buildQueueUtils.ModifyBuildQueue(u, qid, item.tpId, -item.count, true)
-            cleared = true
-          end
+      local g = u.tp and u.tp.general
+      if u.id and g and Tags.FACTORY[g.tpId] and u.armyId == army then
+        table.insert(factories, u)
+        -- An assist on another factory is an order that stays active for as
+        -- long as the factory is slaved, so it counts even with an empty queue.
+        local q, ord = u.predictedBuildQueue, u.orderState
+        if (q and next(q)) or (ord and (ord.activeOrder or next(ord.queuedOrdersArray or {}))) then
+          busy = true
         end
       end
     end
-    return cleared
+    if not busy then return false end
+
+    Import('client/managers/orders/clientOrderManager.lua').ClientClearOrder(factories)
+    return true
   end
 
   BH.Cancel = function()
-    local ok, res = pcall(clearQueues)
-    if not ok then Warn('BuildHotkeys cancel: ' .. tostring(res)) return false end
+    local ok, res = pcall(stopFactories)
+    if not ok then Warn('BuildHotkeys stop: ' .. tostring(res)) return false end
     return res
   end
 
@@ -806,13 +830,31 @@ if not __SdbBuildHotkeys then
     grp[b.hk] = { press = function() return BH.Fire(b.key, b.shift, b.rev) end }
   end
 
-  -- Returning false when there was no queue to clear lets the press carry on
+  -- Returning false when there was nothing to stop lets the press carry on
   -- to the GameMenu group, which has no priority set and so sits below this
-  -- one — so escape still opens the pause menu with nothing selected.
+  -- one — so with the menu left on escape, escape still opens it.
   BH.cancelKey = __CANCELKEY__
   if BH.cancelKey ~= '' then
     if BH.saved[BH.cancelKey] == nil then BH.saved[BH.cancelKey] = grp[BH.cancelKey] or BH.NIL end
     grp[BH.cancelKey] = { press = function() return BH.Cancel() end }
+  end
+
+  -- Moving the pause menu off escape. The game's own toggle goes to the new
+  -- key as it is, and escape keeps only its closing half: an open menu still
+  -- shuts on escape, but a closed one no longer opens behind a stop that had
+  -- nothing to do. The toggle only flips a file-local flag, and it is the
+  -- sole way the menu opens, so that flag is always set while the menu is up.
+  BH.menuKey = __MENUKEY__
+  local gm = IS.LoadedActionMap.GameMenu
+  if BH.menuKey ~= '' and gm and gm.Escape and gm.Escape.press then
+    local toggle = gm.Escape
+    BH.gm = gm
+    BH.gmSaved = { Escape = toggle, [BH.menuKey] = gm[BH.menuKey] or BH.NIL }
+    gm[BH.menuKey] = toggle
+    gm.Escape = { press = function()
+      if BH.menuOpen then return toggle.press() end
+      return false
+    end }
   end
 
   __SdbBuildHotkeys = BH
@@ -831,6 +873,11 @@ if __SdbBuildHotkeys then
   end
   if BH.CH and BH.origLabel then BH.CH.GetHotkeyForTemplate = BH.origLabel end
   if BH.origSetVis then Engine.UI_SetPanelVisibility = BH.origSetVis end
+  if BH.gm and BH.gmSaved then
+    for hk, saved in pairs(BH.gmSaved) do
+      if saved == BH.NIL then BH.gm[hk] = nil else BH.gm[hk] = saved end
+    end
+  end
   __SdbBuildHotkeys = nil
   __SdbBuildHotkeysCount = nil
   __SdbBuildHotkeysCycle = nil

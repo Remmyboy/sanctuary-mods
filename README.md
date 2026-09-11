@@ -29,7 +29,7 @@ source.
 | [SanctuaryHud](SanctuaryHud/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.9.0) | Economy strip in the game's own style, optionally replacing the built-in panel, buttons included; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.2.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
-| [BuildHotkeys](BuildHotkeys/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.1) | One hotkey per *role*, same key every faction, cycling by tier |
+| [BuildHotkeys](BuildHotkeys/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.2.0) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
@@ -328,15 +328,23 @@ of the same rather than walking the cycle; FAF instead resets its cycle on a
 timer, which is what makes its factories cycle too, and `Cycle.Seconds` (0 by
 default, 1.1 to match FAF) turns that on here.
 
-**Escape clears the build queue** of every selected factory, as it does in FAF,
-rather than opening the pause menu. Each entry goes out exactly as a
-right-click on its queue button would — the host request first, since it reads
-the queue by index, then the local prediction. With nothing queued the key
-falls through untouched, so escape still opens the menu; and because there is
-no getter for panel visibility, only a setter, the mod mirrors the menu's state
-by watching that setter (which the menu's own close button goes through too) so
-escape still *closes* the menu rather than clearing a queue behind it.
+**Escape stops every selected factory**, as it does in FAF, rather than opening
+the pause menu. It sends the Stop button's own order rather than editing the
+queue: emptying the queue alone leaves a factory that is assisting another one
+still slaved to it, and it pulls the next item straight back off that factory's
+queue. The host's stop drops the assist along with the queue and the item in
+hand. Only your own factories are stopped — a tank sharing the selection keeps
+its orders. With no selected factory queued or assisting the key falls through
+untouched, so escape still opens the menu; and because there is no getter for
+panel visibility, only a setter, the mod mirrors the menu's state by watching
+that setter (which the menu's own close button goes through too) so escape
+still *closes* the menu rather than stopping a factory behind it.
 `Cancel.ClearFactoryQueue` rebinds or blanks it.
+
+`Menu.PauseMenuKey` moves the pause menu off escape — to **F11**, say; F1 is
+taken by the game's debug menu — so it never opens by accident when escape had
+no factory to stop. The game's own toggle moves to the new key as it is, and
+escape keeps only the closing half: an open menu still shuts on escape.
 
 Holding **Shift** queues five, as the stock hotkeys do. Holding **Alt** walks
 the cycle backwards, as it does in FAF — and a *fresh* Alt press opens at the
@@ -419,7 +427,10 @@ the same art the build menu uses — each unit's icon over the domain plate
 behind it (`backgroundIconID`, keyed on `iconUIType`: land, air, water,
 amphibious), so the strip reads like a slice of the panel rather than floating
 cut-outs, and land/air/naval separate at a glance. The live one is lit and
-underlined, the rest faded.
+underlined, the rest faded. A factory shows only its pick unless
+`Cycle.Seconds` is set: without a cycle window a repeat press queues another of
+the same, so the rest of the list would advertise options pressing again cannot
+reach.
 
 A long cycle shows **one tech tier at a time** rather than all of it: a T3
 engineer's factory key is nine entries once naval factories are in, which would
