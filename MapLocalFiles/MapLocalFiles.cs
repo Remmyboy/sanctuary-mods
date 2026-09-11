@@ -24,18 +24,28 @@ namespace SanctuaryHud
     // and the path starts with "map/", resolve it against the loaded map's
     // folder and serve it from disk. The hit path is untouched, so shipped
     // content behaves exactly as before.
-    [BepInPlugin("com.sanctuarydb.maplocalfiles", "Map-Local Files", "0.1.0")]
+    [BepInPlugin("com.sanctuarydb.maplocalfiles", "Map-Local Files", "0.1.1")]
     public class MapLocalFilesPlugin : BaseUnityPlugin
     {
         private static BepInEx.Logging.ManualLogSource _log;
         private Harmony _harmony;
 
-        // Keyed by resolved on-disk path, which includes the map folder name -
-        // so two maps carrying a file of the same name can never collide.
-        // NativeArrays are Persistent and live for the session, matching how
-        // FilesCache itself holds content; a map's worth is a few hundred KB.
+        // Decal and prop blueprints are a few KB. A map-folder file anywhere
+        // near this is not what the fallback is for, and would otherwise be
+        // copied whole into native memory.
+        private const long MaxFileBytes = 8L * 1024 * 1024;
+
+        // Keyed by resolved on-disk path. The arrays are native
+        // (Allocator.Persistent) and nothing frees them for us, so only the
+        // current map's files are kept: they are disposed when a different
+        // map's file is asked for, and when the plugin unloads. Disposing is
+        // safe because the game never holds on to the buffer - its generated
+        // GetFileContent wrapper copies it into a Lua string (ffi.string)
+        // before returning.
         private static readonly Dictionary<string, NativeArray<byte>> _mapFileCache =
             new Dictionary<string, NativeArray<byte>>(StringComparer.OrdinalIgnoreCase);
+        private static string _cachedMapRoot;
+        private static readonly object _cacheLock = new object();
 
         private void Awake()
         {
@@ -57,6 +67,17 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+            lock (_cacheLock) DisposeCache();
+        }
+
+        private static void DisposeCache()
+        {
+            foreach (var array in _mapFileCache.Values)
+            {
+                if (array.IsCreated) array.Dispose();
+            }
+            _mapFileCache.Clear();
+            _cachedMapRoot = null;
         }
 
         private static void FileContentPostfix(string path, ref NativeArray<byte> fileContent, ref bool __result)
@@ -69,33 +90,53 @@ namespace SanctuaryHud
             catch { return; }
             if (string.IsNullOrEmpty(mapDir)) return;
 
-            string full;
-            try { full = Path.GetFullPath(Path.Combine(mapDir, path.Substring(4))); }
+            string root, full;
+            try
+            {
+                root = Path.GetFullPath(mapDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                full = Path.GetFullPath(Path.Combine(root, path.Substring(4)));
+            }
             catch { return; }
 
             // The rewritten path must stay inside the map folder; "map/../"
             // escaping anywhere else is refused.
-            var root = Path.GetFullPath(mapDir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
 
-            if (_mapFileCache.TryGetValue(full, out var cached))
+            lock (_cacheLock)
             {
-                fileContent = cached;
-                __result = true;
-                return;
-            }
+                // A different map: the previous one's files are never asked
+                // for again, so their native memory goes now.
+                if (!string.Equals(_cachedMapRoot, root, StringComparison.OrdinalIgnoreCase))
+                {
+                    DisposeCache();
+                    _cachedMapRoot = root;
+                }
 
-            if (!File.Exists(full)) return;
-            try
-            {
-                var arr = new NativeArray<byte>(File.ReadAllBytes(full), Allocator.Persistent);
-                _mapFileCache[full] = arr;
-                fileContent = arr;
-                __result = true;
-            }
-            catch (Exception e)
-            {
-                _log.LogWarning($"Map-local file read failed for {path}: {e.Message}");
+                if (_mapFileCache.TryGetValue(full, out var cached))
+                {
+                    fileContent = cached;
+                    __result = true;
+                    return;
+                }
+
+                try
+                {
+                    var info = new FileInfo(full);
+                    if (!info.Exists) return;
+                    if (info.Length > MaxFileBytes)
+                    {
+                        _log.LogWarning($"Map-local file {path} is {info.Length:N0} bytes, over the {MaxFileBytes / (1024 * 1024)} MB limit; not served.");
+                        return;
+                    }
+                    var array = new NativeArray<byte>(File.ReadAllBytes(full), Allocator.Persistent);
+                    _mapFileCache[full] = array;
+                    fileContent = array;
+                    __result = true;
+                }
+                catch (Exception e)
+                {
+                    _log.LogWarning($"Map-local file read failed for {path}: {e.Message}");
+                }
             }
         }
     }
