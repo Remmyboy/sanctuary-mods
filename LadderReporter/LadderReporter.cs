@@ -29,15 +29,21 @@ namespace SanctuaryHud
     //
     // Identity is the game's own Steam session: at report time the plugin
     // mints a Steam web-API auth ticket (GetAuthTicketForWebApi) and sends it
-    // with the result; the ladder server has Steam verify the ticket, so a
-    // report is exactly as trustworthy as being signed in to Steam in the
-    // running game. Nothing to configure, no tokens, no account linking.
+    // with the result; the ladder server has Steam verify the ticket. That
+    // proves which Steam account sent the report, not that the result in it
+    // is true: the ladder applies a player's own loss at once, holds a
+    // claimed win for the opponent to confirm, and freezes contradicting
+    // reports as disputed. Nothing to configure, no tokens, no account
+    // linking. Every ticket is cancelled once its request is over, as Steam
+    // requires, and any still outstanding when the plugin unloads.
     //
-    // It reports only Steam lobbies with exactly two human players — the
-    // ladder's shape. Skirmish vs AI, LAN, observers and team games are
-    // recognised and left alone. The server ignores reports for games that
-    // aren't an open ladder match, so playing unranked with a friend is fine.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.3.0")]
+    // It reports only the ladder's shape: a Steam lobby with exactly two
+    // human players, on opposing teams, and no AI. Skirmish, LAN, AI and team
+    // games are recognised and left alone, as is a game this player is only
+    // watching. Spectators in a ladder game don't stop it reporting. The
+    // server ignores reports for games that aren't an open ladder match, so
+    // playing unranked with a friend is fine.
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.3.1")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -56,9 +62,11 @@ namespace SanctuaryHud
 
         // Steam web-API tickets arrive by callback; each request remembers
         // what to do with its ticket (null on refusal). Shared with the
-        // matchmaking session exchange in Matchmaking.cs.
+        // matchmaking session exchange in Matchmaking.cs. Every handle Steam
+        // issued stays in _liveTickets until ReleaseTicket cancels it.
         private Callback<GetTicketForWebApiResponse_t> _ticketCallback;
-        private readonly Dictionary<uint, Action<string>> _ticketWaiters = new Dictionary<uint, Action<string>>();
+        private readonly Dictionary<uint, Action<uint, string>> _ticketWaiters = new Dictionary<uint, Action<uint, string>>();
+        private readonly Dictionary<uint, HAuthTicket> _liveTickets = new Dictionary<uint, HAuthTicket>();
 
         private sealed class Participant
         {
@@ -77,11 +85,13 @@ namespace SanctuaryHud
             public float StartRealtime;
         }
 
-        // The lobby has no observer slot type: a human whose armyID is beyond
-        // the map's army slots is made an observer at match start (script.lua,
-        // "If ArmyID is not present on the map then you become an observer!").
-        // The lobby state still lists them as PlayerType.Player, so the map's
-        // army count is the only way to tell a spectator from a competitor.
+        // The lobby has no observer dropdown yet: a human whose armyID is
+        // beyond the map's army slots is made an observer at match start
+        // (script.lua, "Till we have proper observer dropdown from in the
+        // lobby"). The lobby state still lists them as PlayerType.Player, so
+        // the map's army count is what tells a spectator from a competitor.
+        // PlayerType.Observer counts as a spectator too, for when the lobby
+        // starts sending it.
         private const string ArmyCountChunk =
             "__SdbLadderArmyCount = '' " +
             "pcall(function() " +
@@ -123,8 +133,8 @@ namespace SanctuaryHud
 
             _cfgEnabled = Config.Bind("Report", "Enabled", true,
                 "Report ranked 1v1 results to the SanctuaryDB ladder when the game ends. Only Steam lobbies " +
-                "with exactly two human players are reported; the ladder ignores games that aren't an open " +
-                "ladder match, so unranked 1v1s are unaffected.");
+                "with exactly two human players on opposing teams and no AI are reported; the ladder ignores " +
+                "games that aren't an open ladder match, so unranked 1v1s are unaffected.");
             // www, not the apex: the apex 308-redirects, and UnityWebRequest
             // drops the POST body when it follows a redirect — the report
             // arrives empty. Talk to the canonical host directly.
@@ -163,6 +173,9 @@ namespace SanctuaryHud
             {
                 Logger.LogWarning($"Ladder reporter: win-condition hook could not be removed: {e.Message}");
             }
+            // A coroutine doesn't run its finally block when the component
+            // goes, so any ticket one still held is cancelled here.
+            ReleaseAllTickets();
             _ticketCallback?.Dispose();
         }
 
@@ -278,32 +291,38 @@ namespace SanctuaryHud
             if (!LuaReady || !RunLua(ArmyCountChunk)) return null;
             if (!int.TryParse(GetLuaGlobal("__SdbLadderArmyCount"), out var armyCount) || armyCount <= 0) return null;
 
-            var humans = state.players
-                .Where(p => p != null && p.type == PlayerType.Player)
-                .Select(p => new Participant
-                {
-                    SteamId = p.id.value,
-                    ArmyId = p.armyID,
-                    Team = p.team,
-                    Name = p.name ?? "",
-                })
-                .ToList();
+            Participant ToParticipant(LobbyPlayer p) => new Participant
+            {
+                SteamId = p.id.value,
+                ArmyId = p.armyID,
+                Team = p.team,
+                Name = p.name ?? "",
+            };
+            bool Seated(LobbyPlayer p) => p.armyID >= 1 && p.armyID <= armyCount;
+            var players = state.players.Where(p => p != null).ToList();
             var snapshot = new MatchSnapshot
             {
                 MapName = Path.GetFileNameWithoutExtension(state.mapPath ?? ""),
                 StartRealtime = Time.realtimeSinceStartup,
-                Humans = humans.Where(p => p.ArmyId >= 1 && p.ArmyId <= armyCount).ToList(),
-                Observers = humans.Where(p => p.ArmyId < 1 || p.ArmyId > armyCount).ToList(),
+                Humans = players.Where(p => p.type == PlayerType.Player && Seated(p)).Select(ToParticipant).ToList(),
+                Observers = players.Where(p => p.type == PlayerType.Observer || (p.type == PlayerType.Player && !Seated(p)))
+                    .Select(ToParticipant).ToList(),
             };
+            // An AI in any slot makes it a skirmish or a team game, not a 1v1.
+            var aiCount = players.Count(p => p.type == PlayerType.AI);
 
             var localId = LobbyManager.localPlayerID.value;
             string skip = null;
             if (!(LobbyManager.Backend is SteamLobbyBackend)) skip = "LAN lobby (no Steam identities)";
             else if (!SteamManager.IsSteamInitialized) skip = "Steam session not initialised";
             else if (snapshot.Observers.Any(p => p.SteamId == localId)) skip = "observing, not playing";
+            else if (aiCount > 0) skip = $"{aiCount} AI player(s) in the game";
             else if (snapshot.Humans.Count != 2)
                 skip = $"{snapshot.Humans.Count} human player(s) plus {snapshot.Observers.Count} observer(s), ladder games have 2 players";
             else if (snapshot.Humans.All(p => p.SteamId != localId)) skip = "not one of the two players";
+            // Armies on the same team are allies (gameUtils.lua, CreateArmies),
+            // so two humans sharing one are playing together, not a 1v1.
+            else if (snapshot.Humans[0].Team == snapshot.Humans[1].Team) skip = $"both players are on team {snapshot.Humans[0].Team}";
 
             snapshot.Reportable = skip == null;
             var roster = string.Join(" vs ", snapshot.Humans.Select(p => p.Name)) +
@@ -327,7 +346,7 @@ namespace SanctuaryHud
             }
 
             Logger.LogInfo("Ladder reporter: result detected, requesting a Steam ticket…");
-            RequestTicket(ticket =>
+            RequestTicket((ticketId, ticket) =>
             {
                 if (ticket == null)
                 {
@@ -335,34 +354,45 @@ namespace SanctuaryHud
                     return;
                 }
                 var json = "{\"ticket\":\"" + ticket + "\"," + body.Substring(1);
-                StartCoroutine(PostRoutine(_cfgEndpoint.Value, json));
+                StartCoroutine(PostRoutine(_cfgEndpoint.Value, json, ticketId));
             });
         }
 
-        /// Asks Steam for a web-API ticket and hands the hex string to
-        /// `onTicket`, or null if Steam refused. The callback arrives via the
-        /// game's own per-frame SteamAPI.RunCallbacks pump.
-        private void RequestTicket(Action<string> onTicket)
+        /// Asks Steam for a web-API ticket and hands `onTicket` its handle and
+        /// hex string, or a null string if Steam refused (a refused handle is
+        /// already cancelled). The callback arrives via the game's own
+        /// per-frame SteamAPI.RunCallbacks pump. A ticket stays valid until it
+        /// is cancelled, so the caller owes ReleaseTicket once the request the
+        /// ticket authenticates has completed, failed or been abandoned.
+        /// Returns the handle, or 0 when Steam issued none.
+        private uint RequestTicket(Action<uint, string> onTicket)
         {
             _ticketCallback ??= Callback<GetTicketForWebApiResponse_t>.Create(OnTicket);
             var handle = SteamUser.GetAuthTicketForWebApi(TicketIdentity);
             if (handle == HAuthTicket.Invalid)
             {
-                onTicket(null);
-                return;
+                onTicket(0, null);
+                return 0;
             }
+            _liveTickets[handle.m_HAuthTicket] = handle;
             _ticketWaiters[handle.m_HAuthTicket] = onTicket;
+            return handle.m_HAuthTicket;
         }
 
         private void OnTicket(GetTicketForWebApiResponse_t response)
         {
-            if (!_ticketWaiters.TryGetValue(response.m_hAuthTicket.m_HAuthTicket, out var waiter)) return;
-            _ticketWaiters.Remove(response.m_hAuthTicket.m_HAuthTicket);
+            var id = response.m_hAuthTicket.m_HAuthTicket;
+            // No waiter: not ours, or a request abandoned (and its ticket
+            // cancelled) before Steam answered. A late answer to an abandoned
+            // request must not start anything.
+            if (!_ticketWaiters.TryGetValue(id, out var waiter)) return;
+            _ticketWaiters.Remove(id);
 
             if (response.m_eResult != EResult.k_EResultOK)
             {
                 Logger.LogWarning($"Ladder reporter: Steam refused an auth ticket ({response.m_eResult}).");
-                waiter(null);
+                ReleaseTicket(id);
+                waiter(id, null);
                 return;
             }
 
@@ -371,7 +401,32 @@ namespace SanctuaryHud
             {
                 ticket.Append(response.m_rgubTicket[i].ToString("x2"));
             }
-            waiter(ticket.ToString());
+            waiter(id, ticket.ToString());
+        }
+
+        /// Cancels a ticket (ISteamUser::CancelAuthTicket) and forgets any
+        /// callback still waiting for it. Safe to call twice, or with 0.
+        private void ReleaseTicket(uint id)
+        {
+            _ticketWaiters.Remove(id);
+            if (!_liveTickets.TryGetValue(id, out var handle)) return;
+            _liveTickets.Remove(id);
+            try
+            {
+                SteamUser.CancelAuthTicket(handle);
+                Logger.LogInfo($"Steam ticket {id} cancelled.");
+            }
+            catch (Exception e)
+            {
+                // Steam has already shut down with the game, and the ticket with it.
+                Logger.LogWarning($"Steam ticket {id} could not be cancelled: {e.Message}");
+            }
+        }
+
+        private void ReleaseAllTickets()
+        {
+            foreach (var id in _liveTickets.Keys.ToList()) ReleaseTicket(id);
+            _ticketWaiters.Clear();
         }
 
         private string BuildPayload(List<Participant> winners)
@@ -387,6 +442,10 @@ namespace SanctuaryHud
                 sb.Append("\"matchId\":\"").Append(JsonEscape(_mmReportMatchId)).Append("\",");
             }
             sb.Append("\"mapName\":\"").Append(JsonEscape(_snapshot.MapName)).Append("\",");
+            // Approximate: real time from the first readable roster, a few
+            // seconds into the match, pauses included. The ladder doesn't read
+            // it today; derive it from the simulation tick before anything
+            // relies on it.
             sb.Append("\"durationSeconds\":")
                 .Append(((int)Math.Max(0f, Time.realtimeSinceStartup - _snapshot.StartRealtime)).ToString(CultureInfo.InvariantCulture))
                 .Append(',');
@@ -429,7 +488,20 @@ namespace SanctuaryHud
         // sending the request"), while UnityWebRequest uses the engine's
         // native TLS. A coroutine never blocks the frame — SendWebRequest is
         // asynchronous and this only wakes to check on it.
-        private IEnumerator PostRoutine(string endpoint, string json)
+        private IEnumerator PostRoutine(string endpoint, string json, uint ticketId)
+        {
+            try
+            {
+                foreach (var step in PostAttempts(endpoint, json)) yield return step;
+            }
+            finally
+            {
+                // Delivered, rejected or given up on: the ticket is spent.
+                ReleaseTicket(ticketId);
+            }
+        }
+
+        private IEnumerable PostAttempts(string endpoint, string json)
         {
             var payload = Encoding.UTF8.GetBytes(json);
             for (var attempt = 1; attempt <= 3; attempt++)

@@ -41,7 +41,7 @@ namespace SanctuaryHud
     // bearer token: the session id, progress events and the result report.
     public partial class LadderReporterPlugin
     {
-        private const string ModVersion = "0.3.0";
+        private const string ModVersion = "0.3.1";
 
         private ConfigEntry<bool> _cfgMmEnabled;
         private ConfigEntry<string> _cfgMmBaseUrl;
@@ -53,6 +53,7 @@ namespace SanctuaryHud
         private string _mmToken;
         private bool _mmSessionInFlight;
         private float _mmNextSessionTry;
+        private uint _mmSessionTicket;         // the ticket the sign-in in flight holds, 0 if none
 
         private string _mmLastHttpError;
         private float _mmLastHttpErrorAt = -999f;
@@ -84,38 +85,115 @@ namespace SanctuaryHud
 
         private sealed class MmMatch
         {
+            // No map has more army slots than this; anything outside
+            // 1..MaxSlot can't be a seat.
+            private const int MaxSlot = 16;
+            private static readonly System.Text.RegularExpressions.Regex IdShape =
+                new System.Text.RegularExpressions.Regex(@"^[A-Za-z0-9_-]{1,64}$");
+            private static readonly System.Text.RegularExpressions.Regex WordShape =
+                new System.Text.RegularExpressions.Regex(@"^[a-z_]{1,32}$");
+            private static readonly System.Text.RegularExpressions.Regex SteamIdShape =
+                new System.Text.RegularExpressions.Regex(@"^[0-9]{17}$");
+
             public string Id, Mode, Status, Host, Joiner, Map, Reason, CancelledBy, OpponentName;
             public ulong SessionId;
             public readonly Dictionary<string, string> Factions = new Dictionary<string, string>();
             public readonly Dictionary<string, int> Slots = new Dictionary<string, int>();
 
+            /// Reads the site's match object. Throws FormatException when a
+            /// field has the wrong JSON type; Problem() then checks what the
+            /// values mean.
             public static MmMatch Parse(JObject o)
             {
                 if (o == null) return null;
                 var m = new MmMatch
                 {
-                    Id = (string)o["id"],
-                    Mode = (string)o["mode"] ?? "manual",
-                    Status = (string)o["status"] ?? "",
-                    Host = (string)o["host"],
-                    Joiner = (string)o["joiner"],
-                    Map = (string)o["map"],
-                    Reason = (string)o["reason"],
-                    CancelledBy = (string)o["cancelledBy"],
-                    OpponentName = (string)o["opponent"]?["name"],
+                    Id = Str(o, "id"),
+                    Mode = Str(o, "mode") ?? "manual",
+                    Status = Str(o, "status") ?? "",
+                    Host = Str(o, "host"),
+                    Joiner = Str(o, "joiner"),
+                    Map = Str(o, "map"),
+                    Reason = Str(o, "reason"),
+                    CancelledBy = Str(o, "cancelledBy"),
+                    OpponentName = o["opponent"] is JObject opponent ? Str(opponent, "name") : null,
                 };
-                var sid = (string)o["sessionId"];
-                if (!string.IsNullOrEmpty(sid)) ulong.TryParse(sid, out m.SessionId);
+                var sid = o["sessionId"];
+                if (sid != null && sid.Type != JTokenType.Null)
+                {
+                    if ((sid.Type != JTokenType.String && sid.Type != JTokenType.Integer) ||
+                        !ulong.TryParse(sid.ToString(), System.Globalization.NumberStyles.None,
+                            System.Globalization.CultureInfo.InvariantCulture, out m.SessionId))
+                    {
+                        throw new FormatException("sessionId must be a whole number");
+                    }
+                }
                 if (o["factions"] is JObject f)
                 {
-                    foreach (var kv in f) m.Factions[kv.Key] = (string)kv.Value;
+                    foreach (var kv in f)
+                    {
+                        var faction = Str(f, kv.Key);
+                        if (faction != null) m.Factions[kv.Key] = faction;
+                    }
                 }
                 if (o["slots"] is JObject s)
                 {
-                    foreach (var kv in s) m.Slots[kv.Key] = (int)kv.Value;
+                    foreach (var kv in s)
+                    {
+                        if (kv.Value == null || kv.Value.Type == JTokenType.Null) continue;
+                        if (kv.Value.Type != JTokenType.Integer) throw new FormatException($"slot for {kv.Key} must be a whole number");
+                        var slot = (long)kv.Value;
+                        if (slot < 1 || slot > MaxSlot) throw new FormatException($"slot for {kv.Key} is {slot}, outside 1..{MaxSlot}");
+                        m.Slots[kv.Key] = (int)slot;
+                    }
                 }
                 return m;
             }
+
+            private static string Str(JObject o, string key)
+            {
+                var t = o[key];
+                if (t == null || t.Type == JTokenType.Null) return null;
+                if (t.Type != JTokenType.String) throw new FormatException($"'{key}' must be a string");
+                return (string)t;
+            }
+
+            /// What is wrong with the match, or null. The site is trusted to
+            /// send sense, but the bridge is still a boundary: the id ends up
+            /// in URL paths, Steam IDs decide who gets kicked, and the map is a
+            /// file path.
+            public string Problem()
+            {
+                if (string.IsNullOrEmpty(Id) || string.IsNullOrEmpty(Status)) return "match needs an id and a status";
+                if (!IdShape.IsMatch(Id)) return "id must be 1-64 letters, digits, '-' or '_'";
+                if (!WordShape.IsMatch(Status)) return "status is not a status word";
+                if (!WordShape.IsMatch(Mode)) return "mode is not a mode word";
+                if (Host != null && !SteamIdShape.IsMatch(Host)) return "host is not a Steam ID";
+                if (Joiner != null && !SteamIdShape.IsMatch(Joiner)) return "joiner is not a Steam ID";
+                if (Host != null && Host == Joiner) return "host and joiner are the same player";
+                foreach (var player in Slots.Keys.Concat(Factions.Keys))
+                {
+                    if (!SteamIdShape.IsMatch(player)) return $"'{player}' in slots or factions is not a Steam ID";
+                }
+                if (Slots.Values.Distinct().Count() != Slots.Count) return "two players share a slot";
+                if (Map != null && !IsMapPath(Map)) return "map is not a relative Maps/.../*.sanmap path";
+                return null;
+            }
+        }
+
+        /// A game map path as the site sends it: relative, under the game's
+        /// Maps folder, a .sanmap, with no empty, "." or ".." segments. Checked
+        /// before the path gets near the file system, where Path.Combine would
+        /// otherwise let a rooted path replace the base folder entirely.
+        private static bool IsMapPath(string map)
+        {
+            if (string.IsNullOrEmpty(map) || map.Length > 260) return false;
+            if (map.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || map.IndexOf(':') >= 0) return false;
+            if (Path.IsPathRooted(map)) return false;
+            if (!map.EndsWith(".sanmap", StringComparison.OrdinalIgnoreCase)) return false;
+            var segments = map.Split('/', '\\');
+            if (segments.Length < 2 || !string.Equals(segments[0], "Maps", StringComparison.OrdinalIgnoreCase)) return false;
+            return segments.All(s => s.Length > 0 && s != "." && s != "..");
         }
 
         // ---- lifecycle -------------------------------------------------------
@@ -330,9 +408,16 @@ namespace SanctuaryHud
             {
                 // Steam never answered the ticket request (offline mode, or
                 // no connection to Steam's servers). Say so and try again.
-                if (now - _mmSessionStarted > 30f)
+                // Only while Steam is what's being waited on: once the ticket
+                // is in, the web request's own timeout applies.
+                if (_ticketWaiters.ContainsKey(_mmSessionTicket) && now - _mmSessionStarted > 30f)
                 {
                     Logger.LogWarning("Matchmaking: Steam did not answer the ticket request in 30 s; is Steam online? Retrying.");
+                    // Abandon it properly: cancel the handle and drop the
+                    // waiter, so a late answer can't start a stale sign-in
+                    // alongside the retry.
+                    ReleaseTicket(_mmSessionTicket);
+                    _mmSessionTicket = 0;
                     _mmSessionInFlight = false;
                     _mmNextSessionTry = now + 30f;
                 }
@@ -342,20 +427,35 @@ namespace SanctuaryHud
             _mmSessionInFlight = true;
             _mmSessionStarted = now;
             Logger.LogInfo("Matchmaking: requesting a Steam ticket to sign in to the ladder.");
-            RequestTicket(ticket =>
+            _mmSessionTicket = RequestTicket((ticketId, ticket) =>
             {
                 if (ticket == null)
                 {
                     Logger.LogWarning("Matchmaking: Steam refused a ticket; retrying in a minute.");
+                    _mmSessionTicket = 0;
                     _mmSessionInFlight = false;
                     _mmNextSessionTry = Time.realtimeSinceStartup + 60f;
                     return;
                 }
-                StartCoroutine(SessionRoutine(ticket));
+                StartCoroutine(SessionRoutine(ticket, ticketId));
             });
         }
 
-        private IEnumerator SessionRoutine(string ticket)
+        private IEnumerator SessionRoutine(string ticket, uint ticketId)
+        {
+            try
+            {
+                foreach (var step in SessionExchange(ticket)) yield return step;
+            }
+            finally
+            {
+                // Signed in or not, the ticket has done its job.
+                ReleaseTicket(ticketId);
+                if (_mmSessionTicket == ticketId) _mmSessionTicket = 0;
+            }
+        }
+
+        private IEnumerable SessionExchange(string ticket)
         {
             var body = new JObject { ["ticket"] = ticket, ["identity"] = TicketIdentity };
             var req = Post("/api/mm/session", body, null);
@@ -938,11 +1038,18 @@ namespace SanctuaryHud
 
         private static bool MapExists(string map)
         {
-            if (string.IsNullOrEmpty(map)) return false;
+            if (!IsMapPath(map)) return false;
             try
             {
-                return File.Exists(Path.Combine(Application.dataPath, map)) ||
-                       File.Exists(Path.Combine(BepInEx.Paths.GameRootPath, map));
+                foreach (var baseDir in new[] { Application.dataPath, BepInEx.Paths.GameRootPath })
+                {
+                    // Belt and braces after IsMapPath: the resolved file must
+                    // still sit inside the folder it was resolved against.
+                    var root = Path.GetFullPath(baseDir).TrimEnd('\\', '/') + Path.DirectorySeparatorChar;
+                    var full = Path.GetFullPath(Path.Combine(root, map));
+                    if (full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full)) return true;
+                }
+                return false;
             }
             catch { return false; }
         }

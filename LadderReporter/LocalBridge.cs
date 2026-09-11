@@ -302,17 +302,25 @@ namespace SanctuaryHud
             }
             else
             {
-                JObject o;
-                try { o = JObject.Parse(body); }
+                // Everything about the payload, from JSON syntax to what the
+                // values mean, is answered with a 400 here. Letting it escape
+                // to the connection handler would only drop the connection.
+                string problem;
+                try
+                {
+                    match = MmMatch.Parse(JObject.Parse(body));
+                    problem = match.Problem();
+                }
                 catch (Exception e)
                 {
-                    WriteResponse(stream, 400, origin, Error("body is not a JSON object: " + e.Message));
-                    return;
+                    match = null;
+                    problem = e is Newtonsoft.Json.JsonReaderException
+                        ? "body is not a JSON object: " + e.Message
+                        : "match is malformed: " + e.Message;
                 }
-                match = MmMatch.Parse(o);
-                if (string.IsNullOrEmpty(match.Id) || string.IsNullOrEmpty(match.Status))
+                if (problem != null)
                 {
-                    WriteResponse(stream, 400, origin, Error("match needs an id and a status"));
+                    WriteResponse(stream, 400, origin, Error(problem));
                     return;
                 }
             }
