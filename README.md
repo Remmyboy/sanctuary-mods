@@ -21,7 +21,7 @@ source.
 | Project | Download | What it does |
 | --- | --- | --- |
 | [SanctuaryHud](SanctuaryHud/) | [**0.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.8.0) | Economy strip in the game's own style, optionally replacing the built-in bars; commander widget and alerts; reclaim values and build countdowns over the map |
-| [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel |
+| [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.1) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.0) | Reports ranked results; launches matchmade games |
@@ -144,6 +144,24 @@ Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
 One clickable row per tech tier of idle engineers (plus a COMMANDER row and an
 ALL row) — clicking selects that group. Hidden entirely when nothing is idle;
 draggable, and its position persists.
+
+**Idle factories** sit underneath (`Factories · Enabled`, on by default): a
+heading per type (LAND, AIR, NAVAL FACTORIES) with one row per tier beneath
+it, and an ALL row once more than one type is idle. Clicking a heading selects
+every idle factory of that type, which is usually what you want before
+queueing; clicking a tier row selects just those. Switching the setting off
+hides the section at once and stops the lookup behind it.
+
+A factory counts as idle exactly when the game draws its idle adornment:
+finished, no order, nothing in its queue — the same rule the game applies to
+engineers, re-checked whenever the order or the queue changes. So a factory
+that is upgrading, or paused with something queued, is not idle. The type is
+read from the client's tag tables (`LAND_FACTORY`, `AIR_FACTORY`,
+`NAVAL_FACTORY`) rather than the strategic icon, because the T3 naval
+factories ship with the air symbol and would otherwise file under AIR; the
+tier is the template's `general.techNumber`. That costs one more Lua query a
+second over your own army's units, the same shape as EcoManager's extractor
+lookup.
 
 Idle state and unit identity come from the DOTS icon buffers rather than
 Harmony hooks, because the icon FFI receivers are Burst-compiled and cannot be

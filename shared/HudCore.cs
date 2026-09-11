@@ -42,6 +42,8 @@ namespace SanctuaryHud
         {
             public string Label;
             public int Tier;
+            /// Factory rows only: an index into FactoryDomains.
+            public int Domain;
             /// Units in this row. Counted even when the id lookup fails (in
             /// which case the row shows but can't select).
             public int Count;
@@ -50,6 +52,16 @@ namespace SanctuaryHud
 
         internal static readonly object _groupLock = new object();
         internal static List<IdleGroup> _idleGroups = new List<IdleGroup>();
+
+        // ---- idle factories (for the IdleEngineers mod) ----
+        // Off unless the mod switches it on: identifying factories costs a Lua
+        // query per poll, so other assemblies' copies of this file never pay.
+        internal static bool _trackIdleFactories = false;
+        /// Ordered by domain (land, air, naval), then tier.
+        internal static List<IdleGroup> _idleFactoryGroups = new List<IdleGroup>();
+        internal static int _idleFactoryCount;
+        /// Headings by IdleGroup.Domain, in the order the rows are sorted.
+        internal static readonly string[] FactoryDomains = { "", "LAND", "AIR", "NAVAL" };
 
         // ---- alloy structures, by tier (for the EcoManager mod) ----
         // Extractors are `structure1_t{1,2,3}_alloy` in the icon registry,
@@ -1105,6 +1117,105 @@ namespace SanctuaryHud
             }
         }
 
+        // ---- factory identity, from the same tag tables ----
+        // The strategic icon cannot give a factory's type: the T3 naval
+        // factories (ues3513, ucs3513, ugs3513) ship with the air symbol. Every
+        // factory template carries exactly one of LAND_FACTORY, AIR_FACTORY and
+        // NAVAL_FACTORY, so the tag tables answer it, and the template loader
+        // fills in `general.techNumber` for the tier. Idle itself still comes
+        // off the game's adornment, which ClientFactory lights by the same rule
+        // as ClientEngineer: completed, no order, nothing queued.
+        // Keyed by LocalID; the value is domain * 10 + tier.
+        private static readonly Dictionary<int, int> _factoryKinds = new Dictionary<int, int>();
+        private static bool _factoryKindsValid;
+        private static bool _loggedFactoryQueryFail;
+
+        private static void RefreshFactoryKinds()
+        {
+            // A failed refresh shows no factory rows rather than last poll's.
+            _factoryKindsValid = false;
+            if (!_trackIdleFactories) return;
+            if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
+            try
+            {
+                if (!RunLua(
+                        "__SdbFactories = '' " +
+                        "local out = {} " +
+                        "local kinds = { 'LAND_FACTORY', 'AIR_FACTORY', 'NAVAL_FACTORY' } " +
+                        "for _, a in pairs(Armies or {}) do " +
+                        "  if a.focused then " +
+                        "    for _, u in pairs(a.units or {}) do " +
+                        "      local li = u.localId and u.localId.index " +
+                        "      local tier = u.tp and u.tp.general and tonumber(u.tp.general.techNumber) " +
+                        "      if li and u.tpId and tier and Tags then " +
+                        "        for d, tag in ipairs(kinds) do " +
+                        "          if Tags[tag] and Tags[tag][u.tpId] then " +
+                        "            out[#out+1] = string.format('%d:%d', li, d * 10 + tier) " +
+                        "            break " +
+                        "          end " +
+                        "        end " +
+                        "      end " +
+                        "    end " +
+                        "  end " +
+                        "end " +
+                        "__SdbFactories = table.concat(out, ',')"))
+                    return;
+
+                var raw = _getLuaGlobal("__SdbFactories");
+                if (raw == null) return;
+
+                _factoryKinds.Clear();
+                // An empty string is a valid answer: no factories yet.
+                foreach (var part in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var colon = part.IndexOf(':');
+                    if (colon > 0 && int.TryParse(part.Substring(0, colon), out var id) &&
+                        int.TryParse(part.Substring(colon + 1), out var kind))
+                    {
+                        _factoryKinds[id] = kind;
+                    }
+                }
+                _factoryKindsValid = true;
+            }
+            catch (Exception e)
+            {
+                if (!_loggedFactoryQueryFail)
+                {
+                    _loggedFactoryQueryFail = true;
+                    _log.LogWarning($"Factory lookup failed (idle factories will stay hidden): {e.Message}");
+                }
+            }
+        }
+
+        /// Files an idle entity under its factory row, if it is one of our
+        /// factories. The kind table only holds our own army's units, so this
+        /// is the ownership check as well.
+        private static void RecordIdleFactory(object em, object entity, Dictionary<int, IdleGroup> groups)
+        {
+            try
+            {
+                if (_localIdField == null || _getLocalIdMi == null) return;
+                var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                var localId = _localIdField.GetValue(component);
+                var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                if (indexField == null) return;
+                var localIndex = Convert.ToInt32(indexField.GetValue(localId));
+                if (!_factoryKinds.TryGetValue(localIndex, out var kind)) return;
+
+                if (!groups.TryGetValue(kind, out var group))
+                {
+                    group = new IdleGroup { Domain = kind / 10, Tier = kind % 10, Label = $"T{kind % 10}" };
+                    groups[kind] = group;
+                }
+                group.Count++;
+                group.UnitIds.Add(localIndex);
+            }
+            catch
+            {
+                // One we cannot attribute is left out rather than guessed at.
+            }
+        }
+
         /// True for an alloy structure by icon — extractors are
         /// `structure1_t{n}_alloy` across every faction, but so are alloy
         /// storages and the T3 furnace, so callers must also check
@@ -1317,6 +1428,7 @@ namespace SanctuaryHud
                 var groups = new Dictionary<int, IdleGroup>();
                 var alloyGroups = new Dictionary<int, IdleGroup>();
                 var alloyUpgrading = new Dictionary<int, IdleGroup>();
+                var factoryGroups = new Dictionary<int, IdleGroup>();
 
                 // Without a trustworthy owner, show nothing rather than
                 // everything: listing an enemy's idle engineers as if they were
@@ -1324,18 +1436,21 @@ namespace SanctuaryHud
                 if (ownColour == null)
                 {
                     _idleCount = 0;
+                    _idleFactoryCount = 0;
                     _alloyCount = 0;
                     _alloyUpgradingCount = 0;
                     _commanderLocalIndex = -1;
                     lock (_groupLock)
                     {
                         _idleGroups = new List<IdleGroup>();
+                        _idleFactoryGroups = new List<IdleGroup>();
                         _alloyGroups = new List<IdleGroup>();
                         _alloyUpgradingGroups = new List<IdleGroup>();
                     }
                     _pollStatus = "no owner";
                     return;
                 }
+                RefreshFactoryKinds();
                 var componentType = _componentTypeReadOnly.Invoke(null, new object[] { _iconElemType });
                 var ctArray = Array.CreateInstance(componentType.GetType(), 1);
                 ctArray.SetValue(componentType, 0);
@@ -1406,6 +1521,13 @@ namespace SanctuaryHud
                                             count++;
                                             RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
                                         }
+
+                                        // RecordIdleFactory does its own
+                                        // ownership check, like RecordAlloy.
+                                        if (_factoryKindsValid)
+                                        {
+                                            RecordIdleFactory(em, entity, factoryGroups);
+                                        }
                                     }
 
                                     // RecordAlloy does its own ownership check,
@@ -1445,9 +1567,14 @@ namespace SanctuaryHud
                 _alloyCount = alloyOrdered.Sum(g => g.Count);
                 _alloyUpgradingCount = alloyUpgradingOrdered.Sum(g => g.Count);
 
+                // The key is domain * 10 + tier, so it sorts land, air, naval.
+                var factoryOrdered = factoryGroups.OrderBy(kv => kv.Key).Select(kv => kv.Value).ToList();
+                _idleFactoryCount = factoryOrdered.Sum(g => g.Count);
+
                 lock (_groupLock)
                 {
                     _idleGroups = ordered;
+                    _idleFactoryGroups = factoryOrdered;
                     _alloyGroups = alloyOrdered;
                     _alloyUpgradingGroups = alloyUpgradingOrdered;
                 }
@@ -1476,16 +1603,18 @@ namespace SanctuaryHud
             {
                 // Leaving a match: drop everything so the next one starts clean
                 // rather than flashing the previous game's units.
-                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _alloyCount > 0)
+                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _idleFactoryCount > 0 || _alloyCount > 0)
                 {
                     _commanderLocalIndex = -1;
                     _commanderIconIndex = -1;
                     _idleCount = 0;
+                    _idleFactoryCount = 0;
                     _alloyCount = 0;
                     _alloyUpgradingCount = 0;
                     lock (_groupLock)
                     {
                         _idleGroups = new List<IdleGroup>();
+                        _idleFactoryGroups = new List<IdleGroup>();
                         _alloyGroups = new List<IdleGroup>();
                         _alloyUpgradingGroups = new List<IdleGroup>();
                     }
