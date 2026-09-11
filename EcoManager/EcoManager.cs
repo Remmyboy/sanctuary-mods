@@ -23,7 +23,7 @@ namespace SanctuaryHud
     // Furnace carries the same strategic icon and nothing on the render entity
     // separates the two — so the T3 row is "tier-3 alloy structures".
     // Assisting an extractor to start its upgrade lives in AssistUpgrade.cs.
-    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.3.0")]
+    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.4.0")]
     public partial class EcoManagerPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -105,25 +105,37 @@ namespace SanctuaryHud
                 upgrading = _alloyUpgradingGroups;
             }
 
+            // The panel is only ever as wide as the rows it is drawing, the
+            // same way it is only ever as tall (below). One measurement covers
+            // the UPGRADING block too, since it lists the same tiers.
+            var hasAll = groups.Count > 1;
+            var layout = MeasureRows(groups, hasAll, _alloyCount, _pollStatus != "ok");
+            // "UPGRADING" is wider than any row this panel draws, so it has to
+            // be measured too or it would clip against the window edge.
+            if (upgrading.Count > 0)
+                layout.Width = Mathf.Max(layout.Width, 16f + _stSubHeading.CalcSize(new GUIContent("UPGRADING")).x);
+            _rect.width = layout.Width;
+
             _stName.normal.textColor = AlloyColour;
-            GUI.Label(new Rect(8, 4, 150, 18), "ALLOY", _stName);
+            GUI.Label(new Rect(8, 4, layout.Width - 16, 18), "ALLOY", _stName);
             if (_pollStatus != "ok")
             {
-                GUI.Label(new Rect(84, 6, 68, 14), _pollStatus, _stSub);
+                GUI.Label(new Rect(40, 6, layout.Width - 48, 14), _pollStatus, _stSub);
             }
 
             // One clickable row per tier; clicking selects that group.
             var y = 23f;
             foreach (var group in groups)
             {
-                y = DrawRow(group.Label, group.Count, group.UnitIds, y, AlloyColour);
+                y = DrawRow(group.Label, group.Count, group.UnitIds, y, AlloyColour, group.IconId, layout);
             }
 
-            if (groups.Count > 1)
+            if (hasAll)
             {
                 GUI.DrawTexture(new Rect(8, y, _rect.width - 16, 1), _texBarBack);
                 y += 3;
-                y = DrawRow("ALL", _alloyCount, groups.SelectMany(g => g.UnitIds).ToList(), y, AlloyColour);
+                // The ALL row has no art of its own, but keeps the indent.
+                y = DrawRow("ALL", _alloyCount, groups.SelectMany(g => g.UnitIds).ToList(), y, AlloyColour, 0, layout);
             }
 
             // Upgrading block: present only while something is actually
@@ -138,11 +150,11 @@ namespace SanctuaryHud
 
                 foreach (var group in upgrading)
                 {
-                    y = DrawRow(group.Label, group.Count, group.UnitIds, y, UpgradeColour);
+                    y = DrawRow(group.Label, group.Count, group.UnitIds, y, UpgradeColour, group.IconId, layout);
                 }
                 if (upgrading.Count > 1)
                 {
-                    y = DrawRow("ALL", _alloyUpgradingCount, upgrading.SelectMany(g => g.UnitIds).ToList(), y, UpgradeColour);
+                    y = DrawRow("ALL", _alloyUpgradingCount, upgrading.SelectMany(g => g.UnitIds).ToList(), y, UpgradeColour, 0, layout);
                 }
             }
 
@@ -150,16 +162,21 @@ namespace SanctuaryHud
             GUI.DragWindow(new Rect(0, 0, 10000, 10000));
         }
 
-        private float DrawRow(string label, int count, List<int> ids, float y, Color countColour)
+        // Rows carry the extractor's own build-menu art where the game has it
+        // loaded, with the tier still spelled out beside it: the T2 and T3
+        // extractors are the same silhouette in different sizes, so the label
+        // is what makes the row unambiguous.
+        private float DrawRow(string label, int count, List<int> ids, float y, Color countColour, uint icon, RowLayout layout)
         {
-            var row = new Rect(4, y, _rect.width - 8, 18);
+            var row = new Rect(4, y, _rect.width - 8, RowHeight);
             var hover = row.Contains(Event.current.mousePosition);
             if (hover) GUI.DrawTexture(row, _texRowHover);
 
-            GUI.Label(new Rect(row.x + 5, row.y, 90, 18), label, _stRowLabel);
+            DrawSprite(new Rect(row.x + 3, row.y + 1, IconSize, IconSize), icon);
+            GUI.Label(new Rect(row.x + layout.Indent, row.y, row.width - layout.Indent, RowHeight), label, _stRowLabel);
             var previous = _stRowCount.normal.textColor;
             _stRowCount.normal.textColor = countColour;
-            GUI.Label(new Rect(row.x + 42, row.y, 30, 18), count.ToString(), _stRowCount);
+            GUI.Label(new Rect(row.x + layout.CountX, row.y, row.width - layout.CountX, RowHeight), count.ToString(), _stRowCount);
             _stRowCount.normal.textColor = previous;
 
             if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hover && ids.Count > 0)
@@ -168,7 +185,7 @@ namespace SanctuaryHud
                 _applyOnFrame = -1;
                 Event.current.Use();
             }
-            return y + 19f;
+            return y + RowHeight + 1f;
         }
     }
 }

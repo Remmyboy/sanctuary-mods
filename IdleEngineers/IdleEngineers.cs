@@ -10,12 +10,12 @@ using static SanctuaryHud.HudCore;
 namespace SanctuaryHud
 {
     // The idle panel: one clickable row per tech tier of idle engineers (plus
-    // COMMANDER and ALL rows), then idle factories by type and tier; clicking
-    // selects that group.
+    // COM and ALL rows), then idle factories by type and tier; clicking
+    // selects that group. Each row carries the unit's own build-menu art.
     // Standalone mod — the ECS poll, Lua selection bridge and styles come from
     // shared\HudCore.cs, compiled into this assembly, so it works with or
     // without the HUD mod loaded.
-    [BepInPlugin("com.sanctuarydb.idleengineers", "Idle Engineers", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.idleengineers", "Idle Engineers", "0.3.0")]
     public class IdleEngineersPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -103,12 +103,29 @@ namespace SanctuaryHud
             }
             // Switched off mid-match: hide at once rather than at the next poll.
             if (!_cfgFactories.Value) factories = new List<IdleGroup>();
+            // The poll hands factories over sorted by type and then tier, and
+            // GroupBy keeps that order.
+            var domains = factories.GroupBy(g => g.Domain).ToList();
+
+            // The panel is only ever as wide as what it draws, the same way it
+            // is only ever as tall (below). Engineer and factory rows share one
+            // layout, so their art, labels and counts stay in columns.
+            var layout = MeasureRows(groups.Concat(factories).ToList(), groups.Count > 1 || domains.Count > 1,
+                Math.Max(_idleCount, _idleFactoryCount), _pollStatus != "ok");
+            // A factory heading is wider than any row, so it has to be measured
+            // too or it would clip against the window edge.
+            foreach (var domain in domains)
+            {
+                layout.Width = Mathf.Max(layout.Width,
+                    16f + _stSubHeading.CalcSize(new GUIContent(FactoryHeading(domain.Key))).x);
+            }
+            _idleRect.width = layout.Width;
 
             _stName.normal.textColor = IdleColour;
-            GUI.Label(new Rect(8, 4, 150, 18), "IDLE", _stName);
+            GUI.Label(new Rect(8, 4, layout.Width - 16, 18), "IDLE", _stName);
             if (_pollStatus != "ok")
             {
-                GUI.Label(new Rect(84, 6, 68, 14), _pollStatus, _stSub);
+                GUI.Label(new Rect(40, 6, layout.Width - 48, 14), _pollStatus, _stSub);
             }
 
             // One clickable row per tech tier; clicking selects that group,
@@ -117,19 +134,19 @@ namespace SanctuaryHud
             foreach (var group in groups)
             {
                 // There is only ever one commander, so its row needs no count.
-                y = DrawIdleRow(group.Label, group.Tier == 0 ? -1 : group.Count, group.UnitIds, y);
+                y = DrawIdleRow(group.Label, group.Tier == 0 ? -1 : group.Count, group.UnitIds, y, group.IconId, layout);
             }
 
             if (groups.Count > 1)
             {
                 GUI.DrawTexture(new Rect(8, y, _idleRect.width - 16, 1), _texBarBack);
                 y += 3;
-                y = DrawIdleRow("ALL", _idleCount, groups.SelectMany(g => g.UnitIds).ToList(), y);
+                // The ALL row has no art of its own, but keeps the indent.
+                y = DrawIdleRow("ALL", _idleCount, groups.SelectMany(g => g.UnitIds).ToList(), y, 0, layout);
             }
 
             // Factories: a heading per type, which selects every idle factory
-            // of that type, then one row per tier. The poll hands them over
-            // sorted by type and then tier, and GroupBy keeps that order.
+            // of that type, then one row per tier.
             if (factories.Count > 0)
             {
                 if (groups.Count > 0)
@@ -138,13 +155,12 @@ namespace SanctuaryHud
                     y += 6;
                 }
 
-                var domains = factories.GroupBy(g => g.Domain).ToList();
                 foreach (var domain in domains)
                 {
                     y = DrawFactoryHeading(domain.Key, domain.SelectMany(g => g.UnitIds).ToList(), y);
                     foreach (var group in domain)
                     {
-                        y = DrawIdleRow(group.Label, group.Count, group.UnitIds, y);
+                        y = DrawIdleRow(group.Label, group.Count, group.UnitIds, y, group.IconId, layout);
                     }
                 }
 
@@ -153,7 +169,7 @@ namespace SanctuaryHud
                 {
                     GUI.DrawTexture(new Rect(8, y, _idleRect.width - 16, 1), _texBarBack);
                     y += 3;
-                    y = DrawIdleRow("ALL", _idleFactoryCount, factories.SelectMany(g => g.UnitIds).ToList(), y);
+                    y = DrawIdleRow("ALL", _idleFactoryCount, factories.SelectMany(g => g.UnitIds).ToList(), y, 0, layout);
                 }
             }
 
@@ -161,17 +177,27 @@ namespace SanctuaryHud
             GUI.DragWindow(new Rect(0, 0, 10000, 10000));
         }
 
-        private float DrawIdleRow(string label, int count, List<int> ids, float y)
+        // Rows carry the unit's own build-menu art where the game has it
+        // loaded, with the tier still spelled out beside it: the art is what
+        // you recognise, the label is what makes the tier certain.
+        private float DrawIdleRow(string label, int count, List<int> ids, float y, uint icon, RowLayout layout)
         {
-            var row = new Rect(4, y, _idleRect.width - 8, 18);
+            var row = new Rect(4, y, _idleRect.width - 8, RowHeight);
             SelectableRow(row, ids);
 
-            GUI.Label(new Rect(row.x + 5, row.y, 90, 18), label, _stRowLabel);
+            DrawSprite(new Rect(row.x + 3, row.y + 1, IconSize, IconSize), icon);
+            GUI.Label(new Rect(row.x + layout.Indent, row.y, row.width - layout.Indent, RowHeight), label, _stRowLabel);
             if (count >= 0)
             {
-                GUI.Label(new Rect(row.x + 42, row.y, 30, 18), count.ToString(), _stRowCount);
+                GUI.Label(new Rect(row.x + layout.CountX, row.y, row.width - layout.CountX, RowHeight), count.ToString(), _stRowCount);
             }
-            return y + 19f;
+            return y + RowHeight + 1f;
+        }
+
+        private static string FactoryHeading(int domain)
+        {
+            var type = domain > 0 && domain < FactoryDomains.Length ? FactoryDomains[domain] : "OTHER";
+            return type + " FACTORIES";
         }
 
         /// "LAND FACTORIES" and so on, in the sub-heading style, and clickable
@@ -181,10 +207,9 @@ namespace SanctuaryHud
             var row = new Rect(4, y, _idleRect.width - 8, 16);
             SelectableRow(row, ids);
 
-            var type = domain > 0 && domain < FactoryDomains.Length ? FactoryDomains[domain] : "OTHER";
             var previous = _stSubHeading.normal.textColor;
             _stSubHeading.normal.textColor = IdleColour;
-            GUI.Label(new Rect(row.x + 4, row.y, row.width - 4, 16), type + " FACTORIES", _stSubHeading);
+            GUI.Label(new Rect(row.x + 4, row.y, row.width - 4, 16), FactoryHeading(domain), _stSubHeading);
             _stSubHeading.normal.textColor = previous;
             return y + 17f;
         }
