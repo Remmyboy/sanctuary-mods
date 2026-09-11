@@ -27,10 +27,10 @@ source.
 | Project | Download | What it does |
 | --- | --- | --- |
 | [SanctuaryHud](SanctuaryHud/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.9.0) | Economy strip in the game's own style, optionally replacing the built-in panel, buttons included; commander widget and alerts; reclaim values and build countdowns over the map |
-| [IdleEngineers](IdleEngineers/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
+| [IdleEngineers](IdleEngineers/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.2.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
 | [EcoManager](EcoManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.1) | One hotkey per *role*, same key every faction, cycling by tier |
-| [LadderReporter](LadderReporter/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.0) | Reports ranked results; launches matchmade games |
+| [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.4.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
