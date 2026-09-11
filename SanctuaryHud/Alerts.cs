@@ -313,8 +313,18 @@ namespace SanctuaryHud
                     var id = System.Text.Encoding.ASCII.GetString(b, p, 4);
                     var len = BitConverter.ToInt32(b, p + 4);
                     var body = p + 8;
+                    var remaining = b.Length - body;
+                    // A chunk has to fit in what's left of the file. A
+                    // negative length would walk p backwards (-8 lands it
+                    // back where it started, and the loop never ends on the
+                    // main thread); an oversized one would read past the end.
+                    // Only "data" gets leeway: streaming encoders leave its
+                    // length unset, and the rest of the file is the audio.
+                    if (id == "data" && (len < 0 || len > remaining)) len = remaining;
+                    if (len < 0 || len > remaining) throw new FormatException($"'{id}' chunk length {len} doesn't fit the file");
                     if (id == "fmt ")
                     {
+                        if (len < 16) throw new FormatException("fmt chunk too short");
                         format = BitConverter.ToUInt16(b, body);
                         channels = BitConverter.ToUInt16(b, body + 2);
                         rate = BitConverter.ToInt32(b, body + 4);
@@ -325,14 +335,17 @@ namespace SanctuaryHud
                     else if (id == "data")
                     {
                         dataStart = body;
-                        dataLen = Math.Min(len, b.Length - body);
+                        dataLen = len;
                         break;
                     }
+                    // len is within the file, so this always moves forward
+                    // and can't overflow.
                     p = body + len + (len & 1);
                 }
                 if (dataStart < 0 || channels <= 0 || rate <= 0) throw new FormatException("no fmt/data chunk");
 
                 var bytesPer = bits / 8;
+                if (bytesPer <= 0) throw new FormatException($"unsupported WAV sample size of {bits} bits");
                 var frames = dataLen / bytesPer;
                 var data = new float[frames];
                 for (var i = 0; i < frames; i++)
