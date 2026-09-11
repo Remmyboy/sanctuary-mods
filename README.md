@@ -33,9 +33,9 @@ source.
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.4.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
+| [ModManager](ModManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.5.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.2.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
+| [ModLoader](ModLoader/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
