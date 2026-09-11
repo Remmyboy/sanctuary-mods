@@ -43,7 +43,9 @@ Adjust the "what it does" cell if the release changed what the mod is.
 
 ## 3. Land it on main first
 
-Releases target `main`, so the commit must be there before tagging:
+The release is tagged at exactly the commit it was built from, and `-Publish`
+refuses unless that commit is `origin/main` with nothing uncommitted in tracked
+files, so the commit must be there first:
 
 ```bash
 git push origin HEAD:main
@@ -71,9 +73,12 @@ One plain-text file describing the mod and what is new. It goes into the
 pwsh -NoProfile -File tools/pack-release.ps1 -Mod EcoManager -Body body.txt
 ```
 
-Without `-Publish` it only builds, into `release/` (gitignored). It fails loudly
-if the DLL is missing, if a zip lacks an expected path, or if any file from your
-own `BepInEx/config` leaked in. Look at the reported sizes: a Standalone that is
+Without `-Publish` it only builds, into `release/` (gitignored). The build is
+always of the committed `HEAD`, checked out clean into a temporary git worktree,
+so uncommitted edits are not in it (the script says so when there are any), and
+each DLL's embedded source revision must equal `HEAD`. It fails loudly if the
+DLL is missing, if a zip lacks an expected path, if a revision doesn't match, or
+if any file from your own `BepInEx/config` leaked in. Look at the reported sizes: a Standalone that is
 not several hundred KB means the BepInEx tree did not come through.
 
 ## 6. Publish
@@ -82,8 +87,12 @@ not several hundred KB means the BepInEx tree did not come through.
 pwsh -NoProfile -File tools/pack-release.ps1 -Mod EcoManager -Body body.txt -Publish
 ```
 
-Refuses if the tag exists — bump the version rather than deleting a tag someone
-may have downloaded. Pass `-Notes notes.md` for a richer markdown release body;
+Refuses if the tag exists locally, on origin or as a release — bump the version
+rather than deleting a tag someone may have downloaded. Otherwise it creates an
+annotated tag at the built commit, pushes it, and creates the release from that
+existing tag (`--verify-tag`), failing if `gh` fails or the release doesn't list
+both zips. If `gh release create` fails after the tag is pushed, the message says
+how to finish from the same tag. Pass `-Notes notes.md` for a richer markdown release body;
 otherwise it uses the plain body plus the standard zip bullets and the
 client-side-only footer.
 
@@ -111,3 +120,7 @@ version unless they have already said to go ahead.
 - **A stale `[BepInPlugin]` version** has happened before: LadderReporter shipped
   0.2.3 while its attribute still read 0.2.1. Bumping the attribute first is
   what stops that.
+- **A release built from a dirty tree.** ReplayManager 0.2.0's DLL embeds
+  commit `42bb4b3` while its tag points at `56d8819`: it was built with
+  uncommitted changes. The clean-worktree build and the revision check are what
+  make that impossible now.

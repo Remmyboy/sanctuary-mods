@@ -11,6 +11,12 @@ The UI mods are presentation-side only: they never touch the game's Lua tree
 tick between players), so a modded client stays lobby-compatible with unmodded
 players. The exceptions are called out in their own sections below.
 
+Lobby-compatible is not the same as safe. Every DLL here, like any BepInEx
+plugin, is a full-trust client plugin: it runs inside the game process with
+the permissions of the Windows account playing, and an unchanged Lua hash is
+no check against cheating or harmful code. Nothing in the game or the loader
+enforces good behaviour, so install DLL mods only from a source you trust.
+
 Every release ships two zips. **Standalone** is everything — BepInEx, the mod
 loader and the mod — for a clean install; extract it into the game's `engine`
 folder. **ModManager** is just the mod, for an install that already has the
@@ -166,7 +172,7 @@ lookup.
 Idle state and unit identity come from the DOTS icon buffers rather than
 Harmony hooks, because the icon FFI receivers are Burst-compiled and cannot be
 patched. Selection and camera moves run through the client's own Lua via an
-emitted call to `luaL_dostring` — client-side only, so still MP-safe. That
+emitted call to `luaL_dostring` — client-side only, so still lobby-compatible. That
 plumbing lives in [shared/HudCore.cs](shared/HudCore.cs), which is compiled
 into each mod that needs it — so each DLL is fully standalone, at the cost of
 each running its own copy of the once-a-second poll.
@@ -440,11 +446,16 @@ with no lobby interaction from either player.
 **Reporting.** The host computes each army's win condition in Lua and
 broadcasts every change to every client; a runtime wrapper around the
 client's `WinConditionUpdate` sees the result. Identity is the game's own
-Steam session: at report time the mod mints a Steam web-API ticket and sends
-it with the result, so a report is exactly as trustworthy as being signed in
-to Steam in the running game. Only Steam lobbies with exactly two human
-players are reported; skirmish, LAN, observers and team games are recognised
-and left alone.
+Steam session: at report time the mod mints a Steam web-API ticket, sends it
+with the result, and cancels it once the request is over. The ticket proves
+which Steam account sent the report, not that the result in it is true, so
+the ladder doesn't take it on trust: a player's own loss applies at once, a
+claimed win applies when the opponent's client agrees or after a 15-minute
+window, and reports that contradict each other freeze the match as disputed.
+Only Steam lobbies with exactly two human players on opposing teams and no AI
+are reported; skirmish, LAN, AI and team games are recognised and left alone,
+as is a game you are only watching. Spectators in a ladder game don't stop it
+reporting.
 
 **Matchmaking.** The site pairs queued players, picks map, factions, slots
 and host, and runs the countdown. The mod never polls the site: it listens
@@ -455,7 +466,10 @@ page already makes, and hands the match object over when there is one
 (`POST /match`). Only requests from `https://www.sanctuarydb.net` (plus
 `Matchmaking.DevOrigins` for a dev server) are answered, so no other web
 page can push a match into the game; a game left open in the menu costs the
-site nothing. Nobody needs the mod to queue: the site only picks the
+site nothing. A pushed match is validated before anything acts on it (ids,
+Steam IDs, slots, and a map that has to be a relative `Maps/.../*.sanmap`
+path inside the game), and a malformed one is answered with a 400. Nobody
+needs the mod to queue: the site only picks the
 automatic path when *both* players' games are seen in the main menu with
 the mod, and falls back to today's manual hosting otherwise. The mod's own
 calls to the site (session id, progress events, the result) carry a bearer
@@ -702,10 +716,16 @@ smoke test (safe to delete).
 **UI mods** — the DLLs, every mod in this repo — each get a section headed
 by the mod's name with its on/off switch inline. Sections start folded, one
 row per mod; clicking a header unfolds that mod's settings beneath it. Off
-destroys the plugin component (its `OnDestroy` unpatches Harmony, so it is a
-genuine unload) and on adds it back. They never enter the Lua hash, so they
-are safe to flip any time, even mid-match, and the disabled set persists
-across restarts.
+destroys the plugin component (its `OnDestroy` unpatches Harmony) and on
+creates it again. That is a component teardown, not an unload: .NET can't
+unload an assembly from a running game, so the mod's code stays in memory
+until the game exits, along with anything its `OnDestroy` doesn't undo. The
+switched-off set persists across restarts, and with ModLoader 1.3 a
+switched-off mod is never started at all: the loader checks the list before
+it creates the plugin, so none of its code runs. A mod whose DLL is deleted
+leaves the list. UI mods never enter the Lua hash, so they are safe to flip
+any time, even mid-match. A mod held back since start-up has no settings to
+show until it is switched on, because a mod binds its settings as it starts.
 
 Each loaded mod's settings sit in its section — panel positions, the commander
 zoom factor, `AssistStartsUpgrade`, hotkeys, anything a mod binds. The list
@@ -725,7 +745,9 @@ so a converted map can carry its own decal blueprints under `map/...`. The
 game's `EM.Lua.FilesCache` is built once at startup and never includes map
 folders; this patches a lazy fallback on the miss path only, serving `map/`
 paths from the loaded map's folder on disk. The hit path is untouched, so
-shipped content behaves exactly as before.
+shipped content behaves exactly as before. Served files live in native memory
+that is freed when a different map loads or the mod unloads, and a file over
+8 MB is refused.
 
 ## ModLoader
 
@@ -737,6 +759,21 @@ the file is written (F6 forces a reload of everything; a deleted DLL has its
 plugins torn down). A mod is installed by dropping its folder in and removed
 by deleting it, with no restart either way, and `dotnet build` of a project
 is the whole iteration loop while developing.
+
+Reloading is not unloading, though. Mono can't remove a single assembly from
+the running game, so each reload destroys the old plugin components and loads
+a fresh copy of the assembly beside the old one. Every copy stays in memory
+until the game exits, along with its static state and anything its
+`OnDestroy` failed to undo, such as static event handlers or background
+threads. The log counts the copies on each reload; after a long run of
+rebuilds, restart the game.
+
+Since 1.3 it is also the registry the [Mod Manager](#modmanager) reads. A
+plugin switched off on the Mods page is held back before it is created, so
+its `Awake` never runs, and the manager starts and stops plugins through the
+loader, which refuses one whose DLL has since been deleted. An older Mod
+Manager can't list a held-back plugin, so the loader only holds plugins back
+when the manager installed says it can.
 
 Two things it has to do that a plain BepInEx plugin would not: it rewrites
 each assembly's identity per load, because Mono returns the cached assembly
