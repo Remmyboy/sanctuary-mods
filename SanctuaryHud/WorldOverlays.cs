@@ -128,6 +128,13 @@ namespace SanctuaryHud
             /// entity for as long as the upgrade runs, so it is read while the
             /// site is in progress and remembered here.
             public bool IsUpgrade;
+            /// Units whose build routine targets this site, from any army, at
+            /// the last poll. The host tells every client when a builder starts
+            /// and stops (OnStartBuilding / OnStopBuilding in work.lua).
+            public int Builders;
+            /// An upgrade whose upgrader has its pause toggle on. A paused
+            /// upgrader stops building it; engineers assisting it don't.
+            public bool UpgraderPaused;
             /// Fraction per second, filtered over the last few samples.
             public float Rate;
             public float LastChange;    // realtime the fraction last moved
@@ -159,6 +166,15 @@ namespace SanctuaryHud
             // anyone's base, so neither gets countdowns or completions.
             "  local focused = 0 " +
             "  for _, a in pairs(Armies or {}) do if a.focused and not a.civilian then focused = focused + 1 end end " +
+            // Who is building what, across every army since an ally can assist.
+            // A builder keeps its target for as long as its build routine runs.
+            "  local building = {} " +
+            "  for _, a in pairs(Armies or {}) do " +
+            "    for _, w in pairs(a.units or {}) do " +
+            "      local t = not w.deleted and w.isBuilding and w.buildTarget " +
+            "      if t and t.id then building[t.id.index] = (building[t.id.index] or 0) + 1 end " +
+            "    end " +
+            "  end " +
             "  for _, a in pairs(Armies or {}) do " +
             "    if a.focused and focused == 1 then " +
             "      for _, u in pairs(a.units or {}) do " +
@@ -180,8 +196,9 @@ namespace SanctuaryHud
             "            elseif has('TECH_CENTRE') then role = 'tech' " +
             "            elseif has('STRATEGIC') then role = 'strategic' end " +
             "            n = n + 1 " +
-            "            out[n] = string.format('%d|%.4f|%.1f|%.1f|%.1f|%.1f|%d|%s|%d|%s', u.id.index, u.progress / bt, pos.x, pos.y, pos.z, bt, " +
-            "              tonumber(g.techNumber) or 0, role, u.upgrader and 1 or 0, tostring(name)) " +
+            "            out[n] = string.format('%d|%.4f|%.1f|%.1f|%.1f|%.1f|%d|%s|%d|%d|%d|%s', u.id.index, u.progress / bt, pos.x, pos.y, pos.z, bt, " +
+            "              tonumber(g.techNumber) or 0, role, u.upgrader and 1 or 0, building[u.id.index] or 0, " +
+            "              (u.upgrader and u.upgrader.GetPause and u.upgrader:GetPause()) and 1 or 0, tostring(name)) " +
             "          end " +
             "        end " +
             "      end " +
@@ -191,8 +208,8 @@ namespace SanctuaryHud
             "end) " +
             "if not ok then __SdbBuildsErr = tostring(err) else __SdbBuildsErr = '' end";
 
-        /// How long a stalled site keeps its last rate before showing as
-        /// stalled. The host only sends progress when it changes, and a
+        /// How long a site can go without moving and still count as being
+        /// worked on. The host only sends progress when it changes, and a
         /// half-second poll can miss one update without meaning anything.
         private const float StallAfter = 2.5f;
         private const float RateTau = 1.5f;
@@ -203,12 +220,18 @@ namespace SanctuaryHud
             if (!LuaReady) return;
 
             // A pause is not a stall: nothing moves because nothing is
-            // simulating. Hold every site's clocks at "now" so neither the
-            // stall timer nor the next rate sample counts the paused time.
+            // simulating. Carry every site's clocks forward by the paused time,
+            // so neither how long it has sat still nor the next rate sample
+            // counts it. (Resetting them to "now" made every site look freshly
+            // worked on after a pause, abandoned and paused ones included.)
             if (Paused)
             {
                 var t = Time.realtimeSinceStartup;
-                foreach (var b in _builds.Values) { b.LastSeen = t; b.LastChange = t; }
+                foreach (var b in _builds.Values)
+                {
+                    b.LastChange += t - b.LastSeen;
+                    b.LastSeen = t;
+                }
                 return;
             }
             if (!RunLua(BuildChunk)) return;
@@ -227,15 +250,16 @@ namespace SanctuaryHud
             var seen = new HashSet<int>();
             foreach (var entry in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                var f = entry.Split(new[] { '|' }, 10);
-                if (f.Length < 10) continue;
+                var f = entry.Split(new[] { '|' }, 12);
+                if (f.Length < 12) continue;
                 if (!int.TryParse(f[0], NumberStyles.Integer, Inv, out var id) ||
                     !float.TryParse(f[1], NumberStyles.Float, Inv, out var frac) ||
                     !float.TryParse(f[2], NumberStyles.Float, Inv, out var x) ||
                     !float.TryParse(f[3], NumberStyles.Float, Inv, out var y) ||
                     !float.TryParse(f[4], NumberStyles.Float, Inv, out var z) ||
                     !float.TryParse(f[5], NumberStyles.Float, Inv, out var bt) ||
-                    !int.TryParse(f[6], NumberStyles.Integer, Inv, out var tier)) continue;
+                    !int.TryParse(f[6], NumberStyles.Integer, Inv, out var tier) ||
+                    !int.TryParse(f[9], NumberStyles.Integer, Inv, out var builders)) continue;
                 seen.Add(id);
 
                 if (!_builds.TryGetValue(id, out var b))
@@ -243,13 +267,15 @@ namespace SanctuaryHud
                     b = new Build { Id = id, LastChange = now };
                     _builds[id] = b;
                 }
-                b.Name = f[9];
+                b.Name = f[11];
                 b.BuildTime = bt;
                 b.Tier = tier;
                 b.Role = f[7];
                 // Sticky: the flag is cleared by the game the moment the
                 // upgrade lands, which may be before the last poll sees it.
                 if (f[8] == "1") b.IsUpgrade = true;
+                b.Builders = builders;
+                b.UpgraderPaused = f[10] == "1";
                 b.Position = new Vector3(x, y, z);
 
                 if (b.LastFraction >= 0f)
@@ -383,6 +409,7 @@ namespace SanctuaryHud
         private static bool _stylesReady;
 
         private static readonly Color EtaColour = new Color(0.85f, 0.92f, 1f, 0.95f);
+        private static readonly Color EconomyStallColour = new Color(1f, 0.55f, 0.08f, 0.95f);   // dark orange
 
         private static void EnsureOverlayStyles()
         {
@@ -545,6 +572,9 @@ namespace SanctuaryHud
             EnsureOverlayStyles();
 
             var now = Time.realtimeSinceStartup;
+            // A stall in either resource throttles every build (construction
+            // draws on both), so it colours them all at once.
+            var economyStalling = SanctuaryHudPlugin.EconomyStalling();
             var ordered = new List<Build>(builds);
             ordered.Sort((p, q) => q.Fraction.CompareTo(p.Fraction));
             var placed = new List<Rect>();
@@ -552,6 +582,15 @@ namespace SanctuaryHud
             foreach (var b in ordered)
             {
                 if (drawn >= Math.Max(1, maxLabels)) break;
+
+                // Being worked on: a builder's routine targets it, or it moved
+                // lately, which also covers a builder the client didn't report.
+                var worked = b.Builders > 0 || now - b.LastChange <= StallAfter;
+                // A paused upgrade that nothing is building isn't going
+                // anywhere, and a frozen clock over it is only clutter. An
+                // engineer assisting it builds straight through the upgrader's
+                // pause, and then it counts as worked on and shows.
+                if (!worked && b.UpgraderPaused) continue;
                 if (!Project(camera, b.Position, scale, logicalWidth, logicalHeight, out var gui)) continue;
 
                 var y = gui.y + 22f;
@@ -562,24 +601,30 @@ namespace SanctuaryHud
                 placed.Add(footprint);
                 drawn++;
 
-                // Nothing has moved for a while: the estimate stays (there is
-                // no better number) and turns red. Before any rate has been
-                // measured, the template's own build time stands in.
-                var stalled = now - b.LastChange > StallAfter;
+                // Normal while it builds, dark orange while a stall slows it,
+                // red once nothing is building it: an abandoned site. The
+                // estimate stays either way (there is no better number); before
+                // any rate has been measured the template's own build time
+                // stands in.
+                Color labelColour, barColour;
+                if (!worked) labelColour = barColour = DangerColour;
+                else if (economyStalling) labelColour = barColour = EconomyStallColour;
+                else { labelColour = EtaColour; barColour = UpgradeColour; }
+
                 var remaining = 1f - b.Fraction;
                 var eta = b.Rate > 1e-4f ? remaining / b.Rate : remaining * Mathf.Max(1f, b.BuildTime);
                 var text = FmtEta(eta);
-                _stEta.normal.textColor = stalled ? DangerColour : EtaColour;
+                _stEta.normal.textColor = labelColour;
 
                 Label(new Rect(gui.x, y, 0f, 0f), text, _stEta);
 
-                // Bar: 54 px wide, in the upgrade blue, under the time.
+                // Bar: 54 px wide, under the time.
                 var barRect = new Rect(gui.x - 27f, y + 11f, 54f, 3f);
                 GUI.DrawTexture(new Rect(barRect.x - 1f, barRect.y - 1f, barRect.width + 2f, barRect.height + 2f), _texShadow);
                 var track = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, 0.15f);
                 GUI.DrawTexture(barRect, _texWhite);
-                GUI.color = stalled ? DangerColour : UpgradeColour;
+                GUI.color = barColour;
                 GUI.DrawTexture(new Rect(barRect.x, barRect.y, barRect.width * Mathf.Clamp01(b.Fraction), barRect.height), _texWhite);
                 GUI.color = track;
             }

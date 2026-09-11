@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using HarmonyLib;
+using SanctuaryUI;
 using UnityEngine;
 using static SanctuaryHud.HudCore;
 
@@ -7,12 +10,13 @@ namespace SanctuaryHud
 {
     // Toasts under the economy strip for the things a player must not miss
     // while looking elsewhere: the commander taking damage, the commander
-    // getting low, and a structure finishing. Each comes with a short
-    // generated tone (no audio assets to ship) and the commander ones jump
-    // the camera to it on click, the same way the widget does.
+    // getting low, a structure finishing, and a player dropping out of the
+    // match. Each comes with a short generated tone (no audio assets to ship)
+    // and the commander ones jump the camera to it on click, the same way the
+    // widget does.
     internal static class Alerts
     {
-        internal enum Kind { CommanderAttacked, CommanderCritical, BuildComplete }
+        internal enum Kind { CommanderAttacked, CommanderCritical, BuildComplete, PlayerDisconnected }
 
         private sealed class Toast
         {
@@ -22,6 +26,8 @@ namespace SanctuaryHud
             public float Shown;
             public float Expires;
             public bool JumpToCommander;
+            /// A white card with dark type instead of the strip's dark panel.
+            public bool Light;
         }
 
         private static readonly List<Toast> _toasts = new List<Toast>();
@@ -147,12 +153,70 @@ namespace SanctuaryHud
             }
         }
 
-        private static void Push(Kind kind, string text, Color colour, bool jump)
+        private static void Push(Kind kind, string text, Color colour, bool jump,
+            bool replace = true, bool light = false, float seconds = ToastSeconds)
         {
             var now = Time.realtimeSinceStartup;
-            _toasts.RemoveAll(t => t.Kind == kind);
-            _toasts.Insert(0, new Toast { Kind = kind, Text = text, Colour = colour, Shown = now, Expires = now + ToastSeconds, JumpToCommander = jump });
+            if (replace) _toasts.RemoveAll(t => t.Kind == kind);
+            _toasts.Insert(0, new Toast
+            {
+                Kind = kind, Text = text, Colour = colour, Shown = now, Expires = now + seconds,
+                JumpToCommander = jump, Light = light,
+            });
             while (_toasts.Count > 4) _toasts.RemoveAt(_toasts.Count - 1);
+        }
+
+        // ---- players dropping out ------------------------------------------
+
+        internal static bool DisconnectEnabled = true;
+
+        // The game reports these in its log panel, top right in small type:
+        // "Player <nickname> disconnected!" (host/commands.lua, broadcast to
+        // every client; a player quitting reads the same, the game doesn't
+        // tell the two apart) and "Connection to the host lost!"
+        // (LobbyManager, when this client loses the host). Both go through
+        // LogPanelUI.AddLogText, so a postfix there turns them into a toast.
+        // The game's own line stays.
+        private static readonly Regex DisconnectLine = new Regex(@"^Player (.+) disconnected!$", RegexOptions.CultureInvariant);
+        private static readonly Color DisconnectInk = new Color(0.08f, 0.1f, 0.13f, 1f);
+
+        internal static void ApplyLogPatch(Harmony harmony)
+        {
+            var method = AccessTools.Method(typeof(LogPanelUI), nameof(LogPanelUI.AddLogText), new[] { typeof(string), typeof(float) });
+            if (method == null) throw new MissingMethodException("LogPanelUI.AddLogText(string, float) not found");
+            harmony.Patch(method, postfix: new HarmonyMethod(typeof(Alerts), nameof(LogTextPostfix)));
+            _log?.LogInfo("Disconnect toasts: log panel hooked.");
+        }
+
+        private static void LogTextPostfix(string message)
+        {
+            if (!DisconnectEnabled || string.IsNullOrEmpty(message)) return;
+            try
+            {
+                var line = message.Trim();
+                string text;
+                var match = DisconnectLine.Match(line);
+                if (match.Success) text = Clip(match.Groups[1].Value) + " DISCONNECTED";
+                else if (line == "Connection to the host lost!") text = "CONNECTION TO THE HOST LOST";
+                else return;
+                // White, unlike the rest, so it reads as news about the match
+                // rather than a warning about your own base; and one player
+                // dropping doesn't push another's notice off.
+                Push(Kind.PlayerDisconnected, text, DisconnectInk, false, replace: false, light: true, seconds: 8f);
+                PlayTone("player-disconnected", 587f, 0.10f, 440f, 0.16f);
+            }
+            catch (Exception e)
+            {
+                _log?.LogWarning($"Disconnect toast failed: {e.Message}");
+            }
+        }
+
+        /// A nickname as the toast shows it: on one line, and short enough
+        /// not to run off the screen.
+        private static string Clip(string name)
+        {
+            var s = (name ?? "").Replace('\n', ' ').Replace('\r', ' ').Trim();
+            return s.Length > 24 ? s.Substring(0, 23) + "…" : s;
         }
 
         // ---- sound ---------------------------------------------------------
@@ -429,8 +493,16 @@ namespace SanctuaryHud
                 var rect = new Rect(logicalWidth / 2f - width / 2f, y, width, 28f);
 
                 var previous = GUI.color;
-                GUI.color = new Color(1f, 1f, 1f, alpha);
-                GUI.DrawTexture(rect, panelTexture);
+                if (t.Light)
+                {
+                    GUI.color = new Color(0.95f, 0.96f, 0.97f, 0.95f * alpha);
+                    GUI.DrawTexture(rect, _texWhite);
+                }
+                else
+                {
+                    GUI.color = new Color(1f, 1f, 1f, alpha);
+                    GUI.DrawTexture(rect, panelTexture);
+                }
                 var bar = t.Colour;
                 bar.a *= alpha;
                 GUI.color = bar;
@@ -438,8 +510,9 @@ namespace SanctuaryHud
                 GUI.DrawTexture(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), _texWhite);
                 GUI.color = previous;
 
-                var textColour = t.Colour;
-                textColour = Color.Lerp(textColour, Color.white, 0.55f);
+                // Dark type on a light card; on the dark panel, the alert's
+                // colour lifted towards white so it reads.
+                var textColour = t.Light ? t.Colour : Color.Lerp(t.Colour, Color.white, 0.55f);
                 textColour.a = alpha;
                 _stToast.normal.textColor = textColour;
                 GUI.Label(rect, t.Text, _stToast);

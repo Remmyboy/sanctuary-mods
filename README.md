@@ -45,16 +45,21 @@ has no release of its own yet; build it from source if you need it.
 - **Economy strip** across the top: alloy on the left, energy on the right,
   each showing current storage, gross income, gross spend and net per second,
   over a capacity bar that lengthens with your storage and reddens as the store
-  heads for empty. `STALL −N/s` appears when the economy can't pay for what is
+  heads for empty. `STALL −N/s` appears when a resource can't pay for what is
   queued. Source: Harmony postfix on `SanctuaryUI.EconomyPanelUI`, the C#
   receiver of Lua's `Engine.UI_SetEconomyValues`.
 
-  The spend figure is what your queue is **asking for**, not what the economy
-  managed to pay (`RequestedTotal` rather than `RequestedStalled`). The two are
-  equal until you stall; during a stall actual spend is capped by income, so
-  showing it would just mirror the income back at you (`+12 −12`) and hide the
-  shortfall. Net stays on actual spend, since that is what really moves the
-  store.
+  While a resource is stalling, its spend figure is what your queue is
+  **asking for** (`RequestedTotal`); otherwise it is what the economy actually
+  paid (`RequestedStalled`), as on the game's own panel. During a stall actual
+  spend is capped by income, so showing it would just mirror the income back
+  at you (`+12 −12`) and hide the shortfall. A resource only counts as
+  stalling when its own store can't cover a tick of demand, which is the test
+  the host's `economy.lua` throttles on: construction draws alloy and energy
+  together and is slowed by whichever runs short, so an energy stall cuts
+  alloy spending as well, and a full alloy store must not show a stall
+  because of it. Net stays on actual spend, since that is what really moves
+  the store.
 
   The rates are smoothed every frame on real elapsed time towards the latest
   update, with a fixed quarter-second time constant, so the strip trails the
@@ -69,9 +74,14 @@ has no release of its own yet; build it from source if you need it.
   Numbers abbreviate exactly as the game's readouts do (`1.2K` above 999).
 - **Hide the game's own bars** (`Overlay · HideGameEconomyBars`, off by
   default, in the Mod Manager's settings): switches off the built-in alloy
-  and energy readouts so the strip is the only economy display. The menu and
-  pause buttons that share the panel stay. They come back whenever the
-  overlay is hidden with **F10**, and when the mod unloads.
+  and energy readouts so the strip is the only economy display. The buttons
+  that share that panel (menu and pause among them) move into the middle of
+  the strip, between alloy and energy, drawn with the game's own icons and
+  its version line under them; hovering one names it. A click there is sent
+  to the game's hidden original as a pointer click, so each does exactly what
+  the game's button does, and an invisible uGUI target under that part of
+  the strip keeps the click from also landing on the map. It all comes back
+  whenever the overlay is hidden with **F10**, and when the mod unloads.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.
@@ -94,16 +104,31 @@ has no release of its own yet; build it from source if you need it.
   progress bar. The rate is measured from successive progress samples
   (half-second poll, filtered), so it reflects whatever is actually assisting;
   before anything has been measured the template's own build time stands in.
-  When nothing has moved for a few seconds the figure stays and turns red,
-  since there is no better number; a pause (the economy stream going quiet)
-  freezes the clocks instead. Labels are placed soonest-first, one that
+  The colour says what is happening to it: normal while something is
+  building it, dark orange while your alloy or energy is stalling (a stall
+  throttles every build), and red once nothing is building it and it hasn't
+  moved for a few seconds, an abandoned site; the estimate stays either way,
+  since there is no better number. What is building a site comes from the
+  units whose build routine targets it (`isBuilding` / `buildTarget`, which
+  the host reports to every client). An upgrade whose upgrader is paused and
+  that nothing is building is left out altogether; an engineer assisting it
+  builds straight through the pause, and then it shows. A game pause (the
+  economy stream going quiet) freezes the clocks instead. Labels are placed
+  soonest-first, one that
   would overlap another is skipped, and `MaxLabels` (12) caps them, so a
   busy base shows the handful nearest completion rather than a wall.
 - **Alerts** (`Alerts · …`): toasts top-centre under the strip, with a short
   generated tone (no audio assets) at `Volume`. *Commander under attack* on
   any health loss, re-sounding at most every eight seconds while it goes on;
   *commander critical* once below `CriticalFraction` (35%), re-armed after
-  repair; *structure complete* when a countdown finishes. Clicking a commander
+  repair; *structure complete* when a countdown finishes; *player
+  disconnected* (`PlayerDisconnected`), a white toast naming them when the
+  game reports a player dropping out, which it otherwise shows as small text
+  top right, and one when your own connection to the host is lost. That
+  comes from a postfix on `LogPanelUI.AddLogText`, the method both notices go
+  through; the game's own line stays, several such toasts can stand at once,
+  and a player quitting reads the same as one disconnecting, since the game
+  sends the same message for both. Clicking a commander
   toast jumps to it like the widget does. Health is re-read four times a
   second off the commander's cached sim id, since the once-a-second ECS poll
   would make the alert a second late. All of it is for the active player
@@ -124,7 +149,8 @@ has no release of its own yet; build it from source if you need it.
   attack is a falling 520→390 Hz pair, critical three 330 Hz pulses,
   complete a rising 660→880 Hz pair. Voice packs replace them: a subfolder
   of `SanctuaryMods\SanctuaryHud\sounds\` holding `commander-under-attack`,
-  `commander-critical`, `structure-complete` and `structure-upgraded` WAVs
+  `commander-critical`, `structure-complete`, `structure-upgraded` and
+  `player-disconnected` WAVs (a line a pack lacks gets the tone)
   (any PCM or float WAV, any rate or channel count), chosen with
   `Alerts · VoicePack`, a left/right chooser on the Mods page listing the
   packs found at load plus `tones` for the built-in sounds. Three ship:
@@ -144,6 +170,9 @@ has no release of its own yet; build it from source if you need it.
   (`Alerts · Sound`); the toasts show regardless.
 
 Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
+Everything the HUD draws steps aside while the game's pause menu or a
+front-end screen (settings, the Mods page) is open over the match, as the
+game's own HUD does: IMGUI would otherwise draw on top of them.
 
 ## IdleEngineers
 
