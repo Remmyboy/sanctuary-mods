@@ -196,8 +196,7 @@ namespace SanctuaryHud
         internal static void Shutdown()
         {
             Restore();
-            if (_shield != null) UnityEngine.Object.Destroy(_shield);
-            _shield = null;
+            HudCore.DestroyShield();
         }
 
         // What survives: the panel's controls. The menu and pause buttons the
@@ -405,85 +404,22 @@ namespace SanctuaryHud
 
         // ---- the game's menus -------------------------------------------------
 
-        /// Whether one of the game's menus is up over the match: the pause
-        /// menu, or a front-end screen such as settings or the Mods page. The
-        /// game's own HUD and map labels sit beneath those; ours is IMGUI,
-        /// which draws over everything, so it has to step aside instead.
-        internal static bool GameMenuOpen()
-        {
-            try
-            {
-                var ui = SanctuaryUIManager.Instance;
-                if (ui != null && ui.TryGetPanel(UIPanelType.PauseMenu, out var pause) && pause.IsVisible) return true;
-                // InterfaceManager.TransitionTo turns this backdrop on for every
-                // screen except None, and None is what a match runs under.
-                var screens = InterfaceManager.Instance;
-                return screens != null && screens.background != null && screens.background.activeInHierarchy;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        /// Whether one of the game's menus is up over the match. Moved into
+        /// HudCore, because the mini-map has to step aside for the same ones;
+        /// this keeps the strip's call sites reading as they did.
+        internal static bool GameMenuOpen() => HudCore.MenuOpen();
 
         // ---- keeping strip clicks off the battlefield -------------------------
 
-        // IMGUI sits outside Unity's event system, so on its own a click on the
-        // strip's buttons would also reach the map beneath (clearing the
-        // selection, starting a box drag). The game's input ignores anything
-        // over uGUI (Engine.IsMouseOverUI is EventSystem.IsPointerOverGameObject),
-        // so an invisible raycast target under the buttons is enough.
-        private static GameObject _shield;
-        private static RectTransform _shieldTarget;
-        private static int _shieldFrame = -1;
-        private static bool _shieldFailed;
+        // The shield itself moved into HudCore, because the mini-map panel
+        // needs exactly the same trick; these two keep the strip's call sites
+        // reading as they always did.
 
         /// Stands the shield over rect (strip coordinates) for this frame.
         /// Call from OnGUI; TickShield takes it down once the calls stop.
-        internal static void Shield(Rect rect, float scale)
-        {
-            if (_shieldFailed || Event.current.type != EventType.Repaint) return;
-            try
-            {
-                if (_shield == null) CreateShield();
-                _shieldTarget.anchoredPosition = new Vector2(rect.x * scale, -rect.y * scale);
-                _shieldTarget.sizeDelta = new Vector2(rect.width * scale, rect.height * scale);
-                if (!_shield.activeSelf) _shield.SetActive(true);
-                _shieldFrame = Time.frameCount;
-            }
-            catch
-            {
-                // Without it the buttons still work; the click just also
-                // reaches the map, as the commander widget's does.
-                _shieldFailed = true;
-            }
-        }
+        internal static void Shield(Rect rect, float scale) => HudCore.Shield(rect, scale);
 
         /// From Update: down once the strip has stopped drawing its buttons.
-        internal static void TickShield()
-        {
-            if (_shield != null && _shield.activeSelf && Time.frameCount - _shieldFrame > 1) _shield.SetActive(false);
-        }
-
-        private static void CreateShield()
-        {
-            _shield = new GameObject("SanctuaryHud strip shield", typeof(RectTransform));
-            _shield.hideFlags = HideFlags.HideAndDontSave;
-            var canvas = _shield.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = short.MaxValue;
-            _shield.AddComponent<GraphicRaycaster>();
-
-            var target = new GameObject("Target", typeof(RectTransform));
-            target.hideFlags = HideFlags.HideAndDontSave;
-            target.transform.SetParent(_shield.transform, false);
-            _shieldTarget = (RectTransform)target.transform;
-            _shieldTarget.anchorMin = _shieldTarget.anchorMax = _shieldTarget.pivot = new Vector2(0f, 1f);
-            var image = target.AddComponent<Image>();
-            image.color = Color.clear;
-            // The raycaster skips a graphic with no draw depth; don't let the
-            // canvas cull this one for being fully transparent.
-            image.canvasRenderer.cullTransparentMesh = false;
-        }
+        internal static void TickShield() => HudCore.TickShield();
     }
 }

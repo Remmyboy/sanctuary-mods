@@ -21,7 +21,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.9.0")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.10.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -131,6 +131,8 @@ namespace SanctuaryHud
                     "Which voice speaks the alerts: a subfolder of SanctuaryMods\\SanctuaryHud\\sounds, or the built-in tones.",
                     new AcceptableValueList<string>(packs.ToArray())));
 
+            MiniMap.Bind(Config);
+
             _visible = _cfgVisible.Value;
 
             _log.LogInfo($"SanctuaryDB HUD loaded (assembly {typeof(SanctuaryHudPlugin).Assembly.GetName().Version}). Unity {Application.unityVersion}.");
@@ -161,6 +163,7 @@ namespace SanctuaryHud
         {
             GamePanel.Shutdown();
             Alerts.Shutdown();
+            MiniMap.Shutdown();
             _harmony?.UnpatchSelf();
         }
 
@@ -200,6 +203,10 @@ namespace SanctuaryHud
             GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && _cfgHideBuiltIn.Value, _log);
             GamePanel.TickShield();
             _menuOpen = _visible && InMatch && GamePanel.GameMenuOpen();
+
+            // The mini-map hides with the rest of the HUD, and under the
+            // game's own menus, as everything else here does.
+            MiniMap.Tick(Time.unscaledDeltaTime, _visible && !_menuOpen);
         }
 
         // ---- economy smoothing --------------------------------------------
@@ -296,6 +303,7 @@ namespace SanctuaryHud
             DrawEconomyStrip(logicalWidth, scale);
             DrawCommanderWidget(logicalWidth);
             Alerts.Draw(logicalWidth, StripHeight + 12f, _texStrip);
+            MiniMap.Draw(logicalWidth, logicalHeight, scale);
 
             GUI.matrix = previousMatrix;
         }

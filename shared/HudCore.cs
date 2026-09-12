@@ -1869,5 +1869,216 @@ namespace SanctuaryHud
             try { return assembly.GetTypes(); }
             catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t != null); }
         }
+
+        // ---- strategic icons, by name ---------------------------------------
+        //
+        // The idle poll reaches the icon registry the long way round, as a
+        // side effect of resolving the whole ECS sweep, and reads it index to
+        // name. A mod that wants to *draw* icons for units it identified
+        // elsewhere needs the opposite direction and none of the sweep — so
+        // this resolves the same two tables on their own.
+
+        private static Dictionary<string, int> _iconIndexByName;
+        private static float _nextIconRegistryRetry;
+
+        /// Resolves the strategic icon registry and atlas without running the
+        /// ECS poll. Icons are registered by Lua during match load, so this
+        /// legitimately finds nothing on the first calls of a match and is
+        /// retried, at most once a second, until it sticks.
+        internal static void EnsureIconRegistry()
+        {
+            if (_iconIndexByName != null && _iconAtlas != null && _iconUvRects != null) return;
+            if (Time.realtimeSinceStartup < _nextIconRegistryRetry) return;
+            _nextIconRegistryRetry = Time.realtimeSinceStartup + 1f;
+
+            try
+            {
+                if (_iconLoaderType == null)
+                {
+                    _iconLoaderType = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic)
+                        .SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
+                }
+                if (_iconNamesByIndex == null) ResolveIconNames();
+                if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();
+
+                if (_iconNamesByIndex != null && _iconIndexByName == null)
+                {
+                    var byName = new Dictionary<string, int>(_iconNamesByIndex.Count, StringComparer.OrdinalIgnoreCase);
+                    // Names are the registry's own keys, so this inversion is
+                    // exact; a duplicate would only mean two indices drawing
+                    // the same art.
+                    foreach (var pair in _iconNamesByIndex) byName[pair.Value] = pair.Key;
+                    _iconIndexByName = byName;
+                }
+            }
+            catch (Exception e)
+            {
+                _log?.LogWarning($"Strategic icon registry unavailable ({e.Message}); callers fall back to plain marks.");
+            }
+        }
+
+        /// The atlas index for a strategic icon's image name, or -1.
+        ///
+        /// Both spellings are in circulation: a unit template records the name
+        /// with its "_normal" suffix, while StrategicIcon strips that suffix on
+        /// the way in, so a caller may hold either. Try what it was given, then
+        /// the other spelling.
+        internal static int IconIndexByName(string name)
+        {
+            if (_iconIndexByName == null || string.IsNullOrEmpty(name)) return -1;
+            if (_iconIndexByName.TryGetValue(name, out var index)) return index;
+            var swapped = name.EndsWith("_normal", StringComparison.OrdinalIgnoreCase)
+                ? name.Substring(0, name.Length - "_normal".Length)
+                : name + "_normal";
+            return _iconIndexByName.TryGetValue(swapped, out index) ? index : -1;
+        }
+
+        /// Draws one from the atlas. False when the atlas or the index isn't
+        /// there, so the caller can fall back to something plainer.
+        internal static bool DrawStrategicIcon(Rect rect, int index)
+        {
+            if (_iconAtlas == null || _iconUvRects == null || index < 0 || index >= _iconUvRects.Count) return false;
+            GUI.DrawTextureWithTexCoords(rect, _iconAtlas, _iconUvRects[index]);
+            return true;
+        }
+
+        /// Dropped when a match ends: icons are registered per match, so last
+        /// game's indices are not safe to carry into the next one.
+        internal static void ClearIconRegistry()
+        {
+            _iconIndexByName = null;
+            _iconNamesByIndex = null;
+            _iconAtlas = null;
+            _iconUvRects = null;
+            _nextIconRegistryRetry = 0f;
+        }
+
+        // ---- the game's menus over a match ------------------------------------
+
+        /// Whether one of the game's menus is up over the match: the pause
+        /// menu, or a front-end screen such as settings or the Mods page. The
+        /// game's own HUD and map labels sit beneath those; IMGUI draws over
+        /// everything, so a mod's panels have to step aside instead.
+        internal static bool MenuOpen()
+        {
+            try
+            {
+                var ui = SanctuaryUI.SanctuaryUIManager.Instance;
+                if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.PauseMenu, out var pause) && pause.IsVisible) return true;
+                // InterfaceManager.TransitionTo turns this backdrop on for
+                // every screen except None, and None is what a match runs
+                // under.
+                var screens = EM.UI.InterfaceManager.Instance;
+                return screens != null && screens.background != null && screens.background.activeInHierarchy;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // ---- keeping IMGUI clicks off the battlefield -------------------------
+        //
+        // IMGUI sits outside Unity's event system, so on its own a click on an
+        // IMGUI widget also reaches the map beneath it — clearing the
+        // selection, or starting a box drag. The game's input ignores anything
+        // over uGUI (Engine.IsMouseOverUI is EventSystem.IsPointerOverGameObject),
+        // so an invisible raycast target under the widget is enough.
+        //
+        // Several rects per assembly, because one mod can have more than one
+        // thing to protect at once — the HUD's economy strip and its mini-map
+        // are both up together. Each Shield call in a frame claims the next
+        // target from a pool; anything not claimed comes down again.
+
+        private static GameObject _shield;
+        private static readonly List<RectTransform> _shieldTargets = new List<RectTransform>();
+        private static int _shieldUsed;
+        private static int _shieldFrame = -1;
+        private static bool _shieldFailed;
+
+        /// Stands a shield over rect (in the caller's own GUI coordinates) for
+        /// this frame. Call from OnGUI, once per area, as many times as
+        /// needed; TickShield takes down whatever stopped being asked for.
+        internal static void Shield(Rect rect, float scale)
+        {
+            if (_shieldFailed || Event.current == null || Event.current.type != EventType.Repaint) return;
+            try
+            {
+                if (_shield == null) CreateShield();
+
+                // First call of a frame starts the claims over.
+                if (_shieldFrame != Time.frameCount)
+                {
+                    _shieldUsed = 0;
+                    _shieldFrame = Time.frameCount;
+                }
+
+                while (_shieldTargets.Count <= _shieldUsed) _shieldTargets.Add(CreateShieldTarget());
+                var target = _shieldTargets[_shieldUsed++];
+                target.anchoredPosition = new Vector2(rect.x * scale, -rect.y * scale);
+                target.sizeDelta = new Vector2(rect.width * scale, rect.height * scale);
+                if (!target.gameObject.activeSelf) target.gameObject.SetActive(true);
+                if (!_shield.activeSelf) _shield.SetActive(true);
+            }
+            catch
+            {
+                // Without it the widget still works; the click just also
+                // reaches the map.
+                _shieldFailed = true;
+            }
+        }
+
+        /// From Update: down once the caller has stopped drawing. Runs before
+        /// the frame's OnGUI, so the count claimed on the previous frame is
+        /// what is still wanted.
+        internal static void TickShield()
+        {
+            if (_shield == null) return;
+            var stale = Time.frameCount - _shieldFrame > 1;
+            var keep = stale ? 0 : _shieldUsed;
+            for (var i = keep; i < _shieldTargets.Count; i++)
+                if (_shieldTargets[i] != null && _shieldTargets[i].gameObject.activeSelf)
+                    _shieldTargets[i].gameObject.SetActive(false);
+            if (stale && _shield.activeSelf) _shield.SetActive(false);
+        }
+
+        /// From OnDestroy: a hot reload leaves the old assembly in memory for
+        /// the rest of the session, so a shield left standing would keep
+        /// swallowing clicks with nothing drawing under it.
+        internal static void DestroyShield()
+        {
+            if (_shield != null) UnityEngine.Object.Destroy(_shield);
+            _shield = null;
+            _shieldTargets.Clear();
+            _shieldUsed = 0;
+            _shieldFrame = -1;
+        }
+
+        private static void CreateShield()
+        {
+            _shield = new GameObject("SanctuaryHud click shield", typeof(RectTransform));
+            _shield.hideFlags = HideFlags.HideAndDontSave;
+            var canvas = _shield.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = short.MaxValue;
+            _shield.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            _shieldTargets.Clear();
+            _shieldUsed = 0;
+        }
+
+        private static RectTransform CreateShieldTarget()
+        {
+            var target = new GameObject("Target", typeof(RectTransform));
+            target.hideFlags = HideFlags.HideAndDontSave;
+            target.transform.SetParent(_shield.transform, false);
+            var rect = (RectTransform)target.transform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
+            var image = target.AddComponent<UnityEngine.UI.Image>();
+            image.color = Color.clear;
+            // The raycaster skips a graphic with no draw depth; don't let the
+            // canvas cull this one for being fully transparent.
+            image.canvasRenderer.cullTransparentMesh = false;
+            return rect;
+        }
     }
 }

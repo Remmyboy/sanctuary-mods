@@ -26,7 +26,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.9.0) | Economy strip in the game's own style, optionally replacing the built-in panel, buttons included; commander widget and alerts; reclaim values and build countdowns over the map |
+| [SanctuaryHud](SanctuaryHud/) | [**0.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.10.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel, buttons included; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.3.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
 | [EcoManager](EcoManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.4.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.2.0) | One hotkey per *role*, same key every faction, cycling by tier |
@@ -169,7 +169,170 @@ has no release of its own yet; build it from source if you need it.
   with the build and ship in the release zips. Sound is off by default
   (`Alerts · Sound`); the toasts show regardless.
 
-Hotkeys: **F10** toggles the overlay, **F9** dumps the UI hierarchy to the log.
+### Mini-map
+
+The mini-map the game doesn't have. Sanctuary ships no map panel at all —
+there is no `minimap` anywhere under `engine\LJ\lua`, and `UIPanelType`, the
+complete list of the game's own panels, goes `Information, Orders,
+Construction, ConstructionFilter, ConstructionQueue, Selection, Log, Economy,
+PauseMenu, GameResult, Chat` — so today the only way to know what is happening
+away from your screen is to pan there.
+
+A panel showing the map from above, shaded where you cannot see, with every
+contact you are allowed to see drawn as its strategic icon in its army's
+colour, and the alloy deposits nobody has taken yet. Clicking or dragging
+anywhere on the map moves the camera there; the border drags the panel and the
+bottom-right corner resizes it. **F2** shows and hides it (`UI · ToggleKey`).
+
+There is deliberately no outline of what the camera is looking at. One was
+built and then taken out again: at the zoom levels that matter it is either the
+whole map — a camera at 648 units with a 50° field of view sees 1057 × 595 of
+world, which is past every edge of a 512 map — or a small box that tells you
+little you can't see from the screen itself.
+
+Buildings that are only queued — placement ghosts, which the game draws on the
+battlefield as outlines — are left off: on a mini-map they would read as
+finished structures, which is worse than not showing them at all.
+
+**The backdrop is the map's own preview.** Every map folder ships a
+`preview.png` beside its `.sanmap` (512², 1024², 400² or 256², depending on the
+map), and the file is simply read and decoded. The game's own loader,
+`LobbyManager.GetMapPicture`, looks like the tidier route and was the first
+thing tried — but it goes through the gamedata index, and starting a *second*
+match or replay in one session calls it at a moment when that index throws,
+after which the map has no picture for the rest of the game. Reading the file
+depends on no game state, so it cannot fail that way. What you get with the
+preview are the numbered start-position circles, which are baked into the
+image; they are a fair price for a backdrop that exists for all 150 maps and
+needs no work per map.
+
+**Which way up was measured, not assumed.** A flipped z axis is the one error
+here that looks perfectly fine — the map is simply mirrored, and nothing about
+it reads as wrong. Ambush Pass is 256×256 with its `Spawn` markers at
+`ARMY_1 (x 98, z 228)` and `ARMY_2 (x 164, z 40)`; on its preview those
+numbered circles sit at `(0.385, 0.107)` and `(0.639, 0.842)` as fractions
+from the top-left. Two points, both axes: x runs left to right unflipped, and
+world **+z is up** the image. The transform keys off map size — which ranges
+from 256 to 2048 across the shipped maps — rather than assuming a scale.
+
+**Six maps have a stale preview**, covering only the centred half of the world
+in each axis: Seton's Clutch, The Forge, There Is Time, Theta Passage, Two Step
+Shuffle and White Desert. They read like maps that were scaled up ×2 without
+the picture being regenerated — the Survival variants of three of them ship
+correct full-map previews. Rather than re-frame the whole mini-map for those,
+the world transform always spans the whole map and only the *picture* is drawn
+into the part it actually covers, so a unit is in the right place on all 150
+maps and those six simply have art in the middle with plain backdrop around it.
+The list was measured, not guessed: every army's Spawn marker on every shipped
+map was projected under both framings and checked against the vivid start
+circle baked into the image, which separates 144 from 6 with nothing
+ambiguous. `Map · FramingOverride` (`My_Map=half`) covers a custom map, or a
+shipped one if the game ever reissues its previews.
+
+**It shows what the game shows, and no more.** The host broadcasts every unit
+in the game to every client and leaves fog, intel and economy filtering to the
+client, so a mini-map that plotted `__Entities.Units` would be a maphack. The
+filter is the client's own `ClientUnit:IsHighlightable()` — vision or radar,
+and not an upgrade shell — so the set of contacts on the mini-map is exactly
+the set the game is already drawing on the battlefield.
+
+**A radar contact is not told on.** It would be easy to draw every contact
+with its real strategic icon, and it would be cheating: `OnIntelRadar`
+*disables* a unit's strategic icon and enables a separate radar icon, which
+`unitTemplateLoader` builds as `<shape>_<tech>_none_normal` — the same plate
+with the role symbol left out — and draws pure white rather than in the army's
+colour. So a radar blip tells you roughly how big a thing it is and nothing
+else, and that is what the mini-map draws too: the blank plate, in white. Only
+contacts you can actually see get their real icon and their owner's colour.
+
+Those icons come from the strategic icon atlas the game binds as a global
+shader texture, looked up by the image names the *template* records for each
+of the two cases. Icons are registered during match load, so a contact seen
+before the registry has filled in draws as a plain square and picks up its
+icon on a later poll.
+
+**A click moves the camera without changing the zoom.** It goes through
+`cameraController.FitCameraToPositions`, the client's own mover — the one the
+game uses to focus a control group — which fits the bounding box it is handed
+but only ever outwards: it takes the greater of the fitted height and the
+height the camera is already at. Handing it a *small* square around the target
+therefore leaves the height exactly as it was and moves the camera and nothing
+else, which is what a click on a mini-map should do. Dragging is a continuous
+pan, rate-limited to about 16 a second, since each one is a chunk across the
+Lua bridge, and the release always lands exactly where you let go.
+
+One thing that comes with going through the game's own mover: it rebuilds the
+camera rotation from the pitch alone, so **a click straightens the camera to
+north-up** if you had rotated it. That is exactly what the game's own focus key
+does to a control group, so it is at least consistent, but it is worth knowing
+before you use the mini-map mid-fight with a rotated camera.
+
+An IMGUI panel is invisible to Unity's event system, and the game's input only
+declines a click when it is over uGUI — so without help the same press would
+also land on the battlefield, clearing the selection or starting a box drag.
+An invisible uGUI raycast target stands under the panel while it is drawn,
+which is enough to make the game ignore it; that is the same trick the HUD's
+economy strip uses, and it now lives in [shared/HudCore.cs](shared/HudCore.cs)
+so both use one copy. The panel's border is its handle and the corner resizes
+it, so a press on the map itself is always a camera move and never a nudge of
+the window. While a drag is in progress the shield covers the whole screen,
+because the *release* is what the game acts on: letting go outside the panel
+with a building queued would otherwise plant it wherever the cursor ended up.
+
+**The fog** shades the whole map and lets the units you share intel with lift
+the shade around themselves, so an empty patch reads as nothing there rather
+than nothing known (`Map · ShowFog`, `Map · FogDarkness`).
+
+The obvious source for it is the game's own fog buffer — `FowPass` renders the
+focused army's intel into a render texture and publishes it as the global
+`_FowBuffer` — and that is what this did first. It is wrong, and instructively
+so: the pass builds its renderer list from `ctx.cullingResults` of the **main
+camera**, and only overrides the *matrices* to the map-wide orthographic view.
+So the vision volumes that reach the buffer are culled to whatever the player
+happens to be looking at, and zooming in erases vision from the rest of the
+map — which on a mini-map put fog over the player's own base.
+
+Coverage is therefore worked out here instead, from the `intel.visionRadius`
+each unit carries on its template, rasterised into a small mask. That is not an
+approximation of the game's rule — it *is* the rule: intel is a plain collider
+overlap, a detector volume of that radius against each unit's signature volume
+(`host/managers/intel/IntelDetector.lua`, `OnColliderEnter`/`OnColliderExit`),
+and there is no line-of-sight or occlusion test anywhere in the intel system.
+Terrain does not block sight in this game, so a circle is the whole of it.
+
+Only units whose intel you actually share report a radius, so an enemy can
+never lift your fog, and the all-armies observer view a replay uses reports
+none at all, since nothing is hidden from it.
+
+Two things the shield can't help with, since the game gates only clicks on
+"is the cursor over UI": the **scroll wheel** over the panel still zooms the
+world, and a panel dragged hard against a screen edge sits in the 8-pixel
+**edge-pan** border, so the camera will creep while you use it. The default
+position is inset clear of that.
+
+**Alloy spots** are the deposits with no extractor on them yet. The game's own
+rule is not simply "enabled": `ClientAlloyResourceSpot.RecalculateRendering`
+hides a marker while the spot is disabled *or* while an extractor the player
+can see is standing on it, and both tests are repeated here. That is
+deliberately not read off the marker's own flag, because CameraUtilities' "hide
+alloy spot markers" switch writes that flag — and running both mods should not
+silently empty this layer.
+
+Contacts are re-read a configurable 8 times a second (`Map · RefreshHz`, 2 to
+20); army colours and deposits every two seconds, since they barely change.
+The contact sweep is a single Lua chunk that walks each army's units, applies
+the visibility test inside the chunk so invisible units never reach the
+payload, and numbers the distinct icon names it saw so a name is sent once
+rather than once per unit. Colours are read off the army object rather than
+derived, because they are handed out by registration-order colour id and not by
+lobby army id — deriving one lands on somebody else's colour.
+
+In a replay the focus army is whatever ReplayManager is showing; the
+all-armies view focuses every army, which the client's own intel code treats as
+seeing everything, so the mini-map fills in without any special case.
+
+Hotkeys: **F10** toggles the overlay, **F2** the mini-map, **F9** dumps the UI
+hierarchy to the log.
 Everything the HUD draws steps aside while the game's pause menu or a
 front-end screen (settings, the Mods page) is open over the match, as the
 game's own HUD does: IMGUI would otherwise draw on top of them.
