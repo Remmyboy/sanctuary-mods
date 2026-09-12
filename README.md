@@ -137,6 +137,16 @@ has no release of its own yet; build it from source if you need it.
   tracking, countdowns or alerts, rather than both sides' at once; watching
   a replay from one seat gets that player's.
 
+  **The strip and the commander widget follow the same rule**, and step
+  aside entirely in the all-armies view — there is no single economy to
+  report there, and what stood on screen was the last seat's figures going
+  stale. The game's own readouts come back while they are away, so that
+  view is never left with no economy display at all. The seat is read from
+  the client's own `GetFocusArmy`, where `-1` is the all-armies view; a
+  value it cannot read counts as focused, so a failed read is never what
+  makes the HUD vanish. The mini-map stays up regardless: it is the one
+  thing here that reads just as well watching everybody.
+
   Which completions get a toast is one switch each under `CompleteToasts`,
   by role (factory, radar, extractor, energy, defence, tech centre,
   strategic, other) and separately for a fresh build and for an upgrade to

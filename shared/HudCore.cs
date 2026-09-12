@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using BepInEx;
@@ -1696,6 +1697,31 @@ namespace SanctuaryHud
         // the frame stamp keeps it from running twice within one assembly.
         private static int _lastSharedTickFrame = -1;
 
+        /// The army the client is looking through: an army id, -1 for the
+        /// all-armies view a replay can sit in, and int.MinValue before it has
+        /// been read.
+        internal static int FocusedArmy = int.MinValue;
+
+        /// Whether the client is looking through one army's eyes.
+        ///
+        /// A replay watched from a seat is; the all-armies view is not, and
+        /// anything reported per-army — an economy readout above all — means
+        /// nothing there. An unread value counts as focused on purpose: a
+        /// failed read must never be what makes the HUD vanish.
+        internal static bool OwnArmyFocused => FocusedArmy != -1;
+
+        // GetFocusArmy is a genuine _G global (common/lobby.lua), so unlike a
+        // module function it can be called straight from an injected chunk.
+        private static void PollFocusArmy()
+        {
+            if (!LuaReady) return;
+            if (!RunLua("__SdbFocusArmy = tostring(GetFocusArmy())")) return;
+            var raw = GetLuaGlobal("__SdbFocusArmy");
+            FocusedArmy = int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
+                ? id
+                : int.MinValue;
+        }
+
         internal static void SharedTick()
         {
             if (Time.frameCount == _lastSharedTickFrame) return;
@@ -1714,6 +1740,9 @@ namespace SanctuaryHud
                     _idleFactoryCount = 0;
                     _alloyCount = 0;
                     _alloyUpgradingCount = 0;
+                    // Unread again, so the next match starts by showing rather
+                    // than by carrying the last one's seat over.
+                    FocusedArmy = int.MinValue;
                     // Each match reloads its sprites through Engine.LoadSprite,
                     // so a reused id could otherwise draw last game's art.
                     ClearSpriteCache();
@@ -1736,6 +1765,7 @@ namespace SanctuaryHud
             {
                 _pollAccum = 0f;
                 PollIdleBuilders();
+                PollFocusArmy();
             }
 
             // Deferred selection: wait for the mouse to come up, then let two

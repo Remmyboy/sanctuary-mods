@@ -200,7 +200,10 @@ namespace SanctuaryHud
 
             // The built-in readouts only go while the strip is standing in for
             // them: overlay on, in a match, option set. Anything else restores.
-            GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && _cfgHideBuiltIn.Value, _log);
+            // ...and while the strip is standing aside, the game's own
+            // readouts have to come back, or the all-armies view would have no
+            // economy display at all.
+            GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && OwnArmyFocused && _cfgHideBuiltIn.Value, _log);
             GamePanel.TickShield();
             _menuOpen = _visible && InMatch && GamePanel.GameMenuOpen();
 
@@ -300,8 +303,16 @@ namespace SanctuaryHud
             }
             if (_cfgBuildEta.Value) WorldOverlays.DrawBuildEtas(scale, logicalWidth, logicalHeight, _cfgBuildEtaMax.Value);
 
-            DrawEconomyStrip(logicalWidth, scale);
-            DrawCommanderWidget(logicalWidth);
+            // The strip and the commander widget are one player's own numbers,
+            // so they step aside in a replay's all-armies view: there is no
+            // single economy to report there, and what was on screen was the
+            // last seat's figures going stale. The mini-map stays — it is the
+            // one thing here that reads just as well watching everybody.
+            if (OwnArmyFocused)
+            {
+                DrawEconomyStrip(logicalWidth, scale);
+                DrawCommanderWidget(logicalWidth);
+            }
             Alerts.Draw(logicalWidth, StripHeight + 12f, _texStrip);
             MiniMap.Draw(logicalWidth, logicalHeight, scale);
 
