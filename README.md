@@ -601,7 +601,7 @@ is a few lines. Player names come from the recorded lobby: a wrapper on the
 installed from a postfix on `ClientLuaInterface.Startup`, before the first
 packet is applied, with the half-second poll as fallback.
 
-**The panel** has the clock, play/pause, a log-scale speed slider, ±1
+**The panel** has the clock, play/pause, a log-scale speed slider, +1
 minute, a FOG toggle, a TIMELINE toggle that hides the total length and the
 seek bar for watching without knowing when the game ends, QUIT, a
 forward-only seek bar with a **RESTART** button beside it, and one row

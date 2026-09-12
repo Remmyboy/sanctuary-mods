@@ -428,10 +428,13 @@ namespace SanctuaryHud.Replays
             catch (Exception e) { Logger.LogWarning($"Replays: fog toggle failed: {e.Message}"); }
         }
 
-        private void Seek(int tick)
+        // The only way backwards: playback restarts from the top, which
+        // rebuilds the client on the recorder's own army, so the view being
+        // watched has to be remembered and put back.
+        private void Restart()
         {
-            if (tick < ReplayPlayer.CurrentTick) _pendingFocus = _focus;   // a rewind rebuilds the client
-            ReplayPlayer.SeekTo(tick);
+            _pendingFocus = _focus;
+            ReplayPlayer.SeekTo(0);
         }
 
         // ---- look ----------------------------------------------------------
@@ -784,8 +787,9 @@ namespace SanctuaryHud.Replays
             var newExp = Slider(speedRect, exp, -2f, 4f, Accent, out var speedChanged);
             if (speedChanged && !seeking) ReplayPlayer.Speed = Mathf.Pow(2f, Mathf.Round(newExp * 4f) / 4f);
             GUILayout.Label(ReplayPlayer.Speed.ToString("0.##", CultureInfo.InvariantCulture) + "x", _stBody, GUILayout.Width(34));
-            if (GUILayout.Button("-1m", _stButton, GUILayout.Width(40))) Seek(tick - 600);
-            if (GUILayout.Button("+1m", _stButton, GUILayout.Width(40))) Seek(tick + 600);
+            // Forward only, like the seek bar: a minute back would be a whole
+            // restart and a fast-forward, which is what RESTART is for.
+            if (GUILayout.Button("+1m", _stButton, GUILayout.Width(40))) ReplayPlayer.SeekTo(tick + 600);
             GUILayout.Space(5);
             var fog = Toggle(_fogOverlay, "FOG", Accent, GUILayout.Width(40));
             if (fog != _fogOverlay) SetFogOverlay(fog);
@@ -815,7 +819,7 @@ namespace SanctuaryHud.Replays
                 }
             }
             var restartRect = GUILayoutUtility.GetRect(26, 20, GUILayout.Width(26));
-            if (GUI.Button(restartRect, GUIContent.none, _stButton)) Seek(0);
+            if (GUI.Button(restartRect, GUIContent.none, _stButton)) Restart();
             if (Event.current.type == EventType.Repaint)
             {
                 var hot = restartRect.Contains(Event.current.mousePosition);
