@@ -31,7 +31,7 @@ source.
 | [EcoManager](EcoManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.4.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.2.0) | One hotkey per *role*, same key every faction, cycling by tier |
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0) | Watch the game's replays fog-free from any seat, with every economy |
+| [ReplayManager](ReplayManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.3.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.5.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
@@ -723,7 +723,7 @@ the host logs.
 
 Makes the game's own replays watchable properly: any player's point of view
 or every army at once, the fog lifted, every army's economy with whole-game
-totals, and a transport with pause, speed, seek and rewind. Since the
+totals, and a transport with pause, speed, forward seek and restart. Since the
 playtest update of 2026-09-04 the game records every match to
 `%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary\Replays\*.sanreplay`
 and plays them from the main menu's replay list; the panel appears whenever
@@ -745,10 +745,11 @@ the mod now only drives the game's socket:
   which is what the socket paces by;
 - **position** is frames read (a postfix on `TryReadFrame`) minus frames
   still queued; **length** is a scan of the file's frame headers;
-- **fast-forward** runs at 16× until the target tick; **rewind** leaves
-  through the game's quit path (scene reload) and calls the game's own
-  `StartReplayPlayback` on the same file again, then fast-forwards. There
-  are no snapshots to seek with, so going back costs a restart.
+- **fast-forward** runs at 16× until the target tick. There are no snapshots
+  to seek with, so the seek bar only goes forward — dragging left of the
+  current tick does nothing — and **RESTART** is the way back to the start:
+  it leaves through the game's quit path (scene reload), calls the game's own
+  `StartReplayPlayback` on the same file again, and fast-forwards from zero.
 
 **Seats, fog, economy.** The recording's `InitClient` message only seats the
 client that recorded it, so the view buttons call the client's own
@@ -763,12 +764,18 @@ is a few lines. Player names come from the recorded lobby: a wrapper on the
 installed from a postfix on `ClientLuaInterface.Startup`, before the first
 packet is applied, with the half-second poll as fallback.
 
-**The panel** has the clock, play/pause, a log-scale speed slider, ±1
+**The panel** has the clock, play/pause, a log-scale speed slider, +1
 minute, a FOG toggle, a TIMELINE toggle that hides the total length and the
-seek bar for watching without knowing when the game ends, QUIT, and one row
+seek bar for watching without knowing when the game ends, QUIT, a
+forward-only seek bar with a **RESTART** button beside it, and one row
 per army: the name button (in the army's own colour) switches to that army's
 view, then alloy and energy as a storage bar, net / in / out per second, and
-the amount used so far in the game. ALL shows every army.
+the amount used so far in the game. ALL shows every army. Armies that never
+show an economy — the empty slots of a map bigger than the game played on it,
+and the neutral army — are left out of the table; once an army has appeared
+it keeps its row, so being wiped out does not remove a player. Drag the
+title bar to move the panel and the grip in its bottom-right corner to
+resize it; both are remembered (`PanelX`, `PanelY`, `PanelScale`).
 
 **Caveats.** A replay is tied to the game build and Lua hash it was recorded
 with; the game's own list greys out mismatches. Playback is a normal client,

@@ -14,14 +14,15 @@ namespace SanctuaryHud.Replays
 {
     // Makes the game's own replays watchable properly: any player's point of
     // view or every army at once, the fog lifted, every army's economy with
-    // whole-game totals, and a transport with pause, speed, seek and rewind.
+    // whole-game totals, and a transport with pause, speed, forward seek and
+    // restart.
     //
     // The game records every match to a `.sanreplay` and plays it back from
     // the main menu's replay list; this panel appears whenever one is
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.3.0")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -29,9 +30,19 @@ namespace SanctuaryHud.Replays
         private ConfigEntry<bool> _cfgTimeline;
         private ConfigEntry<float> _cfgPosX;
         private ConfigEntry<float> _cfgPosY;
+        private ConfigEntry<float> _cfgScale;
 
         private bool _controlsOpen = true;
         private Rect _ctrlRect = new Rect(12, 300, 0, 0);
+
+        // Panel size. The table is laid out at fixed widths, so resizing is a
+        // zoom: the corner grip drags the whole panel's scale. Kept off the
+        // config entry while dragging - BepInEx writes the file on every set.
+        private const float MinScale = 0.6f, MaxScale = 2.5f;
+        private float _scale = 1f;
+        private bool _resizing;
+        private float _anchorX, _anchorY;   // panel top-left, scale-independent
+        private float _grabX = 1f;          // where in the panel the grip was taken
         private bool _fogOverlay;
         private int _lastFocus = int.MinValue;
 
@@ -41,6 +52,11 @@ namespace SanctuaryHud.Replays
         private List<ArmyRow> _armies = new List<ArmyRow>();
         private Dictionary<int, EcoRow> _eco = new Dictionary<int, EcoRow>();
         private Dictionary<int, string> _seatNames = new Dictionary<int, string>();   // armyId -> nickname
+        // Armies that have shown an economy at all. A 2v2 map played 1v1 still
+        // reports its empty slots (and the neutral army), as rows of nothing;
+        // they would be dead lines in the table. Sticky, so a player who is
+        // wiped out late keeps their row.
+        private HashSet<int> _played = new HashSet<int>();
         private int _focus = int.MinValue;
         private string _lastHookErr;
 
@@ -65,6 +81,12 @@ namespace SanctuaryHud.Replays
             public float ACur, AStore, AIn, AHarvest, AOut, AReq;
             public float ECur, EStore, EIn, EHarvest, EOut, EReq;
             public float ATotalIn, ATotalOut, ETotalIn, ETotalOut;   // whole game so far
+
+            // Anything at all: an unoccupied slot reports zeroes forever.
+            public bool Playing =>
+                AStore > 0 || EStore > 0 || ACur > 0 || ECur > 0 ||
+                AIn > 0 || EIn > 0 || AHarvest > 0 || EHarvest > 0 ||
+                ATotalIn > 0 || ETotalIn > 0 || ATotalOut > 0 || ETotalOut > 0;
         }
 
         private void Awake()
@@ -77,8 +99,11 @@ namespace SanctuaryHud.Replays
                 "Show the replay's total length and the seek bar. Off hides both, for watching without knowing when the game ends.");
             _cfgPosX = Config.Bind("UI", "PanelX", 12f, "Playback control panel X in 1080p-logical pixels.");
             _cfgPosY = Config.Bind("UI", "PanelY", 300f, "Playback control panel Y in 1080p-logical pixels.");
+            _cfgScale = Config.Bind("UI", "PanelScale", 1f,
+                "Playback control panel size, 1 being the default. Drag the grip in the panel's bottom-right corner to change it.");
             _ctrlRect.x = _cfgPosX.Value;
             _ctrlRect.y = _cfgPosY.Value;
+            _scale = Mathf.Clamp(_cfgScale.Value, MinScale, MaxScale);
 
             try
             {
@@ -120,17 +145,38 @@ namespace SanctuaryHud.Replays
             if (_dragging && !Input.GetMouseButton(0))
             {
                 _dragging = false;
-                Seek((int)_dragValue);
+                // The bar only seeks forward. Playback may have caught up to
+                // the knob while it was held, and a release behind the current
+                // tick must not turn into a restart — RESTART is for that.
+                if (_dragValue > ReplayPlayer.CurrentTick) ReplayPlayer.SeekTo((int)_dragValue);
+            }
+
+            // Corner grip: the scale that keeps the grabbed point under the
+            // cursor, with the panel's top-left pinned — which is what the
+            // anchor (position times scale, so it holds as the scale moves) is
+            // for. Solving `mouse = (anchor + grab * scale) * screen`.
+            if (_resizing)
+            {
+                if (!Input.GetMouseButton(0)) _resizing = false;
+                else
+                {
+                    var screen = Screen.height / 1080f;
+                    _scale = Mathf.Clamp((Input.mousePosition.x - _anchorX * screen) / (_grabX * screen), MinScale, MaxScale);
+                    _ctrlRect.x = _anchorX / _scale;
+                    _ctrlRect.y = _anchorY / _scale;
+                }
             }
 
             if (ReplayPlayer.Active)
             {
                 PollLua(Time.unscaledDeltaTime);
                 if (!Input.GetMouseButton(0) &&
-                    (Math.Abs(_cfgPosX.Value - _ctrlRect.x) > 0.5f || Math.Abs(_cfgPosY.Value - _ctrlRect.y) > 0.5f))
+                    (Math.Abs(_cfgPosX.Value - _ctrlRect.x) > 0.5f || Math.Abs(_cfgPosY.Value - _ctrlRect.y) > 0.5f ||
+                     Math.Abs(_cfgScale.Value - _scale) > 0.005f))
                 {
                     _cfgPosX.Value = _ctrlRect.x;
                     _cfgPosY.Value = _ctrlRect.y;
+                    _cfgScale.Value = _scale;
                 }
             }
             else if (_luaHooked || _armies.Count > 0 || _seatNames.Count > 0)
@@ -139,6 +185,7 @@ namespace SanctuaryHud.Replays
                 _armies = new List<ArmyRow>();
                 _eco = new Dictionary<int, EcoRow>();
                 _seatNames = new Dictionary<int, string>();
+                _played = new HashSet<int>();
                 _focus = int.MinValue;
                 _lastFocus = int.MinValue;
                 _lastRowCount = -1;
@@ -330,8 +377,14 @@ namespace SanctuaryHud.Replays
                     row.ETotalOut = P(16);
                 }
                 _eco[id] = row;
+                if (row.Playing) _played.Add(id);
             }
         }
+
+        // Empty slots on an oversized map are filtered out of the table. Until
+        // the first army has shown an economy nothing is filtered, so the
+        // table is never empty while the replay is still opening.
+        private bool Playing(ArmyRow a) => _played.Count == 0 || _played.Contains(a.Id);
 
         // "clientID|nickname|armyID|playerType;..." from the recorded lobby.
         private void ParseSeats(string raw)
@@ -375,10 +428,13 @@ namespace SanctuaryHud.Replays
             catch (Exception e) { Logger.LogWarning($"Replays: fog toggle failed: {e.Message}"); }
         }
 
-        private void Seek(int tick)
+        // The only way backwards: playback restarts from the top, which
+        // rebuilds the client on the recorder's own army, so the view being
+        // watched has to be remembered and put back.
+        private void Restart()
         {
-            if (tick < ReplayPlayer.CurrentTick) _pendingFocus = _focus;   // a rewind rebuilds the client
-            ReplayPlayer.SeekTo(tick);
+            _pendingFocus = _focus;
+            ReplayPlayer.SeekTo(0);
         }
 
         // ---- look ----------------------------------------------------------
@@ -389,7 +445,7 @@ namespace SanctuaryHud.Replays
         private static readonly Color OutColour = new Color(1f, 0.5f, 0.45f);
 
         private static bool _uiReady;
-        private static Texture2D _texPanelBg, _texBtn, _texBtnHover, _texBtnOn, _texBtnOnHover, _texKnob, _texTrack;
+        private static Texture2D _texPanelBg, _texBtn, _texBtnHover, _texBtnOn, _texBtnOnHover, _texKnob, _texTrack, _texRestartIcon;
         private static GUIStyle _stPanel, _stTitle, _stTime, _stBody, _stDim, _stHead, _stButton, _stToggleBtn;
         private static GUIStyle _stNet, _stIn, _stOut, _stBar;
 
@@ -408,12 +464,13 @@ namespace SanctuaryHud.Replays
             _texBtnOnHover = Rounded(5, new Color(0.92f, 0.92f, 0.92f, 1f));
             _texKnob = Rounded(7, new Color(0.95f, 0.96f, 0.98f, 1f));
             _texTrack = Rounded(3, Color.white);
+            _texRestartIcon = SkipToStartIcon(32);
 
             _stPanel = new GUIStyle
             {
                 normal = { background = _texPanelBg },
                 border = new RectOffset(11, 11, 11, 11),
-                padding = new RectOffset(12, 12, 10, 12),
+                padding = new RectOffset(10, 10, 7, 8),
             };
             _stTitle = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = TextDim } };
             _stTime = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
@@ -427,9 +484,9 @@ namespace SanctuaryHud.Replays
                 hover = { background = _texBtnHover, textColor = Color.white },
                 active = { background = _texBtnHover, textColor = Color.white },
                 border = new RectOffset(6, 6, 6, 6),
-                padding = new RectOffset(8, 8, 3, 3),
-                margin = new RectOffset(2, 2, 2, 2),
-                fixedHeight = 22,
+                padding = new RectOffset(6, 6, 2, 2),
+                margin = new RectOffset(2, 2, 1, 1),
+                fixedHeight = 20,
                 clipping = TextClipping.Clip,
             };
             _stToggleBtn = new GUIStyle(_stButton)
@@ -467,6 +524,56 @@ namespace SanctuaryHud.Replays
             return tex;
         }
 
+        /// A "skip to start" glyph (a bar plus two left-pointing triangles),
+        /// drawn white so callers can tint it with GUI.color. Rendered oversized
+        /// and shrunk at draw time via ScaleToFit, which is what anti-aliases
+        /// the triangle edges - there's no per-pixel AA in this rasterizer.
+        private static Texture2D SkipToStartIcon(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear };
+            var px = new Color[size * size];
+            var cy = size / 2f;
+            var barW = size * 0.11f;
+            var barX0 = size * 0.12f;
+            var barX1 = barX0 + barW;
+            var triTop = size * 0.16f;
+            var triBot = size * 0.84f;
+            var triW = size * 0.32f;
+            var gap = size * 0.08f;
+            var t1X0 = barX1 + gap;
+            var t1X1 = t1X0 + triW;
+            var t2X0 = t1X1 + gap * 0.6f;
+            var t2X1 = t2X0 + triW;
+
+            Vector2 t1A = new Vector2(t1X1, triTop), t1B = new Vector2(t1X1, triBot), t1C = new Vector2(t1X0, cy);
+            Vector2 t2A = new Vector2(t2X1, triTop), t2B = new Vector2(t2X1, triBot), t2C = new Vector2(t2X0, cy);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    var p = new Vector2(x + 0.5f, y + 0.5f);
+                    var inBar = p.x >= barX0 && p.x <= barX1 && p.y >= triTop && p.y <= triBot;
+                    var inTri = PointInTriangle(p, t1A, t1B, t1C) || PointInTriangle(p, t2A, t2B, t2C);
+                    px[y * size + x] = new Color(1f, 1f, 1f, inBar || inTri ? 1f : 0f);
+                }
+            }
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
+        }
+
+        private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+        {
+            float Sign(Vector2 p1, Vector2 p2, Vector2 p3) => (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+            var d1 = Sign(p, a, b);
+            var d2 = Sign(p, b, c);
+            var d3 = Sign(p, c, a);
+            var hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+            var hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+            return !(hasNeg && hasPos);
+        }
+
         /// A thin slider with a filled track. Returns the (possibly new)
         /// value; `changed` is true only while the user is dragging it.
         private static float Slider(Rect r, float value, float min, float max, Color fill, out bool changed)
@@ -480,7 +587,7 @@ namespace SanctuaryHud.Replays
             switch (ev.GetTypeForControl(id))
             {
                 case EventType.MouseDown:
-                    if (r.Contains(ev.mousePosition) && ev.button == 0)
+                    if (GUIUtility.hotControl == 0 && r.Contains(ev.mousePosition) && ev.button == 0)
                     {
                         GUIUtility.hotControl = id;
                         changed = true;
@@ -543,6 +650,31 @@ namespace SanctuaryHud.Replays
             return result;
         }
 
+        /// A column divider, laid out where a gap between two cells would be.
+        /// Every row draws its own over the full row height, so together they
+        /// read as one line down the table. `split` is the alloy/energy break.
+        private static void VRule(float height, bool split = false)
+        {
+            var w = split ? SplitW : RuleW;
+            var r = GUILayoutUtility.GetRect(w, height, GUILayout.Width(w), GUILayout.Height(height));
+            if (Event.current.type != EventType.Repaint) return;
+            var old = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, split ? 0.2f : 0.09f);
+            GUI.DrawTexture(new Rect(Mathf.Round(r.x + w / 2f), r.y, 1, r.height), Texture2D.whiteTexture);
+            GUI.color = old;
+        }
+
+        /// The line under the column headings, in a 3px-tall slot of its own.
+        private static void HRule()
+        {
+            var r = GUILayoutUtility.GetRect(10, 3, GUILayout.ExpandWidth(true), GUILayout.Height(3));
+            if (Event.current.type != EventType.Repaint) return;
+            var old = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, 0.16f);
+            GUI.DrawTexture(new Rect(r.x, Mathf.Round(r.y + 1), r.width, 1), Texture2D.whiteTexture);
+            GUI.color = old;
+        }
+
         private static void Bar(Rect r, float fraction, Color colour, string text)
         {
             if (Event.current.type == EventType.Repaint)
@@ -576,12 +708,17 @@ namespace SanctuaryHud.Replays
 
         // Column widths, 1080p-logical. The panel is sized from these plus its
         // row count, so it fits two players or twelve.
-        private const float NameW = 84, BarW = 84, CellW = 36, UsedW = 46, Gap = 4;
-        // Row height; the name button is 22 tall with a 2px margin, so 26
+        private const float NameW = 78, BarW = 74, CellW = 34, UsedW = 42, Gap = 4;
+        // Column dividers stand in for the gaps between cells: a hairline down
+        // the middle of RuleW, and the wider SplitW between alloy and energy.
+        private const float RuleW = 5, SplitW = 9;
+        // Row height; the name button is 20 tall with a 1px margin, so 22
         // puts its centre on the same line as full-height cells.
-        private const float RowH = 26;
-        private const float ResourceW = BarW + Gap + CellW * 3 + Gap + UsedW;
-        private const float PanelW = 24 + NameW + Gap + ResourceW + 10 + ResourceW;
+        private const float RowH = 22;
+        private const float ResourceW = BarW + CellW * 3 + UsedW + RuleW * 4;
+        // Padding (10 each side) plus the name button's own 2px margins, which
+        // is why the ARMY heading is laid out 4 wider than the button.
+        private const float PanelW = 24 + NameW + RuleW + ResourceW + SplitW + ResourceW;
         private int _lastRowCount = -1;
 
         private void OnGUI()
@@ -589,7 +726,7 @@ namespace SanctuaryHud.Replays
             if (!ReplayPlayer.Active && !ReplayPlayer.Restarting) return;
             if (!_controlsOpen || ReplayPlayer.Current == ReplayPlayer.Stage.Loading) return;
 
-            var scale = Screen.height / 1080f;
+            var scale = Screen.height / 1080f * _scale;
             var previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var logicalWidth = Screen.width / scale;
@@ -603,9 +740,11 @@ namespace SanctuaryHud.Replays
                 // frame: drag events skip the layout pass, and a zero-height
                 // rect then draws nothing.
                 _ctrlRect.width = PanelW;
-                if (_armies.Count != _lastRowCount)
+                var rows = 0;
+                foreach (var a in _armies) if (Playing(a)) rows++;
+                if (rows != _lastRowCount)
                 {
-                    _lastRowCount = _armies.Count;
+                    _lastRowCount = rows;
                     _ctrlRect.height = 0;
                 }
                 _ctrlRect.x = Mathf.Clamp(_ctrlRect.x, -PanelW + 80, logicalWidth - 80);
@@ -634,75 +773,96 @@ namespace SanctuaryHud.Replays
             }
 
             // Header: clock, transport, speed, jumps, fog, timeline, quit.
-            GUILayout.BeginHorizontal(GUILayout.Height(22));
+            GUILayout.BeginHorizontal(GUILayout.Height(20));
             var timeline = _cfgTimeline.Value;
             var status = finished ? " end" : seeking ? $" > {Clock(ReplayPlayer.SeekTarget)}" : "";
             var clock = timeline ? $"{Clock(tick)} / {Clock(total)}" : Clock(tick);
             GUILayout.Label(clock + status, _stTime, GUILayout.Width(NameW + 30));
             if (GUILayout.Button(ReplayPlayer.Paused ? "PLAY" : "PAUSE", _stButton, GUILayout.Width(56))) ReplayPlayer.Paused = !ReplayPlayer.Paused;
-            GUILayout.Space(6);
+            GUILayout.Space(5);
             // Speed on a log scale, 0.25x to 16x with 1x a third of the way
             // along, in quarter stops. The game clamps at 16x.
             var exp = Mathf.Log(Mathf.Max(0.1f, ReplayPlayer.Speed), 2f);
-            var speedRect = GUILayoutUtility.GetRect(90, 22, GUILayout.Width(90));
+            var speedRect = GUILayoutUtility.GetRect(84, 20, GUILayout.Width(84));
             var newExp = Slider(speedRect, exp, -2f, 4f, Accent, out var speedChanged);
             if (speedChanged && !seeking) ReplayPlayer.Speed = Mathf.Pow(2f, Mathf.Round(newExp * 4f) / 4f);
             GUILayout.Label(ReplayPlayer.Speed.ToString("0.##", CultureInfo.InvariantCulture) + "x", _stBody, GUILayout.Width(34));
-            if (GUILayout.Button("-1m", _stButton, GUILayout.Width(40))) Seek(tick - 600);
-            if (GUILayout.Button("+1m", _stButton, GUILayout.Width(40))) Seek(tick + 600);
-            GUILayout.Space(6);
+            // Forward only, like the seek bar: a minute back would be a whole
+            // restart and a fast-forward, which is what RESTART is for.
+            if (GUILayout.Button("+1m", _stButton, GUILayout.Width(40))) ReplayPlayer.SeekTo(tick + 600);
+            GUILayout.Space(5);
             var fog = Toggle(_fogOverlay, "FOG", Accent, GUILayout.Width(40));
             if (fog != _fogOverlay) SetFogOverlay(fog);
             var tl = Toggle(timeline, "TIMELINE", Accent, GUILayout.Width(70));
-            if (tl != timeline)
-            {
-                _cfgTimeline.Value = tl;
-                _lastRowCount = -1;   // the panel changes height; let it re-fit
-            }
+            if (tl != timeline) _cfgTimeline.Value = tl;
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("QUIT", _stButton, GUILayout.Width(48))) ReplayPlayer.Quit();
             GUILayout.EndHorizontal();
 
             // Seek bar. Dragging only moves the knob; the jump happens when the
-            // mouse is released (see Update).
+            // mouse is released (see Update). Playback can't go back without a
+            // full restart, so the bar seeks forward only: dragging left of the
+            // current tick clamps to it, and RESTART is the way back to the
+            // start. The row (bar and button) is laid out even when the
+            // timeline is hidden, so toggling it never resizes the panel — a
+            // resize mid-click is what used to strand the view buttons.
+            GUILayout.BeginHorizontal();
+            var seekRect = GUILayoutUtility.GetRect(10, 20, GUILayout.ExpandWidth(true));
             if (timeline)
             {
-                var seekRect = GUILayoutUtility.GetRect(10, 20, GUILayout.ExpandWidth(true));
                 var shown = _dragging ? _dragValue : tick;
                 var v2 = Slider(seekRect, shown, 0, Math.Max(1, total - 1), Accent, out var seekChanged);
                 if (seekChanged)
                 {
                     _dragging = true;
-                    _dragValue = v2;
+                    _dragValue = Mathf.Max(tick, v2);
                 }
             }
+            var restartRect = GUILayoutUtility.GetRect(26, 20, GUILayout.Width(26));
+            if (GUI.Button(restartRect, GUIContent.none, _stButton)) Restart();
+            if (Event.current.type == EventType.Repaint)
+            {
+                var hot = restartRect.Contains(Event.current.mousePosition);
+                var old = GUI.color;
+                GUI.color = hot ? Color.white : TextMid;
+                var iconSize = 13f;
+                var iconRect = new Rect(restartRect.x + (restartRect.width - iconSize) / 2f, restartRect.y + (restartRect.height - iconSize) / 2f, iconSize, iconSize);
+                GUI.DrawTexture(iconRect, _texRestartIcon, ScaleMode.ScaleToFit, true);
+                GUI.color = old;
+            }
+            GUILayout.EndHorizontal();
 
             // Economy: one row per army, the name being the view button.
-            // The seek bar carries its own breathing room; without it the
-            // table needs some.
-            GUILayout.Space(timeline ? 2 : 8);
-            GUILayout.BeginHorizontal(GUILayout.Height(16));
-            GUILayout.Label("ARMY", _stHead, GUILayout.Width(NameW));
-            GUILayout.Space(Gap);
+            GUILayout.Space(2);
+            GUILayout.BeginHorizontal(GUILayout.Height(14));
+            GUILayout.Label("ARMY", _stHead, GUILayout.Width(NameW + 4));
+            GUILayout.Space(RuleW);
             ResourceHeader("ALLOY", AlloyColour);
-            GUILayout.Space(10);
+            GUILayout.Space(SplitW);
             ResourceHeader("ENERGY", EnergyColour);
             GUILayout.EndHorizontal();
+            HRule();
 
             foreach (var a in _armies)
             {
+                if (!Playing(a)) continue;
                 GUILayout.BeginHorizontal(GUILayout.Height(RowH));
                 var on = _focus == a.Id;
-                if (Toggle(on, DisplayName(a), a.Colour, GUILayout.Width(NameW)) && !on) SetFocus(a.Id);
-                GUILayout.Space(Gap);
+                if (Toggle(on, DisplayName(a), a.Colour, GUILayout.Width(NameW)) && !on)
+                {
+                    _pendingFocus = int.MinValue;   // a manual pick beats a seek's restore
+                    SetFocus(a.Id);
+                }
                 if (_eco.TryGetValue(a.Id, out var e))
                 {
+                    VRule(RowH);
                     Resource(AlloyColour, e.ACur, e.AStore, e.AIn + e.AHarvest, e.AReq, e.AOut, e.ATotalOut);
-                    GUILayout.Space(10);
+                    VRule(RowH, true);
                     Resource(EnergyColour, e.ECur, e.EStore, e.EIn + e.EHarvest, e.EReq, e.EOut, e.ETotalOut);
                 }
                 else
                 {
+                    GUILayout.Space(RuleW);
                     GUILayout.Label("waiting for economy data", _stDim);
                 }
                 GUILayout.EndHorizontal();
@@ -710,10 +870,49 @@ namespace SanctuaryHud.Replays
 
             GUILayout.BeginHorizontal(GUILayout.Height(RowH));
             var all = _focus == -1;
-            if (Toggle(all, "ALL", Accent, GUILayout.Width(NameW)) && !all) SetFocus(-1);
+            if (Toggle(all, "ALL", Accent, GUILayout.Width(NameW)) && !all)
+            {
+                _pendingFocus = int.MinValue;
+                SetFocus(-1);
+            }
             GUILayout.EndHorizontal();
 
+            ResizeGrip();
             GUI.DragWindow(new Rect(0, 0, 10000, 30));
+        }
+
+        /// The corner grip, drawn outside the layout in the bottom-right of
+        /// the window (the row of buttons there ends well to the left). The
+        /// drag itself runs in Update, off the real mouse position: the panel
+        /// scales under the cursor as it moves, so window-space coordinates
+        /// would chase themselves.
+        private void ResizeGrip()
+        {
+            if (_ctrlRect.height < 40) return;   // the frame after a re-fit
+            var grip = new Rect(_ctrlRect.width - 15, _ctrlRect.height - 15, 13, 13);
+            var ev = Event.current;
+
+            if (ev.type == EventType.MouseDown && ev.button == 0 && grip.Contains(ev.mousePosition))
+            {
+                _resizing = true;
+                _anchorX = _ctrlRect.x * _scale;
+                _anchorY = _ctrlRect.y * _scale;
+                _grabX = Mathf.Max(40f, ev.mousePosition.x);
+                ev.Use();
+            }
+
+            if (ev.type != EventType.Repaint) return;
+            var old = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, _resizing || grip.Contains(ev.mousePosition) ? 0.6f : 0.22f);
+            for (int x = 0; x < 3; x++)
+            {
+                for (int y = 0; y < 3; y++)
+                {
+                    if (x + y < 2) continue;   // the lower-right triangle of dots
+                    GUI.DrawTexture(new Rect(grip.x + 2 + x * 4, grip.y + 2 + y * 4, 2, 2), Texture2D.whiteTexture);
+                }
+            }
+            GUI.color = old;
         }
 
         private static void ResourceHeader(string name, Color colour)
@@ -722,12 +921,14 @@ namespace SanctuaryHud.Replays
             GUI.color = colour;
             GUILayout.Label(name, _stHead, GUILayout.Width(BarW));
             GUI.color = old;
-            GUILayout.Space(Gap);
             var right = new GUIStyle(_stHead) { alignment = TextAnchor.LowerRight };
+            GUILayout.Space(RuleW);
             GUILayout.Label("NET", right, GUILayout.Width(CellW));
+            GUILayout.Space(RuleW);
             GUILayout.Label("IN", right, GUILayout.Width(CellW));
+            GUILayout.Space(RuleW);
             GUILayout.Label("OUT", right, GUILayout.Width(CellW));
-            GUILayout.Space(Gap);
+            GUILayout.Space(RuleW);
             GUILayout.Label("USED", right, GUILayout.Width(UsedW));
         }
 
@@ -745,14 +946,16 @@ namespace SanctuaryHud.Replays
             r.y += (RowH - 16) / 2;
             r.height = 16;
             Bar(r, store > 0 ? cur / store : 0f, colour, $"{Short(cur)} / {Short(store)}");
-            GUILayout.Space(Gap);
+            VRule(RowH);
             var old = GUI.color;
             GUI.color = net >= 0 ? GainColour : LossColour;
             GUILayout.Label((net >= 0 ? "+" : "") + net, _stNet, GUILayout.Width(CellW), GUILayout.Height(RowH));
             GUI.color = old;
+            VRule(RowH);
             GUILayout.Label("+" + inc, _stIn, GUILayout.Width(CellW), GUILayout.Height(RowH));
+            VRule(RowH);
             GUILayout.Label("-" + req, _stOut, GUILayout.Width(CellW), GUILayout.Height(RowH));
-            GUILayout.Space(Gap);
+            VRule(RowH);
             var right = new GUIStyle(_stBody) { alignment = TextAnchor.MiddleRight };
             GUILayout.Label(Short(used), right, GUILayout.Width(UsedW), GUILayout.Height(RowH));
         }
