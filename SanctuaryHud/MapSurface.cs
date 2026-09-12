@@ -37,29 +37,62 @@ namespace SanctuaryHud
         private static Texture2D _backdropTexture;
         private static bool _loggedNoPreview;
 
-        /// True when this map's preview covers only the centred half of the
-        /// world in each axis — see HalfFramedMaps.
-        private static bool _halfFramed;
-
-        /// Set by the plugin from `Map · FramingOverride`.
-        internal static string FramingOverride;
-
-        // Six shipped maps have a stale preview.png that covers only the
-        // centred half of the world in each axis, a quarter of the area. They
-        // look like maps that were scaled up x2 without the preview being
-        // regenerated — note that the Survival variants of three of them ship
-        // correct full-map previews.
+        // ---- the frame: the part of the world the panel shows -----------------
         //
-        // Measured, not guessed: for all 150 shipped maps, each army's Spawn
-        // marker was projected under both framings and the result checked
-        // against the vivid start circle baked into the image. 144 maps agree
-        // with the full-map framing and these six with the half. Redo that
-        // measurement if the game ever reissues its previews.
-        private static readonly string[] HalfFramedMaps =
+        // The playable area, not the whole world. On most maps they are the
+        // same, but six shipped maps (Seton's Clutch, The Forge, There Is Time,
+        // Theta Passage, Two Step Shuffle, White Desert) have terrain twice the
+        // size of the play space, with an area named "PlayableArea" fencing
+        // play into the centred half — and the game's GetDefaultPlayableArea
+        // looks exactly that name up. Each map's preview is rendered of that
+        // area, so framing on it makes the picture fill the panel.
+        //
+        // Measuring every Spawn marker against the start circles baked into
+        // the previews first singled those six out as "stale previews", and the
+        // first release drew them into the middle of a world-sized panel with
+        // a black border round three-quarters of it. They are not stale, they
+        // are fenced; reading the area from the game makes that the rule
+        // rather than a list of names.
+        //
+        // The whole world until the area has been read, which is the right
+        // answer for almost every map anyway.
+
+        internal static float FrameX { get; private set; }
+        internal static float FrameZ { get; private set; }
+        internal static float FrameW { get; private set; }
+        internal static float FrameL { get; private set; }
+        private static bool _frameFromArea;
+
+        /// Frames the panel on an area given as its centre and full size, the
+        /// shape the client's Area class uses. Ignored when it is degenerate
+        /// or sticks out past the world, rather than trusted into a broken
+        /// panel.
+        internal static void SetFrame(float centreX, float centreZ, float sizeX, float sizeZ)
         {
-            "Seton_s_Clutch", "The_Forge", "There_Is_Time",
-            "Theta_Passage", "Two_Step_Shuffle", "White_Desert",
-        };
+            if (!Ready || !(sizeX >= 8f) || !(sizeZ >= 8f)) return;
+            var x = centreX - sizeX * 0.5f;
+            var z = centreZ - sizeZ * 0.5f;
+            const float slack = 1f;
+            if (x < -slack || z < -slack || x + sizeX > Width + slack || z + sizeZ > Length + slack) return;
+            if (_frameFromArea && Mathf.Approximately(x, FrameX) && Mathf.Approximately(z, FrameZ) &&
+                Mathf.Approximately(sizeX, FrameW) && Mathf.Approximately(sizeZ, FrameL)) return;
+
+            FrameX = x;
+            FrameZ = z;
+            FrameW = sizeX;
+            FrameL = sizeZ;
+            _frameFromArea = true;
+            HudCore._log?.LogInfo($"MiniMap: {MapName} framed on its playable area {sizeX:0}x{sizeZ:0} at ({x:0}, {z:0}) of {Width:0}x{Length:0}.");
+        }
+
+        private static void ResetFrame()
+        {
+            FrameX = 0f;
+            FrameZ = 0f;
+            FrameW = Width;
+            FrameL = Length;
+            _frameFromArea = false;
+        }
 
         /// Picks up a newly loaded map, and drops everything when the match
         /// ends. Cheap enough to call every frame: the common case is one
@@ -100,10 +133,10 @@ namespace SanctuaryHud
             }
 
             var dataName = Path.GetFileNameWithoutExtension(path) ?? "";
-            _halfFramed = ResolveFraming(dataName);
+            ResetFrame();
             LoadBackdrop(path);
             HudCore._log?.LogInfo(
-                $"MiniMap: {MapName} ({dataName}) {Width}x{Length}, framing {(_halfFramed ? "HALF" : "FULL")}, " +
+                $"MiniMap: {MapName} ({dataName}) {Width}x{Length}, " +
                 $"backdrop {(Backdrop != null ? "loaded" : "missing")}.");
         }
 
@@ -189,43 +222,10 @@ namespace SanctuaryHud
             return _loadImage != null && _loadImage.Invoke(null, new object[] { texture, bytes, false }) is bool ok && ok;
         }
 
-        /// Whether this map's preview covers only the centred half. The
-        /// override wins, so a map the list doesn't know about (a custom one,
-        /// or a new shipped one) is a settings edit rather than a rebuild:
-        /// "Theta_Passage=half;My_Map=full".
-        private static bool ResolveFraming(string dataName)
-        {
-            var overrides = FramingOverride;
-            if (!string.IsNullOrEmpty(overrides))
-            {
-                foreach (var entry in overrides.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var eq = entry.IndexOf('=');
-                    if (eq <= 0) continue;
-                    if (!entry.Substring(0, eq).Trim().Equals(dataName, StringComparison.OrdinalIgnoreCase)) continue;
-                    return entry.Substring(eq + 1).Trim().StartsWith("half", StringComparison.OrdinalIgnoreCase);
-                }
-            }
-
-            foreach (var name in HalfFramedMaps)
-                if (name.Equals(dataName, StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
-
-        /// Where the preview image belongs inside the map area.
-        ///
-        /// The world transform always spans the whole map, on every map, so a
-        /// unit is drawn in the right place regardless. On a half-framed map
-        /// the picture simply doesn't reach the edges: it is drawn into the
-        /// middle quarter it actually covers, and the outer ring is left as
-        /// backdrop. Better a correct map with art in the middle than a
-        /// complete picture with every unit in the wrong place.
-        internal static Rect BackdropRect(Rect map)
-        {
-            if (!_halfFramed) return map;
-            return new Rect(map.x + map.width * 0.25f, map.y + map.height * 0.25f,
-                            map.width * 0.5f, map.height * 0.5f);
-        }
+        /// Where the preview image belongs inside the map area: all of it, now
+        /// that the panel is framed on the same playable area the preview was
+        /// rendered of.
+        internal static Rect BackdropRect(Rect map) => map;
 
         internal static void Clear()
         {
@@ -236,7 +236,11 @@ namespace SanctuaryHud
             MapName = null;
             Width = 0f;
             Length = 0f;
-            _halfFramed = false;
+            FrameX = 0f;
+            FrameZ = 0f;
+            FrameW = 0f;
+            FrameL = 0f;
+            _frameFromArea = false;
         }
 
         // ---- world <-> panel ------------------------------------------------
@@ -249,15 +253,16 @@ namespace SanctuaryHud
         // the top-left. Two points, both axes: x runs left to right unflipped,
         // and world +z is *up* the image.
         //
-        // Every shipped map's playable area is the whole map, so there is no
-        // playable-area term; the transform keys off map size, so a custom map
-        // whose playable area is smaller is still drawn whole.
+        // Both directions go through the frame, so a unit, a click and the fog
+        // all agree on where the playable area sits in the panel.
 
         internal static Vector2 WorldToPanel(Vector3 world, Rect map)
         {
+            var w = Mathf.Max(1f, FrameW);
+            var l = Mathf.Max(1f, FrameL);
             return new Vector2(
-                map.x + Mathf.Clamp01(world.x / Width) * map.width,
-                map.y + (1f - Mathf.Clamp01(world.z / Length)) * map.height);
+                map.x + Mathf.Clamp01((world.x - FrameX) / w) * map.width,
+                map.y + (1f - Mathf.Clamp01((world.z - FrameZ) / l)) * map.height);
         }
 
         internal static Vector3 PanelToWorld(Vector2 point, Rect map)
@@ -266,7 +271,7 @@ namespace SanctuaryHud
             var v = Mathf.Clamp01((point.y - map.y) / Mathf.Max(1f, map.height));
             // The y is irrelevant to the caller: the camera mover is handed a
             // square in the ground plane and samples the height itself.
-            return new Vector3(u * Width, 0f, (1f - v) * Length);
+            return new Vector3(FrameX + u * FrameW, 0f, FrameZ + (1f - v) * FrameL);
         }
     }
 }

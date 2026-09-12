@@ -225,19 +225,25 @@ from the top-left. Two points, both axes: x runs left to right unflipped, and
 world **+z is up** the image. The transform keys off map size — which ranges
 from 256 to 2048 across the shipped maps — rather than assuming a scale.
 
-**Six maps have a stale preview**, covering only the centred half of the world
-in each axis: Seton's Clutch, The Forge, There Is Time, Theta Passage, Two Step
-Shuffle and White Desert. They read like maps that were scaled up ×2 without
-the picture being regenerated — the Survival variants of three of them ship
-correct full-map previews. Rather than re-frame the whole mini-map for those,
-the world transform always spans the whole map and only the *picture* is drawn
-into the part it actually covers, so a unit is in the right place on all 150
-maps and those six simply have art in the middle with plain backdrop around it.
-The list was measured, not guessed: every army's Spawn marker on every shipped
-map was projected under both framings and checked against the vivid start
-circle baked into the image, which separates 144 from 6 with nothing
-ambiguous. `Map · FramingOverride` (`My_Map=half`) covers a custom map, or a
-shipped one if the game ever reissues its previews.
+**The mini-map shows the playable area, not the whole world.** On most maps
+those are the same thing. On six — Seton's Clutch, The Forge, There Is Time,
+Theta Passage, Two Step Shuffle and White Desert — the terrain is twice the
+size of the play space, and the map carries an area named `PlayableArea` that
+fences play into the centred half; the game's own `GetDefaultPlayableArea`
+looks that name up and puts its barriers there. Each map's preview is rendered
+of that playable area, so framing the mini-map on it makes the picture fill the
+panel and puts every unit in the right place.
+
+That was not the first reading. Projecting every army's Spawn marker on all
+150 shipped maps against the start circle baked into each preview separates
+144 full-map previews from exactly those six, which first looked like previews
+left stale after a map was scaled up — and the first release drew the picture
+into the middle of a world-sized panel, leaving three-quarters of it an empty
+black border. The six are not stale; they are fenced. The framing now comes
+from the game's own playable area rather than a list of names, so it holds for
+a custom map too. (A map that names its rect just `Playable`, as Fields of Isis
+does, is not matched by the game's lookup and plays across the whole map — and
+its preview is full-map to match.)
 
 **It shows what the game shows, and no more.** The host broadcasts every unit
 in the game to every client and leaves fog, intel and economy filtering to the

@@ -52,8 +52,13 @@ namespace SanctuaryHud
             if (Time.unscaledTime < _nextBuild) return;
             _nextBuild = Time.unscaledTime + 0.2f;
 
-            var width = MapSurface.Width;
-            var length = MapSurface.Length;
+            // The mask covers what the mini-map covers — the playable area —
+            // not the whole world, or the fog would be drawn out of register
+            // on any map whose play space is smaller than its terrain.
+            var originX = MapSurface.FrameX;
+            var originZ = MapSurface.FrameZ;
+            var width = MapSurface.FrameW;
+            var length = MapSurface.FrameL;
             if (width <= 0f || length <= 0f) return;
 
             if (Mask == null)
@@ -84,8 +89,8 @@ namespace SanctuaryHud
                     var contact = contacts[c];
                     if (contact.VisionRadius <= 0f) continue;
 
-                    var cx = contact.X / width * Size;
-                    var cy = contact.Z / length * Size;
+                    var cx = (contact.X - originX) / width * Size;
+                    var cy = (contact.Z - originZ) / length * Size;
                     var rx = Mathf.Max(1f, contact.VisionRadius / width * Size);
                     var ry = Mathf.Max(1f, contact.VisionRadius / length * Size);
 
