@@ -22,7 +22,7 @@ namespace SanctuaryHud.Replays
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.3.0")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
