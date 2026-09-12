@@ -105,10 +105,40 @@ namespace SanctuaryHud
             _shown = _cfgEnabled.Value;
         }
 
+        /// Whether something in here has thrown. The mini-map shares the HUD's
+        /// Update and OnGUI now, so an exception escaping it would take the
+        /// economy strip and the alerts down with it — everything below is
+        /// guarded, and a fault costs the mini-map and nothing else.
+        private static bool _tickFailed;
+        private static bool _drawFailed;
+
         /// From the HUD's Update. `hudShowing` is the overlay's own state, so
         /// the mini-map goes away with the rest of the HUD on F10 and under
         /// the game's menus.
         internal static void Tick(float deltaTime, bool hudShowing)
+        {
+            if (_tickFailed) return;
+            try { TickCore(deltaTime, hudShowing); }
+            catch (Exception e)
+            {
+                _tickFailed = true;
+                _log?.LogError($"Mini-map update failed; the rest of the HUD carries on without it: {e}");
+            }
+        }
+
+        /// From the HUD's OnGUI, inside its 1080p-logical GUI matrix.
+        internal static void Draw(float logicalWidth, float logicalHeight, float scale)
+        {
+            if (_drawFailed) return;
+            try { DrawCore(logicalWidth, logicalHeight, scale); }
+            catch (Exception e)
+            {
+                _drawFailed = true;
+                _log?.LogError($"Mini-map draw failed; the rest of the HUD carries on without it: {e}");
+            }
+        }
+
+        private static void TickCore(float deltaTime, bool hudShowing)
         {
             if (_cfgEnabled == null) return;
 
@@ -175,8 +205,7 @@ namespace SanctuaryHud
             }
         }
 
-        /// From the HUD's OnGUI, inside its 1080p-logical GUI matrix.
-        internal static void Draw(float logicalWidth, float logicalHeight, float scale)
+        private static void DrawCore(float logicalWidth, float logicalHeight, float scale)
         {
             if (_cfgEnabled == null || !_shown || !MapSurface.Ready) return;
             EnsureUi();
