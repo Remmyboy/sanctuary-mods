@@ -26,7 +26,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.10.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel, buttons included; commander widget and alerts; reclaim values and build countdowns over the map |
+| [SanctuaryHud](SanctuaryHud/) | [**0.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.10.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel, buttons included; a compact orders row and a plainer unit card in place of the game's; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.3.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
 | [EcoManager](EcoManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.4.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.2.0) | One hotkey per *role*, same key every faction, cycling by tier |
@@ -82,6 +82,64 @@ has no release of its own yet; build it from source if you need it.
   the game's button does, and an invisible uGUI target under that part of
   the strip keeps the click from also landing on the map. It all comes back
   whenever the overlay is hidden with **F10**, and when the mod unloads.
+- **Size** (`Overlay · StripScale`, 0.7 to 1.6): the strip and the commander
+  widget drawn larger or smaller, on top of the usual scaling to screen
+  height; nothing else moves. The gross in and gross out figures sit one
+  over the other beside the net, so the two figures being compared line up.
+- **Compact orders row** (`Orders · CompactPanel`, on by default) in place
+  of the game's orders panel bottom-left. The game draws all twenty-one
+  order buttons for any selection and dims the ones that don't apply; of the
+  bright ones only Stop and the toggles (pause, repeat build, shield, intel,
+  production) do anything when clicked in the current build — the Lua
+  registers no click function for move, attack, patrol and the rest, which
+  are hotkeys and right-clicks anyway. The row shows only the buttons the
+  game has enabled for the selection, and with `Orders · HideInert` (on by
+  default) only the ones that are wired, so a factory gets pause, repeat
+  build and stop and a tank gets stop. The HUD's own glyphs on tiles in the
+  game's order colours (the game's icons are a small glyph in a large sprite
+  lit by a glow shader, and don't survive being borrowed), a lit tile for a
+  toggle that is on, the button's name over it on hover;
+  each click is sent to the game's own button as a pointer click, so
+  whatever Lua hung on it runs unchanged. `Orders · Scale` sizes the row.
+  The game's panel is kept running underneath at zero alpha (Lua goes on
+  filling it in and flipping it with the selection), and comes back when the
+  overlay is hidden or the mod unloads.
+- **Unit card** (`InfoCard · ReplaceCard`, on by default) in place of the
+  game's unit information panel. The game's card is a bitmap mock-up with
+  fifteen text fields over it: the template id next to the name, income to
+  three decimal places, and no telling which figure is which without
+  learning the picture. The replacement draws from the same values (a
+  postfix on `InformationPanelUI.SetValues` catches every update): name and
+  class, a health bar with `current / max` and regen, armour and bubble
+  shields only when the unit has them, build progress while it is being
+  built, then what it adds to or takes from the economy per second, each
+  resource in its own colour and only where it is not zero (no build cost:
+  that belongs to the build menu), and build power, veterancy, transport and
+  ammo capacity only where they are not zero. Figures round and abbreviate
+  like the strip; no template id. `InfoCard · Scale` sizes it. With the replacement off,
+  `InfoCard · TidyGameCard` (on by default) still hides the template id on
+  the game's own card and rounds its income figures.
+- **Selection row** (`Selection · HorizontalRow`, on by default) in place of
+  the game's selection list, which stacks the selected unit types upwards in
+  a narrow column on the left edge. The same buttons — the game's own
+  background, portrait and count — draw as a row along the bottom at the
+  left end of the build options. Left click keeps just that type, right
+  click drops it, both passed to the game's own button. `Selection · Scale`
+  sizes it. The unit card steps aside while more than one unit is selected:
+  the game's card describes one unit of the group, whichever came first.
+- **Build strip** (`Construction · ReplaceStrip`, on by default) in place of
+  the game's build options, tier tabs and build queue, each of which is a
+  dashed panel with paging arrows and "coming soon" placeholders. The HUD
+  lays the bottom out itself from where the game's strip starts: the
+  selection row, then only the options the selection actually has; above
+  the options the tier tabs, only when more than one is live, then the
+  queue with its counts and progress. Every button is the game's own, so
+  clicks (shift and right included) and hovers do what they do on the
+  game's panels — hovering an option puts its figures on the unit card.
+  `Construction · Scale` sizes the rows. With the strip left to the game,
+  `Construction · HideLoneTierTab` (on by default) still conceals the tier
+  tabs whenever no more than one of them can be clicked — a tier-1 factory's
+  single T1, or a structure whose only option is its own upgrade.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.

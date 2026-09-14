@@ -12,7 +12,12 @@ namespace SanctuaryHud
 {
     // Client-side HUD: the economy strip across the top and the commander
     // widget top-right, reclaim values and build countdowns drawn over the
-    // map (WorldOverlays.cs), and the commander alerts (Alerts.cs).
+    // map (WorldOverlays.cs), the commander alerts (Alerts.cs), the mini-map
+    // (MiniMap.cs), and stand-ins for the game's own panels along the bottom:
+    // a compact orders row (OrdersBar.cs), a plainer unit card (InfoCard.cs),
+    // the selection list as a row (SelectionRow.cs), the build options,
+    // tabs and queue as rows (BuildStrip.cs, on UnitRow.cs), and the tier
+    // tabs put away when there is only one (TierTabs.cs).
     // Presentation-only: reads state the game already sends to the render
     // side and draws an IMGUI overlay. Never touches the lobby-hashed Lua
     // tree or the simulation.
@@ -21,7 +26,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.10.0")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.11.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -30,6 +35,7 @@ namespace SanctuaryHud
         private ConfigEntry<bool> _cfgVisible;
         private ConfigEntry<KeyCode> _cfgToggleKey;
         private ConfigEntry<bool> _cfgHideBuiltIn;
+        private ConfigEntry<float> _cfgStripScale;
         private ConfigEntry<bool> _cfgReclaim;
         private ConfigEntry<KeyCode> _cfgReclaimHoldKey;
         private ConfigEntry<float> _cfgReclaimMinValue;
@@ -60,6 +66,9 @@ namespace SanctuaryHud
                 "Hide the game's own alloy and energy readouts at the top of the screen, so the strip is the only economy display. " +
                 "The menu and pause buttons that share that panel move into the middle of the strip. " +
                 "It all comes back whenever the overlay is hidden or the mod is unloaded.");
+            _cfgStripScale = Config.Bind("Overlay", "StripScale", 1f,
+                new ConfigDescription("Size of the economy strip and the commander widget, as a multiple of the standard size.",
+                    new AcceptableValueRange<float>(0.7f, 1.6f)));
             _cfgCommanderZoom = Config.Bind("Commander", "JumpZoomFactor", 0.5f,
                 "How wide the camera sits after jumping to the commander, as a fraction of the current camera height. " +
                 "Higher = further out. 0.5 keeps roughly your current zoom.");
@@ -132,6 +141,12 @@ namespace SanctuaryHud
                     new AcceptableValueList<string>(packs.ToArray())));
 
             MiniMap.Bind(Config);
+            OrdersBar.Bind(Config);
+            InfoCard.Bind(Config);
+            SelectionRow.Bind(Config);
+            TierTabs.Bind(Config);
+            BuildStrip.Bind(Config);
+            UnitDomains.Bind(Config);
 
             _visible = _cfgVisible.Value;
 
@@ -153,6 +168,24 @@ namespace SanctuaryHud
             {
                 _log.LogWarning($"Disconnect toasts unavailable (log panel hook failed): {e.Message}");
             }
+            // The stand-ins for the game's panels: one hook keeps a concealed
+            // panel concealed through Lua's own visibility calls, the other
+            // catches the unit card's values. Without them the game's own
+            // panels stay as they are.
+            try
+            {
+                PanelConceal.ApplyPatch(_harmony);
+                InfoCard.ApplyPatch(_harmony);
+            }
+            catch (Exception e)
+            {
+                _log.LogWarning($"Panel stand-ins unavailable (hook failed): {e.Message}");
+                OrdersBar.Enabled.Value = false;
+                InfoCard.Enabled.Value = false;
+                SelectionRow.Enabled.Value = false;
+                TierTabs.HideLone.Value = false;
+                BuildStrip.Enabled.Value = false;
+            }
             _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log.");
         }
 
@@ -164,12 +197,49 @@ namespace SanctuaryHud
             GamePanel.Shutdown();
             Alerts.Shutdown();
             MiniMap.Shutdown();
+            OrdersBar.Shutdown();
+            InfoCard.Shutdown();
+            SelectionRow.Shutdown();
+            TierTabs.Shutdown();
+            BuildStrip.Shutdown();
             _harmony?.UnpatchSelf();
         }
 
         // ---- input --------------------------------------------------------
 
+        // ---- cost meter ------------------------------------------------------
+        // How long the HUD's own Update and OnGUI take per frame, logged every
+        // ten seconds while in a match, so a slow game can be blamed or cleared
+        // from the log alone.
+        private static readonly System.Diagnostics.Stopwatch _swUpdate = new System.Diagnostics.Stopwatch();
+        private static readonly System.Diagnostics.Stopwatch _swGui = new System.Diagnostics.Stopwatch();
+        private static int _meterFrames;
+        private static float _meterNext;
+
+        private void LateUpdate()
+        {
+            _meterFrames++;
+            if (Time.realtimeSinceStartup < _meterNext) return;
+            _meterNext = Time.realtimeSinceStartup + 10f;
+            if (_meterFrames > 0 && InMatch)
+            {
+                _log.LogInfo($"HUD cost: update {_swUpdate.Elapsed.TotalMilliseconds / _meterFrames:0.00} ms/frame, " +
+                             $"gui {_swGui.Elapsed.TotalMilliseconds / _meterFrames:0.00} ms/frame over {_meterFrames} frames " +
+                             $"({_meterFrames / 10f:0} fps).");
+            }
+            _swUpdate.Reset();
+            _swGui.Reset();
+            _meterFrames = 0;
+        }
+
         private void Update()
+        {
+            _swUpdate.Start();
+            try { UpdateInner(); }
+            finally { _swUpdate.Stop(); }
+        }
+
+        private void UpdateInner()
         {
             if (Input.GetKeyDown(_cfgToggleKey.Value))
             {
@@ -210,6 +280,22 @@ namespace SanctuaryHud
             // The mini-map hides with the rest of the HUD, and under the
             // game's own menus, as everything else here does.
             MiniMap.Tick(Time.unscaledDeltaTime, _visible && !_menuOpen);
+
+            // The game's own orders panel and unit card stay concealed under
+            // its menus too (nothing of the HUD shows there anyway); their
+            // stand-ins just don't draw. Only hiding the overlay, or leaving
+            // the match, gives them back.
+            OrdersBar.Tick(_visible);
+            InfoCard.Tick(_visible);
+            SelectionRow.Tick(_visible);
+            // The build strip takes the tier tabs with it; TierTabs only
+            // minds them while the strip is the game's own.
+            BuildStrip.Tick(_visible);
+            TierTabs.Tick(_visible && !BuildStrip.Active);
+            // The domain map is per match: the sprite registry reloads with
+            // each one, so it is dropped between matches and rebuilt.
+            if (InMatch) UnitDomains.Tick();
+            else UnitDomains.Reset();
         }
 
         // ---- economy smoothing --------------------------------------------
@@ -282,6 +368,13 @@ namespace SanctuaryHud
 
         private void OnGUI()
         {
+            _swGui.Start();
+            try { OnGuiInner(); }
+            finally { _swGui.Stop(); }
+        }
+
+        private void OnGuiInner()
+        {
             // Under the game's pause menu or a settings screen nothing of the
             // game's own shows through, so nothing of ours should either.
             if (!_visible || !InMatch || _menuOpen) return;
@@ -303,17 +396,30 @@ namespace SanctuaryHud
             }
             if (_cfgBuildEta.Value) WorldOverlays.DrawBuildEtas(scale, logicalWidth, logicalHeight, _cfgBuildEtaMax.Value);
 
+            // The stand-ins for the game's own panels sit where those did,
+            // along the bottom.
+            OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+            InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+            if (BuildStrip.Active) BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+            else SelectionRow.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+
             // The strip and the commander widget are one player's own numbers,
             // so they step aside in a replay's all-armies view: there is no
             // single economy to report there, and what was on screen was the
             // last seat's figures going stale. The mini-map stays — it is the
             // one thing here that reads just as well watching everybody.
+            //
+            // Both draw under their own scale on top of the screen's, so the
+            // setting sizes them without touching anything else.
+            var stripScale = Mathf.Clamp(_cfgStripScale.Value, 0.7f, 1.6f);
             if (OwnArmyFocused)
             {
-                DrawEconomyStrip(logicalWidth, scale);
-                DrawCommanderWidget(logicalWidth);
+                GUI.matrix = Matrix4x4.Scale(new Vector3(scale * stripScale, scale * stripScale, 1f));
+                DrawEconomyStrip(Screen.width / (scale * stripScale), scale * stripScale);
+                DrawCommanderWidget(Screen.width / (scale * stripScale));
+                GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             }
-            Alerts.Draw(logicalWidth, StripHeight + 12f, _texStrip);
+            Alerts.Draw(logicalWidth, StripHeight * stripScale + 12f, _texStrip);
             MiniMap.Draw(logicalWidth, logicalHeight, scale);
 
             GUI.matrix = previousMatrix;
@@ -323,15 +429,20 @@ namespace SanctuaryHud
 
         // The game's UI palette (Beam UI, as the front menu uses it): near-
         // black blue panels with a hairline of accent blue.
-        private static readonly Color GamePanelColour = new Color(0.098f, 0.137f, 0.176f, 0.80f);   // #19232D
-        private static readonly Color GameAccent = new Color(0.239f, 0.686f, 1f);                    // #3DAFFF
-        private static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
+        internal static readonly Color GamePanelColour = new Color(0.098f, 0.137f, 0.176f, 0.80f);   // #19232D
+        internal static readonly Color GameAccent = new Color(0.239f, 0.686f, 1f);                    // #3DAFFF
+        internal static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
 
         private static Texture2D _texStrip;
         private static GUIStyle _stStripVersion, _stStripGlyph;
         private static bool _gameStyleReady;
         private static Color _alloyTint = AlloyColour;
         private static Color _energyTint = EnergyColour;
+
+        /// The resource tints as the strip draws them: the game's own where
+        /// they could be read off its panel, the fallbacks otherwise.
+        internal static Color AlloyTint => _alloyTint;
+        internal static Color EnergyTint => _energyTint;
 
         /// Once, in a match: put the game's typeface on the strip and take
         /// its resource tints off the game's own panel, so the two read as
@@ -363,6 +474,10 @@ namespace SanctuaryHud
             }
             WorldOverlays.ApplyFont(font);
             Alerts.ApplyFont(font);
+            OrdersBar.ApplyFont(font);
+            InfoCard.ApplyFont(font);
+            UnitRow.ApplyFont(font);
+            BuildStrip.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
             _stStripVersion = new GUIStyle(_stStripMax) { fontSize = 11, alignment = TextAnchor.MiddleCenter };
             _stStripGlyph = new GUIStyle(_stStripLabel) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
@@ -386,7 +501,7 @@ namespace SanctuaryHud
         /// Number formatting, matching the game's own readouts (SignedTextElement:
         /// K above 999, M above 999,999) so the two never disagree on the
         /// same figure.
-        private static string Fmt(float v)
+        internal static string Fmt(float v)
         {
             var a = Mathf.Round(Mathf.Abs(v));
             if (a > 999_999_999f) return (a / 1_000_000_000f).ToString("0.###") + "B";
@@ -395,7 +510,7 @@ namespace SanctuaryHud
             return a.ToString("0");
         }
 
-        private static void Fill(Rect rect, Color colour)
+        internal static void Fill(Rect rect, Color colour)
         {
             var previous = GUI.color;
             GUI.color = colour;
@@ -545,23 +660,28 @@ namespace SanctuaryHud
             GUI.Label(new Rect(x + pad + 66f, 2f, storageWidth + 8f, 26f), storageText, _stStripValue);
             GUI.Label(new Rect(x + pad + 66f + storageWidth + 8f, 8f, 90f, 18f), "/ " + Fmt(limit), _stStripMax);
 
-            // Right cluster: +in  −out  net.
+            // Right cluster: net on the right, with gross in stacked over
+            // gross out beside it, so the two figures that are compared line
+            // up under each other rather than reading across.
             var netText = (net >= 0f ? "+" : "−") + Fmt(net) + "/s";
             _stStripNet.normal.textColor = stalling ? DangerColour : net >= 0f ? GainColour : LossColour;
-            GUI.Label(new Rect(x + w - pad - 108f, 4f, 108f, 22f), netText, _stStripNet);
+            GUI.Label(new Rect(x + w - pad - 108f, 11f, 108f, 22f), netText, _stStripNet);
 
-            GUI.Label(new Rect(x + w - pad - 108f - 150f, 7f, 70f, 18f), "+" + Fmt(income), _stStripIn);
+            var flowsX = x + w - pad - 108f - 6f - 64f;
+            GUI.Label(new Rect(flowsX, 5f, 64f, 16f), "+" + Fmt(income), _stStripIn);
             // Flag the spend figure while stalling, since it is then demand
             // you are not actually meeting rather than resources leaving the
-            // store — the STALL chip below carries the size of the shortfall.
+            // store — the STALL chip beside it carries the size of the shortfall.
             _stStripOut.normal.textColor = stalling ? DangerColour : LossColour;
-            GUI.Label(new Rect(x + w - pad - 108f - 76f, 7f, 70f, 18f), "−" + Fmt(spent), _stStripOut);
+            GUI.Label(new Rect(flowsX, 23f, 64f, 16f), "−" + Fmt(spent), _stStripOut);
 
             // --- row 2: capacity bar ---
             // A thin line in the resource colour on an accent-tinted track,
-            // the way the game draws its own gauges, rather than a block.
+            // the way the game draws its own gauges, rather than a block. It
+            // stops short of the flows column whatever the storage size.
             var lengthFactor = Mathf.Clamp(0.45f + 0.15f * Mathf.Log10(limit / 400f), 0.45f, 1f);
-            var barRect = new Rect(x + pad, 36f, inner * lengthFactor, 4f);
+            var barMax = flowsX - 12f - (x + pad);
+            var barRect = new Rect(x + pad, 36f, Mathf.Min(inner * lengthFactor, barMax), 4f);
             var track = GameAccent;
             track.a = 0.14f;
             Fill(barRect, track);
@@ -571,7 +691,7 @@ namespace SanctuaryHud
             Fill(new Rect(barRect.x, barRect.y, fillWidth, barRect.height), colour);
             if (fillWidth > 2f) Fill(new Rect(barRect.x + fillWidth - 1f, barRect.y - 1f, 1f, barRect.height + 2f), new Color(1f, 1f, 1f, 0.75f));
 
-            // Warning chip rides at the end of the bar row.
+            // Warning chip rides at the end of the bar row, short of the flows.
             string chip = null;
             if (stalling) chip = "STALL −" + Fmt(wantedRaw - spendRaw) + "/s";
             else if (net < -0.5f)
@@ -582,7 +702,7 @@ namespace SanctuaryHud
             if (chip != null)
             {
                 var chipWidth = _stStripChip.CalcSize(new GUIContent(chip)).x + 14f;
-                var chipRect = new Rect(x + w - pad - chipWidth, 29f, chipWidth, 15f);
+                var chipRect = new Rect(flowsX - 10f - chipWidth, 29f, chipWidth, 15f);
                 Fill(chipRect, stalling ? DangerColour : new Color(0.75f, 0.45f, 0.15f, 0.9f));
                 GUI.Label(chipRect, chip, _stStripChip);
             }

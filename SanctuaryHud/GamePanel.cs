@@ -392,8 +392,14 @@ namespace SanctuaryHud
                 tr.width, tr.height);
         }
 
+        // The game's order icons come out of a top-down atlas with a negative
+        // height in their rectangle; passed through as-is the negative UV
+        // height flips them the right way up, so only the size takes the
+        // magnitude.
         private static bool DrawFitted(Rect rect, Texture texture, Rect uv, float width, float height)
         {
+            width = Mathf.Abs(width);
+            height = Mathf.Abs(height);
             if (width <= 0f || height <= 0f) return false;
             var fit = Mathf.Min(rect.width / width, rect.height / height);
             var w = width * fit;
