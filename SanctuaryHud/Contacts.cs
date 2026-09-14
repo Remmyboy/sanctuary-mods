@@ -175,6 +175,16 @@ namespace SanctuaryHud
             "    end " +
             "  end " +
             "  __SdbMmSpots = table.concat(spots, ';') " +
+            // The map's starting playable area, which is what its preview
+            // image was rendered of. Last, and in a pcall of its own, so a
+            // failure here can never cost the colours or the deposits.
+            "  __SdbMmArea = '' " +
+            "  pcall(function() " +
+            "    local area = Import('common/mapUtils.lua').GetDefaultPlayableArea() " +
+            "    if area and area.position and area.size then " +
+            "      __SdbMmArea = string.format('%.2f,%.2f,%.2f,%.2f', area.position.x, area.position.y, area.size.x, area.size.y) " +
+            "    end " +
+            "  end) " +
             "end) " +
             "if not ok then __SdbMmSlowErr = tostring(err) else __SdbMmSlowErr = '' end";
 
@@ -293,6 +303,20 @@ namespace SanctuaryHud
                     var lift = Mathf.Max(0.45f, Mathf.Max(r, Mathf.Max(g, b)));
                     ArmyColours[id] = new Color(r / lift, g / lift, b / lift, 1f);
                 }
+            }
+
+            // Read before the early return below, so switching the deposits
+            // off never costs the framing.
+            var area = GetLuaGlobal("__SdbMmArea");
+            if (!string.IsNullOrEmpty(area))
+            {
+                var a = area.Split(',');
+                if (a.Length == 4 &&
+                    float.TryParse(a[0], NumberStyles.Float, Inv, out var areaX) &&
+                    float.TryParse(a[1], NumberStyles.Float, Inv, out var areaZ) &&
+                    float.TryParse(a[2], NumberStyles.Float, Inv, out var areaW) &&
+                    float.TryParse(a[3], NumberStyles.Float, Inv, out var areaL))
+                    MapSurface.SetFrame(areaX, areaZ, areaW, areaL);
             }
 
             if (!wantSpots)

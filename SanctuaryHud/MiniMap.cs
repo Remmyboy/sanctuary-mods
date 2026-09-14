@@ -30,7 +30,6 @@ namespace SanctuaryHud
         private static ConfigEntry<bool> _cfgAlloySpots;
         private static ConfigEntry<bool> _cfgFog;
         private static ConfigEntry<float> _cfgFogDarkness;
-        private static ConfigEntry<string> _cfgFraming;
         private static ConfigEntry<float> _cfgPosX;
         private static ConfigEntry<float> _cfgPosY;
 
@@ -94,8 +93,6 @@ namespace SanctuaryHud
             _cfgFogDarkness = config.Bind("MiniMap", "FogDarkness", 0.6f,
                 new ConfigDescription("How heavily the unseen ground is shaded.",
                     new AcceptableValueRange<float>(0.1f, 0.95f)));
-            _cfgFraming = config.Bind("MiniMap", "FramingOverride", "",
-                "Force how a map's preview image is framed, for a map whose picture is offset or scaled wrongly — \"My_Map=half\" if the image covers only the middle of the map, \"My_Map=full\" if it covers all of it. Semicolon-separated; the map name is its folder name. Six shipped maps are already known and need no entry.");
             _cfgPosX = config.Bind("MiniMap", "PanelX", 16f, "Panel X in 1080p-logical pixels.");
             _cfgPosY = config.Bind("MiniMap", "PanelY", 802f, "Panel Y in 1080p-logical pixels.");
 
@@ -171,7 +168,6 @@ namespace SanctuaryHud
 
             if (!InMatch) return;
 
-            MapSurface.FramingOverride = _cfgFraming.Value;
             MapSurface.Refresh();
 
             if (Input.GetKeyDown(_cfgToggleKey.Value))
@@ -213,7 +209,7 @@ namespace SanctuaryHud
             // The map keeps its own proportions inside a Size-by-Size box, so
             // a non-square map is letter-boxed rather than stretched.
             var side = Mathf.Clamp(_size, 120f, 640f);
-            var aspect = MapSurface.Length / Mathf.Max(1f, MapSurface.Width);
+            var aspect = MapSurface.FrameL / Mathf.Max(1f, MapSurface.FrameW);
             var mapW = aspect <= 1f ? side : side / aspect;
             var mapH = aspect <= 1f ? side * aspect : side;
 
