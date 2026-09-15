@@ -26,7 +26,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.11.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.11.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip in place of the game's bottom panels; commander widget and alerts; reclaim values and build countdowns over the map |
+| [SanctuaryHud](SanctuaryHud/) | [**0.11.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.11.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip in place of the game's bottom panels; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.4.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape |
 | [EcoManager](EcoManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.5.0) | BUILD and ALLOY tile panels in FA's shape: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until it arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
@@ -124,9 +124,13 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   telling which figure is which without learning the picture. The
   replacement draws from the same values (a postfix on
   `InformationPanelUI.SetValues` catches every update): the class as the
-  title ("Tier 3: Tank") with the unit's own name beside it, a health bar
-  with `current / max` and regen, armour and bubble shields only when the
-  unit has them, build progress while it is being built, then what it adds
+  title ("Tier 3: Tank") with the unit's own name beside it, the shield as
+  a gauge above the health where the unit has one (read from the client,
+  since the game's card values never carry it; while the shield is coming
+  up the bar is its recharge instead, and turns into the shield amount once
+  it is up), a health bar with `current / max` and regen, armour and bubble
+  shields only when the unit has them, build progress while it is being
+  built, then what it adds
   to or takes from the economy per second behind the resource marks and
   only where it is not zero, and build power behind its hammer. Figures
   round and abbreviate like the strip; no template id, no build cost. It

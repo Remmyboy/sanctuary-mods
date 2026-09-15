@@ -201,6 +201,8 @@ namespace SanctuaryHud
 
         private static readonly List<QueueItem> _queue = new List<QueueItem>();
         private static float _factoryProgress = -1f;
+        private static float _shieldCur, _shieldMax;
+        private static float _shieldRecharge = -1f;
         private static bool _hoveringUnit;
         private static float _nextPeek;
 
@@ -220,7 +222,23 @@ namespace SanctuaryHud
             // Any builder: a factory, or an engineer (whose queue is the
             // structures it has been told to put up, and whose target may be
             // something else entirely when it is assisting).
-            "  if not (u and u.tp and u.tp.construction) then __SdbFactory = hovering .. '|' return end " +
+            // The unit's shield, summed over its shields: the game's card
+            // values never carry one (informationPanel.lua sends false).
+            // ...and, while a shield is coming up, how far along its recharge
+            // is (the client tracks the recharge in ticks; -1 when it is not).
+            "  local sh, shm, rp = 0, 0, -1 " +
+            "  if u and u.shields then " +
+            "    for _, s in ipairs(u.shields) do " +
+            "      sh = sh + (tonumber(s:GetHealth()) or 0) " +
+            "      shm = shm + (tonumber(s:GetMaxHealth()) or 0) " +
+            "      if s.GetRechargeProgress then " +
+            "        local p, d = s:GetRechargeProgress() " +
+            "        if p and d and d > 0 then rp = math.max(rp, p / d) end " +
+            "      end " +
+            "    end " +
+            "  end " +
+            "  local shield = string.format('%.0f:%.0f:%.3f', sh, shm, rp) " +
+            "  if not (u and u.tp and u.tp.construction) then __SdbFactory = hovering .. '||||' .. shield return end " +
             "  local function art(tpId) " +
             "    local t = tpId and __Templates.Units[tpId] " +
             "    local g = t and t.general " +
@@ -238,7 +256,7 @@ namespace SanctuaryHud
             "    prog = tonumber(t.progress) / tonumber(t.tp.economy.buildTime) " +
             "    target = art(t.tpId) " +
             "  end " +
-            "  __SdbFactory = hovering .. '|' .. string.format('%.3f', prog) .. '|' .. target .. '|' .. table.concat(out, ';') " +
+            "  __SdbFactory = hovering .. '|' .. string.format('%.3f', prog) .. '|' .. target .. '|' .. table.concat(out, ';') .. '|' .. shield " +
             "end) " +
             "if not ok then __SdbFactory = '' end";
 
@@ -253,6 +271,18 @@ namespace SanctuaryHud
                 var raw = GetLuaGlobal("__SdbFactory") ?? "";
                 var parts = raw.Split('|');
                 _hoveringUnit = parts.Length > 0 && parts[0] == "1";
+                _shieldCur = _shieldMax = 0f;
+                _shieldRecharge = -1f;
+                if (parts.Length >= 5)
+                {
+                    var sp = parts[4].Split(':');
+                    if (sp.Length >= 3) float.TryParse(sp[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _shieldRecharge);
+                    if (sp.Length >= 2)
+                    {
+                        float.TryParse(sp[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _shieldCur);
+                        float.TryParse(sp[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _shieldMax);
+                    }
+                }
                 _queue.Clear();
                 _factoryProgress = -1f;
                 if (parts.Length < 4) return;
@@ -289,6 +319,8 @@ namespace SanctuaryHud
         {
             _queue.Clear();
             _factoryProgress = -1f;
+            _shieldCur = _shieldMax = 0f;
+            _shieldRecharge = -1f;
             _hoveringUnit = false;
         }
 
@@ -380,6 +412,7 @@ namespace SanctuaryHud
 
             var showArmour = v.isArmourShieldEnabled && v.armourShieldMax > 0f;
             var showBubble = v.isBubbleShieldEnabled && v.bubbleShieldMax > 0f;
+            var showShield = !showBubble && _shieldMax > 0f;
             var showHealth = v.healthMax > 0f;
             var showIncome = Mathf.Abs(v.alloyNetIncome) >= 0.5f || Mathf.Abs(v.energyNetIncome) >= 0.5f;
             var extras = Extras(v);
@@ -388,6 +421,7 @@ namespace SanctuaryHud
             if (showHealth) height += GaugeHeight;
             if (showArmour) height += GaugeHeight;
             if (showBubble) height += GaugeHeight;
+            if (showShield) height += GaugeHeight;
             if (v.isConstructionPercentEnabled) height += GaugeHeight;
             if (building) height += 20f;
             var band = 0f;
@@ -430,6 +464,25 @@ namespace SanctuaryHud
             }
             y += 20f;
 
+            if (showShield)
+            {
+                // The shield as the client sees it, read with the queue poll,
+                // above the health: it is what takes the hits first. While it
+                // is coming up the bar is the recharge instead, at which point
+                // the game shows 1 / 10,000 and the figure means nothing.
+                if (_shieldRecharge >= 0f && _shieldRecharge < 1f)
+                {
+                    var frac = Mathf.Clamp01(_shieldRecharge);
+                    GUI.Label(new Rect(Pad, y, inner, 16f), "SHIELD CHARGING", _stLabel);
+                    GUI.Label(new Rect(Pad, y, inner, 16f), (frac * 100f).ToString("0") + "%", _stValue);
+                    Bar(y + 17f, frac, new Color(0.55f, 0.78f, 1f, 0.55f));
+                    y += GaugeHeight;
+                }
+                else
+                {
+                    Gauge(ref y, "SHIELD", _shieldCur, _shieldMax, 0f, Mathf.Clamp01(_shieldCur / _shieldMax), UpgradeColour);
+                }
+            }
             if (showHealth)
             {
                 var frac = Mathf.Clamp01(v.healthValue / v.healthMax);
