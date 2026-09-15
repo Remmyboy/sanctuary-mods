@@ -460,13 +460,62 @@ labelled.
 
 ## EcoManager
 
-A small **ALLOY** panel: one clickable row per extractor tier (T1/T2/T3, plus
-an ALL row), and — only while something is actually upgrading — an
-**UPGRADING** block underneath listing those by tier. Clicking any row selects
-that group. Rows carry the extractor's build-menu art beside the tier label,
-by the same route as the [idle rows](#idleengineers), and the panel is only as
-wide as its rows. Hidden until you have your first extractor; draggable,
-position persists.
+Two panels in the shape of FA's UI-Party eco manager.
+
+The **BUILD** panel is two columns of tiles, alloy on the left and energy on
+the right, one tile per template your army has **under construction**: the
+unit's build-menu art with its build progress along the top, that column's
+spend in the corner, the count, and the tier. Each column is headed by its
+total and sorted by its own resource, so the top of the left column is what
+is eating the alloy and the top of the right what is eating the energy.
+Hovering a tile shows both rates, the progress, and how many builders are on
+it. **Left-click selects the builders** working on that template — engineers,
+factories, or the extractors upgrading themselves. **Right-click pauses them**,
+and right-click again resumes them: the tile dims and shows a pause mark while
+the panel is holding its builders. That is what an eco manager is for — see
+what is eating the economy, and stop it in one click.
+
+The **ALLOY** panel is the extractor tiles, a row per tier: on the left the
+extractors sitting at that tier, and on the right — only while any are — a
+second tile of the same art tagged UP, counting the ones upgrading away from
+it. Clicking a tile selects that group.
+
+Each panel has its own `Enabled` switch, `Scale` and position (draggable,
+persists), so either can be dropped or shrunk without the other; `Tooltips`
+turns the hover boxes off for both. The BUILD panel is hidden until the first
+build is under way, the ALLOY panel until the first extractor.
+
+### Where the spend comes from
+
+The economy stream only carries army totals, but the client knows enough to
+split the spend by what is being built. Every builder holds `buildTarget`
+while its build routine runs, and its `buildPower` is kept current by the
+host's `SetBuildPower` command; the host's own drain
+(`ResourceEntity:RecalculateBuildDrain`) is cost × Σ build power ÷ build
+time per second. So one sweep a second over your own units sums the build
+power pointed at each half-built thing, groups by template, and has the
+demand — the same figure the game adds into "requested" on its economy
+panel. Two things to know: it is the *demand*, before a stall scales it
+down, so during a stall the tiles add up to more than you are actually
+spending; and adjacency discounts never reach the client, so a structure
+beside a storage reads a little high.
+
+Factories, engineers, assisting engineers and upgrading extractors all go
+through the same build routine, so one sweep covers the lot: an upgrade
+shows as its higher-tier template under construction, built by the extractor
+below it, exactly as the game models it. Placement ghosts (progress zero) are
+queued, not started, and are left out.
+
+Pausing sends the game's own Pause toggle (`RequestUnitsToggle`) for the
+builders on the tile, the way the orders panel does. A paused builder ends
+its build routine and drops `buildTarget`, so nothing on the client ties it
+to what it was building afterwards; the panel remembers what each tile
+paused so the same tile can release exactly that. A tile that disappears —
+its targets finished, cancelled or destroyed — releases anything it was
+holding, since a paused extractor also stops extracting, and unloading the
+mod releases everything.
+
+### Extractor tiles
 
 The tier comes off the strategic icon, `structure1_t{n}_alloy_normal`, which is
 uniform across all three factions. Upgrading state is the game's own upgrade
@@ -483,7 +532,7 @@ supplies identity instead — every template is filed into `Tags[tag][tpId]` as
 it loads, making `Tags.ALLOYS_EXTRACTION` exactly the set of extractor
 template ids, and `Armies[focused].units` exactly our own units. One query per
 poll turns that into a set of LocalIDs, which the panel matches against. It
-doubles as the ownership filter, so the alloy rows never depend on the
+doubles as the ownership filter, so the extractor tiles never depend on the
 army-colour match the idle rows use.
 
 ### Assist starts the upgrade
@@ -543,7 +592,9 @@ That query counts only completed extractors. An upgrading extractor builds
 its replacement as a second entity, present from the moment the upgrade
 starts and already wearing the higher tier's icon — so a T1 mid-upgrade would
 otherwise read as a finished T2. The T1 stays until the upgrade lands and is
-the one carrying the upgrade adornment, so it is what fills the UPGRADING row.
+the one carrying the upgrade adornment, so it is what the UP tile counts.
+The replacement, meanwhile, is what the build tiles show: the
+higher tier under construction, with the upgrade's cost as its spend.
 
 ## BuildHotkeys
 
