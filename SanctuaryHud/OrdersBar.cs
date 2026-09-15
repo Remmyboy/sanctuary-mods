@@ -248,7 +248,12 @@ namespace SanctuaryHud
                 }
                 GUI.color = previous;
 
-                if (GUI.Button(rect, GUIContent.none, GUIStyle.none)) Click(button.Element);
+                if (GUI.Button(rect, GUIContent.none, GUIStyle.none))
+                {
+                    var b = button.Element.GetComponent<Button>();
+                    _log?.LogInfo($"Orders row: click {button.Key} (active {button.Active}, interactable {(b != null && b.interactable)}, emitClicks {button.Element.emitClickEvents}, activeInHierarchy {button.Element.gameObject.activeInHierarchy}).");
+                    Click(button.Element);
+                }
             }
 
             // The name of the button under the mouse, in a chip above the row:

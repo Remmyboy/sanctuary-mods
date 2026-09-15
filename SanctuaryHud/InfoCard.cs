@@ -403,7 +403,12 @@ namespace SanctuaryHud
             // carries what is selected.
             var building = _hoverTemplate != null;
             if (!building && !_hoveringUnit && SelectionRow.CountSelected() > 1) return;
-            var factory = _queue.Count > 0 || _factoryProgress >= 0f;
+            // A job to show needs something in the queue: a builder can report
+            // progress on a target the queue does not list (a structure
+            // upgrading itself), and indexing an empty queue took the whole
+            // overlay down — every IMGUI control after the fault stopped
+            // taking clicks.
+            var factory = _queue.Count > 0;
             _width = factory ? Width + 60f : Width;
             if (_stTitle == null) ApplyFont(null);
 

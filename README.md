@@ -26,7 +26,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.11.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.11.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip in place of the game's bottom panels; commander widget and alerts; reclaim values and build countdowns over the map |
+| [SanctuaryHud](SanctuaryHud/) | [**0.11.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.11.2) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip in place of the game's bottom panels; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.4.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape |
 | [EcoManager](EcoManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.5.0) | BUILD and ALLOY tile panels in FA's shape: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until it arrives |
 | [BuildHotkeys](BuildHotkeys/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |

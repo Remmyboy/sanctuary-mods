@@ -26,7 +26,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.11.1")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.11.2")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -408,10 +408,15 @@ namespace SanctuaryHud
             // along the bottom.
             if (_cfgSanctuaryUi.Value)
             {
-                OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip);
-                InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip);
-                if (BuildStrip.Active) BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip);
-                else SelectionRow.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+                // Each behind its own fence: an exception part-way through
+                // OnGUI leaves IMGUI's control bookkeeping out of step for
+                // the rest of the frame, and every button drawn after it
+                // stops taking clicks — so one stand-in's fault must not
+                // reach the others. Logged once per site.
+                Fenced("orders row", () => OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip));
+                Fenced("unit card", () => InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip));
+                if (BuildStrip.Active) Fenced("build strip", () => BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip));
+                else Fenced("selection row", () => SelectionRow.Draw(logicalWidth, logicalHeight, scale, _texStrip));
             }
 
             // The strip and the commander widget are one player's own numbers,
@@ -437,6 +442,23 @@ namespace SanctuaryHud
         }
 
         private const float StripHeight = 48f;
+
+        private static readonly HashSet<string> _fenceLogged = new HashSet<string>();
+
+        /// Runs one stand-in's draw, catching anything it throws so the rest
+        /// of the frame still draws and still takes clicks. The first fault
+        /// at each site goes to the log with its stack; later ones are quiet.
+        private static void Fenced(string site, Action draw)
+        {
+            try
+            {
+                draw();
+            }
+            catch (Exception e)
+            {
+                if (_fenceLogged.Add(site)) _log?.LogWarning($"HUD {site} threw and was skipped this frame (logged once): {e}");
+            }
+        }
 
         // The game's UI palette (Beam UI, as the front menu uses it): near-
         // black blue panels with a hairline of accent blue.
