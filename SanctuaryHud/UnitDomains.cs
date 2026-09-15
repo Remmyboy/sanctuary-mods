@@ -25,8 +25,14 @@ namespace SanctuaryHud
                 "a lighter blue for air, and green over blue split diagonally for a unit that goes on both. Off: one neutral tile for all.");
         }
 
-        private static readonly Dictionary<Sprite, Domain> _bySprite = new Dictionary<Sprite, Domain>();
-        private static readonly List<KeyValuePair<uint, Domain>> _pending = new List<KeyValuePair<uint, Domain>>();
+        private struct Info
+        {
+            public Domain Domain;
+            public string TpId;
+        }
+
+        private static readonly Dictionary<Sprite, Info> _bySprite = new Dictionary<Sprite, Info>();
+        private static readonly List<KeyValuePair<uint, Info>> _pending = new List<KeyValuePair<uint, Info>>();
         private static bool _queried;
         private static float _nextTry;
 
@@ -46,7 +52,7 @@ namespace SanctuaryHud
             "      end " +
             "      local d = 0 " +
             "      if air then d = 4 elseif amph or (naval and land) then d = 3 elseif naval then d = 2 elseif land then d = 1 end " +
-            "      out[#out + 1] = id .. ',' .. d " +
+            "      out[#out + 1] = id .. ',' .. d .. ',' .. tostring(tpId) " +
             "    end " +
             "  end " +
             "  __SdbDomains = table.concat(out, ';') " +
@@ -68,7 +74,6 @@ namespace SanctuaryHud
         /// then resolves the ids to sprites a few at a time as they load.
         internal static void Tick()
         {
-            if (Enabled == null || !Enabled.Value) return;
             if (!_queried)
             {
                 if (Time.realtimeSinceStartup < _nextTry) return;
@@ -87,10 +92,9 @@ namespace SanctuaryHud
                 if (string.IsNullOrEmpty(raw)) return;   // templates not loaded yet
                 foreach (var entry in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    var comma = entry.IndexOf(',');
-                    if (comma < 0) continue;
-                    if (!uint.TryParse(entry.Substring(0, comma), out var id) || !int.TryParse(entry.Substring(comma + 1), out var d)) continue;
-                    _pending.Add(new KeyValuePair<uint, Domain>(id, (Domain)Mathf.Clamp(d, 0, 4)));
+                    var f = entry.Split(',');
+                    if (f.Length < 3 || !uint.TryParse(f[0], out var id) || !int.TryParse(f[1], out var d)) continue;
+                    _pending.Add(new KeyValuePair<uint, Info>(id, new Info { Domain = (Domain)Mathf.Clamp(d, 0, 4), TpId = f[2] }));
                 }
                 _queried = true;
                 _log?.LogInfo($"Unit domains: {_pending.Count} template(s) listed.");
@@ -112,6 +116,10 @@ namespace SanctuaryHud
         }
 
         internal static Domain Of(Sprite portrait) =>
-            portrait != null && _bySprite.TryGetValue(portrait, out var d) ? d : Domain.Unknown;
+            portrait != null && _bySprite.TryGetValue(portrait, out var info) ? info.Domain : Domain.Unknown;
+
+        /// The template id behind a button's portrait, or null.
+        internal static string TemplateOf(Sprite portrait) =>
+            portrait != null && _bySprite.TryGetValue(portrait, out var info) ? info.TpId : null;
     }
 }

@@ -52,6 +52,9 @@ namespace SanctuaryHud
             /// This row's build-menu art, as an AssetID index (0 = none).
             /// See ResolveSprite; filled from the Lua template data.
             public uint IconId;
+            /// The plate the game draws behind that art, coloured by where
+            /// the unit goes (land, water, both); 0 = none.
+            public uint PlateId;
         }
 
         internal static readonly object _groupLock = new object();
@@ -1078,6 +1081,7 @@ namespace SanctuaryHud
                         // and the long word would set the panel's width alone.
                         Label = isCommander ? "COM" : $"T{tier}",
                         IconId = RowIcon(isCommander ? "cmd" : "eng" + tier),
+                        PlateId = RowPlate(isCommander ? "cmd" : "eng" + tier),
                     };
                     groups[key] = group;
                 }
@@ -1143,6 +1147,9 @@ namespace SanctuaryHud
 
         /// The build-menu art for a row, or 0 when Lua hasn't answered yet.
         internal static uint RowIcon(string key) => _rowIcons.TryGetValue(key, out var id) ? id : 0u;
+        private static readonly Dictionary<string, uint> _rowPlates = new Dictionary<string, uint>();
+        /// The plate behind a row's art, as an AssetID index (0 = none).
+        internal static uint RowPlate(string key) => _rowPlates.TryGetValue(key, out var id) ? id : 0u;
 
         /// One sweep over our own army's units per poll: completed extractors,
         /// factories by type and tier (only while a mod wants them), and a
@@ -1215,7 +1222,10 @@ namespace SanctuaryHud
                         // FFI hands back uint32 cdata, which would concatenate
                         // as '1234ULL', hence tonumber and string.format.
                         "    local id = g and g.foregroundIconID and tonumber(g.foregroundIconID.index) or 0 " +
-                        "    if id ~= 0 then icons[#icons+1] = k .. '=' .. string.format('%d', id) end " +
+                        // backgroundIconID is the plate behind it, which the
+                        // game colours by where the unit goes (land, water, both).
+                        "    local plate = g and g.backgroundIconID and tonumber(g.backgroundIconID.index) or 0 " +
+                        "    if id ~= 0 then icons[#icons+1] = k .. '=' .. string.format('%d', id) .. ':' .. string.format('%d', plate) end " +
                         "  end " +
                         // pairs() order changes between polls; sorted, the
                         // string only changes when the answer does.
@@ -1266,11 +1276,15 @@ namespace SanctuaryHud
                     _log.LogInfo($"Row art ids: {(iconsRaw.Length == 0 ? "(none)" : iconsRaw)}");
                 }
                 _rowIcons.Clear();
+                _rowPlates.Clear();
                 foreach (var part in iconsRaw.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     var split = part.IndexOf('=');
-                    if (split > 0 && uint.TryParse(part.Substring(split + 1), out var icon))
-                        _rowIcons[part.Substring(0, split)] = icon;
+                    if (split <= 0) continue;
+                    var key = part.Substring(0, split);
+                    var ids = part.Substring(split + 1).Split(':');
+                    if (uint.TryParse(ids[0], out var icon)) _rowIcons[key] = icon;
+                    if (ids.Length > 1 && uint.TryParse(ids[1], out var plate)) _rowPlates[key] = plate;
                 }
             }
             catch (Exception e)
@@ -1306,6 +1320,7 @@ namespace SanctuaryHud
                         Tier = kind % 10,
                         Label = $"T{kind % 10}",
                         IconId = RowIcon("fac" + kind),
+                        PlateId = RowPlate("fac" + kind),
                     };
                     groups[kind] = group;
                 }
@@ -1364,7 +1379,7 @@ namespace SanctuaryHud
                 {
                     if (!into.TryGetValue(tier, out var group))
                     {
-                        group = new IdleGroup { Tier = tier, Label = $"T{tier}", IconId = RowIcon("alloy" + tier) };
+                        group = new IdleGroup { Tier = tier, Label = $"T{tier}", IconId = RowIcon("alloy" + tier), PlateId = RowPlate("alloy" + tier) };
                         into[tier] = group;
                     }
                     group.Count++;
@@ -1507,9 +1522,70 @@ namespace SanctuaryHud
             }
         }
 
+        // The game switches a unit's idle marker off while it is selected
+        // (the selection takes its place on the strategic icon), so a poll
+        // that reads only the marker loses every idle builder the moment you
+        // click the row that selects them — and the panel vanishes. The
+        // client's Lua still knows: the same test its CheckShowIdleAdornment
+        // makes, run over the selection each poll, fills in the gap.
+        private static readonly HashSet<int> _idleSelected = new HashSet<int>();
+        private const string IdleSelectedChunk =
+            "local ok, err = pcall(function() " +
+            "  local sel = Import('client/input/selectionSystem.lua') " +
+            "  local picked = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
+            "    or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
+            "  local out = {} " +
+            "  for _, u in pairs(picked) do " +
+            "    if u.tp and u.tp.construction and u.localId and u.simOrderState " +
+            "       and u.simOrderState.activeOrder == nil " +
+            "       and (not u.buildQueue or #u.buildQueue == 0) " +
+            "       and (not u.IsCompleted or u:IsCompleted()) " +
+            "       and (not u.CanShowIdleAdornment or u:CanShowIdleAdornment()) then " +
+            "      out[#out + 1] = tostring(u.localId.index) " +
+            "    end " +
+            "  end " +
+            "  __SdbIdleSelected = table.concat(out, ',') " +
+            "end) " +
+            "if not ok then __SdbIdleSelected = '' end";
+
+        private static void PollIdleSelected()
+        {
+            _idleSelected.Clear();
+            try
+            {
+                EnsureLuaBridge();
+                if (!LuaReady || !RunLua(IdleSelectedChunk)) return;
+                var raw = GetLuaGlobal("__SdbIdleSelected");
+                if (string.IsNullOrEmpty(raw)) return;
+                foreach (var part in raw.Split(','))
+                {
+                    if (int.TryParse(part, out var index)) _idleSelected.Add(index);
+                }
+            }
+            catch { /* the marker alone will have to do this poll */ }
+        }
+
+        /// The entity's LocalID index, or -1.
+        private static int LocalIndexOf(object em, object entity)
+        {
+            try
+            {
+                if (_localIdField == null || _getLocalIdMi == null) return -1;
+                var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
+                var localId = _localIdField.GetValue(localComponent);
+                var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                return indexField != null ? Convert.ToInt32(indexField.GetValue(localId)) : -1;
+            }
+            catch
+            {
+                return -1;
+            }
+        }
+
         private static void PollIdleBuilders()
         {
             if (!ResolveEcs()) return;
+            PollIdleSelected();
 
             // Icon data is registered by the game during match load, often
             // after the economy stream (our in-match signal) has started — so
@@ -1615,6 +1691,9 @@ namespace SanctuaryHud
                                         if (index == _idleImageIndex) idle = true;
                                         else upgrading = true;
                                     }
+                                    // Selected and idle by the client's own
+                                    // test, marker or no marker.
+                                    if (!idle && _idleSelected.Count > 0 && _idleSelected.Contains(LocalIndexOf(em, entity))) idle = true;
 
                                     if (idle)
                                     {
@@ -1747,6 +1826,7 @@ namespace SanctuaryHud
                     // so a reused id could otherwise draw last game's art.
                     ClearSpriteCache();
                     _rowIcons.Clear();
+                    _rowPlates.Clear();
                     _loggedRowIcons = null;
                     lock (_groupLock)
                     {
@@ -1995,6 +2075,9 @@ namespace SanctuaryHud
             {
                 var ui = SanctuaryUI.SanctuaryUIManager.Instance;
                 if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.PauseMenu, out var pause) && pause.IsVisible) return true;
+                // The end-of-match result screen counts too: the game's own
+                // HUD is done by then, so the mods' panels should be as well.
+                if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.GameResult, out var result) && result.IsVisible) return true;
                 // InterfaceManager.TransitionTo turns this backdrop on for
                 // every screen except None, and None is what a match runs
                 // under.

@@ -52,7 +52,11 @@ namespace SanctuaryHud
             if (_concealOptions.Apply(options)) Describe(options, queue);
             _concealQueue.Apply(queue);
             _concealTabs.Apply(tabs);
-            if (!want) UnitRow.ClearHover();
+            if (!want)
+            {
+                UnitRow.ClearHover();
+                InfoCard.SetHover(null);
+            }
         }
 
         internal static void Shutdown()
@@ -135,6 +139,19 @@ namespace SanctuaryHud
             UnitRow.Draw(ax, above, s, scale, _queue, panelTexture);
 
             UnitRow.FlushHover();
+
+            // A build option under the mouse turns the unit card into a
+            // build card: cost and time for that template.
+            if (Event.current.type == EventType.Repaint)
+            {
+                var hovered = UnitRow.Hovered;
+                string template = null;
+                if (hovered != null && _options.Exists(e => e.Element == hovered))
+                {
+                    template = UnitDomains.TemplateOf(hovered.portraitImage != null ? hovered.portraitImage.overrideSprite : null);
+                }
+                InfoCard.SetHover(template);
+            }
         }
 
         private static void CollectTabs(ConstructionFilterPanelUI panel)

@@ -109,6 +109,79 @@ namespace SanctuaryHud
             _hiddenId = null;
         }
 
+        // ---- the build card -------------------------------------------------------
+        //
+        // With a build option under the mouse the game fills the card with
+        // the template's figures, but nothing in them says so. The build
+        // strip tells this which template it is, and a small Lua query works
+        // out how long the selected builders would take: the template's
+        // buildTime over their build power — summed for engineers assisting
+        // one job, but a factory builds alone, so the biggest one selected.
+
+        private static string _hoverTemplate;
+        private static float _hoverSeconds, _hoverPower;
+        private static float _hoverRefresh;
+
+        /// The template of the build option under the mouse, or null.
+        internal static void SetHover(string template)
+        {
+            if (template == _hoverTemplate)
+            {
+                // The selection can change under a held hover.
+                if (template != null && Time.realtimeSinceStartup >= _hoverRefresh) QueryTime();
+                return;
+            }
+            _hoverTemplate = template;
+            if (template != null) QueryTime();
+        }
+
+        private static void QueryTime()
+        {
+            _hoverRefresh = Time.realtimeSinceStartup + 1f;
+            _hoverSeconds = 0f;
+            _hoverPower = 0f;
+            var id = _hoverTemplate;
+            if (string.IsNullOrEmpty(id) || !id.All(char.IsLetterOrDigit)) return;
+            try
+            {
+                EnsureLuaBridge();
+                if (!LuaReady) return;
+                var chunk =
+                    "local ok = pcall(function() " +
+                    $"  local tp = __Templates.Units['{id}'] " +
+                    "  local bt = tp and tp.economy and tp.economy.buildTime or 0 " +
+                    "  local sel = Import('client/input/selectionSystem.lua') " +
+                    "  local picked = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
+                    "    or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
+                    "  local mobile, fixed = 0, 0 " +
+                    "  for _, u in pairs(picked) do " +
+                    "    local p = u.buildPower or (u.tp and u.tp.construction and u.tp.construction.buildPower) or 0 " +
+                    "    if u.tp and u.tp.movement then mobile = mobile + p else fixed = math.max(fixed, p) end " +
+                    "  end " +
+                    "  local power = mobile > 0 and mobile or fixed " +
+                    "  local secs = power > 0 and bt / power or bt " +
+                    "  __SdbBuildSecs = string.format('%.1f,%.1f', secs, power) " +
+                    "end) " +
+                    "if not ok then __SdbBuildSecs = '' end";
+                if (!RunLua(chunk)) return;
+                var raw = GetLuaGlobal("__SdbBuildSecs");
+                if (string.IsNullOrEmpty(raw)) return;
+                var parts = raw.Split(',');
+                float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _hoverSeconds);
+                if (parts.Length > 1) float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _hoverPower);
+            }
+            catch { /* the card shows the cost without a time */ }
+        }
+
+        private static string Duration(float seconds)
+        {
+            if (seconds < 60f) return seconds.ToString("0") + "s";
+            var m = Mathf.FloorToInt(seconds / 60f);
+            var s = Mathf.RoundToInt(seconds - m * 60f);
+            if (s == 60) { m++; s = 0; }
+            return $"{m}:{s:00}";
+        }
+
         // ---- the game's panel ---------------------------------------------------
 
         private static readonly PanelConceal _conceal = new PanelConceal();
@@ -157,8 +230,10 @@ namespace SanctuaryHud
         internal static void ApplyFont(Font font)
         {
             _stTitle = new GUIStyle(_stName) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
-            _stSubtitle = new GUIStyle(_stStripMax) { fontSize = 12, alignment = TextAnchor.MiddleRight, normal = { textColor = SanctuaryHudPlugin.MutedText } };
-            _stLabel = new GUIStyle(_stStripLabel) { fontSize = 11, alignment = TextAnchor.MiddleLeft, normal = { textColor = SanctuaryHudPlugin.MutedText } };
+            // The class and the gauge labels read as secondary but must stay
+            // legible over a bright map: light on the panel, no fading.
+            _stSubtitle = new GUIStyle(_stStripMax) { fontSize = 12, alignment = TextAnchor.MiddleRight, normal = { textColor = new Color(0.80f, 0.87f, 0.96f) } };
+            _stLabel = new GUIStyle(_stStripLabel) { fontSize = 11, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.85f, 0.90f, 0.97f) } };
             _stValue = new GUIStyle(_stStripIn) { fontSize = 13, alignment = TextAnchor.MiddleRight, normal = { textColor = Color.white } };
             _stFigure = new GUIStyle(_stStripIn) { fontSize = 13, alignment = TextAnchor.MiddleLeft };
             _stSmall = new GUIStyle(_stStripIn) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
@@ -171,10 +246,14 @@ namespace SanctuaryHud
         {
             var panel = _conceal.Panel as InformationPanelUI;
             if (panel == null || !panel.IsVisible || !_haveValues || _source != panel) return;
-            // With a group selected the game's card describes one unit of
-            // it, whichever came first, which says nothing about the group;
-            // the selection row carries what is selected.
-            if (SelectionRow.CountSelected() > 1) return;
+            // A build option under the mouse makes this a build card: what
+            // it costs and how long the selected builders would take. That
+            // shows whatever is selected. Otherwise, with a group selected
+            // the game's card describes one unit of it, whichever came
+            // first, which says nothing about the group; the selection row
+            // carries what is selected.
+            var building = _hoverTemplate != null;
+            if (!building && SelectionRow.CountSelected() > 1) return;
             if (_stTitle == null) ApplyFont(null);
 
             var v = _values;
@@ -191,6 +270,7 @@ namespace SanctuaryHud
             if (showArmour) height += GaugeHeight;
             if (showBubble) height += GaugeHeight;
             if (v.isConstructionPercentEnabled) height += GaugeHeight;
+            if (building) height += 40f;
             if (showIncome) height += 20f;
             if (extras != null) height += 16f;
             height += Pad - 2f;
@@ -215,12 +295,16 @@ namespace SanctuaryHud
             var inner = Width - Pad * 2f;
             var y = Pad;
 
-            // Name on the left, the class of thing it is on the right.
-            GUI.Label(new Rect(Pad, y, inner, 20f), _name, _stTitle);
-            if (_display.Length > 0)
+            // The class of thing it is on the left as the title ("Tier 3:
+            // Tank" is what you act on), its given name on the right. A unit
+            // with no class line, an engineer say, has its name as the title.
+            var title = _display.Length > 0 ? _display : _name;
+            var aside = _display.Length > 0 ? _name : "";
+            GUI.Label(new Rect(Pad, y, inner, 20f), title, _stTitle);
+            if (aside.Length > 0)
             {
-                var nameWidth = _stTitle.CalcSize(new GUIContent(_name)).x;
-                GUI.Label(new Rect(Pad + nameWidth + 8f, y + 1f, inner - nameWidth - 8f, 20f), _display, _stSubtitle);
+                var titleWidth = _stTitle.CalcSize(new GUIContent(title)).x;
+                GUI.Label(new Rect(Pad + titleWidth + 8f, y + 1f, inner - titleWidth - 8f, 20f), aside, _stSubtitle);
             }
             y += 20f;
 
@@ -252,6 +336,24 @@ namespace SanctuaryHud
             // ones that are not zero (a generator makes energy, not alloy).
             // No build cost: it is already paid by the time this card is
             // about a unit, and the build menu is where it matters.
+            if (building)
+            {
+                // Cost, then the time for whoever is selected to build it.
+                GUI.Label(new Rect(Pad, y, inner, 18f), "COST", _stLabel);
+                Costs(Pad + 48f, y, inner - 48f, v.alloyBuildCost, v.energyBuildCost);
+                y += 20f;
+                GUI.Label(new Rect(Pad, y, inner, 18f), "TIME", _stLabel);
+                _stFigure.normal.textColor = Color.white;
+                var time = _hoverSeconds > 0f ? Duration(_hoverSeconds) : "—";
+                GUI.Label(new Rect(Pad + 48f, y, inner - 48f, 18f), time, _stFigure);
+                if (_hoverPower > 0f)
+                {
+                    var timeWidth = _stFigure.CalcSize(new GUIContent(time)).x;
+                    _stSmall.normal.textColor = SanctuaryHudPlugin.MutedText;
+                    GUI.Label(new Rect(Pad + 48f + timeWidth + 8f, y + 1f, inner, 16f), "at " + SanctuaryHudPlugin.Fmt(_hoverPower) + " build power", _stSmall);
+                }
+                y += 20f;
+            }
             if (showIncome)
             {
                 Figures(Pad, y, inner, v.alloyNetIncome, v.energyNetIncome);
@@ -295,6 +397,17 @@ namespace SanctuaryHud
             track.a = 0.14f;
             SanctuaryHudPlugin.Fill(new Rect(Pad, y, inner, 4f), track);
             SanctuaryHudPlugin.Fill(new Rect(Pad, y, inner * frac, 4f), colour);
+        }
+
+        /// Alloy then energy costs side by side in their tints, plain.
+        private static void Costs(float x, float y, float width, float alloy, float energy)
+        {
+            var a = SanctuaryHudPlugin.Fmt(alloy);
+            _stFigure.normal.textColor = SanctuaryHudPlugin.AlloyTint;
+            GUI.Label(new Rect(x, y, width, 18f), a, _stFigure);
+            x += _stFigure.CalcSize(new GUIContent(a)).x + 12f;
+            _stFigure.normal.textColor = SanctuaryHudPlugin.EnergyTint;
+            GUI.Label(new Rect(x, y, width, 18f), SanctuaryHudPlugin.Fmt(energy), _stFigure);
         }
 
         /// Alloy then energy rates side by side in their tints, signed, per

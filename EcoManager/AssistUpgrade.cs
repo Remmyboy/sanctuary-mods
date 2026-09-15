@@ -73,6 +73,17 @@ namespace SanctuaryHud
             "        if a.focused and a.units and a.units[hover.id.index] then mine = true end " +
             "      end " +
             "      if not mine then return end " +
+            // Builders only: the assist has to come from an engineer or the
+            // commander, something that can actually work on the upgrade. A
+            // tank told to assist an extractor just guards it, and must not
+            // spend alloy on the way.
+            "      local pickedNow = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
+            "        or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
+            "      local builder = false " +
+            "      for _, e in pairs(pickedNow) do " +
+            "        if e ~= hover and e.tp and e.tp.construction and e.tp.movement then builder = true break end " +
+            "      end " +
+            "      if not builder then return end " +
             // Extractors only. Factories upgrade too, and silently spending a
             // fortune because someone assisted one would be a nasty surprise.
             "      if not (Tags and Tags.ALLOYS_EXTRACTION and Tags.ALLOYS_EXTRACTION[hover.tpId]) then return end " +

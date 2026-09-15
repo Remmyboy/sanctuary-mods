@@ -396,6 +396,54 @@ namespace SanctuaryHud
         // height in their rectangle; passed through as-is the negative UV
         // height flips them the right way up, so only the size takes the
         // magnitude.
+        /// The sprite an Image carries, with its texture and the part of it
+        /// the sprite covers; false where there is nothing drawable.
+        private static bool Resolve(Graphic icon, out Texture texture, out Rect uv, out float width, out float height)
+        {
+            texture = null;
+            uv = default;
+            width = height = 0f;
+            if (icon is RawImage raw)
+            {
+                texture = raw.texture;
+                if (texture == null) return false;
+                uv = raw.uvRect;
+                width = texture.width * Mathf.Abs(uv.width);
+                height = texture.height * Mathf.Abs(uv.height);
+                return width > 0f && height > 0f;
+            }
+            var sprite = icon is Image image ? image.overrideSprite : null;
+            texture = sprite == null ? null : sprite.texture;
+            if (texture == null || _unreadableSprites.Contains(sprite.GetInstanceID())) return false;
+            Rect tr;
+            try
+            {
+                tr = sprite.textureRect;
+            }
+            catch
+            {
+                _unreadableSprites.Add(sprite.GetInstanceID());
+                return false;
+            }
+            uv = new Rect(tr.x / texture.width, tr.y / texture.height, tr.width / texture.width, tr.height / texture.height);
+            width = Mathf.Abs(tr.width);
+            height = Mathf.Abs(tr.height);
+            return width > 0f && height > 0f;
+        }
+
+        /// Width over height of the art an Image carries, or 1 where there
+        /// is none: for sizing a tile to the game's own art.
+        internal static float Aspect(Graphic icon) =>
+            icon != null && Resolve(icon, out _, out _, out var w, out var h) ? w / h : 1f;
+
+        /// Draws an Image's art stretched to rect, tinted by GUI.color.
+        internal static bool DrawStretched(Rect rect, Graphic icon)
+        {
+            if (icon == null || !Resolve(icon, out var texture, out var uv, out _, out _)) return false;
+            GUI.DrawTextureWithTexCoords(rect, texture, uv);
+            return true;
+        }
+
         private static bool DrawFitted(Rect rect, Texture texture, Rect uv, float width, float height)
         {
             width = Mathf.Abs(width);

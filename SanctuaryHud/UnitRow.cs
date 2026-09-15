@@ -21,6 +21,16 @@ namespace SanctuaryHud
         internal sealed class Entry
         {
             public UnitButtonElement Element;   // null for a separator
+            /// The tile's width at scale 1: the game's art is wider than it
+            /// is tall, and the tile takes its shape rather than squaring it.
+            public float Width;
+        }
+
+        private static float TileWidth(UnitButtonElement element)
+        {
+            var aspect = GamePanel.Aspect(element.background);
+            if (Mathf.Abs(aspect - 1f) < 0.01f) aspect = GamePanel.Aspect(element.portraitImage);
+            return ButtonSize * Mathf.Clamp(aspect, 1f, 1.8f);
         }
 
         internal const float ButtonSize = 40f;
@@ -118,11 +128,16 @@ namespace SanctuaryHud
                 {
                     var button = child.GetComponent<Button>();
                     if (button != null && !button.interactable) continue;
-                    // A "coming soon" placeholder: the game gives it "?" for
-                    // its hotkey and leaves it clickable.
+                    // A "coming soon" placeholder: the Lua adds it with click
+                    // and hover events off (constructionPanel.lua's demo units).
+                    if (!element.emitClickEvents) continue;
                     if (element.textOverlayText != null && element.textOverlayText.text == "?") continue;
+                    // ...and one with no art of its own wears the prefab's
+                    // default portrait, which is the "coming soon" picture.
+                    if (element.portraitImage != null && element.defaultPortrait != null &&
+                        element.portraitImage.overrideSprite == element.defaultPortrait) continue;
                 }
-                row.Add(new Entry { Element = element });
+                row.Add(new Entry { Element = element, Width = TileWidth(element) });
             }
             while (row.Count > 0 && row[row.Count - 1].Element == null) row.RemoveAt(row.Count - 1);
         }
@@ -132,7 +147,7 @@ namespace SanctuaryHud
         {
             if (row.Count == 0) return 0f;
             var w = Pad * 2f - Gap;
-            foreach (var entry in row) w += (entry.Element != null ? ButtonSize : SeparatorWidth) + Gap;
+            foreach (var entry in row) w += (entry.Element != null ? entry.Width : SeparatorWidth) + Gap;
             return w;
         }
 
@@ -163,8 +178,8 @@ namespace SanctuaryHud
                     bx += SeparatorWidth + Gap;
                     continue;
                 }
-                DrawButton(new Rect(bx, Pad, ButtonSize, ButtonSize), entry.Element);
-                bx += ButtonSize + Gap;
+                DrawButton(new Rect(bx, Pad, entry.Width, ButtonSize), entry.Element);
+                bx += entry.Width + Gap;
             }
 
             GUI.matrix = previousMatrix;
@@ -178,14 +193,16 @@ namespace SanctuaryHud
             if (hover && e.type == EventType.Repaint) _hoverThisFrame = element;
             var previous = GUI.color;
 
-            // The HUD's own tile under the game's portrait of the type: the
-            // game's brown backdrop sprite is left out.
+            // The game's own backdrop for the type, or — with the element
+            // colours on and the type known — the HUD's coloured tile, then
+            // the game's portrait over either.
             GUI.color = Color.white;
             var domain = UnitDomains.Enabled != null && UnitDomains.Enabled.Value
                 ? UnitDomains.Of(element.portraitImage != null ? element.portraitImage.overrideSprite : null)
                 : UnitDomains.Domain.Unknown;
-            GUI.DrawTexture(rect, Tile(domain));
-            GamePanel.DrawIcon(rect, element.portraitImage);
+            if (domain != UnitDomains.Domain.Unknown) GUI.DrawTexture(rect, Tile(domain));
+            else if (!GamePanel.DrawStretched(rect, element.background)) GUI.DrawTexture(rect, Tile(UnitDomains.Domain.Unknown));
+            GamePanel.DrawStretched(rect, element.portraitImage);
             if (hover) SanctuaryHudPlugin.Fill(rect, new Color(1f, 1f, 1f, 0.12f));
             GUI.color = previous;
 
@@ -252,6 +269,9 @@ namespace SanctuaryHud
 
         private static UnitButtonElement _hoverThisFrame;
         private static UnitButtonElement _hovered;
+
+        /// The game button under the mouse as of the last repaint, or null.
+        internal static UnitButtonElement Hovered => _hovered;
 
         /// Call once per OnGUI after the last row has drawn.
         internal static void FlushHover()
