@@ -101,7 +101,7 @@ namespace SanctuaryHud
             if (panel == null || !panel.IsVisible) return 0f;
             if (Event.current.type == EventType.Layout) UnitRow.Collect(panel, _row, false);
             var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
-            return UnitRow.Draw(x, bottom, s, scale, _row, panelTexture).width;
+            return UnitRow.Draw(x, bottom, s, scale, _row, panelTexture, float.MaxValue, true).width;
         }
 
         /// From OnGUI, under the 1080-logical matrix: the row on its own,
@@ -124,7 +124,7 @@ namespace SanctuaryHud
                 x = construction.IsVisible ? strip.xMax + 10f : strip.x;
                 if (x + width > logicalWidth - 10f) x = Mathf.Max(0f, logicalWidth - 10f - width);
             }
-            UnitRow.Draw(x, bottom, s, scale, _row, panelTexture);
+            UnitRow.Draw(x, bottom, s, scale, _row, panelTexture, float.MaxValue, true);
             UnitRow.FlushHover();
         }
 

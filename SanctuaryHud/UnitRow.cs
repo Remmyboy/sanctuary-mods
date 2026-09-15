@@ -35,7 +35,7 @@ namespace SanctuaryHud
 
         internal const float ButtonSize = 40f;
         internal const float Gap = 4f;
-        internal const float SeparatorWidth = 9f;
+        internal const float SeparatorWidth = 16f;
         internal const float Pad = 5f;
         internal const float Height = ButtonSize + Pad * 2f;
 
@@ -182,7 +182,7 @@ namespace SanctuaryHud
         /// Draws the row with its bottom-left corner at (x, bottom), in
         /// 1080-logical coordinates, at scale s, wrapping onto further lines
         /// upward when it would run past maxWidth. Returns the area drawn.
-        internal static Rect Draw(float x, float bottom, float s, float scale, List<Entry> row, Texture2D panelTexture, float maxWidth = float.MaxValue)
+        internal static Rect Draw(float x, float bottom, float s, float scale, List<Entry> row, Texture2D panelTexture, float maxWidth = float.MaxValue, bool badges = false)
         {
             if (row.Count == 0) return new Rect(x, bottom, 0f, 0f);
             if (_stText == null) ApplyFont(null);
@@ -212,11 +212,13 @@ namespace SanctuaryHud
                     if (entry.Element == null)
                     {
                         accent.a = 0.35f;
-                        SanctuaryHudPlugin.Fill(new Rect(bx + SeparatorWidth / 2f, by + 6f, 1f, ButtonSize - 12f), accent);
+                        // A clear break between groups (air, land, naval,
+                        // structures): a gap with a line down its middle.
+                        SanctuaryHudPlugin.Fill(new Rect(bx + SeparatorWidth / 2f - 1f, by + 4f, 2f, ButtonSize - 8f), accent);
                         bx += SeparatorWidth + Gap;
                         continue;
                     }
-                    DrawButton(new Rect(bx, by, entry.Width, ButtonSize), entry.Element);
+                    DrawButton(new Rect(bx, by, entry.Width, ButtonSize), entry.Element, badges);
                     bx += entry.Width + Gap;
                 }
                 by += ButtonSize + Gap;
@@ -226,7 +228,7 @@ namespace SanctuaryHud
             return area;
         }
 
-        private static void DrawButton(Rect rect, UnitButtonElement element)
+        private static void DrawButton(Rect rect, UnitButtonElement element, bool badge)
         {
             var e = Event.current;
             var hover = rect.Contains(e.mousePosition);
@@ -256,6 +258,32 @@ namespace SanctuaryHud
             {
                 SanctuaryHudPlugin.Fill(new Rect(rect.x, rect.yMax - 4f, rect.width, 3f), new Color(0f, 0f, 0f, 0.5f));
                 SanctuaryHudPlugin.Fill(new Rect(rect.x, rect.yMax - 4f, rect.width * Mathf.Clamp01(bar.fillAmount), 3f), GainColour);
+            }
+
+            // The type's strategic icon — the same image the map draws over the
+            // unit, out of the game's icon atlas, in your army's colour — on a
+            // small grey plate in the top-right corner, for telling one type
+            // from the next in a mixed selection.
+            if (badge)
+            {
+                var iconName = UnitDomains.IconOf(element.portraitImage != null ? element.portraitImage.overrideSprite : null);
+                EnsureIconRegistry();
+                var index = IconIndexByName(iconName);
+                if (index >= 0)
+                {
+                    // Big enough for the symbol inside the shape to read: the
+                    // art beneath is the same one type every time.
+                    // No plate: the icon carries its own outline, and sits tight
+                    // in the corner, white, over the art.
+                    // Once, as the map draws it, raised a little above the tile's
+                    // edge. Thickening it by offset passes was tried both ways
+                    // and only muddied the symbol.
+                    var badgeRect = new Rect(rect.xMax - 22f, rect.y - 3f, 22f, 22f);
+                    var previousColour = GUI.color;
+                    GUI.color = Color.white;
+                    DrawStrategicIcon(badgeRect, index);
+                    GUI.color = previousColour;
+                }
             }
 
             // The overlay text: a count, or a hotkey.

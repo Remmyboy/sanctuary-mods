@@ -29,6 +29,8 @@ namespace SanctuaryHud
         {
             public Domain Domain;
             public string TpId;
+            /// The map's strategic icon image for the type (shape_tech_symbol_normal).
+            public string IconName;
         }
 
         private static readonly Dictionary<Sprite, Info> _bySprite = new Dictionary<Sprite, Info>();
@@ -52,7 +54,9 @@ namespace SanctuaryHud
             "      end " +
             "      local d = 0 " +
             "      if air then d = 4 elseif amph or (naval and land) then d = 3 elseif naval then d = 2 elseif land then d = 1 end " +
-            "      out[#out + 1] = id .. ',' .. d .. ',' .. tostring(tpId) " +
+            "      local ic = g.icon " +
+            "      local iconName = (ic and ic.shape and ic.tech and ic.symbol) and string.format('%s_%s_%s_normal', ic.shape, ic.tech, ic.symbol) or '' " +
+            "      out[#out + 1] = id .. ',' .. d .. ',' .. tostring(tpId) .. ',' .. iconName " +
             "    end " +
             "  end " +
             "  __SdbDomains = table.concat(out, ';') " +
@@ -94,7 +98,7 @@ namespace SanctuaryHud
                 {
                     var f = entry.Split(',');
                     if (f.Length < 3 || !uint.TryParse(f[0], out var id) || !int.TryParse(f[1], out var d)) continue;
-                    _pending.Add(new KeyValuePair<uint, Info>(id, new Info { Domain = (Domain)Mathf.Clamp(d, 0, 4), TpId = f[2] }));
+                    _pending.Add(new KeyValuePair<uint, Info>(id, new Info { Domain = (Domain)Mathf.Clamp(d, 0, 4), TpId = f[2], IconName = f.Length > 3 ? f[3] : null }));
                 }
                 _queried = true;
                 _log?.LogInfo($"Unit domains: {_pending.Count} template(s) listed.");
@@ -117,6 +121,11 @@ namespace SanctuaryHud
 
         internal static Domain Of(Sprite portrait) =>
             portrait != null && _bySprite.TryGetValue(portrait, out var info) ? info.Domain : Domain.Unknown;
+
+        /// The map's strategic icon image name for the type behind a button's
+        /// portrait, or null.
+        internal static string IconOf(Sprite portrait) =>
+            portrait != null && _bySprite.TryGetValue(portrait, out var info) && !string.IsNullOrEmpty(info.IconName) ? info.IconName : null;
 
         /// The template id behind a button's portrait, or null.
         internal static string TemplateOf(Sprite portrait) =>

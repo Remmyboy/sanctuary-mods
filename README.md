@@ -153,8 +153,11 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,
   which stacks the selected unit types upwards in a narrow column on the
   left edge. The same buttons — the game's own plate and portrait, with the
-  count in the corner and the tile shaped to the art — draw as a row along
-  the bottom at the left end of the build options. Left click keeps just
+  count in the corner and the tile shaped to the art, with the type's
+  strategic icon (the map's own, out of the icon atlas) in the top-right
+  corner — draw as a row along the bottom at the left end of the build
+  options, with a clear break between the game's groups (air, land, naval,
+  structures). Left click keeps just
   that type, right click drops it, both passed to the game's own button.
   `SelectionScale` sizes it.
 - **Build strip** (`BuildStrip`) in place of the game's build options, tier
