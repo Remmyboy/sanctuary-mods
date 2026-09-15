@@ -26,10 +26,10 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.10.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel, buttons included; a compact orders row and a plainer unit card in place of the game's; commander widget and alerts; reclaim values and build countdowns over the map |
-| [IdleEngineers](IdleEngineers/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.3.0) | Clickable idle-engineer panel, with idle factories by type and tier underneath |
-| [EcoManager](EcoManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.4.0) | Alloy extractors by tier, plus upgrades in progress; assist starts an upgrade and holds it paused until the engineer arrives |
-| [BuildHotkeys](BuildHotkeys/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.2.0) | One hotkey per *role*, same key every faction, cycling by tier |
+| [SanctuaryHud](SanctuaryHud/) | [**0.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.10.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip in place of the game's bottom panels; commander widget and alerts; reclaim values and build countdowns over the map |
+| [IdleEngineers](IdleEngineers/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.3.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape |
+| [EcoManager](EcoManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.4.0) | BUILD and ALLOY tile panels in FA's shape: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until it arrives |
+| [BuildHotkeys](BuildHotkeys/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.2.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.3.0) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
@@ -86,60 +86,104 @@ has no release of its own yet; build it from source if you need it.
   widget drawn larger or smaller, on top of the usual scaling to screen
   height; nothing else moves. The gross in and gross out figures sit one
   over the other beside the net, so the two figures being compared line up.
-- **Compact orders row** (`Orders · CompactPanel`, on by default) in place
-  of the game's orders panel bottom-left. The game draws all twenty-one
-  order buttons for any selection and dims the ones that don't apply; of the
-  bright ones only Stop and the toggles (pause, repeat build, shield, intel,
-  production) do anything when clicked in the current build — the Lua
-  registers no click function for move, attack, patrol and the rest, which
-  are hotkeys and right-clicks anyway. The row shows only the buttons the
-  game has enabled for the selection, and with `Orders · HideInert` (on by
-  default) only the ones that are wired, so a factory gets pause, repeat
-  build and stop and a tank gets stop. The HUD's own glyphs on tiles in the
-  game's order colours (the game's icons are a small glyph in a large sprite
-  lit by a glow shader, and don't survive being borrowed), a lit tile for a
-  toggle that is on, the button's name over it on hover;
-  each click is sent to the game's own button as a pointer click, so
-  whatever Lua hung on it runs unchanged. `Orders · Scale` sizes the row.
-  The game's panel is kept running underneath at zero alpha (Lua goes on
-  filling it in and flipping it with the selection), and comes back when the
-  overlay is hidden or the mod unloads.
-- **Unit card** (`InfoCard · ReplaceCard`, on by default) in place of the
-  game's unit information panel. The game's card is a bitmap mock-up with
-  fifteen text fields over it: the template id next to the name, income to
-  three decimal places, and no telling which figure is which without
-  learning the picture. The replacement draws from the same values (a
-  postfix on `InformationPanelUI.SetValues` catches every update): name and
-  class, a health bar with `current / max` and regen, armour and bubble
-  shields only when the unit has them, build progress while it is being
-  built, then what it adds to or takes from the economy per second, each
-  resource in its own colour and only where it is not zero (no build cost:
-  that belongs to the build menu), and build power, veterancy, transport and
-  ammo capacity only where they are not zero. Figures round and abbreviate
-  like the strip; no template id. `InfoCard · Scale` sizes it. With the replacement off,
-  `InfoCard · TidyGameCard` (on by default) still hides the template id on
-  the game's own card and rounds its income figures.
-- **Selection row** (`Selection · HorizontalRow`, on by default) in place of
-  the game's selection list, which stacks the selected unit types upwards in
-  a narrow column on the left edge. The same buttons — the game's own
-  background, portrait and count — draw as a row along the bottom at the
-  left end of the build options. Left click keeps just that type, right
-  click drops it, both passed to the game's own button. `Selection · Scale`
-  sizes it. The unit card steps aside while more than one unit is selected:
-  the game's card describes one unit of the group, whichever came first.
-- **Build strip** (`Construction · ReplaceStrip`, on by default) in place of
-  the game's build options, tier tabs and build queue, each of which is a
-  dashed panel with paging arrows and "coming soon" placeholders. The HUD
-  lays the bottom out itself from where the game's strip starts: the
-  selection row, then only the options the selection actually has; above
-  the options the tier tabs, only when more than one is live, then the
-  queue with its counts and progress. Every button is the game's own, so
-  clicks (shift and right included) and hovers do what they do on the
-  game's panels — hovering an option puts its figures on the unit card.
-  `Construction · Scale` sizes the rows. With the strip left to the game,
-  `Construction · HideLoneTierTab` (on by default) still conceals the tier
-  tabs whenever no more than one of them can be clicked — a tier-1 factory's
-  single T1, or a structure whose only option is its own upgrade.
+  Each half leads with its resource's mark — an ingot for alloy, a bolt for
+  energy — in place of the word; the same marks sit in front of every alloy,
+  energy and build-power figure across these mods (a hammer for build
+  power, a clock for time), so a figure never needs a label.
+
+### SanctuaryUI
+
+The HUD's own versions of the game's panels along the bottom of the screen,
+under one switch (`SanctuaryUI · Enabled`, on by default) with everything
+below it in the same section of the Mod Manager page. Off leaves the game's
+panels exactly as they are and the rest of the settings do nothing. Each
+stand-in keeps the game's own panel running underneath at zero alpha — Lua
+goes on filling it in and flipping it with the selection, and its buttons
+stay live — and gives it back when the overlay is hidden with **F10**, when
+the switch goes off, or when the mod unloads. All of them step aside under
+the game's menus, the F8 Mods page and the result screen, as the strip does.
+
+- **Orders row** (`OrdersRow`) in place of the game's orders panel
+  bottom-left. The game draws all twenty-one order buttons for any selection
+  and dims the ones that don't apply; of the bright ones only Stop and the
+  toggles (pause, repeat build, shield, intel, production) do anything when
+  clicked in the current build — the Lua registers no click function for
+  move, attack, patrol and the rest, which are hotkeys and right-clicks
+  anyway. The row shows only the buttons the game has enabled for the
+  selection, and with `OrdersHideInert` (on by default) only the ones that
+  are wired, so a factory gets pause, repeat build and stop and a tank gets
+  stop. The HUD's own glyphs on tiles in the game's order colours (the game's
+  icons are a small glyph in a large sprite lit by a glow shader, and don't
+  survive being borrowed), a lit tile for a toggle that is on, the button's
+  name over it on hover; each click is sent to the game's own button as a
+  pointer click, so whatever Lua hung on it runs unchanged. `OrdersScale`
+  sizes the row.
+- **Unit card** (`UnitCard`) in place of the game's unit information panel.
+  The game's card is a bitmap mock-up with fifteen text fields over it: the
+  template id next to the name, income to three decimal places, and no
+  telling which figure is which without learning the picture. The
+  replacement draws from the same values (a postfix on
+  `InformationPanelUI.SetValues` catches every update): the class as the
+  title ("Tier 3: Tank") with the unit's own name beside it, a health bar
+  with `current / max` and regen, armour and bubble shields only when the
+  unit has them, build progress while it is being built, then what it adds
+  to or takes from the economy per second behind the resource marks and
+  only where it is not zero, and build power behind its hammer. Figures
+  round and abbreviate like the strip; no template id, no build cost. It
+  steps aside while more than one unit is selected — the game's card
+  describes one unit of the group, whichever came first — unless a unit is
+  under the mouse, when it is about that unit.
+
+  A **factory or engineer** shows what it is working on: the current job's
+  art, large, at the right of the usage band with its percentage under it,
+  and the rest of its queue as small tiles beside it, counts in their
+  corners. For an engineer that is assisting, the job it is helping with is
+  the one shown even though it is not in its own queue. This comes from a
+  Lua query four times a second while the card is up (the unit's
+  `predictedBuildQueue` and its `buildTarget`'s progress over that target's
+  `buildTime`); the card widens to fit.
+
+  Hovering a **build option** turns it into a build card: one line of alloy
+  cost, energy cost and time behind their marks. The time is the template's
+  `buildTime` over the selected builders' build power — engineers assisting
+  one job add up, a factory builds alone, so the strongest selected one
+  counts. `UnitCardScale` sizes the card. With the replacement off,
+  `UnitCardTidyGameCard` (on by default) still hides the template id on the
+  game's own card and rounds its income figures.
+- **Selection row** (`SelectionRow`) in place of the game's selection list,
+  which stacks the selected unit types upwards in a narrow column on the
+  left edge. The same buttons — the game's own plate and portrait, with the
+  count in the corner and the tile shaped to the art — draw as a row along
+  the bottom at the left end of the build options. Left click keeps just
+  that type, right click drops it, both passed to the game's own button.
+  `SelectionScale` sizes it.
+- **Build strip** (`BuildStrip`) in place of the game's build options, tier
+  tabs and build queue, each of which is a dashed panel with paging arrows
+  and "coming soon" placeholders. The HUD lays the bottom out itself from
+  where the game's strip starts: the selection row, then only the options
+  the selection actually has (placeholders are recognised by the default
+  portrait they wear); above the options the tier tabs, only when more than
+  one is live, then the queue with its counts and progress. A long list
+  wraps onto further lines upward rather than running off the screen. Every
+  button is the game's own, so clicks (shift and right included) and hovers
+  do what they do on the game's panels, and a tier tab press sends the
+  click the game's toggle needs to light up. `BuildScale` sizes the rows.
+  With the strip left to the game, `HideLoneTierTab` (on by default) still
+  conceals the tier tabs whenever no more than one of them can be clicked —
+  a tier-1 factory's single T1, or a structure whose only option is its own
+  upgrade.
+- **Element colours** (`DomainColours`, off by default): the unit tiles in
+  the selection row, options and queue coloured by where the unit goes —
+  green for land, blue for naval, a lighter blue for air, green over blue
+  split diagonally for one that goes on both — instead of the game's own
+  plate, which carries the same idea in brown and blue. The buttons carry
+  no template id, but a portrait is a template's foreground icon, so a
+  once-a-match Lua query ties every icon to its tags.
+
+Each stand-in dumps the game panel's object tree to the log the first time
+it conceals it, and a **cost meter** logs the HUD's own Update and OnGUI
+time per frame every ten seconds in a match, so "is it the mod" is
+answerable from the log alone.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
   keeping roughly your current zoom.
@@ -250,7 +294,7 @@ A panel showing the map from above, shaded where you cannot see, with every
 contact you are allowed to see drawn as its strategic icon in its army's
 colour, and the alloy deposits nobody has taken yet. Clicking or dragging
 anywhere on the map moves the camera there; the border drags the panel and the
-bottom-right corner resizes it. **F2** shows and hides it (`UI · ToggleKey`).
+bottom-right corner resizes it (`MiniMap · Locked` stops both, and the panel stays wholly on screen). **F2** shows and hides it (`UI · ToggleKey`).
 
 There is deliberately no outline of what the camera is looking at. One was
 built and then taken out again: at the zoom levels that matter it is either the
@@ -413,17 +457,29 @@ game's own HUD does: IMGUI would otherwise draw on top of them.
 
 ## IdleEngineers
 
-One clickable row per tech tier of idle engineers (plus a COM row for the
-commander and an ALL row) — clicking selects that group. Each row shows the
-unit's own build-menu art beside its label. Hidden entirely when nothing is
-idle; only as wide as what it is showing; draggable, and its position persists.
+The idle panel, in the shape of the eco panels: one clickable tile per tech
+tier of idle engineers, stacked down a column with the commander on its own
+line above them — clicking selects that group. A tile is the unit's own
+build-menu art on the game's own plate (brown for land, blue for water),
+with the count in the corner and the tier under it. Hidden entirely when
+nothing is idle; only as wide as what it is showing; draggable within the
+screen, and its position persists (`Panel · PosX`, `PosY`), with `Panel ·
+Scale` for its size and `Panel · Locked` to stop it moving during a game.
+On the right half of the screen it keeps its right edge fixed as it changes
+width and lays itself out from that edge. It steps aside under the game's
+menus, the F8 Mods page and the result screen.
 
-**Idle factories** sit underneath (`Factories · Enabled`, on by default): a
-heading per type (LAND, AIR, NAVAL FACTORIES) with one row per tier beneath
-it, and an ALL row once more than one type is idle. Clicking a heading selects
-every idle factory of that type, which is usually what you want before
-queueing; clicking a tier row selects just those. Switching the setting off
-hides the section at once and stops the lookup behind it.
+**Idle factories** sit underneath (`Factories · Enabled`, on by default):
+one FACTORIES heading with a tile per type and tier along a row beneath it.
+Clicking the heading selects every idle factory; clicking a tile selects
+just those. Switching the setting off hides the section at once and stops
+the lookup behind it.
+
+A selected unit keeps its tile: the game turns a unit's idle marker off
+while it is selected, so a poll reading only that marker lost every idle
+engineer on the click that selected them, and the panel emptied itself. The
+poll now also asks the client's Lua which selected units are idle by the
+game's own test (finished, no order, nothing queued).
 
 A factory counts as idle exactly when the game draws its idle adornment:
 finished, no order, nothing in its queue — the same rule the game applies to
@@ -595,6 +651,18 @@ otherwise read as a finished T2. The T1 stays until the upgrade lands and is
 the one carrying the upgrade adornment, so it is what the UP tile counts.
 The replacement, meanwhile, is what the build tiles show: the
 higher tier under construction, with the upgrade's cost as its spend.
+
+### Odds and ends
+
+- The assist hook only queues an upgrade when the selection holds an
+  engineer or the commander: a tank told to assist an extractor just guards
+  it, and must not spend alloy on the way.
+- Both panels lead with the resource marks — an ingot for alloy, a bolt for
+  energy, centred over their columns — in place of the words, the same
+  marks the HUD uses everywhere.
+- Both panels stay wholly on screen whatever the resolution, and `Panel ·
+  Locked` stops either being dragged during a game. They step aside under
+  the game's menus, the F8 Mods page and the result screen.
 
 ## BuildHotkeys
 
@@ -782,6 +850,32 @@ command a button click sends. Returning `false` when nothing matched lets the
 key fall through to whatever it normally does, and because chat disables every
 action group but `MouseControls`, typing already suppresses these for free.
 
+### Toggles
+
+`Toggles · PauseKey` (**X**) pauses the selected factories and engineers and
+again resumes them; `Toggles · RepeatBuildKey` (**Z**) switches repeat build
+on the selected factories and again off. Each does what the orders panel's
+toggle does — on if any selected unit has it off, else off — through the
+game's own `SetToggle` command. Both sit *behind* whatever else the key does
+here: a build role on the same key fires first, and the toggle only when
+that had nothing to build for the selection. X is the point-defence role by
+default, so with engineers selected X builds point defence and with
+factories selected, which have nothing under that role, X pauses them.
+Blank either to unbind.
+
+### Extractor placement
+
+Placing an extractor snaps it onto a deposit near the cursor. The game's
+`FindClosestResourceSpot` fixes that at 8 world units, which zoomed out is a
+couple of pixels. `Placement · ExtractorSnapPixels` (40) makes the snap a
+fixed size on screen instead: the mod turns that pixel radius into world
+units from the camera's height and field of view and pushes it into the
+hook a few times a second as you zoom. `Placement · ExtractorSnapDistance`
+(8) is the floor in world units, however far in you zoom; set the pixel
+value to 0 to use the floor alone. The hook is the same search as the
+game's, swapped in on the module table so the game's own callers reach it,
+and put back on unload.
+
 ## LadderReporter
 
 Reports ranked 1v1 results to the [SanctuaryDB ladder](https://www.sanctuarydb.net/ladder)
@@ -900,7 +994,9 @@ show an economy — the empty slots of a map bigger than the game played on it,
 and the neutral army — are left out of the table; once an army has appeared
 it keeps its row, so being wiped out does not remove a player. Drag the
 title bar to move the panel and the grip in its bottom-right corner to
-resize it; both are remembered (`PanelX`, `PanelY`, `PanelScale`).
+resize it; both are remembered (`PanelX`, `PanelY`, `PanelScale`). The panel
+stays wholly on screen, and `UI · Locked` stops it being dragged. The
+resource columns are headed by the HUD's ingot and bolt marks.
 
 **Caveats.** A replay is tied to the game build and Lua hash it was recorded
 with; the game's own list greys out mismatches. Playback is a normal client,

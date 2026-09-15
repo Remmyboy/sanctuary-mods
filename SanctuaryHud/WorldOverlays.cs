@@ -438,12 +438,22 @@ namespace SanctuaryHud
         }
 
         /// Text with a dark backing so it reads over terrain of any colour.
-        private static void Label(Rect rect, string text, GUIStyle style)
+        private static void Label(Rect rect, string text, GUIStyle style, Texture2D mark = null)
         {
             var size = style.CalcSize(new GUIContent(text));
-            var box = new Rect(rect.center.x - size.x / 2f - 4f, rect.center.y - size.y / 2f - 1f, size.x + 8f, size.y + 2f);
+            var markSize = mark != null ? size.y - 2f : 0f;
+            var lead = mark != null ? markSize + 3f : 0f;
+            var box = new Rect(rect.center.x - (size.x + lead) / 2f - 4f, rect.center.y - size.y / 2f - 1f, size.x + lead + 8f, size.y + 2f);
             GUI.DrawTexture(box, _texShadow);
-            GUI.Label(box, text, style);
+            if (mark != null)
+            {
+                // The resource's mark in the text's own colour.
+                var previous = GUI.color;
+                GUI.color = style.normal.textColor;
+                GUI.DrawTexture(new Rect(box.x + 4f, box.y + 2f, markSize, markSize), mark);
+                GUI.color = previous;
+            }
+            GUI.Label(new Rect(box.x + lead, box.y, box.width - lead, box.height), text, style);
         }
 
         private static string FmtValue(float v)
@@ -533,7 +543,7 @@ namespace SanctuaryHud
                 var y = at.y;
                 if (c.Alloys >= 1f)
                 {
-                    Label(new Rect(at.x, y, 0f, 0f), FmtValue(c.Alloys), _stReclaim);
+                    Label(new Rect(at.x, y, 0f, 0f), FmtValue(c.Alloys), _stReclaim, Glyphs.Get("alloy"));
                     y += _stReclaim.fontSize + 2f;
                 }
                 // Energy only where it is the point: a pure-energy prop, or
@@ -541,7 +551,7 @@ namespace SanctuaryHud
                 // beside its ten alloys would double every figure on screen.
                 if (c.Energy >= 1f && (c.Alloys < 1f || c.Energy >= Mathf.Max(100f, 10f * minValue)))
                 {
-                    Label(new Rect(at.x, y, 0f, 0f), "E " + FmtValue(c.Energy), _stReclaimEnergy);
+                    Label(new Rect(at.x, y, 0f, 0f), FmtValue(c.Energy), _stReclaimEnergy, Glyphs.Get("energy"));
                 }
             }
         }

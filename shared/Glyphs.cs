@@ -46,6 +46,10 @@ namespace SanctuaryHud
                 case "repair": return Repair;
                 case "harvest": return Harvest;
                 case "capture": return Capture;
+                case "alloy": return Alloy;
+                case "energy": return Energy;
+                case "time": return Clock;
+                case "power": return Hammer;
                 default: return null;
             }
         }
@@ -232,6 +236,46 @@ namespace SanctuaryHud
             // An arrow down into a tray.
             if (Arrow(x, y + 0.12f, -90f, 0.5f)) return true;
             return y <= -0.5f && y >= -0.66f && Mathf.Abs(x) <= 0.56f || Mathf.Abs(x) >= 0.44f && Mathf.Abs(x) <= 0.56f && y <= -0.28f && y >= -0.66f;
+        }
+
+        // ---- the resource and time marks on the build card -------------------------
+
+        private static readonly Vector2[] Hexagon =
+        {
+            Polar(90f, 0.7f), Polar(30f, 0.7f), Polar(-30f, 0.7f), Polar(-90f, 0.7f), Polar(-150f, 0.7f), Polar(150f, 0.7f),
+        };
+
+        /// A hexagonal ingot: a hexagon with a hollow centre.
+        private static bool Alloy(float x, float y) =>
+            InPolygon(x, y, Hexagon) && !InPolygon(x / 0.5f, y / 0.5f, Hexagon);
+
+        private static readonly Vector2[] Bolt =
+        {
+            new Vector2(0.15f, 0.75f), new Vector2(-0.45f, 0.05f), new Vector2(-0.05f, 0.05f),
+            new Vector2(-0.2f, -0.75f), new Vector2(0.45f, 0.0f), new Vector2(0.05f, 0.0f),
+        };
+
+        private static bool Energy(float x, float y) => InPolygon(x, y, Bolt);
+
+        /// A clock face: a ring with the hands at ten past ten.
+        private static bool Clock(float x, float y)
+        {
+            var r = Mathf.Sqrt(x * x + y * y);
+            if (r >= 0.58f && r <= 0.72f) return true;
+            if (r <= 0.08f) return true;
+            // Minute hand up, hour hand to the right.
+            if (Mathf.Abs(x) <= 0.07f && y >= 0f && y <= 0.45f) return true;
+            return Mathf.Abs(y) <= 0.07f && x >= 0f && x <= 0.3f;
+        }
+
+        /// Build power: a hammer, handle down-left, head up-right.
+        private static bool Hammer(float x, float y)
+        {
+            // Rotate 45° so the handle lies along the x axis.
+            var rx = (x + y) / Mathf.Sqrt(2f);
+            var ry = (y - x) / Mathf.Sqrt(2f);
+            if (Mathf.Abs(ry) <= 0.11f && rx >= -0.72f && rx <= 0.3f) return true;
+            return rx >= 0.2f && rx <= 0.6f && Mathf.Abs(ry) <= 0.42f;
         }
 
         private static bool Capture(float x, float y)

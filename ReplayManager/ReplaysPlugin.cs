@@ -22,7 +22,7 @@ namespace SanctuaryHud.Replays
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.3.0")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.4.0")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -31,6 +31,7 @@ namespace SanctuaryHud.Replays
         private ConfigEntry<float> _cfgPosX;
         private ConfigEntry<float> _cfgPosY;
         private ConfigEntry<float> _cfgScale;
+        private ConfigEntry<bool> _cfgLocked;
 
         private bool _controlsOpen = true;
         private Rect _ctrlRect = new Rect(12, 300, 0, 0);
@@ -99,6 +100,7 @@ namespace SanctuaryHud.Replays
                 "Show the replay's total length and the seek bar. Off hides both, for watching without knowing when the game ends.");
             _cfgPosX = Config.Bind("UI", "PanelX", 12f, "Playback control panel X in 1080p-logical pixels.");
             _cfgPosY = Config.Bind("UI", "PanelY", 300f, "Playback control panel Y in 1080p-logical pixels.");
+            _cfgLocked = Config.Bind("UI", "Locked", false, "Keep the panel where it is: no dragging during playback.");
             _cfgScale = Config.Bind("UI", "PanelScale", 1f,
                 "Playback control panel size, 1 being the default. Drag the grip in the panel's bottom-right corner to change it.");
             _ctrlRect.x = _cfgPosX.Value;
@@ -747,8 +749,9 @@ namespace SanctuaryHud.Replays
                     _lastRowCount = rows;
                     _ctrlRect.height = 0;
                 }
-                _ctrlRect.x = Mathf.Clamp(_ctrlRect.x, -PanelW + 80, logicalWidth - 80);
-                _ctrlRect.y = Mathf.Clamp(_ctrlRect.y, 0, logicalHeight - 40);
+                // Kept wholly on screen, whatever the resolution.
+                _ctrlRect.x = Mathf.Clamp(_ctrlRect.x, 0, Mathf.Max(0f, logicalWidth - PanelW));
+                _ctrlRect.y = Mathf.Clamp(_ctrlRect.y, 0, Mathf.Max(0f, logicalHeight - _ctrlRect.height));
                 _ctrlRect = GUILayout.Window(0x53445250, _ctrlRect, DrawControls, GUIContent.none, _stPanel, GUILayout.Width(PanelW));
             }
             finally
@@ -768,7 +771,7 @@ namespace SanctuaryHud.Replays
             {
                 GUILayout.Label("REPLAY", _stTitle);
                 GUILayout.Label($"Rewinding to {Clock(ReplayPlayer.SeekTarget)}, restarting playback...", _stBody);
-                GUI.DragWindow(new Rect(0, 0, 10000, 30));
+                if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0, 0, 10000, 30));
                 return;
             }
 
@@ -878,7 +881,7 @@ namespace SanctuaryHud.Replays
             GUILayout.EndHorizontal();
 
             ResizeGrip();
-            GUI.DragWindow(new Rect(0, 0, 10000, 30));
+            if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0, 0, 10000, 30));
         }
 
         /// The corner grip, drawn outside the layout in the bottom-right of
@@ -919,7 +922,17 @@ namespace SanctuaryHud.Replays
         {
             var old = GUI.color;
             GUI.color = colour;
-            GUILayout.Label(name, _stHead, GUILayout.Width(BarW));
+            // The resource's mark before its name, as on the HUD's card and strip.
+            var mark = Glyphs.Get(name == "ALLOY" ? "alloy" : "energy");
+            if (mark != null)
+            {
+                GUILayout.Label(mark, GUILayout.Width(12f), GUILayout.Height(12f));
+                GUILayout.Label(name, _stHead, GUILayout.Width(BarW - 16f));
+            }
+            else
+            {
+                GUILayout.Label(name, _stHead, GUILayout.Width(BarW));
+            }
             GUI.color = old;
             var right = new GUIStyle(_stHead) { alignment = TextAnchor.LowerRight };
             GUILayout.Space(RuleW);

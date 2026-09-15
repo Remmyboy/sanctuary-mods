@@ -28,13 +28,13 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("Orders", "CompactPanel", true,
+            Enabled = config.Bind("SanctuaryUI", "OrdersRow", true,
                 "Replace the game's orders panel (bottom left) with a compact row showing only the orders the selected units can take, " +
                 "using the game's own icons. The game's panel comes back whenever the overlay is hidden or the mod is unloaded.");
-            HideInert = config.Bind("Orders", "HideInert", true,
+            HideInert = config.Bind("SanctuaryUI", "OrdersHideInert", true,
                 "Leave out the buttons the game has not wired up yet: move, attack, patrol, assist and the rest do nothing when clicked " +
                 "in the current build (they are hotkeys and right-clicks). Stop and the toggles — pause, repeat build, shield, intel, production — stay.");
-            Scale = config.Bind("Orders", "Scale", 1f,
+            Scale = config.Bind("SanctuaryUI", "OrdersScale", 1f,
                 new ConfigDescription("Size of the compact row, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 

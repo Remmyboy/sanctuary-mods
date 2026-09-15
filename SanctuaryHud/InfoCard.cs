@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -32,13 +33,13 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("InfoCard", "ReplaceCard", true,
+            Enabled = config.Bind("SanctuaryUI", "UnitCard", true,
                 "Replace the game's unit information card with a plainer one drawn from the same values: name, health, shields, " +
                 "build cost, income and build power in labelled rows, figures rounded, template id left off. " +
                 "The game's card comes back whenever the overlay is hidden or the mod is unloaded.");
-            TidyBuiltIn = config.Bind("InfoCard", "TidyGameCard", true,
+            TidyBuiltIn = config.Bind("SanctuaryUI", "UnitCardTidyGameCard", true,
                 "With the game's own card kept (ReplaceCard off): hide the unit's template id and round its income figures.");
-            Scale = config.Bind("InfoCard", "Scale", 1f,
+            Scale = config.Bind("SanctuaryUI", "UnitCardScale", 1f,
                 new ConfigDescription("Size of the replacement card, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
@@ -182,6 +183,115 @@ namespace SanctuaryHud
             return $"{m}:{s:00}";
         }
 
+        // ---- a factory's queue and progress ----------------------------------------
+        //
+        // A factory under the mouse (or the one factory selected) shows what
+        // it is building: the first five items of its queue as small tiles,
+        // and how far the current one has got — as FA's card does. The
+        // game's card has none of this; it comes from a small Lua query,
+        // four times a second while the card is up: the hovered unit's
+        // predictedBuildQueue, and its buildTarget's progress over the
+        // target's buildTime.
+
+        private sealed class QueueItem
+        {
+            public int Count;
+            public uint Icon, Plate;
+        }
+
+        private static readonly List<QueueItem> _queue = new List<QueueItem>();
+        private static float _factoryProgress = -1f;
+        private static bool _hoveringUnit;
+        private static float _nextPeek;
+
+        private const string PeekChunk =
+            "local ok = pcall(function() " +
+            "  local m = Import('client/inputEventsFunctions.lua') " +
+            "  local u = m.GetHoverUnit and m.GetHoverUnit() " +
+            "  local hovering = (u and u.tp) and 1 or 0 " +
+            "  if not (u and u.tp) then " +
+            "    local sel = Import('client/input/selectionSystem.lua') " +
+            "    local picked = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
+            "      or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
+            "    local only, n = nil, 0 " +
+            "    for _, e in pairs(picked) do only = e n = n + 1 end " +
+            "    if n == 1 then u = only end " +
+            "  end " +
+            // Any builder: a factory, or an engineer (whose queue is the
+            // structures it has been told to put up, and whose target may be
+            // something else entirely when it is assisting).
+            "  if not (u and u.tp and u.tp.construction) then __SdbFactory = hovering .. '|' return end " +
+            "  local function art(tpId) " +
+            "    local t = tpId and __Templates.Units[tpId] " +
+            "    local g = t and t.general " +
+            "    return (g and g.foregroundIconID and tonumber(g.foregroundIconID.index) or 0) .. ':' .. " +
+            "           (g and g.backgroundIconID and tonumber(g.backgroundIconID.index) or 0) " +
+            "  end " +
+            "  local out = {} " +
+            "  for i, item in ipairs(u.predictedBuildQueue or {}) do " +
+            "    if i > 5 then break end " +
+            "    out[#out + 1] = (tonumber(item.count) or 0) .. ':' .. art(item.tpId) " +
+            "  end " +
+            "  local prog, target = -1, '' " +
+            "  local t = u.buildTarget " +
+            "  if t and t.tp and t.tp.economy and tonumber(t.tp.economy.buildTime) and tonumber(t.progress) then " +
+            "    prog = tonumber(t.progress) / tonumber(t.tp.economy.buildTime) " +
+            "    target = art(t.tpId) " +
+            "  end " +
+            "  __SdbFactory = hovering .. '|' .. string.format('%.3f', prog) .. '|' .. target .. '|' .. table.concat(out, ';') " +
+            "end) " +
+            "if not ok then __SdbFactory = '' end";
+
+        private static void Peek()
+        {
+            if (Time.realtimeSinceStartup < _nextPeek) return;
+            _nextPeek = Time.realtimeSinceStartup + 0.25f;
+            try
+            {
+                EnsureLuaBridge();
+                if (!LuaReady || !RunLua(PeekChunk)) return;
+                var raw = GetLuaGlobal("__SdbFactory") ?? "";
+                var parts = raw.Split('|');
+                _hoveringUnit = parts.Length > 0 && parts[0] == "1";
+                _queue.Clear();
+                _factoryProgress = -1f;
+                if (parts.Length < 4) return;
+                float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _factoryProgress);
+                // What it is working on right now, first — its own next
+                // item for a factory, which then merges with the queue's
+                // head; something else's job for an assisting engineer.
+                var target = parts[2].Split(':');
+                uint targetIcon = 0, targetPlate = 0;
+                if (target.Length >= 2)
+                {
+                    uint.TryParse(target[0], out targetIcon);
+                    uint.TryParse(target[1], out targetPlate);
+                }
+                foreach (var item in parts[3].Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var f = item.Split(':');
+                    if (f.Length < 3) continue;
+                    int.TryParse(f[0], out var count);
+                    uint.TryParse(f[1], out var icon);
+                    uint.TryParse(f[2], out var plate);
+                    _queue.Add(new QueueItem { Count = count, Icon = icon, Plate = plate });
+                }
+                if (targetIcon != 0 && (_queue.Count == 0 || _queue[0].Icon != targetIcon))
+                {
+                    _queue.Insert(0, new QueueItem { Count = 1, Icon = targetIcon, Plate = targetPlate });
+                    if (_queue.Count > 5) _queue.RemoveAt(5);
+                }
+            }
+            catch { /* the card shows without the queue */ }
+        }
+
+        private static void ForgetPeek()
+        {
+            _queue.Clear();
+            _factoryProgress = -1f;
+            _hoveringUnit = false;
+        }
+
         // ---- the game's panel ---------------------------------------------------
 
         private static readonly PanelConceal _conceal = new PanelConceal();
@@ -208,6 +318,8 @@ namespace SanctuaryHud
             var panel = replace ? FindPanel() : null;
             if (_conceal.Apply(panel)) Describe(panel);
             if (Enabled.Value || !TidyBuiltIn.Value) RestoreBuiltIn();
+            if (panel != null && panel.IsVisible) Peek();
+            else ForgetPeek();
         }
 
         internal static void Shutdown()
@@ -222,8 +334,13 @@ namespace SanctuaryHud
         // is 264 at 1080), and never taller than it: the selection list sits
         // directly above and must stay clear.
         private const float Width = 264f;
+        /// This draw's width: the base, or wider while a build queue shares
+        /// the usage band.
+        private static float _width = Width;
         private const float Pad = 8f;
         private const float GaugeHeight = 26f;
+        private const float QueueTile = 20f;
+        private const float JobTile = 40f;
 
         private static GUIStyle _stTitle, _stSubtitle, _stLabel, _stValue, _stFigure, _stSmall;
 
@@ -253,7 +370,9 @@ namespace SanctuaryHud
             // first, which says nothing about the group; the selection row
             // carries what is selected.
             var building = _hoverTemplate != null;
-            if (!building && SelectionRow.CountSelected() > 1) return;
+            if (!building && !_hoveringUnit && SelectionRow.CountSelected() > 1) return;
+            var factory = _queue.Count > 0 || _factoryProgress >= 0f;
+            _width = factory ? Width + 60f : Width;
             if (_stTitle == null) ApplyFont(null);
 
             var v = _values;
@@ -270,12 +389,15 @@ namespace SanctuaryHud
             if (showArmour) height += GaugeHeight;
             if (showBubble) height += GaugeHeight;
             if (v.isConstructionPercentEnabled) height += GaugeHeight;
-            if (building) height += 40f;
-            if (showIncome) height += 20f;
-            if (extras != null) height += 16f;
+            if (building) height += 20f;
+            var band = 0f;
+            if (showIncome) band += 20f;
+            if (extras != null || v.buildPower > 0f) band += 18f;
+            if (factory) band = Mathf.Max(band, JobTile + 16f);
+            height += band;
             height += Pad - 2f;
 
-            var area = new Rect(14f, logicalHeight - 14f - height * s, Width * s, height * s);
+            var area = new Rect(14f, logicalHeight - 14f - height * s, _width * s, height * s);
             // Where the game's own card sits: the replacement takes its bottom-left corner.
             if (PanelConceal.GuiRect(panel, scale, out var anchor))
             {
@@ -292,7 +414,7 @@ namespace SanctuaryHud
             var previousMatrix = GUI.matrix;
             GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(area.x, area.y, 0f), Quaternion.identity, new Vector3(s, s, 1f));
 
-            var inner = Width - Pad * 2f;
+            var inner = _width - Pad * 2f;
             var y = Pad;
 
             // The class of thing it is on the left as the title ("Tier 3:
@@ -338,43 +460,92 @@ namespace SanctuaryHud
             // about a unit, and the build menu is where it matters.
             if (building)
             {
-                // Cost, then the time for whoever is selected to build it.
-                GUI.Label(new Rect(Pad, y, inner, 18f), "COST", _stLabel);
-                Costs(Pad + 48f, y, inner - 48f, v.alloyBuildCost, v.energyBuildCost);
-                y += 20f;
-                GUI.Label(new Rect(Pad, y, inner, 18f), "TIME", _stLabel);
-                _stFigure.normal.textColor = Color.white;
-                var time = _hoverSeconds > 0f ? Duration(_hoverSeconds) : "—";
-                GUI.Label(new Rect(Pad + 48f, y, inner - 48f, 18f), time, _stFigure);
-                if (_hoverPower > 0f)
-                {
-                    var timeWidth = _stFigure.CalcSize(new GUIContent(time)).x;
-                    _stSmall.normal.textColor = SanctuaryHudPlugin.MutedText;
-                    GUI.Label(new Rect(Pad + 48f + timeWidth + 8f, y + 1f, inner, 16f), "at " + SanctuaryHudPlugin.Fmt(_hoverPower) + " build power", _stSmall);
-                }
+                // One line: alloy, energy, time, each behind its mark — an
+                // ingot, a bolt, a clock — so the figures need no words.
+                var fx = Pad;
+                fx = Marked(fx, y, "alloy", SanctuaryHudPlugin.AlloyTint, SanctuaryHudPlugin.Fmt(v.alloyBuildCost));
+                fx = Marked(fx, y, "energy", SanctuaryHudPlugin.EnergyTint, SanctuaryHudPlugin.Fmt(v.energyBuildCost));
+                Marked(fx, y, "time", Color.white, _hoverSeconds > 0f ? Duration(_hoverSeconds) : "—");
                 y += 20f;
             }
+            // The usage rows share a band with the current job on the right:
+            // its art, large, the percentage under it, and the rest of the
+            // queue as small tiles beside it.
+            var bandTop = y;
+
             if (showIncome)
             {
-                Figures(Pad, y, inner, v.alloyNetIncome, v.energyNetIncome);
+                // What it adds to or takes from the economy per second,
+                // behind the same marks; a zero is left out.
+                var fx = Pad;
+                string Rate(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
+                if (Mathf.Abs(v.alloyNetIncome) >= 0.5f) fx = Marked(fx, y, "alloy", SanctuaryHudPlugin.AlloyTint, Rate(v.alloyNetIncome));
+                if (Mathf.Abs(v.energyNetIncome) >= 0.5f) Marked(fx, y, "energy", SanctuaryHudPlugin.EnergyTint, Rate(v.energyNetIncome));
                 y += 20f;
             }
 
-            if (extras != null)
+            if (extras != null || v.buildPower > 0f)
             {
-                _stSmall.normal.textColor = new Color(0.85f, 0.9f, 0.97f);
-                GUI.Label(new Rect(Pad, y, inner, 16f), extras, _stSmall);
-                y += 16f;
+                // Build power behind a hammer; the rarer figures as words after it.
+                var fx = Pad;
+                if (v.buildPower > 0f) fx = Marked(fx, y, "power", new Color(0.85f, 0.9f, 0.97f), SanctuaryHudPlugin.Fmt(v.buildPower));
+                if (extras != null)
+                {
+                    _stSmall.normal.textColor = new Color(0.85f, 0.9f, 0.97f);
+                    GUI.Label(new Rect(fx, y + 1f, inner - (fx - Pad), 16f), extras, _stSmall);
+                }
+                y += 18f;
+            }
+
+            if (factory)
+            {
+                // The current job, large, at the right edge of the band, the
+                // percentage under it; whatever is queued behind it as small
+                // tiles to its left, counts in their corners.
+                var job = new Rect(_width - Pad - JobTile, bandTop, JobTile, JobTile);
+                DrawQueueTile(job, _queue[0], false);
+                if (_factoryProgress >= 0f)
+                {
+                    _stSmall.normal.textColor = Color.white;
+                    var pct = (Mathf.Clamp01(_factoryProgress) * 100f).ToString("0") + "%";
+                    var size = _stSmall.CalcSize(new GUIContent(pct));
+                    GUI.Label(new Rect(job.center.x - size.x / 2f, job.yMax + 1f, size.x + 2f, 14f), pct, _stSmall);
+                }
+                var qx = job.x - 4f;
+                for (var i = 1; i < _queue.Count; i++)
+                {
+                    qx -= QueueTile + 3f;
+                    DrawQueueTile(new Rect(qx, bandTop + 2f, QueueTile, QueueTile), _queue[i], true);
+                }
+                y = Mathf.Max(y, bandTop + JobTile + 16f);
             }
 
             GUI.matrix = previousMatrix;
+        }
+
+        /// One queue tile: the game's plate and art, and the count in the
+        /// corner where it is more than one.
+        private static void DrawQueueTile(Rect tile, QueueItem item, bool withCount)
+        {
+            SanctuaryHudPlugin.Fill(tile, new Color(0.1f, 0.12f, 0.15f, 0.9f));
+            if (HasSprite(item.Icon))
+            {
+                DrawSprite(tile, item.Plate);
+                DrawSprite(tile, item.Icon);
+            }
+            if (!withCount || item.Count <= 1) return;
+            var count = item.Count.ToString();
+            var size = _stSmall.CalcSize(new GUIContent(count));
+            SanctuaryHudPlugin.Fill(new Rect(tile.xMax - size.x - 4f, tile.yMax - size.y, size.x + 4f, size.y), new Color(0f, 0f, 0f, 0.65f));
+            _stSmall.normal.textColor = Color.white;
+            GUI.Label(new Rect(tile.xMax - size.x - 2f, tile.yMax - size.y, size.x + 2f, size.y), count, _stSmall);
         }
 
         /// A labelled gauge: label left, "value / max" right, regen beside
         /// the value when there is any, and the bar underneath.
         private static void Gauge(ref float y, string label, float value, float max, float regen, float frac, Color colour)
         {
-            var inner = Width - Pad * 2f;
+            var inner = _width - Pad * 2f;
             GUI.Label(new Rect(Pad, y, inner, 16f), label, _stLabel);
             var text = SanctuaryHudPlugin.Fmt(value) + " / " + SanctuaryHudPlugin.Fmt(max);
             GUI.Label(new Rect(Pad, y, inner, 16f), text, _stValue);
@@ -392,22 +563,29 @@ namespace SanctuaryHud
 
         private static void Bar(float y, float frac, Color colour)
         {
-            var inner = Width - Pad * 2f;
+            var inner = _width - Pad * 2f;
             var track = SanctuaryHudPlugin.GameAccent;
             track.a = 0.14f;
             SanctuaryHudPlugin.Fill(new Rect(Pad, y, inner, 4f), track);
             SanctuaryHudPlugin.Fill(new Rect(Pad, y, inner * frac, 4f), colour);
         }
 
-        /// Alloy then energy costs side by side in their tints, plain.
-        private static void Costs(float x, float y, float width, float alloy, float energy)
+        /// A mark (one of the HUD's glyphs) in the given tint, then a figure
+        /// in the same tint. Returns where the next one starts.
+        private static float Marked(float x, float y, string glyph, Color tint, string text)
         {
-            var a = SanctuaryHudPlugin.Fmt(alloy);
-            _stFigure.normal.textColor = SanctuaryHudPlugin.AlloyTint;
-            GUI.Label(new Rect(x, y, width, 18f), a, _stFigure);
-            x += _stFigure.CalcSize(new GUIContent(a)).x + 12f;
-            _stFigure.normal.textColor = SanctuaryHudPlugin.EnergyTint;
-            GUI.Label(new Rect(x, y, width, 18f), SanctuaryHudPlugin.Fmt(energy), _stFigure);
+            var mark = Glyphs.Get(glyph);
+            if (mark != null)
+            {
+                var previous = GUI.color;
+                GUI.color = tint;
+                GUI.DrawTexture(new Rect(x, y + 2f, 14f, 14f), mark);
+                GUI.color = previous;
+                x += 17f;
+            }
+            _stFigure.normal.textColor = tint;
+            GUI.Label(new Rect(x, y, _width, 18f), text, _stFigure);
+            return x + _stFigure.CalcSize(new GUIContent(text)).x + 14f;
         }
 
         /// Alloy then energy rates side by side in their tints, signed, per
@@ -433,7 +611,6 @@ namespace SanctuaryHud
         private static string Extras(UIInformationValues v)
         {
             var parts = new System.Collections.Generic.List<string>();
-            if (v.buildPower > 0f) parts.Add("BUILD POWER " + SanctuaryHudPlugin.Fmt(v.buildPower));
             if (v.veterancy > 0f) parts.Add("VETERANCY " + SanctuaryHudPlugin.Fmt(v.veterancy));
             if (v.transportCapacity > 0f) parts.Add("TRANSPORT " + SanctuaryHudPlugin.Fmt(v.transportCapacity));
             if (v.ammoCapacity > 0f) parts.Add("AMMO " + SanctuaryHudPlugin.Fmt(v.ammoCapacity));

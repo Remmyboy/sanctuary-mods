@@ -25,11 +25,13 @@ namespace SanctuaryHud
         private ConfigEntry<float> _cfgPosX;
         private ConfigEntry<float> _cfgPosY;
         private ConfigEntry<float> _cfgScale;
+        private ConfigEntry<bool> _cfgLocked;
 
         // Geometry in 1080p-logical pixels (GUI.matrix rescales per resolution).
         private Rect _idleRect = new Rect(12, 250, 132, 44);
 
         private static readonly Color IdleColour = new Color(1f, 0.62f, 0.2f);
+        private static bool _rightAligned;
 
         private const float Pad = 6f;
         private const float TileW = 54f;
@@ -51,6 +53,7 @@ namespace SanctuaryHud
                 "List idle factories under the engineers, by type (land, air, naval) and tier.");
             _cfgPosX = Config.Bind("Panel", "PosX", 12f, "Idle panel X in 1080p-logical pixels.");
             _cfgPosY = Config.Bind("Panel", "PosY", 250f, "Idle panel Y in 1080p-logical pixels.");
+            _cfgLocked = Config.Bind("Panel", "Locked", false, "Keep the panel where it is: no dragging during a game.");
             _cfgScale = Config.Bind("Panel", "Scale", 1f,
                 new ConfigDescription("Size of the panel, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
             _idleRect.x = _cfgPosX.Value;
@@ -110,9 +113,14 @@ namespace SanctuaryHud
             var previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var logicalWidth = Screen.width / scale;
+            // On the right half of the screen the panel keeps its right edge
+            // where it is as it changes width, and lays itself out from that
+            // edge; on the left half, from the left, as before.
+            _rightAligned = _idleRect.center.x > logicalWidth / 2f;
 
-            _idleRect.x = Mathf.Clamp(_idleRect.x, -_idleRect.width + 40, logicalWidth - 40);
-            _idleRect.y = Mathf.Clamp(_idleRect.y, 0, Screen.height / scale - 30);
+            // Kept wholly on screen, whatever the resolution or the panel's size.
+            _idleRect.x = Mathf.Clamp(_idleRect.x, 0, Mathf.Max(0f, logicalWidth - _idleRect.width));
+            _idleRect.y = Mathf.Clamp(_idleRect.y, 0, Mathf.Max(0f, Screen.height / scale - _idleRect.height));
             _idleRect = GUI.Window(0x5DC, _idleRect, DrawIdleWindow, GUIContent.none, _stWindow);
 
             GUI.matrix = previousMatrix;
@@ -140,10 +148,14 @@ namespace SanctuaryHud
                 width = Mathf.Max(width, Pad * 2f + 4f + _stSubHeading.CalcSize(new GUIContent("FACTORIES")).x);
             }
             if (_pollStatus != "ok") width = Mathf.Max(width, 152f);
+            if (_rightAligned) _idleRect.x += _idleRect.width - width;
             _idleRect.width = width;
+            var col = _rightAligned ? width - Pad - TileW : Pad;
 
             _stName.normal.textColor = IdleColour;
-            GUI.Label(new Rect(Pad + 2f, 4f, width - Pad * 2f, 18f), "IDLE", _stName);
+            _stName.alignment = _rightAligned ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
+            GUI.Label(new Rect(Pad + 2f, 4f, width - Pad * 2f - 4f, 18f), "IDLE", _stName);
+            _stName.alignment = TextAnchor.MiddleLeft;
             if (_pollStatus != "ok")
             {
                 GUI.Label(new Rect(40, 6, width - 48, 14), _pollStatus, _stSub);
@@ -155,12 +167,12 @@ namespace SanctuaryHud
             var commander = groups.FirstOrDefault(g => g.Tier == 0);
             if (commander != null)
             {
-                Tile(new Rect(Pad, y, TileW, TileH), commander.PlateId, commander.IconId, commander.Label, -1, commander.UnitIds);
+                Tile(new Rect(col, y, TileW, TileH), commander.PlateId, commander.IconId, commander.Label, -1, commander.UnitIds);
                 y += TileH + TileGap;
             }
             foreach (var group in groups.Where(g => g.Tier != 0))
             {
-                Tile(new Rect(Pad, y, TileW, TileH), group.PlateId, group.IconId, group.Label, group.Count, group.UnitIds);
+                Tile(new Rect(col, y, TileW, TileH), group.PlateId, group.IconId, group.Label, group.Count, group.UnitIds);
                 y += TileH + TileGap;
             }
 
@@ -176,7 +188,7 @@ namespace SanctuaryHud
                 }
 
                 y = DrawFactoryHeading(factories.SelectMany(g => g.UnitIds).ToList(), y);
-                var x = Pad;
+                var x = _rightAligned ? width - Pad - (factories.Count * TileW + (factories.Count - 1) * TileGap) : Pad;
                 foreach (var group in factories)
                 {
                     Tile(new Rect(x, y, TileW, TileH), group.PlateId, group.IconId, group.Label, group.Count, group.UnitIds);
@@ -186,7 +198,7 @@ namespace SanctuaryHud
             }
 
             _idleRect.height = y + Pad - TileGap;
-            GUI.DragWindow(new Rect(0, 0, 10000, 10000));
+            if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0, 0, 10000, 10000));
         }
 
         /// One tile: the unit's own build-menu art where the game has it
@@ -244,7 +256,9 @@ namespace SanctuaryHud
 
             var previous = _stSubHeading.normal.textColor;
             _stSubHeading.normal.textColor = IdleColour;
-            GUI.Label(new Rect(row.x + 4, row.y, row.width - 4, 16), "FACTORIES", _stSubHeading);
+            _stSubHeading.alignment = _rightAligned ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
+            GUI.Label(new Rect(row.x + 4, row.y, row.width - 8, 16), "FACTORIES", _stSubHeading);
+            _stSubHeading.alignment = TextAnchor.MiddleLeft;
             _stSubHeading.normal.textColor = previous;
             return y + 17f;
         }

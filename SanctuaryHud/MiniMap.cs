@@ -32,6 +32,7 @@ namespace SanctuaryHud
         private static ConfigEntry<float> _cfgFogDarkness;
         private static ConfigEntry<float> _cfgPosX;
         private static ConfigEntry<float> _cfgPosY;
+        private static ConfigEntry<bool> _cfgLocked;
 
         /// The key toggles this within a session; the setting is what it
         /// starts as and what the Mods page shows.
@@ -95,6 +96,7 @@ namespace SanctuaryHud
                     new AcceptableValueRange<float>(0.1f, 0.95f)));
             _cfgPosX = config.Bind("MiniMap", "PanelX", 16f, "Panel X in 1080p-logical pixels.");
             _cfgPosY = config.Bind("MiniMap", "PanelY", 802f, "Panel Y in 1080p-logical pixels.");
+            _cfgLocked = config.Bind("MiniMap", "Locked", false, "Keep the panel where it is: no dragging or resizing during a game.");
 
             _rect.x = _cfgPosX.Value;
             _rect.y = _cfgPosY.Value;
@@ -215,8 +217,9 @@ namespace SanctuaryHud
 
             _rect.width = mapW + Frame * 2f;
             _rect.height = mapH + Frame * 2f;
-            _rect.x = Mathf.Clamp(_rect.x, -_rect.width + 60f, logicalWidth - 60f);
-            _rect.y = Mathf.Clamp(_rect.y, 0f, logicalHeight - 40f);
+            // Kept wholly on screen, whatever the resolution or the panel's size.
+            _rect.x = Mathf.Clamp(_rect.x, 0f, Mathf.Max(0f, logicalWidth - _rect.width));
+            _rect.y = Mathf.Clamp(_rect.y, 0f, Mathf.Max(0f, logicalHeight - _rect.height));
 
             _mapArea = new Rect(Frame, Frame, mapW, mapH);
 
@@ -274,7 +277,7 @@ namespace SanctuaryHud
             // Whatever the map and the grip didn't claim is the frame, and the
             // frame is the handle: a press on the map itself is always a camera
             // move, never a nudge of the window.
-            GUI.DragWindow(new Rect(0f, 0f, _rect.width, _rect.height));
+            if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0f, 0f, _rect.width, _rect.height));
         }
 
         private static void DrawContacts()
@@ -353,7 +356,7 @@ namespace SanctuaryHud
 
             if (ev.type == EventType.MouseDown)
             {
-                if (gripRect.Contains(ev.mousePosition))
+                if (gripRect.Contains(ev.mousePosition) && !_cfgLocked.Value)
                 {
                     _resizing = true;
                     _resizeStartSize = _size;

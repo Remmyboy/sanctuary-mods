@@ -27,11 +27,11 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("Construction", "ReplaceStrip", true,
+            Enabled = config.Bind("SanctuaryUI", "BuildStrip", true,
                 "Replace the game's build options, tier tabs and build queue with the HUD's own rows: the selection row, then the " +
                 "options the selection actually has (no placeholders, no paging), with the tier tabs — only when there is more than one — " +
                 "and the queue above. Clicks and hovers go to the game's own buttons. It all comes back whenever the overlay is hidden or the mod is unloaded.");
-            Scale = config.Bind("Construction", "Scale", 1f,
+            Scale = config.Bind("SanctuaryUI", "BuildScale", 1f,
                 new ConfigDescription("Size of the build rows, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
@@ -127,10 +127,13 @@ namespace SanctuaryHud
             // The selection row first, then the options after it.
             var selectionWidth = SelectionRow.DrawAt(x, bottom, scale, panelTexture);
             var optionsX = selectionWidth > 0f ? x + selectionWidth + 10f : x;
-            var optionsWidth = UnitRow.Draw(optionsX, bottom, s, scale, _options, panelTexture);
+            // The options wrap onto more lines, upward, rather than run off
+            // the screen's right edge.
+            var optionsArea = UnitRow.Draw(optionsX, bottom, s, scale, _options, panelTexture, logicalWidth - optionsX - 10f);
 
             // Above: the tier tabs (when there is a choice), then the queue.
-            var above = bottom - (optionsWidth > 0f ? UnitRow.Height * s : selectionWidth > 0f ? UnitRow.Height * Mathf.Clamp(SelectionRow.Scale.Value, 0.7f, 1.6f) : 0f) - RowGap;
+            var above = (optionsArea.width > 0f ? optionsArea.y
+                    : bottom - (selectionWidth > 0f ? UnitRow.Height * Mathf.Clamp(SelectionRow.Scale.Value, 0.7f, 1.6f) : 0f)) - RowGap;
             var ax = optionsX;
             if (_tabs.Count > 1)
             {
@@ -239,6 +242,11 @@ namespace SanctuaryHud
                 };
                 ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerDownHandler);
                 ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerUpHandler);
+                // The Lua handler (on the release) turns the other tabs off,
+                // and leaves turning this one on to the uGUI Toggle's own
+                // click — so that has to be sent too, after the release, as
+                // a real press would.
+                ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerClickHandler);
             }
             catch (Exception ex)
             {

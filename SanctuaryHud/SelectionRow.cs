@@ -25,11 +25,11 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("Selection", "HorizontalRow", true,
+            Enabled = config.Bind("SanctuaryUI", "SelectionRow", true,
                 "Draw the selected unit types as a row along the bottom, at the left end of the build options, instead of the game's " +
                 "column up the left edge. Left click keeps just that type, right click drops it. " +
                 "The game's list comes back whenever the overlay is hidden or the mod is unloaded.");
-            Scale = config.Bind("Selection", "Scale", 1f,
+            Scale = config.Bind("SanctuaryUI", "SelectionScale", 1f,
                 new ConfigDescription("Size of the row, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
@@ -101,7 +101,7 @@ namespace SanctuaryHud
             if (panel == null || !panel.IsVisible) return 0f;
             if (Event.current.type == EventType.Layout) UnitRow.Collect(panel, _row, false);
             var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
-            return UnitRow.Draw(x, bottom, s, scale, _row, panelTexture);
+            return UnitRow.Draw(x, bottom, s, scale, _row, panelTexture).width;
         }
 
         /// From OnGUI, under the 1080-logical matrix: the row on its own,

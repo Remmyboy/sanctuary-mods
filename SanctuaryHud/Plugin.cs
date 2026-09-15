@@ -36,6 +36,7 @@ namespace SanctuaryHud
         private ConfigEntry<KeyCode> _cfgToggleKey;
         private ConfigEntry<bool> _cfgHideBuiltIn;
         private ConfigEntry<float> _cfgStripScale;
+        private ConfigEntry<bool> _cfgSanctuaryUi;
         private ConfigEntry<bool> _cfgReclaim;
         private ConfigEntry<KeyCode> _cfgReclaimHoldKey;
         private ConfigEntry<float> _cfgReclaimMinValue;
@@ -141,6 +142,12 @@ namespace SanctuaryHud
                     new AcceptableValueList<string>(packs.ToArray())));
 
             MiniMap.Bind(Config);
+            // The stand-ins for the game's own bottom panels, under one switch:
+            // with it off the game's panels stay as they are and only the
+            // strip, the mini-map, the alerts and the map labels remain.
+            _cfgSanctuaryUi = Config.Bind("SanctuaryUI", "Enabled", true,
+                "The HUD's own versions of the game's bottom panels — the orders row, the unit card, the selection row and the build " +
+                "strip with its tabs and queue — in place of the game's. Off leaves the game's panels untouched; the settings below then do nothing.");
             OrdersBar.Bind(Config);
             InfoCard.Bind(Config);
             SelectionRow.Bind(Config);
@@ -285,13 +292,14 @@ namespace SanctuaryHud
             // its menus too (nothing of the HUD shows there anyway); their
             // stand-ins just don't draw. Only hiding the overlay, or leaving
             // the match, gives them back.
-            OrdersBar.Tick(_visible);
-            InfoCard.Tick(_visible);
-            SelectionRow.Tick(_visible);
+            var ui = _visible && _cfgSanctuaryUi.Value;
+            OrdersBar.Tick(ui);
+            InfoCard.Tick(ui);
+            SelectionRow.Tick(ui);
             // The build strip takes the tier tabs with it; TierTabs only
             // minds them while the strip is the game's own.
-            BuildStrip.Tick(_visible);
-            TierTabs.Tick(_visible && !BuildStrip.Active);
+            BuildStrip.Tick(ui);
+            TierTabs.Tick(ui && !BuildStrip.Active);
             // The domain map is per match: the sprite registry reloads with
             // each one, so it is dropped between matches and rebuilt.
             if (InMatch) UnitDomains.Tick();
@@ -398,10 +406,13 @@ namespace SanctuaryHud
 
             // The stand-ins for the game's own panels sit where those did,
             // along the bottom.
-            OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip);
-            InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip);
-            if (BuildStrip.Active) BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip);
-            else SelectionRow.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+            if (_cfgSanctuaryUi.Value)
+            {
+                OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+                InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+                if (BuildStrip.Active) BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+                else SelectionRow.Draw(logicalWidth, logicalHeight, scale, _texStrip);
+            }
 
             // The strip and the commander widget are one player's own numbers,
             // so they step aside in a replay's all-armies view: there is no
@@ -652,13 +663,30 @@ namespace SanctuaryHud
             var inner = w - pad * 2f;
 
             // --- row 1: label + storage on the left, flows on the right ---
-            _stStripLabel.normal.textColor = baseColour;
-            GUI.Label(new Rect(x + pad, 7f, 70f, 20f), label, _stStripLabel);
+            // The resource's mark, large, in place of its name: the ingot
+            // and the bolt are the same marks the unit card and the eco
+            // panels use, so they need no word beside them.
+            var mark = Glyphs.Get(key);
+            var lead = 0f;
+            if (mark != null)
+            {
+                var previousColour = GUI.color;
+                GUI.color = baseColour;
+                GUI.DrawTexture(new Rect(x + pad, 4f, 22f, 22f), mark);
+                GUI.color = previousColour;
+                lead = 30f;
+            }
+            else
+            {
+                _stStripLabel.normal.textColor = baseColour;
+                GUI.Label(new Rect(x + pad, 7f, 70f, 20f), label, _stStripLabel);
+                lead = 66f;
+            }
 
             var storageText = Fmt(current);
             var storageWidth = _stStripValue.CalcSize(new GUIContent(storageText)).x;
-            GUI.Label(new Rect(x + pad + 66f, 2f, storageWidth + 8f, 26f), storageText, _stStripValue);
-            GUI.Label(new Rect(x + pad + 66f + storageWidth + 8f, 8f, 90f, 18f), "/ " + Fmt(limit), _stStripMax);
+            GUI.Label(new Rect(x + pad + lead, 2f, storageWidth + 8f, 26f), storageText, _stStripValue);
+            GUI.Label(new Rect(x + pad + lead + storageWidth + 8f, 8f, 90f, 18f), "/ " + Fmt(limit), _stStripMax);
 
             // Right cluster: net on the right, with gross in stacked over
             // gross out beside it, so the two figures that are compared line

@@ -30,15 +30,26 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.3.0")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
             new Dictionary<string, ConfigEntry<string>>();
 
         private ConfigEntry<string> _cfgCancelKey;
+        private ConfigEntry<string> _cfgPauseKey;
+        private ConfigEntry<string> _cfgRepeatKey;
         private ConfigEntry<string> _cfgMenuKey;
         private ConfigEntry<float> _cfgCycleSeconds;
+        private ConfigEntry<float> _cfgSnapDistance;
+        private ConfigEntry<float> _cfgSnapPixels;
+
+        // The snap distance as pushed into the hook: a screen-pixel radius
+        // turned into world units from the camera's height and field of
+        // view, so it holds its size on screen as you zoom; the world-unit
+        // setting is its floor. Re-sent only when it moves by a twentieth.
+        private float _snapPoll;
+        private float _snapPushed = -1f;
         private ConfigEntry<bool> _cfgOverlay;
         private ConfigEntry<float> _cfgOverlaySeconds;
         private ConfigEntry<float> _cfgOverlayY;
@@ -90,6 +101,13 @@ namespace SanctuaryHud
         {
             _log ??= Logger;
 
+            _cfgPauseKey = Config.Bind("Toggles", "PauseKey", "X",
+                "Pauses the selected factories and engineers, and again resumes them: the orders panel's Pause toggle, " +
+                "on if any selected unit is unpaused, else off. A build role on the same key fires first; the toggle only " +
+                "when that had nothing to build. Blank to unbind.");
+            _cfgRepeatKey = Config.Bind("Toggles", "RepeatBuildKey", "Z",
+                "Switches repeat build on the selected factories, and again off: the orders panel's Repeat toggle. " +
+                "A build role on the same key fires first; the toggle only when that had nothing to build. Blank to unbind.");
             _cfgCancelKey = Config.Bind("Cancel", "ClearFactoryQueue", "Escape",
                 "Stops every selected factory, as escape does in FAF: the same order as the Stop button, so its " +
                 "build queue is cleared and an assist on another factory is dropped rather than left to refill it. " +
@@ -100,6 +118,13 @@ namespace SanctuaryHud
                 "Key that opens the pause menu, in the game's own format, e.g. F11 or Ctrl-M (not F1, which opens " +
                 "the game's debug menu). Moving it off escape leaves escape to stopping factories; escape still " +
                 "closes the menu once it is open. Escape or blank keeps the game's own binding.");
+            _cfgSnapPixels = Config.Bind("Placement", "ExtractorSnapPixels", 40f,
+                new ConfigDescription("How close to a deposit, in screen pixels, the cursor has to be for an extractor being placed to snap onto it, " +
+                    "whatever the zoom. 0 turns this off and leaves the world-unit distance below.",
+                    new AcceptableValueRange<float>(0f, 200f)));
+            _cfgSnapDistance = Config.Bind("Placement", "ExtractorSnapDistance", 8f,
+                new ConfigDescription("The least snap distance in world units, however far in you zoom. The game's own is 8.",
+                    new AcceptableValueRange<float>(4f, 80f)));
             _cfgCycleSeconds = Config.Bind("Cycle", "Seconds", 0f,
                 "How long a key keeps cycling after a press, the way FAF hotbuild's cycle reset time does " +
                 "(theirs is 1.1). Off by default: a structure already cycles for as long as its template is " +
@@ -270,6 +295,7 @@ namespace SanctuaryHud
 
         private void Update()
         {
+            PushSnap();
 
             // The overlay has to keep up with keypresses, so it polls far more
             // often than the once-a-second install upkeep below. Both are a
@@ -317,7 +343,7 @@ namespace SanctuaryHud
         }
 
         private string Signature() =>
-            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value + "|menu=" + _cfgMenuKey.Value;
+            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value + "|menu=" + _cfgMenuKey.Value + "|snap=" + _cfgSnapDistance.Value + "|pause=" + _cfgPauseKey.Value + "|repeat=" + _cfgRepeatKey.Value;
 
         /// Reads the cycle the last press landed in: press counter, key, live
         /// index, then every option in order. The counter leads so two presses
@@ -477,6 +503,12 @@ namespace SanctuaryHud
             var cancelKey = "";
             if (TryBindings(_cfgCancelKey.Value, "ClearFactoryQueue", out var canonicalCancel, out _))
                 cancelKey = canonicalCancel;
+            var pauseKey = "";
+            if (TryBindings(_cfgPauseKey.Value, "PauseKey", out var canonicalPause, out _))
+                pauseKey = canonicalPause;
+            var repeatKey = "";
+            if (TryBindings(_cfgRepeatKey.Value, "RepeatBuildKey", out var canonicalRepeat, out _))
+                repeatKey = canonicalRepeat;
 
             // Escape is where the game already binds the menu, so only another
             // key has anything to move.
@@ -484,7 +516,7 @@ namespace SanctuaryHud
             if (TryBindings(_cfgMenuKey.Value, "PauseMenuKey", out var canonicalMenu, out _) && canonicalMenu != "Escape")
                 menuKey = canonicalMenu;
 
-            if (roleEntries.Count == 0 && cancelKey.Length == 0 && menuKey.Length == 0)
+            if (roleEntries.Count == 0 && cancelKey.Length == 0 && menuKey.Length == 0 && pauseKey.Length == 0 && repeatKey.Length == 0)
             {
                 Logger.LogWarning("Build hotkeys: nothing bound — every role's key is blank or invalid.");
                 _installed = true;
@@ -500,7 +532,10 @@ namespace SanctuaryHud
                 .Replace("__ROLES__", string.Join(",", roleEntries.ToArray()))
                 .Replace("__BINDINGS__", string.Join(",", bindingEntries.ToArray()))
                 .Replace("__CYCLE__", Mathf.Max(0f, _cfgCycleSeconds.Value).ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .Replace("__SNAP__", Mathf.Clamp(_cfgSnapDistance.Value, 4f, 80f).ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("__CANCELKEY__", Quote(cancelKey))
+                .Replace("__PAUSEKEY__", Quote(pauseKey))
+                .Replace("__REPEATKEY__", Quote(repeatKey))
                 .Replace("__MENUKEY__", Quote(menuKey));
 
             try
@@ -519,6 +554,10 @@ namespace SanctuaryHud
                 }
                 if (cancelKey.Length > 0)
                     Logger.LogInfo($"Build hotkeys: {cancelKey} -> stop selected factories");
+                if (pauseKey.Length > 0)
+                    Logger.LogInfo($"Build hotkeys: {pauseKey} -> pause/resume selected builders");
+                if (repeatKey.Length > 0)
+                    Logger.LogInfo($"Build hotkeys: {repeatKey} -> repeat build on/off");
                 if (menuKey.Length > 0)
                     Logger.LogInfo($"Build hotkeys: {menuKey} -> pause menu (escape only closes it)");
                 Logger.LogInfo($"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys.");
@@ -529,10 +568,53 @@ namespace SanctuaryHud
             }
         }
 
+        /// A few times a second while the hook is in: the snap distance for
+        /// the current zoom, into the hook's BH.snap.
+        private void PushSnap()
+        {
+            if (!_installed) return;
+            _snapPoll += Time.unscaledDeltaTime;
+            if (_snapPoll < 0.2f) return;
+            _snapPoll = 0f;
+
+            var floor = Mathf.Clamp(_cfgSnapDistance.Value, 4f, 80f);
+            var snap = floor;
+            var pixels = Mathf.Clamp(_cfgSnapPixels.Value, 0f, 200f);
+            if (pixels > 0f)
+            {
+                var camera = Camera.main;
+                if (camera == null)
+                {
+                    var all = Camera.allCameras;
+                    camera = all != null && all.Length > 0 ? all[0] : null;
+                }
+                if (camera != null)
+                {
+                    // World units per screen pixel at the camera's height: the
+                    // vertical field of view spans 2·h·tan(fov/2) of ground
+                    // over the screen's height. Near enough for a tilted
+                    // camera; the snap is a tolerance, not a measurement.
+                    var height = Mathf.Abs(camera.transform.position.y);
+                    var perPixel = 2f * height * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad) / Mathf.Max(1, Screen.height);
+                    snap = Mathf.Max(floor, pixels * perPixel);
+                }
+            }
+
+            if (_snapPushed >= 0f && Mathf.Abs(snap - _snapPushed) < Mathf.Max(0.5f, _snapPushed * 0.05f)) return;
+            var chunk = "if __SdbBuildHotkeys then __SdbBuildHotkeys.snap = " +
+                        snap.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " end";
+            try
+            {
+                if (LuaReady && RunLua(chunk)) _snapPushed = snap;
+            }
+            catch { /* next poll tries again */ }
+        }
+
         private void Remove()
         {
             if (!_installed) return;
             _installed = false;
+            _snapPushed = -1f;
             _installedSignature = null;
             try
             {
@@ -778,6 +860,40 @@ if not __SdbBuildHotkeys then
     return BH.origSetVis(panelType, visible)
   end
 
+  -- Placing an extractor snaps it onto a deposit within a few world units
+  -- of the cursor. The game's FindClosestResourceSpot fixes that at 8, which
+  -- zoomed out is a couple of pixels; this is the same search with the
+  -- distance from the setting. The module's own callers reach the function
+  -- through the module table, so replacing the field there catches them.
+  BH.snap = __SNAP__
+  local CPS = Import('client/input/constructionPreviewSystem.lua')
+  local PU = Import('common/systems/placementUtils.lua')
+  local RS = Import('common/resourceSpot.lua')
+  if CPS and CPS.FindClosestResourceSpot and PU and RS then
+    BH.CPS = CPS
+    BH.origFindSpot = CPS.FindClosestResourceSpot
+    CPS.FindClosestResourceSpot = function(position)
+      local tp = __Templates.Units[BM.GetBuildTpId()]
+      if not tp then return BH.origFindSpot(position) end
+      local closest, best = nil, BH.snap
+      local domain = PU.GetPlacementDomain(tp)
+      for _, spot in pairs(RS.resourceSpots) do
+        local p = spot:GetPosition()
+        p.x = math.truncateToInt(p.x)
+        p.z = math.truncateToInt(p.z)
+        local d = math.sqrt((position.x - p.x) ^ 2 + (position.z - p.z) ^ 2)
+        if d < best then
+          local minX, minY, maxX, maxY = PU.GetPlacementBounds(p, tp.skirtSize)
+          if CPS.CanPlaceAtArea(minX, minY, maxX, maxY, domain, true) then
+            best = d
+            closest = p
+          end
+        end
+      end
+      return closest
+    end
+  end
+
   -- Stop every selected factory, the way FAF's escape does. This is the Stop
   -- button's own order, not a queue edit: emptying the queue alone leaves a
   -- factory that assists another one still slaved to it, and it pulls the next
@@ -822,6 +938,33 @@ if not __SdbBuildHotkeys then
     return res
   end
 
+  -- Pause and repeat build on the selection, as the orders panel's toggles
+  -- do it: on if any selected unit has it off, else off. SetToggle sends
+  -- the game's own command, and errors with nothing valid selected, hence
+  -- the pcall. False with no unit that has the toggle, so the key falls
+  -- through to whatever else it does.
+  local function flipToggle(name)
+    if BH.menuOpen or IsObserver() then return false end
+    local units = SS.GetSelectedUnits()
+    if not units then return false end
+    local army = GetFocusArmy()
+    local any, allOn = false, true
+    for _, u in pairs(units) do
+      if u.armyId == army and u.toggles and u.toggles[name] ~= nil then
+        any = true
+        if not u.toggles[name] then allOn = false end
+      end
+    end
+    if not any then return false end
+    Import('client/inputEventsFunctions.lua').SetToggle(name, not allOn)
+    return true
+  end
+  BH.Toggle = function(name)
+    local ok, res = pcall(flipToggle, name)
+    if not ok then Warn('BuildHotkeys toggle: ' .. tostring(res)) return false end
+    return res
+  end
+
   -- Construction has the highest group priority, so these run before the
   -- Orders group; returning false when nothing matched lets the event fall
   -- through to whatever the key normally does.
@@ -837,6 +980,22 @@ if not __SdbBuildHotkeys then
   if BH.cancelKey ~= '' then
     if BH.saved[BH.cancelKey] == nil then BH.saved[BH.cancelKey] = grp[BH.cancelKey] or BH.NIL end
     grp[BH.cancelKey] = { press = function() return BH.Cancel() end }
+  end
+
+  -- The toggle keys sit behind whatever the key already does here: a build
+  -- role on the same key fires first, and the toggle only when that had
+  -- nothing to build for the selection.
+  BH.pauseKey = __PAUSEKEY__
+  BH.repeatKey = __REPEATKEY__
+  for name, hk in pairs({ Pause = BH.pauseKey, RepeatBuild = BH.repeatKey }) do
+    if hk ~= '' then
+      if BH.saved[hk] == nil then BH.saved[hk] = grp[hk] or BH.NIL end
+      local before = grp[hk]
+      grp[hk] = { press = function()
+        if before and before.press and before.press() then return true end
+        return BH.Toggle(name)
+      end }
+    end
   end
 
   -- Moving the pause menu off escape. The game's own toggle goes to the new
@@ -873,6 +1032,7 @@ if __SdbBuildHotkeys then
   end
   if BH.CH and BH.origLabel then BH.CH.GetHotkeyForTemplate = BH.origLabel end
   if BH.origSetVis then Engine.UI_SetPanelVisibility = BH.origSetVis end
+  if BH.CPS and BH.origFindSpot then BH.CPS.FindClosestResourceSpot = BH.origFindSpot end
   if BH.gm and BH.gmSaved then
     for hk, saved in pairs(BH.gmSaved) do
       if saved == BH.NIL then BH.gm[hk] = nil else BH.gm[hk] = saved end

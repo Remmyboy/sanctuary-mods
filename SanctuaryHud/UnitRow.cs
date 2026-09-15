@@ -151,13 +151,48 @@ namespace SanctuaryHud
             return w;
         }
 
-        /// Draws the row with its bottom-left corner at (x, bottom), in
-        /// 1080-logical coordinates, at scale s. Returns the outer width.
-        internal static float Draw(float x, float bottom, float s, float scale, List<Entry> row, Texture2D panelTexture)
+        private static readonly List<List<Entry>> _lines = new List<List<Entry>>();
+
+        /// Splits the row into lines no wider than maxWidth (in screen
+        /// logical units, so at scale s), breaking between tiles; a
+        /// separator never starts or ends a line.
+        private static void Wrap(List<Entry> row, float s, float maxWidth)
         {
-            if (row.Count == 0) return 0f;
+            _lines.Clear();
+            var line = new List<Entry>();
+            var width = Pad * 2f;
+            foreach (var entry in row)
+            {
+                var w = entry.Element != null ? entry.Width : SeparatorWidth;
+                if (line.Count > 0 && (width + w) * s > maxWidth)
+                {
+                    while (line.Count > 0 && line[line.Count - 1].Element == null) line.RemoveAt(line.Count - 1);
+                    _lines.Add(line);
+                    line = new List<Entry>();
+                    width = Pad * 2f;
+                }
+                if (entry.Element == null && line.Count == 0) continue;
+                line.Add(entry);
+                width += w + Gap;
+            }
+            while (line.Count > 0 && line[line.Count - 1].Element == null) line.RemoveAt(line.Count - 1);
+            if (line.Count > 0) _lines.Add(line);
+        }
+
+        /// Draws the row with its bottom-left corner at (x, bottom), in
+        /// 1080-logical coordinates, at scale s, wrapping onto further lines
+        /// upward when it would run past maxWidth. Returns the area drawn.
+        internal static Rect Draw(float x, float bottom, float s, float scale, List<Entry> row, Texture2D panelTexture, float maxWidth = float.MaxValue)
+        {
+            if (row.Count == 0) return new Rect(x, bottom, 0f, 0f);
             if (_stText == null) ApplyFont(null);
-            var area = new Rect(x, bottom - Height * s, Width(row) * s, Height * s);
+            Wrap(row, s, maxWidth);
+            if (_lines.Count == 0) return new Rect(x, bottom, 0f, 0f);
+
+            var width = 0f;
+            foreach (var line in _lines) width = Mathf.Max(width, Width(line));
+            var height = Pad * 2f + _lines.Count * ButtonSize + (_lines.Count - 1) * Gap;
+            var area = new Rect(x, bottom - height * s, width * s, height * s);
 
             Shield(area, scale);
             GUI.DrawTexture(area, panelTexture);
@@ -168,22 +203,27 @@ namespace SanctuaryHud
             var previousMatrix = GUI.matrix;
             GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(area.x, area.y, 0f), Quaternion.identity, new Vector3(s, s, 1f));
 
-            var bx = Pad;
-            foreach (var entry in row)
+            var by = Pad;
+            foreach (var line in _lines)
             {
-                if (entry.Element == null)
+                var bx = Pad;
+                foreach (var entry in line)
                 {
-                    accent.a = 0.35f;
-                    SanctuaryHudPlugin.Fill(new Rect(bx + SeparatorWidth / 2f, Pad + 6f, 1f, ButtonSize - 12f), accent);
-                    bx += SeparatorWidth + Gap;
-                    continue;
+                    if (entry.Element == null)
+                    {
+                        accent.a = 0.35f;
+                        SanctuaryHudPlugin.Fill(new Rect(bx + SeparatorWidth / 2f, by + 6f, 1f, ButtonSize - 12f), accent);
+                        bx += SeparatorWidth + Gap;
+                        continue;
+                    }
+                    DrawButton(new Rect(bx, by, entry.Width, ButtonSize), entry.Element);
+                    bx += entry.Width + Gap;
                 }
-                DrawButton(new Rect(bx, Pad, entry.Width, ButtonSize), entry.Element);
-                bx += entry.Width + Gap;
+                by += ButtonSize + Gap;
             }
 
             GUI.matrix = previousMatrix;
-            return area.width;
+            return area;
         }
 
         private static void DrawButton(Rect rect, UnitButtonElement element)

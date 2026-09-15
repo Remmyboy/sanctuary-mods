@@ -43,6 +43,7 @@ namespace SanctuaryHud
         private ConfigEntry<float> _cfgExtractorsScale;
         private ConfigEntry<float> _cfgExtractorsPosX;
         private ConfigEntry<float> _cfgExtractorsPosY;
+        private ConfigEntry<bool> _cfgLocked;
 
         // Geometry in 1080p-logical pixels, before each panel's own scale
         // (GUI.matrix rescales per resolution and per panel).
@@ -80,6 +81,7 @@ namespace SanctuaryHud
             _cfgTooltips = Config.Bind("Panel", "Tooltips", true,
                 "Show a detail box beside a panel while a tile is hovered: name, both rates, progress, " +
                 "builders, and what the clicks do.");
+            _cfgLocked = Config.Bind("Panel", "Locked", false, "Keep both panels where they are: no dragging during a game.");
 
             _cfgBuildEnabled = Config.Bind("Build", "Enabled", true,
                 "The BUILD panel: everything under construction as tiles, alloy spend down the left column and " +
@@ -158,6 +160,10 @@ namespace SanctuaryHud
         private void OnGUI()
         {
             if (!InMatch) return;
+            // Under the game's pause menu, the Mods page (F8), a settings
+            // screen or the result screen nothing of the game's own HUD
+            // shows, so nothing of this should either.
+            if (MenuOpen()) return;
             EnsureStyles();
             EnsureTileStyles();
 
@@ -183,8 +189,9 @@ namespace SanctuaryHud
             var height = Screen.height / scale;
 
             var local = new Rect(rect.x / panelScale, rect.y / panelScale, rect.width, rect.height);
-            local.x = Mathf.Clamp(local.x, -local.width + 40, width - 40);
-            local.y = Mathf.Clamp(local.y, 0, height - 30);
+            // Kept wholly on screen, whatever the resolution or the panel's size.
+            local.x = Mathf.Clamp(local.x, 0, Mathf.Max(0f, width - local.width));
+            local.y = Mathf.Clamp(local.y, 0, Mathf.Max(0f, height - local.height));
             local = GUI.Window(id, local, draw, GUIContent.none, _stWindow);
             // A right-click that also reached the map would order the
             // selection somewhere; the shield keeps every click on the panel.
@@ -237,16 +244,29 @@ namespace SanctuaryHud
                 DrawBuildTile(new Rect(Pad + TileW + TileGap, top + i * (TileH + TileGap), TileW, TileH), byEnergy[i], true, id);
 
             _buildRect.height = top + groups.Count * (TileH + TileGap) - TileGap + Pad;
-            GUI.DragWindow(new Rect(0, 0, 10000, 10000));
+            if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0, 0, 10000, 10000));
         }
 
         /// The resource's name in its colour, its total demand in white below.
         private static void ColumnHeader(Rect rect, string label, Color colour, float total)
         {
-            var previous = _stColumn.normal.textColor;
-            _stColumn.normal.textColor = colour;
-            GUI.Label(rect, label, _stColumn);
-            _stColumn.normal.textColor = previous;
+            // The resource's mark, large, in place of its name — the same
+            // ingot and bolt as the HUD's strip and card.
+            var mark = Glyphs.Get(label == "ALLOY" ? "alloy" : "energy");
+            if (mark != null)
+            {
+                var previousColour = GUI.color;
+                GUI.color = colour;
+                GUI.DrawTexture(new Rect(rect.center.x - 9f, rect.y - 1f, 18f, 18f), mark);
+                GUI.color = previousColour;
+            }
+            else
+            {
+                var previous = _stColumn.normal.textColor;
+                _stColumn.normal.textColor = colour;
+                GUI.Label(rect, label, _stColumn);
+                _stColumn.normal.textColor = previous;
+            }
             GUI.Label(new Rect(rect.x, rect.y + 13f, rect.width, 16f), "-" + Rate(total) + "/s", _stTotal);
         }
 
@@ -329,7 +349,18 @@ namespace SanctuaryHud
             ClearTip(id);
 
             _stName.normal.textColor = AlloyColour;
-            GUI.Label(new Rect(Pad + 2f, 3f, width - Pad * 2f, 18f), "ALLOY", _stName);
+            var alloyMark = Glyphs.Get("alloy");
+            if (alloyMark != null)
+            {
+                var previousColour = GUI.color;
+                GUI.color = AlloyColour;
+                GUI.DrawTexture(new Rect(width / 2f - 10f, 2f, 20f, 20f), alloyMark);
+                GUI.color = previousColour;
+            }
+            else
+            {
+                GUI.Label(new Rect(Pad + 2f, 3f, width - Pad * 2f, 18f), "ALLOY", _stName);
+            }
             if (_pollStatus != "ok")
             {
                 GUI.Label(new Rect(width - Pad - 100f, 5f, 100f, 14f), _pollStatus, _stSub);
@@ -357,7 +388,7 @@ namespace SanctuaryHud
             }
 
             _extractorRect.height = top + row * (TileH + TileGap) - TileGap + Pad;
-            GUI.DragWindow(new Rect(0, 0, 10000, 10000));
+            if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0, 0, 10000, 10000));
         }
 
         /// An extractor tile: the tier's art, a tag, and the count. The
@@ -467,7 +498,7 @@ namespace SanctuaryHud
             _stTileCount = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.LowerRight };
             _stTileTag = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.LowerLeft };
             _stColumn = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            _stTotal = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
+            _stTotal = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             _stTip = new GUIStyle { fontSize = 11, wordWrap = true, alignment = TextAnchor.UpperLeft, normal = { textColor = new Color(1f, 1f, 1f, 0.85f) } };
         }
     }

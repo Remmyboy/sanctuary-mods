@@ -18,7 +18,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            HideLone = config.Bind("Construction", "HideLoneTierTab", true,
+            HideLone = config.Bind("SanctuaryUI", "HideLoneTierTab", true,
                 "Hide the tier tabs over the build options when only one of them can be clicked: a tier-1 factory's lone T1, " +
                 "or a structure whose only option is its own upgrade.");
         }
