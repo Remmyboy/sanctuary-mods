@@ -26,7 +26,10 @@ namespace SanctuaryHud
         private Button _button;
         private LayoutElement _layout;
         private TooltipTrigger _tooltip;
-        private Vector2 _native = new Vector2(80f, 80f);
+        /// The game lays its buttons in 80-unit grid cells (the prefab's root
+        /// is 100, its art overhanging), so the clone takes the cell, not the
+        /// root, and the art draws at the size it does on the game's panel.
+        private const float Cell = 80f;
 
         internal OrderButtonElement Source => _source;
 
@@ -41,7 +44,6 @@ namespace SanctuaryHud
                 go = Instantiate(prefab, holder);
                 go.name = "Order";
                 var tile = go.AddComponent<OrderTile>();
-                if (prefab.transform is RectTransform prt && prt.rect.width > 1f && prt.rect.height > 1f) tile._native = prt.rect.size;
 
                 var element = go.GetComponent<OrderButtonElement>();
                 if (element != null)
@@ -59,10 +61,10 @@ namespace SanctuaryHud
                 tile._layout = go.GetComponent<LayoutElement>();
                 if (tile._layout == null) tile._layout = go.AddComponent<LayoutElement>();
                 tile._layout.ignoreLayout = false;
-                tile._layout.preferredWidth = tile._native.x;
-                tile._layout.preferredHeight = tile._native.y;
-                tile._layout.minWidth = tile._native.x;
-                tile._layout.minHeight = tile._native.y;
+                tile._layout.preferredWidth = Cell;
+                tile._layout.preferredHeight = Cell;
+                tile._layout.minWidth = Cell;
+                tile._layout.minHeight = Cell;
                 go.transform.localScale = Vector3.one;
 
                 go.transform.SetParent(parent, false);
