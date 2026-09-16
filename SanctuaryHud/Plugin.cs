@@ -409,16 +409,14 @@ namespace SanctuaryHud
             }
             if (_cfgBuildEta.Value) WorldOverlays.DrawBuildEtas(scale, logicalWidth, logicalHeight, _cfgBuildEtaMax.Value);
 
-            // The stand-ins for the game's own panels sit where those did,
-            // along the bottom.
+            // The unit card, the one stand-in still drawn here, sits where the
+            // game's own card did; the rows are on the HUD canvas.
             if (_cfgSanctuaryUi.Value)
             {
-                // Each behind its own fence: an exception part-way through
-                // OnGUI leaves IMGUI's control bookkeeping out of step for
-                // the rest of the frame, and every button drawn after it
-                // stops taking clicks — so one stand-in's fault must not
-                // reach the others. Logged once per site.
-                Fenced("orders row", () => OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip));
+                // Behind a fence: an exception part-way through OnGUI leaves
+                // IMGUI's control bookkeeping out of step for the rest of the
+                // frame, and every button drawn after it stops taking clicks.
+                // Logged once.
                 Fenced("unit card", () => InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip));
             }
 
@@ -510,7 +508,6 @@ namespace SanctuaryHud
             }
             WorldOverlays.ApplyFont(font);
             Alerts.ApplyFont(font);
-            OrdersBar.ApplyFont(font);
             InfoCard.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
             _stStripVersion = new GUIStyle(_stStripMax) { fontSize = 11, alignment = TextAnchor.MiddleCenter };

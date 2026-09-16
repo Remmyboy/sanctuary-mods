@@ -18,9 +18,10 @@ namespace SanctuaryHud
     // which are hotkeys and right-clicks anyway.
     //
     // With this on, the game's panel is made invisible (PanelConceal) and a
-    // compact row draws in its place: only the orders the selection can take,
-    // wearing the game's own icons and colours, each click passed on to the
-    // game's own button so whatever Lua hung on it runs unchanged.
+    // compact row stands in its place on the HUD canvas: only the orders the
+    // selection can take, each a clone of the game's own button (OrderTile)
+    // wearing its icon, colour and glow, mirroring the concealed one and
+    // passing it every click so whatever Lua hung on it runs unchanged.
     internal static class OrdersBar
     {
         internal static ConfigEntry<bool> Enabled, HideInert;
@@ -72,9 +73,27 @@ namespace SanctuaryHud
                 Describe(panel);
             }
             _conceal.Apply(want ? panel : null);
+            try
+            {
+                SyncRow(want ? panel : null);
+            }
+            catch (Exception e)
+            {
+                if (!_syncLogged)
+                {
+                    _syncLogged = true;
+                    _log?.LogWarning($"Orders row could not be laid out (logged once): {e}");
+                }
+                _bar?.Show(false);
+            }
         }
 
-        internal static void Shutdown() => _conceal.Release();
+        internal static void Shutdown()
+        {
+            _conceal.Release();
+            _bar?.Destroy();
+            _bar = null;
+        }
 
         // ---- the buttons -------------------------------------------------------
 
@@ -164,143 +183,132 @@ namespace SanctuaryHud
             }
         }
 
-        // ---- drawing --------------------------------------------------------------
+        // ---- the row ----------------------------------------------------------------
 
-        // The game's buttons are 80 canvas units, 40 at 1080; the row keeps
-        // that size so the icons read as they do on the game's own panel.
-        private const float ButtonSize = 40f;
-        private const float Gap = 4f;
-        private const float Pad = 5f;
+        private const float Gap = 8f;
 
-        private static GUIStyle _stCaption;
+        private static OrderRow _bar;
+        private static bool _syncLogged;
 
-        internal static void ApplyFont(Font font)
+        /// From Update, after the conceal. Builds the row on the HUD canvas
+        /// the first time, fills it from the game's panel, and puts it where
+        /// the game's panel sits.
+        private static void SyncRow(OrdersPanelUI panel)
         {
-            _stCaption = new GUIStyle(_stStripChip) { fontSize = 12, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.85f, 0.9f, 0.97f) } };
-            if (font != null) _stCaption.font = font;
-        }
+            if (panel == null || !panel.IsVisible)
+            {
+                _bar?.Show(false);
+                return;
+            }
+            var root = HudCanvas.Ensure(panel);
+            if (root == null) return;
+            if (_bar == null || !_bar.Alive) _bar = OrderRow.Create(root, "Orders row");
 
-        /// From OnGUI, under the 1080-logical matrix.
-        internal static void Draw(float logicalWidth, float logicalHeight, float scale, Texture2D panelTexture)
-        {
-            var panel = _conceal.Panel as OrdersPanelUI;
-            if (panel == null || !panel.IsVisible) return;
-            if (Event.current.type == EventType.Layout) Collect(panel, HideInert.Value);
-            if (_row.Count == 0) return;
-            if (_stCaption == null) ApplyFont(null);
+            Collect(panel, HideInert.Value);
+            if (_row.Count == 0)
+            {
+                _bar.Show(false);
+                return;
+            }
 
             var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
-            var innerW = _row.Count * ButtonSize + (_row.Count - 1) * Gap + Pad * 2f;
-            var innerH = ButtonSize + Pad * 2f;
-            var area = new Rect(14f, logicalHeight - 14f - innerH * s, innerW * s, innerH * s);
+            _bar.Show(true);
+            _bar.Sync(panel, _row, s);
+
             // Where the game's own panel sits: the row takes its bottom-left corner.
-            if (PanelConceal.GuiRect(panel, scale, out var anchor))
-            {
-                area.x = anchor.x;
-                area.y = anchor.yMax - area.height;
-            }
-
-            Shield(area, scale);
-            GUI.DrawTexture(area, panelTexture);
-            var accent = SanctuaryHudPlugin.GameAccent;
-            accent.a = 0.6f;
-            SanctuaryHudPlugin.Fill(new Rect(area.x, area.y, area.width, 1f), accent);
-
-            var previousMatrix = GUI.matrix;
-            GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(area.x, area.y, 0f), Quaternion.identity, new Vector3(s, s, 1f));
-
-            string caption = null;
-            var x = Pad;
-            foreach (var button in _row)
-            {
-                var rect = new Rect(x, Pad, ButtonSize, ButtonSize);
-                x += ButtonSize + Gap;
-                var hover = rect.Contains(Event.current.mousePosition);
-                if (hover) caption = button.Label + (button.Active ? "  ·  ON" : "");
-
-                // The game's own three layers, as its panel stacks them: the
-                // dashed background in the order's colour, the icon in white,
-                // and the frame — which the game keeps all but invisible until
-                // the toggle is on or the mouse is over it.
-                // The HUD's own glyph on a flat tile in the order's colour
-                // (the Lua's dark tint brightened, as the game's glow shader
-                // does): filled solid while a toggle is on, edged otherwise.
-                var tint = Bright(button.Tint);
-                var fill = tint;
-                fill.a = button.Active ? 0.75f : hover ? 0.4f : 0.22f;
-                SanctuaryHudPlugin.Fill(rect, fill);
-                var edge = button.Active ? Color.white : tint;
-                edge.a = button.Active ? 0.95f : hover ? 0.9f : 0.55f;
-                SanctuaryHudPlugin.Fill(new Rect(rect.x, rect.y, rect.width, 1f), edge);
-                SanctuaryHudPlugin.Fill(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), edge);
-                SanctuaryHudPlugin.Fill(new Rect(rect.x, rect.y, 1f, rect.height), edge);
-                SanctuaryHudPlugin.Fill(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), edge);
-
-                var previous = GUI.color;
-                GUI.color = Color.white;
-                var glyph = Glyphs.Get(button.Key);
-                var glyphRect = new Rect(rect.x + rect.width * 0.2f, rect.y + rect.height * 0.2f, rect.width * 0.6f, rect.height * 0.6f);
-                if (glyph != null) GUI.DrawTexture(glyphRect, glyph);
-                else
-                {
-                    _stStripGlyph.normal.textColor = Color.white;
-                    GUI.Label(rect, button.Label.Substring(0, 1), _stStripGlyph);
-                }
-                GUI.color = previous;
-
-                if (GUI.Button(rect, GUIContent.none, GUIStyle.none))
-                {
-                    var b = button.Element.GetComponent<Button>();
-                    _log?.LogInfo($"Orders row: click {button.Key} (active {button.Active}, interactable {(b != null && b.interactable)}, emitClicks {button.Element.emitClickEvents}, activeInHierarchy {button.Element.gameObject.activeInHierarchy}).");
-                    Click(button.Element);
-                }
-            }
-
-            // The name of the button under the mouse, in a chip above the row:
-            // the icons are the game's, and not all of them explain themselves.
-            if (caption != null)
-            {
-                var width = _stCaption.CalcSize(new GUIContent(caption)).x + 16f;
-                var chip = new Rect(0f, -22f, width, 18f);
-                GUI.DrawTexture(chip, panelTexture);
-                SanctuaryHudPlugin.Fill(new Rect(chip.x, chip.y, chip.width, 1f), accent);
-                GUI.Label(new Rect(chip.x + 8f, chip.y, chip.width - 8f, chip.height), caption, _stCaption);
-            }
-
-            GUI.matrix = previousMatrix;
+            var at = new Vector2(28f, 28f);
+            if (HudCanvas.LocalRect(panel, out var anchor)) at = new Vector2(anchor.x, anchor.y);
+            _bar.Place(at);
         }
 
-        private static readonly GUIStyle _stStripGlyph = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-
-        /// The Lua's tints are dark (stop is 0.55, 0.02, 0.02); the game's
-        /// button shader glows them up. Same hue, full brightness.
-        private static Color Bright(Color tint)
+        /// The order buttons (OrderTile) on a plate, one line.
+        private sealed class OrderRow
         {
-            Color.RGBToHSV(tint, out var h, out var s, out var v);
-            var bright = Color.HSVToRGB(h, Mathf.Min(1f, s * 1.1f), Mathf.Max(v, 0.9f));
-            bright.a = tint.a;
-            return bright;
-        }
+            private RectTransform _rect;
+            private SanctuaryPanelUI _panel;
+            private readonly List<OrderTile> _tiles = new List<OrderTile>();
+            private readonly List<OrderButtonElement> _shown = new List<OrderButtonElement>();
 
-        /// Clicks the game's own button the way the mouse would: down then
-        /// up, which is what its Lua handler fires on.
-        private static void Click(OrderButtonElement element)
-        {
-            if (element == null) return;
-            try
+            internal bool Alive => _rect != null;
+
+            internal static OrderRow Create(RectTransform root, string name)
             {
-                var data = new PointerEventData(EventSystem.current)
-                {
-                    button = PointerEventData.InputButton.Left,
-                    clickCount = 1,
-                    position = Input.mousePosition,
-                };
-                ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerDownHandler);
-                ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerUpHandler);
+                var rt = HudCanvas.Plate(root, name);
+                var group = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
+                group.padding = new RectOffset((int)TileRow.Pad, (int)TileRow.Pad, (int)TileRow.Pad, (int)TileRow.Pad);
+                group.spacing = Gap;
+                group.childAlignment = TextAnchor.MiddleLeft;
+                group.childControlWidth = true;
+                group.childControlHeight = true;
+                group.childForceExpandWidth = false;
+                group.childForceExpandHeight = false;
+                HudCanvas.FitToContents(rt);
+                rt.gameObject.SetActive(false);
+                return new OrderRow { _rect = rt };
             }
-            catch (Exception e)
+
+            internal void Show(bool showing)
             {
-                _log?.LogWarning($"Orders row: the game's button threw ({e.Message}).");
+                if (_rect == null) return;
+                if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+            }
+
+            internal void Place(Vector2 bottomLeft)
+            {
+                if (_rect != null) _rect.anchoredPosition = bottomLeft;
+            }
+
+            internal void Destroy()
+            {
+                if (_rect != null) UnityEngine.Object.Destroy(_rect.gameObject);
+                _rect = null;
+                _tiles.Clear();
+                _shown.Clear();
+            }
+
+            internal void Sync(SanctuaryPanelUI panel, List<OrderButton> buttons, float scale)
+            {
+                if (_rect == null) return;
+                if (panel != _panel)
+                {
+                    _panel = panel;
+                    foreach (var tile in _tiles) if (tile != null) UnityEngine.Object.Destroy(tile.gameObject);
+                    _tiles.Clear();
+                    _shown.Clear();
+                }
+                _rect.localScale = new Vector3(scale, scale, 1f);
+
+                var same = buttons.Count == _shown.Count;
+                for (var i = 0; same && i < buttons.Count; i++) same = buttons[i].Element == _shown[i];
+                if (!same)
+                {
+                    _shown.Clear();
+                    foreach (var tile in _tiles) if (tile != null && tile.gameObject.activeSelf) tile.gameObject.SetActive(false);
+                    var at = 0;
+                    var sibling = 1;   // after the hairline
+                    foreach (var button in buttons)
+                    {
+                        while (at < _tiles.Count && _tiles[at] == null) _tiles.RemoveAt(at);
+                        OrderTile tile;
+                        if (at < _tiles.Count) tile = _tiles[at];
+                        else
+                        {
+                            tile = OrderTile.Create(panel, _rect);
+                            if (tile == null) continue;
+                            _tiles.Add(tile);
+                        }
+                        at++;
+                        tile.transform.SetSiblingIndex(sibling++);
+                        if (!tile.gameObject.activeSelf) tile.gameObject.SetActive(true);
+                        _shown.Add(button.Element);
+                    }
+                }
+                for (var i = 0; i < _shown.Count && i < _tiles.Count && i < buttons.Count; i++)
+                {
+                    var button = buttons[i];
+                    if (_tiles[i] != null) _tiles[i].Mirror(button.Element, button.Label + (button.Active ? "  ·  ON" : ""));
+                }
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
             }
         }
 
@@ -341,6 +349,11 @@ namespace SanctuaryHud
                 }
                 _log?.LogInfo($"Orders panel found; {found.Count} button(s): {string.Join(" | ", found)}.");
                 PanelConceal.DumpSubtree(panel.transform, 0, _log, 1);
+                if (panel.buttonPrefab != null)
+                {
+                    _log?.LogInfo("...and its button prefab:");
+                    PanelConceal.DumpSubtree(panel.buttonPrefab.transform, 0, _log, 3);
+                }
             }
             catch (Exception e)
             {

@@ -112,12 +112,12 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   anyway. The row shows only the buttons the game has enabled for the
   selection, and with `OrdersHideInert` (on by default) only the ones that
   are wired, so a factory gets pause, repeat build and stop and a tank gets
-  stop. The HUD's own glyphs on tiles in the game's order colours (the game's
-  icons are a small glyph in a large sprite lit by a glow shader, and don't
-  survive being borrowed), a lit tile for a toggle that is on, the button's
-  name over it on hover; each click is sent to the game's own button as a
-  pointer click, so whatever Lua hung on it runs unchanged. `OrdersScale`
-  sizes the row.
+  stop. Each button is a clone of the game's own — its dashed plate in the
+  order's colour, its icon, and the frame its glow shader lights while the
+  toggle is on or the mouse is over it — mirroring the concealed one and
+  passing it every click, so whatever Lua hung on it runs unchanged. The
+  button's name comes up as the game's own tooltip. `OrdersScale` sizes
+  the row.
 - **Unit card** (`UnitCard`) in place of the game's unit information panel.
   The game's card is a bitmap mock-up with fifteen text fields over it: the
   template id next to the name, income to three decimal places, and no
@@ -175,9 +175,9 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   setting applies, the count text is the game's own TextMeshPro in its own
   font, a click over it never reaches the map (the game gates on its event
   system, so no invisible shield is needed), and a fault in one tile's
-  update cannot stop the rest of the HUD taking clicks. The orders row and
-  unit card are to follow the same route; the strip, mini-map and map
-  labels stay IMGUI, which suits them.
+  update cannot stop the rest of the HUD taking clicks. The orders row is
+  built the same way; the unit card is to follow. The strip, mini-map and
+  map labels stay IMGUI, which suits them.
 - **Build strip** (`BuildStrip`) in place of the game's build options, tier
   tabs and build queue, each of which is a dashed panel with paging arrows
   and "coming soon" placeholders. The HUD lays the bottom out itself from
