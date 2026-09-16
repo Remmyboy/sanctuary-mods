@@ -417,6 +417,8 @@ namespace SanctuaryHud
             frt.offsetMax = Vector2.zero;
 
             for (var i = 0; i < _border.Length; i++) _border[i] = Dot(_map, "Border", BorderColour);
+            // Lines hang from their top-left corner, as Edge places them.
+            foreach (var line in _border) line.rectTransform.pivot = new Vector2(0f, 1f);
             _gripMarks.Clear();
             for (var i = 0; i < 6; i++) _gripMarks.Add(Dot(_plate, "Grip", Color.white));
             foreach (var mark in _gripMarks) mark.rectTransform.pivot = new Vector2(0f, 1f);

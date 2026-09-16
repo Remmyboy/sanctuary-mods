@@ -557,7 +557,8 @@ spend in the corner, the count, and the tier. Each column is headed by its
 total and sorted by its own resource, so the top of the left column is what
 is eating the alloy and the top of the right what is eating the energy.
 Hovering a tile shows both rates, the progress, and how many builders are on
-it, in the game's own tooltip. **Left-click selects the builders** working on that template — engineers,
+it, in the game's own tooltip. `Build · MaxRows` (8) caps the list at the
+biggest spenders of each column, so a late game is not a wall of tiles. **Left-click selects the builders** working on that template — engineers,
 factories, or the extractors upgrading themselves. **Right-click pauses them**,
 and right-click again resumes them: the tile dims and shows a pause mark while
 the panel is holding its builders. That is what an eco manager is for — see

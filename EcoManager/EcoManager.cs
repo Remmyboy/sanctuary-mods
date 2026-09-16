@@ -45,6 +45,7 @@ namespace SanctuaryHud
         private ConfigEntry<float> _cfgBuildPosX;
         private ConfigEntry<float> _cfgBuildPosY;
         private ConfigEntry<bool> _cfgRightClickPauses;
+        private ConfigEntry<int> _cfgBuildRows;
         private ConfigEntry<bool> _cfgExtractorsEnabled;
         private ConfigEntry<float> _cfgExtractorsScale;
         private ConfigEntry<float> _cfgExtractorsPosX;
@@ -72,6 +73,9 @@ namespace SanctuaryHud
             _cfgRightClickPauses = Config.Bind("Build", "RightClickPauses", true,
                 "Right-clicking a build tile pauses every builder working on that template, and again resumes " +
                 "them. Sends the game's own Pause toggle. Off, right-click does nothing.");
+            _cfgBuildRows = Config.Bind("Build", "MaxRows", 8,
+                new ConfigDescription("How many rows the BUILD panel shows at most: the biggest spenders of each column. The rest are left off.",
+                    new AcceptableValueRange<int>(1, 30)));
 
             _cfgExtractorsEnabled = Config.Bind("Extractors", "Enabled", true,
                 "The ALLOY panel: a row per tier: the extractors at that tier on the left, the ones " +
@@ -310,7 +314,9 @@ namespace SanctuaryHud
             HudCanvas.SetText(_alloyHead.Total, "-" + Rate(groups.Sum(g => g.AlloyRate)) + "/s");
             HudCanvas.SetText(_energyHead.Total, "-" + Rate(groups.Sum(g => g.EnergyRate)) + "/s");
 
-            for (var i = 0; i < groups.Count; i++)
+            // The biggest spenders only: past the cap the list is noise.
+            var rows = Mathf.Min(groups.Count, Mathf.Clamp(_cfgBuildRows.Value, 1, 30));
+            for (var i = 0; i < rows; i++)
             {
                 var slot = RowAt(_buildRows, _buildRowsBox, i);
                 slot.Pool.Begin();
@@ -318,7 +324,7 @@ namespace SanctuaryHud
                 BuildTile(slot.Pool.Take(), byEnergy[i], true);
                 slot.Pool.End();
             }
-            HideRowsFrom(_buildRows, groups.Count);
+            HideRowsFrom(_buildRows, rows);
         }
 
         /// A template under construction: art, progress along the top, one
