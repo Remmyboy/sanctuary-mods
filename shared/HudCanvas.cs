@@ -198,6 +198,9 @@ namespace SanctuaryHud
             text.fontStyle = style;
             text.raycastTarget = false;
             text.overflowMode = TextOverflowModes.Overflow;
+            // A figure never breaks across lines; a caller that wants
+            // wrapping turns it on.
+            text.enableWordWrapping = false;
             return text;
         }
 

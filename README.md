@@ -156,7 +156,7 @@ as its panels are.
   the one shown even though it is not in its own queue. This comes from a
   Lua query four times a second while the card is up (the unit's
   `predictedBuildQueue` and its `buildTarget`'s progress over that target's
-  `buildTime`); the card keeps its width, so the queue shows at most three
+  `buildTime`); the card keeps its width, so the queue shows at most two
   small tiles beside the job.
 
   Hovering a **build option** turns it into a build card: one line of alloy

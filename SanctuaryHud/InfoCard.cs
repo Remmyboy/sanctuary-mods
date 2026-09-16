@@ -385,9 +385,9 @@ namespace SanctuaryHud
         private const float Width = 528f;
         private const float Pad = BottomDock.Pad;
         private const float GaugeHeight = 52f;
-        private const float QueueTile = 40f;
+        private const float QueueTile = 36f;
         private const float JobTile = 80f;
-        private const float MarkSize = 28f;
+        private const float MarkSize = 24f;
         private const float LineHeight = 30f;
 
         private static readonly Color LabelColour = new Color(0.85f, 0.90f, 0.97f);
@@ -460,7 +460,7 @@ namespace SanctuaryHud
             private GameObject _band;
             private RectTransform _left;
             private GameObject _queueBlock;
-            private readonly QueueTileView[] _small = new QueueTileView[3];
+            private readonly QueueTileView[] _small = new QueueTileView[2];
             private QueueTileView _job;
             private TMP_Text _jobPercent;
 
@@ -787,7 +787,7 @@ namespace SanctuaryHud
                 go.transform.SetParent(parent, false);
                 line._go = go;
                 var row = go.AddComponent<HorizontalLayoutGroup>();
-                row.spacing = 24f;
+                row.spacing = 16f;
                 row.childAlignment = TextAnchor.MiddleLeft;
                 row.childControlWidth = true;
                 row.childControlHeight = true;
@@ -819,13 +819,13 @@ namespace SanctuaryHud
                     markLayout.minWidth = MarkSize;
                     markLayout.minHeight = MarkSize;
                     line._marks[i] = image;
-                    line._figures[i] = HudCanvas.Text(item.transform, "Text", 26f, Color.white, TextAlignmentOptions.MidlineLeft);
+                    line._figures[i] = HudCanvas.Text(item.transform, "Text", 22f, Color.white, TextAlignmentOptions.MidlineLeft);
                     line._items[i] = item;
                     item.SetActive(false);
                 }
                 if (withExtras)
                 {
-                    line._extras = HudCanvas.Text(go.transform, "Extras", 22f, LabelColour, TextAlignmentOptions.MidlineLeft);
+                    line._extras = HudCanvas.Text(go.transform, "Extras", 20f, LabelColour, TextAlignmentOptions.MidlineLeft);
                     line._extras.gameObject.SetActive(false);
                 }
                 go.SetActive(false);
