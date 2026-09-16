@@ -74,6 +74,7 @@ namespace SanctuaryHud
             // commander, something that can actually work on the upgrade. A
             // tank told to assist an extractor just guards it, and must not
             // spend alloy on the way.
+            "      local sel = Import('client/input/selectionSystem.lua') " +
             "      local pickedNow = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
             "        or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
             "      local builder = false " +

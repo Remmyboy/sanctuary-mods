@@ -28,7 +28,7 @@ source.
 | --- | --- | --- |
 | [SanctuaryHud](SanctuaryHud/) | [**0.12.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.12.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.5.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas |
-| [EcoManager](EcoManager/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.6.0) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until it arrives |
+| [EcoManager](EcoManager/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.0) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
 | [BuildHotkeys](BuildHotkeys/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.0) | Watch the game's replays fog-free from any seat, with every economy |
@@ -652,31 +652,38 @@ the upgrade button — so the host validates and replicates it like any other
 order, and no files change, so the lobby hash is untouched. What it costs you
 is that an assist click now spends alloy.
 
-### Paused until the engineer arrives
+### Paused until an engineer starts on it
 
 Sending five engineers to five extractors starts five upgrades at once, and the
 economy goes flat while every one of them crawls. With `AssistPausesUpgrade`
 (default on) each upgrade started this way is **paused as soon as it starts**
-and released when its engineer actually turns up — so the cost is spread over
-the walk instead of landing all at once, and an engineer that gets killed on
-the way never spends anything at all.
+and released when an engineer actually starts building it — so the cost is
+spread over the walk instead of landing all at once, and an engineer that gets
+killed on the way never spends anything at all.
 
-The pause has to lag the queueing by about a second (`AssistPauseSeconds`): the
-upgrade is not registered as in progress on the frame it is requested, and
-pausing before then does nothing. Each entry waits out that delay, checks the
-upgrade really took, and is dropped if it did not. Arrival is the engineer
-getting within its own `construction.range` plus `AssistPauseRadius` of the
-extractor, measured in the ground plane so a slope cannot hide it. A cancelled
-upgrade releases the pause on its way out, so nothing is ever left stopped with
-no explanation — and neither is unloading the mod.
+"Starts building" is the host's own signal, not distance. The host tells every
+client when a builder begins work (`OnStartBuilding`), which sets `isBuilding`
+and `buildTarget` on that unit. An engineer assisting an upgrade builds the
+upgrade site on the extractor's spot, and that site's `upgrader` points back at
+the extractor. So when one engineer walks into a cluster of extractors, only the
+one it works on unpauses. An engineer that is merely nearby, still walking, or
+has the assist further down its queue releases nothing. Any builder counts, an
+ally's included; the extractor building its own upgrade does not.
+
+The pause waits at least `AssistPauseSeconds` after the queueing, and until the
+upgrade site shows some progress. Before that the site is still a placement
+ghost, which an assisting engineer will not start on, so pausing any earlier
+could hold the upgrade for good. An entry whose upgrade never took is dropped.
+A cancelled upgrade releases the pause on its way out, so nothing is ever left
+stopped with no explanation — and neither is unloading the mod.
 
 Pausing goes through `RequestUnitsToggle`, which takes explicit unit ids, so
 none of this disturbs your selection. The watch runs five times a second from
 the C# side, because a second's granularity would be visible on both halves.
 
-One thing to know: if the engineer never arrives — killed, or re-tasked — the
-extractor stays paused with the upgrade queued. That is the safe failure (it
-costs nothing), but it is yours to unpause.
+One thing to know: if no engineer ever starts on it — killed, or re-tasked —
+the extractor stays paused with the upgrade queued. That is the safe failure
+(it costs nothing), but it is yours to unpause.
 
 The hook is a runtime wrapper around the client's `IssueAssistOrder`:
 `inputActions.lua` binds the key to
