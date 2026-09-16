@@ -16,15 +16,6 @@ namespace SanctuaryHud
     {
         internal enum Domain { Unknown, Land, Naval, Amphibious, Air }
 
-        internal static BepInEx.Configuration.ConfigEntry<bool> Enabled;
-
-        internal static void Bind(BepInEx.Configuration.ConfigFile config)
-        {
-            Enabled = config.Bind("SanctuaryUI", "DomainColours", false,
-                "Colour the unit tiles in the selection row, build options and queue by element: green for land, blue for naval, " +
-                "a lighter blue for air, and green over blue split diagonally for a unit that goes on both. Off: one neutral tile for all.");
-        }
-
         private struct Info
         {
             public Domain Domain;

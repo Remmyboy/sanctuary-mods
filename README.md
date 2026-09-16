@@ -111,7 +111,7 @@ and information panels, the unit card standing on the orders row, and the
 build area against its right edge, the selection row and the options along
 the bottom with the tier tabs and the queue above them, no gaps between.
 One hairline runs along every exposed top edge of the combined shape, with
-thin dividers where pieces meet. `PanelArt` (on by default) dresses the
+thin dividers where pieces meet. `PanelArt` (off by default) dresses the
 plates in the game's own dashed panel sprite instead, so they are framed
 as its panels are.
 
@@ -210,13 +210,10 @@ as its panels are.
   conceals the tier tabs whenever no more than one of them can be clicked —
   a tier-1 factory's single T1, or a structure whose only option is its own
   upgrade.
-- **Element colours** (`DomainColours`, off by default): the unit tiles in
-  the selection row, options and queue coloured by where the unit goes —
-  green for land, blue for naval, a lighter blue for air, green over blue
-  split diagonally for one that goes on both — instead of the game's own
-  plate, which carries the same idea in brown and blue. The buttons carry
-  no template id, but a portrait is a template's foreground icon, so a
-  once-a-match Lua query ties every icon to its tags.
+- The buttons carry no template id, but a portrait is a template's
+  foreground icon, so a once-a-match Lua query ties every icon to its
+  template; that is how a hovered build option names the template for the
+  build card.
 
 Each stand-in dumps the game panel's object tree to the log the first time
 it conceals it, and a **cost meter** logs the HUD's own Update and OnGUI

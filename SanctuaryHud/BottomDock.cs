@@ -28,8 +28,8 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            PanelArt = config.Bind("SanctuaryUI", "PanelArt", true,
-                "Dress the bottom panels in the game's own dashed panel art, as its panels are, instead of the HUD's plain plate with a hairline.");
+            PanelArt = config.Bind("SanctuaryUI", "PanelArt", false,
+                "Dress the bottom panels in the game's own dashed panel art, as its panels are, instead of the HUD's plain plate with its one outline. Off reads cleaner.");
         }
 
         /// One row of tiles, plate included: the height every piece on the

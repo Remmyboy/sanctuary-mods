@@ -156,7 +156,6 @@ namespace SanctuaryHud
             TierTabs.Bind(Config);
             BuildStrip.Bind(Config);
             BottomDock.Bind(Config);
-            UnitDomains.Bind(Config);
 
             _visible = _cfgVisible.Value;
 

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
@@ -38,7 +37,6 @@ namespace SanctuaryHud
         private GameObject _textContainer, _hoverOverlay;
         private Button _button;
         private LayoutElement _layout;
-        private Image _edge;
         private bool _hover;
 
         /// The game button this tile stands for, or null.
@@ -94,11 +92,6 @@ namespace SanctuaryHud
                 if (tile._progress != null) tile._progress.gameObject.SetActive(false);
                 if (tile._textContainer != null) tile._textContainer.SetActive(false);
 
-                // The HUD's own addition: a line along the bottom edge in the
-                // unit's element colour.
-                tile._edge = HudCanvas.Fill(rt, "Edge", Color.white);
-                HudCanvas.StretchAlongBottom(tile._edge.rectTransform, 2f);
-
                 go.transform.SetParent(parent, false);
                 go.SetActive(true);
                 return tile;
@@ -115,25 +108,10 @@ namespace SanctuaryHud
             }
         }
 
-        // ---- the element tiles --------------------------------------------------
-
-        private static readonly Dictionary<UnitDomains.Domain, Sprite> _domainSprites = new Dictionary<UnitDomains.Domain, Sprite>();
-
-        private static Sprite DomainSprite(UnitDomains.Domain domain)
-        {
-            if (_domainSprites.TryGetValue(domain, out var sprite) && sprite != null) return sprite;
-            var texture = UnitRow.Tile(domain);
-            sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-            sprite.hideFlags = HideFlags.HideAndDontSave;
-            _domainSprites[domain] = sprite;
-            return sprite;
-        }
-
         // ---- mirroring ------------------------------------------------------------
 
-        /// Takes the given game button's look for this frame: its art (or
-        /// the HUD's element tile behind the portrait), strategic icon,
-        /// count, progress and whether it can be clicked.
+        /// Takes the given game button's look for this frame: its plate and
+        /// art, strategic icon, count, progress and whether it can be clicked.
         internal void Mirror(UnitButtonElement source)
         {
             _source = source;
@@ -143,22 +121,15 @@ namespace SanctuaryHud
             _layout.minHeight = _native.y;
 
             var portrait = source.portraitImage != null ? source.portraitImage.overrideSprite : null;
-            var domain = UnitDomains.Enabled != null && UnitDomains.Enabled.Value ? UnitDomains.Of(portrait) : UnitDomains.Domain.Unknown;
 
             if (_background != null)
             {
-                if (domain != UnitDomains.Domain.Unknown)
-                {
-                    _background.sprite = DomainSprite(domain);
-                    _background.color = Color.white;
-                }
-                else
-                {
-                    var src = source.background;
-                    var plate = src != null ? src.overrideSprite : null;
-                    _background.sprite = plate != null ? plate : DomainSprite(UnitDomains.Domain.Unknown);
-                    _background.color = src != null && plate != null ? src.color : Color.white;
-                }
+                // The game's own plate, which carries where the unit goes
+                // (land, water, both) in its colour; a slate where it has none.
+                var src = source.background;
+                var plate = src != null ? src.overrideSprite : null;
+                _background.sprite = plate;
+                _background.color = plate != null ? src.color : new Color(0.15f, 0.19f, 0.25f, 0.95f);
             }
             if (_portrait != null)
             {
@@ -204,9 +175,6 @@ namespace SanctuaryHud
                 _button.interactable = sourceButton == null || sourceButton.interactable;
             }
 
-            var edge = UnitRow.EdgeFor(domain);
-            edge.a = _hover ? 1f : 0.7f;
-            _edge.color = edge;
         }
 
         // ---- pointer events, passed to the game's button -----------------------
