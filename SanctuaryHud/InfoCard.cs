@@ -427,8 +427,12 @@ namespace SanctuaryHud
 
             _card.Show(true);
             _card.Fill(_values, building, SanctuaryHudPlugin.HudScale);
-            // On top of the orders row, in the left column.
-            var at = new Vector2(BottomDock.Origin.x, BottomDock.Origin.y + BottomDock.OrdersHeight);
+            // On top of the orders row, in the left column — and on top of
+            // where it would be when nothing is selected (a hovered unit has
+            // no orders row), so the card never moves.
+            var scale = SanctuaryHudPlugin.HudScale;
+            var ordersHeight = BottomDock.OrdersHeight > 0f ? BottomDock.OrdersHeight : BottomDock.RowHeight * scale;
+            var at = new Vector2(BottomDock.Origin.x, BottomDock.Origin.y + ordersHeight);
             _card.Place(at);
             BottomDock.Column(_card.PlacedWidth);
             BottomDock.Add(new Rect(at.x, at.y, _card.PlacedWidth, _card.PlacedHeight));
