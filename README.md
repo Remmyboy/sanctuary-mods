@@ -67,10 +67,11 @@ has no release of its own yet; build it from source if you need it.
   net trail it by the same amount as each other. Storage is never smoothed.
   The strip stays up through a pause: the game's economy panel being visible
   counts as "in a match" even while the stream is silent.
-- **Looks**: the strip takes the game's typeface (Rajdhani, off its
-  TextMeshPro asset when the build keeps the source font; Bahnschrift on
-  Windows otherwise) and the alloy/energy tints off the game's own panel, on
-  the same near-black blue with an accent-blue hairline as the front menu.
+- **Looks**: the strip is uGUI on the game's HUD canvas like the rest
+  (see SanctuaryUI below): its texts are the game's own TextMeshPro font,
+  its alloy and energy marks the game's own icons, and the tints come off
+  the game's own panel, on the same near-black blue with an accent-blue
+  hairline as the front menu. The commander widget is built the same way.
   Numbers abbreviate exactly as the game's readouts do (`1.2K` above 999).
 - **Hide the game's own bars** (`Overlay · HideGameEconomyBars`, off by
   default, in the Mod Manager's settings): switches off the built-in alloy

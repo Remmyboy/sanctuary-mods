@@ -211,6 +211,7 @@ namespace SanctuaryHud
             SelectionRow.Shutdown();
             TierTabs.Shutdown();
             BuildStrip.Shutdown();
+            EcoStrip.Shutdown();
             HudCanvas.Destroy();
             _harmony?.UnpatchSelf();
         }
@@ -286,9 +287,15 @@ namespace SanctuaryHud
             GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && OwnArmyFocused && _cfgHideBuiltIn.Value, _log);
             GamePanel.TickShield();
             _menuOpen = _visible && InMatch && GamePanel.GameMenuOpen();
+            // The strip and the commander widget are one player's own numbers,
+            // so they step aside in a replay's all-armies view: there is no
+            // single economy to report there, and what was on screen was the
+            // last seat's figures going stale. The mini-map stays — it is the
+            // one thing here that reads just as well watching everybody.
+            EcoStrip.Tick(_visible && InMatch && !_menuOpen && OwnArmyFocused, SliderScale);
             // The HUD canvas (the uGUI stand-ins) hides with the rest of the
             // HUD, and under the game's menus, as everything else here does.
-            HudCanvas.SetShowing(_visible && InMatch && !_menuOpen && _cfgSanctuaryUi.Value);
+            HudCanvas.SetShowing(_visible && InMatch && !_menuOpen);
 
             // The mini-map hides with the rest of the HUD, and under the
             // game's own menus, as everything else here does.
@@ -327,6 +334,10 @@ namespace SanctuaryHud
         /// and a filter that only moved on changes froze a third of the way
         /// there (50 showed as 16) until something else in the stream moved.
         private static readonly Dictionary<string, float[]> _smooth = new Dictionary<string, float[]>();
+
+        /// The smoothed [income, demand, spend] for a resource, or null before
+        /// the first update.
+        internal static float[] Smoothed(string key) => _smooth.TryGetValue(key, out var s) ? s : null;
         private static int _seenSequence = -1;
 
         /// Time constant of the filter, in seconds. Short: the aim is to take
@@ -413,23 +424,9 @@ namespace SanctuaryHud
             // The stand-ins for the game's own bottom panels are on the HUD
             // canvas (HudCanvas), not drawn here.
 
-            // The strip and the commander widget are one player's own numbers,
-            // so they step aside in a replay's all-armies view: there is no
-            // single economy to report there, and what was on screen was the
-            // last seat's figures going stale. The mini-map stays — it is the
-            // one thing here that reads just as well watching everybody.
-            //
-            // Both draw under their own scale on top of the screen's, so the
-            // setting sizes them without touching anything else.
-            var stripScale = SliderScale;
-            if (OwnArmyFocused)
-            {
-                GUI.matrix = Matrix4x4.Scale(new Vector3(scale * stripScale, scale * stripScale, 1f));
-                DrawEconomyStrip(Screen.width / (scale * stripScale), scale * stripScale);
-                DrawCommanderWidget(Screen.width / (scale * stripScale));
-                GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
-            }
-            Alerts.Draw(logicalWidth, StripHeight * stripScale + 12f, _texStrip);
+            // The strip and the commander widget are on the HUD canvas too
+            // (EcoStrip); the alerts sit under the strip's edge.
+            Alerts.Draw(logicalWidth, StripHeight * SliderScale + 12f, _texStrip);
             MiniMap.Draw(logicalWidth, logicalHeight, scale);
 
             GUI.matrix = previousMatrix;
@@ -451,7 +448,6 @@ namespace SanctuaryHud
         internal static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
 
         private static Texture2D _texStrip;
-        private static GUIStyle _stStripVersion, _stStripGlyph;
         private static bool _gameStyleReady;
         private static Color _alloyTint = AlloyColour;
         private static Color _energyTint = EnergyColour;
@@ -492,8 +488,6 @@ namespace SanctuaryHud
             WorldOverlays.ApplyFont(font);
             Alerts.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
-            _stStripVersion = new GUIStyle(_stStripMax) { fontSize = 11, alignment = TextAnchor.MiddleCenter };
-            _stStripGlyph = new GUIStyle(_stStripLabel) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
 
             var alloy = AlloyColour;
             var energy = EnergyColour;
@@ -531,213 +525,6 @@ namespace SanctuaryHud
             GUI.color = previous;
         }
 
-        // Full-width strip: alloy on the left, energy on the right. Each half
-        // shows storage on top with gross in / gross out / net beside it, and a
-        // capacity bar underneath whose length scales gently with storage size
-        // and whose colour warns as the store heads for empty. With the game's
-        // panel hidden, its buttons sit between the two halves.
-        private void DrawEconomyStrip(float width, float scale)
-        {
-            Dictionary<string, float> eco;
-            lock (_ecoLock) eco = _eco;
-            if (eco == null) return;
-
-            GUI.DrawTexture(new Rect(0, 0, width, StripHeight), _texStrip);
-
-            var controls = GamePanel.Controls;
-            var middle = controls.Count > 0 ? PanelControlsWidth(controls.Count) : 0f;
-            var half = (width - middle) / 2f;
-
-            DrawStripHalf(eco, "alloy", "ALLOY", _alloyTint, 0f, half);
-            DrawStripHalf(eco, "energy", "ENERGY", _energyTint, half + middle, half);
-            if (middle > 0f) DrawPanelControls(new Rect(half, 0f, middle, StripHeight), controls, scale);
-
-            // The game's panels sit on a hairline of accent blue; give the
-            // strip the same edge, with a short fade under it so it lifts
-            // off the map rather than ending in a hard line.
-            var accent = GameAccent;
-            accent.a = 0.35f;
-            Fill(new Rect(half - 0.5f, 10f, 1f, StripHeight - 20f), accent);
-            if (middle > 0f) Fill(new Rect(half + middle - 0.5f, 10f, 1f, StripHeight - 20f), accent);
-            accent.a = 0.6f;
-            Fill(new Rect(0, StripHeight - 1f, width, 1f), accent);
-            for (var i = 0; i < 4; i++)
-            {
-                Fill(new Rect(0, StripHeight + i, width, 1f), new Color(0f, 0f, 0f, 0.28f - i * 0.07f));
-            }
-        }
-
-        private const float ControlSize = 26f;
-        private const float ControlGap = 4f;
-
-        /// Wide enough for the row of buttons or the version line under them,
-        /// whichever is wider, with room either side.
-        private static float PanelControlsWidth(int count)
-        {
-            var buttons = count * ControlSize + (count - 1) * ControlGap;
-            var version = string.IsNullOrEmpty(GamePanel.VersionText) ? 0f : _stStripVersion.CalcSize(new GUIContent(GamePanel.VersionText)).x;
-            return Mathf.Max(buttons, version) + 28f;
-        }
-
-        // The buttons from the game's hidden panel: a row of its icons, and its
-        // version line under them, which gives way to the name of the button
-        // under the mouse. A click is passed on to the game's original.
-        private static void DrawPanelControls(Rect area, List<GamePanel.PanelControl> controls, float scale)
-        {
-            GamePanel.Shield(area, scale);
-
-            var x = area.center.x - (controls.Count * ControlSize + (controls.Count - 1) * ControlGap) / 2f;
-            var caption = GamePanel.VersionText;
-            foreach (var control in controls)
-            {
-                var rect = new Rect(x, 4f, ControlSize, ControlSize);
-                x += ControlSize + ControlGap;
-                var hover = rect.Contains(Event.current.mousePosition);
-                if (hover) caption = control.Label;
-
-                var fill = GameAccent;
-                fill.a = hover ? 0.24f : 0.10f;
-                Fill(rect, fill);
-                var edge = GameAccent;
-                edge.a = hover ? 0.8f : 0.45f;
-                Fill(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), edge);
-
-                var tint = hover ? Color.white : new Color(0.78f, 0.85f, 0.95f, 0.9f);
-                var iconRect = new Rect(rect.center.x - 8f, rect.center.y - 8f, 16f, 16f);
-                var previous = GUI.color;
-                GUI.color = tint;
-                var drawn = GamePanel.DrawIcon(iconRect, control.Icon);
-                GUI.color = previous;
-                if (!drawn) DrawControlGlyph(iconRect, control, tint);
-
-                if (GUI.Button(rect, GUIContent.none, GUIStyle.none)) GamePanel.Click(control, _log);
-            }
-
-            if (!string.IsNullOrEmpty(caption)) GUI.Label(new Rect(area.x, 31f, area.width, 14f), caption, _stStripVersion);
-        }
-
-        /// Stand-in art for a control whose icon can't be drawn.
-        private static void DrawControlGlyph(Rect r, GamePanel.PanelControl control, Color tint)
-        {
-            switch (control.Kind)
-            {
-                case GamePanel.ControlKind.Menu:
-                    for (var i = 0; i < 3; i++) Fill(new Rect(r.x + 1f, r.y + 2f + i * 5f, r.width - 2f, 2f), tint);
-                    break;
-                case GamePanel.ControlKind.Pause:
-                    Fill(new Rect(r.x + 3f, r.y + 1f, 4f, r.height - 2f), tint);
-                    Fill(new Rect(r.xMax - 7f, r.y + 1f, 4f, r.height - 2f), tint);
-                    break;
-                default:
-                    _stStripGlyph.normal.textColor = tint;
-                    GUI.Label(r, control.Kind == GamePanel.ControlKind.Help ? "?" : control.Label.Substring(0, 1), _stStripGlyph);
-                    break;
-            }
-        }
-
-        private void DrawStripHalf(Dictionary<string, float> eco, string key, string label, Color baseColour, float x, float w)
-        {
-            float V(string name) => eco.TryGetValue(key + name, out var v) ? v : 0f;
-
-            var current = V("StorageCurrent");
-            var limit = Mathf.Max(1f, V("StorageLimit"));
-            var incomeRaw = V("GeneratedIncome");
-            var wantedRaw = -V("RequestedTotal");
-            var spendRaw = -V("RequestedStalled");
-            var stalling = IsStalling(current, incomeRaw, wantedRaw, spendRaw);
-
-            var s = _smooth.TryGetValue(key, out var smoothed) ? smoothed : new[] { incomeRaw, wantedRaw, spendRaw };
-            var income = s[0];
-            // While this resource is the one stalling, the spend figure shows
-            // demand, not what the economy managed to pay: actual spend is then
-            // capped by income, so it would just mirror the income back at you
-            // (+12 −12) and hide the shortfall. Otherwise it shows actual spend,
-            // as the game's panel does, which is what differs when the other
-            // resource stalls and throttles this one's spending with it.
-            var spent = stalling ? s[1] : s[2];
-            // Net stays on actual spend: it describes the store's real
-            // movement, which is what the bar and the "empty in" chip need.
-            // Derived from the same filtered figures as the income, so the
-            // two never trail the game by different amounts.
-            var net = s[0] - s[2];
-
-            const float pad = 16f;
-            var inner = w - pad * 2f;
-
-            // --- row 1: label + storage on the left, flows on the right ---
-            // The resource's mark, large, in place of its name: the ingot
-            // and the bolt are the same marks the unit card and the eco
-            // panels use, so they need no word beside them.
-            var mark = Glyphs.Get(key);
-            var lead = 0f;
-            if (mark != null)
-            {
-                var previousColour = GUI.color;
-                GUI.color = baseColour;
-                GUI.DrawTexture(new Rect(x + pad, 4f, 22f, 22f), mark);
-                GUI.color = previousColour;
-                lead = 30f;
-            }
-            else
-            {
-                _stStripLabel.normal.textColor = baseColour;
-                GUI.Label(new Rect(x + pad, 7f, 70f, 20f), label, _stStripLabel);
-                lead = 66f;
-            }
-
-            var storageText = Fmt(current);
-            var storageWidth = _stStripValue.CalcSize(new GUIContent(storageText)).x;
-            GUI.Label(new Rect(x + pad + lead, 2f, storageWidth + 8f, 26f), storageText, _stStripValue);
-            GUI.Label(new Rect(x + pad + lead + storageWidth + 8f, 8f, 90f, 18f), "/ " + Fmt(limit), _stStripMax);
-
-            // Right cluster: net on the right, with gross in stacked over
-            // gross out beside it, so the two figures that are compared line
-            // up under each other rather than reading across.
-            var netText = (net >= 0f ? "+" : "−") + Fmt(net) + "/s";
-            _stStripNet.normal.textColor = stalling ? DangerColour : net >= 0f ? GainColour : LossColour;
-            GUI.Label(new Rect(x + w - pad - 108f, 11f, 108f, 22f), netText, _stStripNet);
-
-            var flowsX = x + w - pad - 108f - 6f - 64f;
-            GUI.Label(new Rect(flowsX, 5f, 64f, 16f), "+" + Fmt(income), _stStripIn);
-            // Flag the spend figure while stalling, since it is then demand
-            // you are not actually meeting rather than resources leaving the
-            // store — the STALL chip beside it carries the size of the shortfall.
-            _stStripOut.normal.textColor = stalling ? DangerColour : LossColour;
-            GUI.Label(new Rect(flowsX, 23f, 64f, 16f), "−" + Fmt(spent), _stStripOut);
-
-            // --- row 2: capacity bar ---
-            // A thin line in the resource colour on an accent-tinted track,
-            // the way the game draws its own gauges, rather than a block. It
-            // stops short of the flows column whatever the storage size.
-            var lengthFactor = Mathf.Clamp(0.45f + 0.15f * Mathf.Log10(limit / 400f), 0.45f, 1f);
-            var barMax = flowsX - 12f - (x + pad);
-            var barRect = new Rect(x + pad, 36f, Mathf.Min(inner * lengthFactor, barMax), 4f);
-            var track = GameAccent;
-            track.a = 0.14f;
-            Fill(barRect, track);
-
-            var colour = FillColour(baseColour, current, net, stalling);
-            var fillWidth = barRect.width * Mathf.Clamp01(current / limit);
-            Fill(new Rect(barRect.x, barRect.y, fillWidth, barRect.height), colour);
-            if (fillWidth > 2f) Fill(new Rect(barRect.x + fillWidth - 1f, barRect.y - 1f, 1f, barRect.height + 2f), new Color(1f, 1f, 1f, 0.75f));
-
-            // Warning chip rides at the end of the bar row, short of the flows.
-            string chip = null;
-            if (stalling) chip = "STALL −" + Fmt(wantedRaw - spendRaw) + "/s";
-            else if (net < -0.5f)
-            {
-                var tte = current / -net;
-                if (tte < 120f) chip = "EMPTY IN " + tte.ToString("0") + "s";
-            }
-            if (chip != null)
-            {
-                var chipWidth = _stStripChip.CalcSize(new GUIContent(chip)).x + 14f;
-                var chipRect = new Rect(flowsX - 10f - chipWidth, 29f, chipWidth, 15f);
-                Fill(chipRect, stalling ? DangerColour : new Color(0.75f, 0.45f, 0.15f, 0.9f));
-                GUI.Label(chipRect, chip, _stStripChip);
-            }
-        }
-
         /// The host's economy ticks ten times a second; the stream's rates are
         /// per second, its storage a plain amount (economyPanel.lua).
         private const float TicksPerSecond = 10f;
@@ -749,7 +536,7 @@ namespace SanctuaryHud
         /// isn't enough: construction draws alloy and energy together and is
         /// throttled by whichever is short, so an energy stall cuts alloy
         /// spending too, and read that way a full alloy store showed STALL.
-        private static bool IsStalling(float stored, float income, float wanted, float spent) =>
+        internal static bool IsStalling(float stored, float income, float wanted, float spent) =>
             wanted - spent > 0.5f && stored * TicksPerSecond + income < wanted - 0.5f;
 
         private static bool IsStalling(Dictionary<string, float> eco, string key)
@@ -768,7 +555,7 @@ namespace SanctuaryHud
             return eco != null && (IsStalling(eco, "alloy") || IsStalling(eco, "energy"));
         }
 
-        private static Color FillColour(Color baseColour, float stored, float net, bool stalling)
+        internal static Color FillColour(Color baseColour, float stored, float net, bool stalling)
         {
             if (stalling) return DangerColour;
             if (net >= -0.5f) return baseColour;
@@ -781,63 +568,6 @@ namespace SanctuaryHud
                 colour = Color.Lerp(colour, DangerColour, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8f));
             }
             return colour;
-        }
-
-        // Commander button, top-right under the economy strip: click to select
-        // the commander and fly the camera to it; the bar underneath is its
-        // health, always visible so a commander under fire is obvious.
-        private void DrawCommanderWidget(float width)
-        {
-            if (_commanderLocalIndex < 0) return;
-
-            const float w = 108f;
-            const float h = 66f;
-            var rect = new Rect(width - w - 14f, StripHeight + 10f, w, h);
-            var hover = rect.Contains(Event.current.mousePosition);
-
-            GUI.DrawTexture(rect, _texStrip);
-            if (hover) GUI.DrawTexture(rect, _texRowHover);
-            var edge = GameAccent;
-            edge.a = hover ? 0.8f : 0.45f;
-            Fill(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), edge);
-
-            var frac = _commanderMaxHealth > 0f ? Mathf.Clamp01(_commanderHealth / _commanderMaxHealth) : 1f;
-            var hurt = frac < 0.999f;
-
-            _stCmdLabel.normal.textColor = hurt && frac < 0.35f ? DangerColour : new Color(0.85f, 0.9f, 0.97f);
-            GUI.Label(new Rect(rect.x, rect.y + 6f, rect.width, 20f), "COMMANDER", _stCmdLabel);
-
-            // The game's own strategic icon, sampled out of its atlas.
-            var previous = GUI.color;
-            var iconRect = new Rect(rect.center.x - 13f, rect.y + 20f, 26f, 26f);
-            if (_iconAtlas != null && _iconUvRects != null &&
-                _commanderIconIndex >= 0 && _commanderIconIndex < _iconUvRects.Count)
-            {
-                GUI.color = _ownArmyColourUi ?? Color.white;
-                GUI.DrawTextureWithTexCoords(iconRect, _iconAtlas, _iconUvRects[_commanderIconIndex]);
-                GUI.color = previous;
-            }
-            else
-            {
-                GUI.color = hurt && frac < 0.35f ? DangerColour : new Color(0.55f, 0.78f, 1f, 0.95f);
-                GUI.Label(new Rect(rect.x, rect.y + 20f, rect.width, 18f), "◆", _stCmdGlyph);
-                GUI.color = previous;
-            }
-
-            // Health bar.
-            var barRect = new Rect(rect.x + 10f, rect.yMax - 12f, rect.width - 20f, 4f);
-            var track = GameAccent;
-            track.a = 0.14f;
-            Fill(barRect, track);
-            Fill(new Rect(barRect.x, barRect.y, barRect.width * frac, barRect.height),
-                frac > 0.6f ? new Color(0.42f, 0.85f, 0.5f) : frac > 0.3f ? new Color(0.95f, 0.72f, 0.2f) : DangerColour);
-
-            if (Event.current.type == EventType.MouseDown && Event.current.button == 0 && hover)
-            {
-                _pendingCommander = true;
-                _applyOnFrame = -1;
-                Event.current.Use();
-            }
         }
 
         // ---- diagnostics (F9) ---------------------------------------------

@@ -102,9 +102,13 @@ namespace SanctuaryHud
             var width = _rect.rect.width * _rect.localScale.x;
             var height = _rect.rect.height * _rect.localScale.y;
 
-            // A drag moves the pivot; the saved position is the left edge.
-            var x = _drag != null && _drag.Moved ? _rect.anchoredPosition.x - (_rightAligned ? width : 0f) : logical.x * k;
-            var y = _drag != null && _drag.Moved ? -_rect.anchoredPosition.y : logical.y * k;
+            // While a drag is on, and on the frame it ends, the plate is where
+            // the mouse put it — even on a frame the mouse held still, when no
+            // drag event came — and the saved position follows; otherwise the
+            // saved position places it. The saved position is the left edge.
+            var dragged = _drag != null && (_drag.Dragging || _drag.Moved);
+            var x = dragged ? _rect.anchoredPosition.x - (_rightAligned ? width : 0f) : logical.x * k;
+            var y = dragged ? -_rect.anchoredPosition.y : logical.y * k;
             if (_drag != null) _drag.Moved = false;
 
             // On the right half the panel hangs from its right edge, so a
