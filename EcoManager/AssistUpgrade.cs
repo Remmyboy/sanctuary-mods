@@ -29,14 +29,13 @@ namespace SanctuaryHud
     // internal callers) intercepts every assist without touching a file.
     //
     // `AssistPausesUpgrade` then holds each of those upgrades paused until an
-    // engineer actually turns up — see the Lua below for why that is worth the
-    // machinery.
+    // engineer actually starts building it — see the Lua below for why that is
+    // worth the machinery.
     public partial class EcoManagerPlugin
     {
         private ConfigEntry<bool> _cfgAssistStartsUpgrade;
         private ConfigEntry<bool> _cfgAssistPauses;
         private ConfigEntry<float> _cfgAssistPauseDelay;
-        private ConfigEntry<float> _cfgAssistPauseRadius;
 
         private bool _assistHookInstalled;
         private string _assistSignature;
@@ -52,10 +51,8 @@ namespace SanctuaryHud
             "  __SdbAssistUpgrade = true " +
             "  __SdbAssistPause = __PAUSE__ " +
             "  __SdbAssistPauseDelay = __DELAY__ " +
-            "  __SdbAssistPauseRadius = __RADIUS__ " +
             "  __SdbAssistPendingList = {} " +
             "  local m = Import('client/inputEventsFunctions.lua') " +
-            "  local sel = Import('client/input/selectionSystem.lua') " +
             "  local orig = m.IssueAssistOrder " +
             "  __SdbAssistUpgradeOrig = orig " +
             "  local wrapped = function(...) " +
@@ -92,18 +89,12 @@ namespace SanctuaryHud
             // is the same call constructionPanel.lua makes for an upgrade click.
             "      Import('common/commands/definitions/buildQueue.lua')" +
             ".RequestQueueAmount.Send({ hover.id }, { itemId }, up, 1) " +
-            // Remember who was told to go and help, so the tick below knows
-            // which engineers arriving should release the pause.
+            // Remember the extractor, so the tick below can hold its upgrade
+            // until work on it actually begins.
             "      if __SdbAssistPause then " +
-            "        local engs = {} " +
-            "        local picked = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
-            "          or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
-            "        for _, e in pairs(picked) do " +
-            "          if e ~= hover and e.tp and e.tp.construction then table.insert(engs, e) end " +
-            "        end " +
             "        local now = (os and os.clock) and os.clock() or 0 " +
             "        table.insert(__SdbAssistPendingList, " +
-            "          { u = hover, engs = engs, due = now + __SdbAssistPauseDelay, paused = false }) " +
+            "          { u = hover, due = now + __SdbAssistPauseDelay, paused = false }) " +
             "      end " +
             // Lets the C# side confirm the hook is actually firing; the Lua
             // log is not much use for that from here.
@@ -118,13 +109,23 @@ namespace SanctuaryHud
 
             // Queue five engineers onto five extractors and all five upgrades
             // start at once, which drains the economy flat. Pausing each one
-            // the moment it starts, then releasing it when its engineer
-            // actually arrives, spreads that cost over the walk instead.
+            // the moment it starts, then releasing it when an engineer starts
+            // building it, spreads that cost over the walk instead.
             //
-            // The pause has to lag the queueing: the upgrade is not registered
-            // as in progress on the same frame it is requested, and pausing
-            // before then does nothing. So each entry waits out its delay
-            // first, and is dropped if the upgrade never took.
+            // "Starts building" is the host's own signal, not distance. The
+            // host sends OnStartBuilding only once a builder is in range and
+            // working, which sets isBuilding and buildTarget on that unit
+            // here. An engineer assisting an upgrade builds the upgrade site —
+            // the separate structure growing on the extractor's spot — whose
+            // `upgrader` points back at the extractor. So an engineer still
+            // walking over, one with the assist further down its queue, or
+            // one working on the extractor next door releases nothing.
+            //
+            // The pause itself waits for that site to show some progress.
+            // Until then the site is still a placement ghost, which an
+            // assisting engineer will not start on, so a pause landing that
+            // early would hold the upgrade for good. The delay before any of
+            // this lets the queued upgrade settle first.
             "  function __SdbAssistToggle(unit, on) " +
             "    Import('common/commands/definitions/toggles.lua').RequestUnitsToggle.Send( " +
             "      { unit.id }, Import('common/toggles.lua').ToggleNameToToggleType('Pause'), on) " +
@@ -133,43 +134,38 @@ namespace SanctuaryHud
             "  function __SdbAssistTick() " +
             "    local list = __SdbAssistPendingList " +
             "    if not list or #list == 0 then return end " +
+            // Upgrades with a builder on them right now, by upgrading
+            // structure. The structure building its own upgrade doesn't count;
+            // anyone else's engineer, an ally's included, does.
+            "    local worked = {} " +
+            "    for _, a in pairs(Armies or {}) do " +
+            "      for _, w in pairs(a.units or {}) do " +
+            "        local t = not w.deleted and w.isBuilding and w.buildTarget " +
+            "        local up = t and t.upgrader " +
+            "        if up and up ~= w and up.id then worked[up.id.index] = true end " +
+            "      end " +
+            "    end " +
             "    local now = (os and os.clock) and os.clock() or 0 " +
             "    for i = #list, 1, -1 do " +
             "      local e = list[i] " +
             "      local u = e.u " +
             "      local drop = false " +
-            "      if not (u and u.id) then " +
+            "      if not (u and u.id) or u.deleted then " +
             "        drop = true " +
-            "      elseif not e.paused then " +
-            "        if now >= e.due then " +
-            "          local upgrading = u.IsUpgradeQueued and u:IsUpgradeQueued() " +
-            "          local pauseable = u.HasToggle and u:HasToggle('Pause') " +
-            "          if upgrading and pauseable then " +
-            "            __SdbAssistToggle(u, true) " +
-            "            e.paused = true " +
-            "          else " +
-            "            drop = true " +
-            "          end " +
-            "        end " +
-            "      elseif not (u.IsUpgradeQueued and u:IsUpgradeQueued()) then " +
-            // Finished or cancelled while we held it: let go either way, so a
+            "      elseif now >= e.due then " +
+            "        if worked[u.id.index] or not (u.IsUpgradeQueued and u:IsUpgradeQueued()) then " +
+            // Being built, or finished or cancelled: let go either way, so a
             // cancelled upgrade never strands a paused extractor.
-            "        __SdbAssistToggle(u, false) " +
-            "        drop = true " +
-            "      else " +
-            "        local p = u.GetPosition and u:GetPosition() " +
-            "        if p then " +
-            "          for _, eng in pairs(e.engs) do " +
-            "            local q = eng.GetPosition and eng:GetPosition() " +
-            "            if q then " +
-            "              local reach = (eng.tp and eng.tp.construction and eng.tp.construction.range or 5) " +
-            "                + __SdbAssistPauseRadius " +
-            "              local dx, dz = p.x - q.x, p.z - q.z " +
-            "              if dx * dx + dz * dz <= reach * reach then " +
-            "                __SdbAssistToggle(u, false) " +
-            "                drop = true " +
-            "                break " +
-            "              end " +
+            "          if e.paused then __SdbAssistToggle(u, false) end " +
+            "          drop = true " +
+            "        elseif not e.paused then " +
+            "          local site = u.upgradeTarget " +
+            "          if site and site.progress and site.progress > 0 then " +
+            "            if u.HasToggle and u:HasToggle('Pause') then " +
+            "              __SdbAssistToggle(u, true) " +
+            "              e.paused = true " +
+            "            else " +
+            "              drop = true " +
             "            end " +
             "          end " +
             "        end " +
@@ -217,19 +213,16 @@ namespace SanctuaryHud
                 "first, so the assist has something to work on. Sends the same command the upgrade button does. " +
                 "Set false to leave assist behaviour alone.");
             _cfgAssistPauses = Config.Bind("Assist", "AssistPausesUpgrade", true,
-                "Hold each upgrade started this way paused until its engineer arrives. Without it, five " +
-                "engineers sent to five extractors start five upgrades at once and the economy stalls; with " +
-                "it the cost is spread across the walk.");
+                "Hold each upgrade started this way paused until an engineer actually starts building it, " +
+                "not just when one is nearby. Without it, five engineers sent to five extractors start five " +
+                "upgrades at once and the economy stalls; with it the cost is spread across the walk.");
             _cfgAssistPauseDelay = Config.Bind("Assist", "AssistPauseSeconds", 1f,
-                "How long to wait after queueing before pausing. The upgrade is not registered as in " +
-                "progress on the frame it is requested, and pausing before then does nothing.");
-            _cfgAssistPauseRadius = Config.Bind("Assist", "AssistPauseRadius", 3f,
-                "Extra distance beyond the engineer's own build range at which it counts as having arrived, " +
-                "which releases the pause. Raise it if upgrades stay paused after the engineer is clearly there.");
+                "The least time to wait after queueing before pausing. The pause also waits for the upgrade to " +
+                "have actually begun, since an engineer cannot start on one paused before then.");
         }
 
         private string AssistSignature() =>
-            $"{_cfgAssistPauses.Value}|{_cfgAssistPauseDelay.Value}|{_cfgAssistPauseRadius.Value}";
+            $"{_cfgAssistPauses.Value}|{_cfgAssistPauseDelay.Value}";
 
         /// Called each frame; installs the hook once the match's Lua VM is up.
         private void UpdateAssistUpgrade(float deltaTime)
@@ -255,8 +248,8 @@ namespace SanctuaryHud
             if (_assistHookInstalled && _assistSignature != AssistSignature()) RemoveAssistHook();
 
             // Faster than the install upkeep below: this is what actually
-            // applies the delayed pause and watches for the engineer arriving,
-            // and a second's granularity would be visible on both.
+            // applies the delayed pause and watches for an engineer starting
+            // work, and a second's granularity would be visible on both.
             if (_assistHookInstalled && _cfgAssistPauses.Value)
             {
                 _tickAccum += deltaTime;
@@ -290,14 +283,13 @@ namespace SanctuaryHud
             {
                 var chunk = InstallChunk
                     .Replace("__PAUSE__", _cfgAssistPauses.Value ? "true" : "false")
-                    .Replace("__DELAY__", Math.Max(0f, _cfgAssistPauseDelay.Value).ToString(CultureInfo.InvariantCulture))
-                    .Replace("__RADIUS__", Math.Max(0f, _cfgAssistPauseRadius.Value).ToString(CultureInfo.InvariantCulture));
+                    .Replace("__DELAY__", Math.Max(0f, _cfgAssistPauseDelay.Value).ToString(CultureInfo.InvariantCulture));
                 if (!RunLua(chunk)) return;
                 _assistHookInstalled = true;
                 _assistSignature = AssistSignature();
                 _upgradesQueued = 0;
                 Logger.LogInfo("Assist-starts-upgrade hook installed for this match" +
-                               (_cfgAssistPauses.Value ? " (upgrades held paused until the engineer arrives)." : "."));
+                               (_cfgAssistPauses.Value ? " (upgrades held paused until an engineer starts building them)." : "."));
             }
             catch (Exception e)
             {
