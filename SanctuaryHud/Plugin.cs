@@ -409,16 +409,8 @@ namespace SanctuaryHud
             }
             if (_cfgBuildEta.Value) WorldOverlays.DrawBuildEtas(scale, logicalWidth, logicalHeight, _cfgBuildEtaMax.Value);
 
-            // The unit card, the one stand-in still drawn here, sits where the
-            // game's own card did; the rows are on the HUD canvas.
-            if (_cfgSanctuaryUi.Value)
-            {
-                // Behind a fence: an exception part-way through OnGUI leaves
-                // IMGUI's control bookkeeping out of step for the rest of the
-                // frame, and every button drawn after it stops taking clicks.
-                // Logged once.
-                Fenced("unit card", () => InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip));
-            }
+            // The stand-ins for the game's own bottom panels are on the HUD
+            // canvas (HudCanvas), not drawn here.
 
             // The strip and the commander widget are one player's own numbers,
             // so they step aside in a replay's all-armies view: there is no
@@ -443,23 +435,6 @@ namespace SanctuaryHud
         }
 
         private const float StripHeight = 48f;
-
-        private static readonly HashSet<string> _fenceLogged = new HashSet<string>();
-
-        /// Runs one stand-in's draw, catching anything it throws so the rest
-        /// of the frame still draws and still takes clicks. The first fault
-        /// at each site goes to the log with its stack; later ones are quiet.
-        private static void Fenced(string site, Action draw)
-        {
-            try
-            {
-                draw();
-            }
-            catch (Exception e)
-            {
-                if (_fenceLogged.Add(site)) _log?.LogWarning($"HUD {site} threw and was skipped this frame (logged once): {e}");
-            }
-        }
 
         // The game's UI palette (Beam UI, as the front menu uses it): near-
         // black blue panels with a hairline of accent blue.
@@ -508,7 +483,6 @@ namespace SanctuaryHud
             }
             WorldOverlays.ApplyFont(font);
             Alerts.ApplyFont(font);
-            InfoCard.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
             _stStripVersion = new GUIStyle(_stStripMax) { fontSize = 11, alignment = TextAnchor.MiddleCenter };
             _stStripGlyph = new GUIStyle(_stStripLabel) { fontSize = 16, alignment = TextAnchor.MiddleCenter };

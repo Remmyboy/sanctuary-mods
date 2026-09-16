@@ -6,6 +6,7 @@ using HarmonyLib;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
@@ -18,7 +19,7 @@ namespace SanctuaryHud
     // without learning the picture.
     //
     // With this on, the game's card is made invisible (PanelConceal) and a
-    // plainer one draws in its place from the same values — the postfix on
+    // plainer one stands in its place on the HUD canvas, from the same values — the postfix on
     // InformationPanelUI.SetValues catches every update Lua sends — with
     // labelled rows, a health bar, figures rounded and coloured by resource,
     // and only the rows that apply to this unit. No portrait: with ten units
@@ -352,49 +353,59 @@ namespace SanctuaryHud
             if (Enabled.Value || !TidyBuiltIn.Value) RestoreBuiltIn();
             if (panel != null && panel.IsVisible) Peek();
             else ForgetPeek();
+            try
+            {
+                SyncCard(panel);
+            }
+            catch (Exception e)
+            {
+                if (!_syncLogged)
+                {
+                    _syncLogged = true;
+                    _log?.LogWarning($"Unit card could not be laid out (logged once): {e}");
+                }
+                _card?.Show(false);
+            }
         }
 
         internal static void Shutdown()
         {
             _conceal.Release();
             RestoreBuiltIn();
+            _card?.Destroy();
+            _card = null;
         }
 
-        // ---- drawing --------------------------------------------------------------
+        // ---- the card ----------------------------------------------------------------
+        //
+        // As wide as the game's own card (528 canvas units), wider while a
+        // build queue shares the usage band; as tall as its rows. Built once
+        // on the HUD canvas (Card) and filled every frame from the values,
+        // rows switched on and off as they apply.
 
-        // As wide as the game's own card (528 canvas units at a 4K reference
-        // is 264 at 1080), and never taller than it: the selection list sits
-        // directly above and must stay clear.
-        private const float Width = 264f;
-        /// This draw's width: the base, or wider while a build queue shares
-        /// the usage band.
-        private static float _width = Width;
-        private const float Pad = 8f;
-        private const float GaugeHeight = 26f;
-        private const float QueueTile = 20f;
-        private const float JobTile = 40f;
+        private const float Width = 528f;
+        private const float QueueExtra = 120f;
+        private const float Pad = 16f;
+        private const float GaugeHeight = 52f;
+        private const float QueueTile = 40f;
+        private const float JobTile = 80f;
+        private const float MarkSize = 28f;
 
-        private static GUIStyle _stTitle, _stSubtitle, _stLabel, _stValue, _stFigure, _stSmall;
+        private static readonly Color LabelColour = new Color(0.85f, 0.90f, 0.97f);
+        private static readonly Color SubtitleColour = new Color(0.80f, 0.87f, 0.96f);
 
-        internal static void ApplyFont(Font font)
+        private static Card _card;
+        private static bool _syncLogged;
+
+        /// From Update, after the conceal and the peek: shows the card
+        /// where the game's sits, or hides it.
+        private static void SyncCard(InformationPanelUI panel)
         {
-            _stTitle = new GUIStyle(_stName) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
-            // The class and the gauge labels read as secondary but must stay
-            // legible over a bright map: light on the panel, no fading.
-            _stSubtitle = new GUIStyle(_stStripMax) { fontSize = 12, alignment = TextAnchor.MiddleRight, normal = { textColor = new Color(0.80f, 0.87f, 0.96f) } };
-            _stLabel = new GUIStyle(_stStripLabel) { fontSize = 11, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.85f, 0.90f, 0.97f) } };
-            _stValue = new GUIStyle(_stStripIn) { fontSize = 13, alignment = TextAnchor.MiddleRight, normal = { textColor = Color.white } };
-            _stFigure = new GUIStyle(_stStripIn) { fontSize = 13, alignment = TextAnchor.MiddleLeft };
-            _stSmall = new GUIStyle(_stStripIn) { fontSize = 11, alignment = TextAnchor.MiddleLeft };
-            if (font == null) return;
-            foreach (var style in new[] { _stTitle, _stSubtitle, _stLabel, _stValue, _stFigure, _stSmall }) style.font = font;
-        }
-
-        /// From OnGUI, under the 1080-logical matrix.
-        internal static void Draw(float logicalWidth, float logicalHeight, float scale, Texture2D panelTexture)
-        {
-            var panel = _conceal.Panel as InformationPanelUI;
-            if (panel == null || !panel.IsVisible || !_haveValues || _source != panel) return;
+            if (panel == null || !panel.IsVisible || !_haveValues || _source != panel)
+            {
+                _card?.Show(false);
+                return;
+            }
             // A build option under the mouse makes this a build card: what
             // it costs and how long the selected builders would take. That
             // shows whatever is selected. Otherwise, with a group selected
@@ -402,277 +413,507 @@ namespace SanctuaryHud
             // first, which says nothing about the group; the selection row
             // carries what is selected.
             var building = _hoverTemplate != null;
-            if (!building && !_hoveringUnit && SelectionRow.CountSelected() > 1) return;
-            // A job to show needs something in the queue: a builder can report
-            // progress on a target the queue does not list (a structure
-            // upgrading itself), and indexing an empty queue took the whole
-            // overlay down — every IMGUI control after the fault stopped
-            // taking clicks.
-            var factory = _queue.Count > 0;
-            _width = factory ? Width + 60f : Width;
-            if (_stTitle == null) ApplyFont(null);
+            if (!building && !_hoveringUnit && SelectionRow.CountSelected() > 1)
+            {
+                _card?.Show(false);
+                return;
+            }
+            var root = HudCanvas.Ensure(panel);
+            if (root == null) return;
+            if (_card == null || !_card.Alive)
+            {
+                HudCanvas.TakeFont(panel.unitName);
+                _card = Card.Create(root);
+            }
 
-            var v = _values;
-            var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
+            _card.Show(true);
+            _card.Fill(_values, building, Mathf.Clamp(Scale.Value, 0.7f, 1.6f));
 
-            var showArmour = v.isArmourShieldEnabled && v.armourShieldMax > 0f;
-            var showBubble = v.isBubbleShieldEnabled && v.bubbleShieldMax > 0f;
-            var showShield = !showBubble && _shieldMax > 0f;
-            var showHealth = v.healthMax > 0f;
-            var showIncome = Mathf.Abs(v.alloyNetIncome) >= 0.5f || Mathf.Abs(v.energyNetIncome) >= 0.5f;
-            var extras = Extras(v);
-
-            var height = Pad + 20f;
-            if (showHealth) height += GaugeHeight;
-            if (showArmour) height += GaugeHeight;
-            if (showBubble) height += GaugeHeight;
-            if (showShield) height += GaugeHeight;
-            if (v.isConstructionPercentEnabled) height += GaugeHeight;
-            if (building) height += 20f;
-            var band = 0f;
-            if (showIncome) band += 20f;
-            if (extras != null || v.buildPower > 0f) band += 18f;
-            if (factory) band = Mathf.Max(band, JobTile + 16f);
-            height += band;
-            height += Pad - 2f;
-
-            var area = new Rect(14f, logicalHeight - 14f - height * s, _width * s, height * s);
             // Where the game's own card sits: the replacement takes its bottom-left corner.
-            if (PanelConceal.GuiRect(panel, scale, out var anchor))
-            {
-                area.x = anchor.x;
-                area.y = anchor.yMax - area.height;
-            }
-
-            Shield(area, scale);
-            GUI.DrawTexture(area, panelTexture);
-            var accent = SanctuaryHudPlugin.GameAccent;
-            accent.a = 0.6f;
-            SanctuaryHudPlugin.Fill(new Rect(area.x, area.y, area.width, 1f), accent);
-
-            var previousMatrix = GUI.matrix;
-            GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(area.x, area.y, 0f), Quaternion.identity, new Vector3(s, s, 1f));
-
-            var inner = _width - Pad * 2f;
-            var y = Pad;
-
-            // The class of thing it is on the left as the title ("Tier 3:
-            // Tank" is what you act on), its given name on the right. A unit
-            // with no class line, an engineer say, has its name as the title.
-            var title = _display.Length > 0 ? _display : _name;
-            var aside = _display.Length > 0 ? _name : "";
-            GUI.Label(new Rect(Pad, y, inner, 20f), title, _stTitle);
-            if (aside.Length > 0)
-            {
-                var titleWidth = _stTitle.CalcSize(new GUIContent(title)).x;
-                GUI.Label(new Rect(Pad + titleWidth + 8f, y + 1f, inner - titleWidth - 8f, 20f), aside, _stSubtitle);
-            }
-            y += 20f;
-
-            if (showShield)
-            {
-                // The shield as the client sees it, read with the queue poll,
-                // above the health: it is what takes the hits first. While it
-                // is coming up the bar is the recharge instead, at which point
-                // the game shows 1 / 10,000 and the figure means nothing.
-                if (_shieldRecharge >= 0f && _shieldRecharge < 1f)
-                {
-                    var frac = Mathf.Clamp01(_shieldRecharge);
-                    GUI.Label(new Rect(Pad, y, inner, 16f), "SHIELD CHARGING", _stLabel);
-                    GUI.Label(new Rect(Pad, y, inner, 16f), (frac * 100f).ToString("0") + "%", _stValue);
-                    Bar(y + 17f, frac, new Color(0.55f, 0.78f, 1f, 0.55f));
-                    y += GaugeHeight;
-                }
-                else
-                {
-                    Gauge(ref y, "SHIELD", _shieldCur, _shieldMax, 0f, Mathf.Clamp01(_shieldCur / _shieldMax), UpgradeColour);
-                }
-            }
-            if (showHealth)
-            {
-                var frac = Mathf.Clamp01(v.healthValue / v.healthMax);
-                var colour = frac > 0.6f ? GainColour : frac > 0.3f ? new Color(0.95f, 0.72f, 0.2f) : DangerColour;
-                Gauge(ref y, "HEALTH", v.healthValue, v.healthMax, v.healthRegen, frac, colour);
-            }
-            if (showArmour)
-            {
-                Gauge(ref y, "ARMOUR", v.armourShieldValue, v.armourShieldMax, v.armourShieldRegen, Mathf.Clamp01(v.armourShieldValue / v.armourShieldMax), UpgradeColour);
-            }
-            if (showBubble)
-            {
-                Gauge(ref y, "SHIELD", v.bubbleShieldValue, v.bubbleShieldMax, v.bubbleShieldRegen, Mathf.Clamp01(v.bubbleShieldValue / v.bubbleShieldMax), UpgradeColour);
-            }
-            if (v.isConstructionPercentEnabled)
-            {
-                var frac = Mathf.Clamp01(v.constructionPercent);
-                GUI.Label(new Rect(Pad, y, inner, 16f), "BUILDING", _stLabel);
-                GUI.Label(new Rect(Pad, y, inner, 16f), (frac * 100f).ToString("0") + "%", _stValue);
-                Bar(y + 17f, frac, UpgradeColour);
-                y += GaugeHeight;
-            }
-
-            // What the unit adds to or takes from the economy, per second:
-            // just the figures, each in its resource's colour, and only the
-            // ones that are not zero (a generator makes energy, not alloy).
-            // No build cost: it is already paid by the time this card is
-            // about a unit, and the build menu is where it matters.
-            if (building)
-            {
-                // One line: alloy, energy, time, each behind its mark — an
-                // ingot, a bolt, a clock — so the figures need no words.
-                var fx = Pad;
-                fx = Marked(fx, y, "alloy", SanctuaryHudPlugin.AlloyTint, SanctuaryHudPlugin.Fmt(v.alloyBuildCost));
-                fx = Marked(fx, y, "energy", SanctuaryHudPlugin.EnergyTint, SanctuaryHudPlugin.Fmt(v.energyBuildCost));
-                Marked(fx, y, "time", Color.white, _hoverSeconds > 0f ? Duration(_hoverSeconds) : "—");
-                y += 20f;
-            }
-            // The usage rows share a band with the current job on the right:
-            // its art, large, the percentage under it, and the rest of the
-            // queue as small tiles beside it.
-            var bandTop = y;
-
-            if (showIncome)
-            {
-                // What it adds to or takes from the economy per second,
-                // behind the same marks; a zero is left out.
-                var fx = Pad;
-                string Rate(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
-                if (Mathf.Abs(v.alloyNetIncome) >= 0.5f) fx = Marked(fx, y, "alloy", SanctuaryHudPlugin.AlloyTint, Rate(v.alloyNetIncome));
-                if (Mathf.Abs(v.energyNetIncome) >= 0.5f) Marked(fx, y, "energy", SanctuaryHudPlugin.EnergyTint, Rate(v.energyNetIncome));
-                y += 20f;
-            }
-
-            if (extras != null || v.buildPower > 0f)
-            {
-                // Build power behind a hammer; the rarer figures as words after it.
-                var fx = Pad;
-                if (v.buildPower > 0f) fx = Marked(fx, y, "power", new Color(0.85f, 0.9f, 0.97f), SanctuaryHudPlugin.Fmt(v.buildPower));
-                if (extras != null)
-                {
-                    _stSmall.normal.textColor = new Color(0.85f, 0.9f, 0.97f);
-                    GUI.Label(new Rect(fx, y + 1f, inner - (fx - Pad), 16f), extras, _stSmall);
-                }
-                y += 18f;
-            }
-
-            if (factory)
-            {
-                // The current job, large, at the right edge of the band, the
-                // percentage under it; whatever is queued behind it as small
-                // tiles to its left, counts in their corners.
-                var job = new Rect(_width - Pad - JobTile, bandTop, JobTile, JobTile);
-                DrawQueueTile(job, _queue[0], false);
-                if (_factoryProgress >= 0f)
-                {
-                    _stSmall.normal.textColor = Color.white;
-                    var pct = (Mathf.Clamp01(_factoryProgress) * 100f).ToString("0") + "%";
-                    var size = _stSmall.CalcSize(new GUIContent(pct));
-                    GUI.Label(new Rect(job.center.x - size.x / 2f, job.yMax + 1f, size.x + 2f, 14f), pct, _stSmall);
-                }
-                var qx = job.x - 4f;
-                for (var i = 1; i < _queue.Count; i++)
-                {
-                    qx -= QueueTile + 3f;
-                    DrawQueueTile(new Rect(qx, bandTop + 2f, QueueTile, QueueTile), _queue[i], true);
-                }
-                y = Mathf.Max(y, bandTop + JobTile + 16f);
-            }
-
-            GUI.matrix = previousMatrix;
+            var at = new Vector2(28f, 28f);
+            if (HudCanvas.LocalRect(panel, out var anchor)) at = new Vector2(anchor.x, anchor.y);
+            _card.Place(at);
         }
 
-        /// One queue tile: the game's plate and art, and the count in the
-        /// corner where it is more than one.
-        private static void DrawQueueTile(Rect tile, QueueItem item, bool withCount)
-        {
-            SanctuaryHudPlugin.Fill(tile, new Color(0.1f, 0.12f, 0.15f, 0.9f));
-            if (HasSprite(item.Icon))
-            {
-                DrawSprite(tile, item.Plate);
-                DrawSprite(tile, item.Icon);
-            }
-            if (!withCount || item.Count <= 1) return;
-            var count = item.Count.ToString();
-            var size = _stSmall.CalcSize(new GUIContent(count));
-            SanctuaryHudPlugin.Fill(new Rect(tile.xMax - size.x - 4f, tile.yMax - size.y, size.x + 4f, size.y), new Color(0f, 0f, 0f, 0.65f));
-            _stSmall.normal.textColor = Color.white;
-            GUI.Label(new Rect(tile.xMax - size.x - 2f, tile.yMax - size.y, size.x + 2f, size.y), count, _stSmall);
-        }
-
-        /// A labelled gauge: label left, "value / max" right, regen beside
-        /// the value when there is any, and the bar underneath.
-        private static void Gauge(ref float y, string label, float value, float max, float regen, float frac, Color colour)
-        {
-            var inner = _width - Pad * 2f;
-            GUI.Label(new Rect(Pad, y, inner, 16f), label, _stLabel);
-            var text = SanctuaryHudPlugin.Fmt(value) + " / " + SanctuaryHudPlugin.Fmt(max);
-            GUI.Label(new Rect(Pad, y, inner, 16f), text, _stValue);
-            if (regen >= 0.5f)
-            {
-                var width = _stValue.CalcSize(new GUIContent(text)).x;
-                _stSmall.normal.textColor = GainColour;
-                var regenText = "+" + SanctuaryHudPlugin.Fmt(regen) + "/s";
-                var regenWidth = _stSmall.CalcSize(new GUIContent(regenText)).x;
-                GUI.Label(new Rect(Pad + inner - width - regenWidth - 8f, y + 1f, regenWidth, 16f), regenText, _stSmall);
-            }
-            Bar(y + 17f, frac, colour);
-            y += GaugeHeight;
-        }
-
-        private static void Bar(float y, float frac, Color colour)
-        {
-            var inner = _width - Pad * 2f;
-            var track = SanctuaryHudPlugin.GameAccent;
-            track.a = 0.14f;
-            SanctuaryHudPlugin.Fill(new Rect(Pad, y, inner, 4f), track);
-            SanctuaryHudPlugin.Fill(new Rect(Pad, y, inner * frac, 4f), colour);
-        }
-
-        /// A mark (one of the HUD's glyphs) in the given tint, then a figure
-        /// in the same tint. Returns where the next one starts.
-        private static float Marked(float x, float y, string glyph, Color tint, string text)
-        {
-            var mark = Glyphs.Get(glyph);
-            if (mark != null)
-            {
-                var previous = GUI.color;
-                GUI.color = tint;
-                GUI.DrawTexture(new Rect(x, y + 2f, 14f, 14f), mark);
-                GUI.color = previous;
-                x += 17f;
-            }
-            _stFigure.normal.textColor = tint;
-            GUI.Label(new Rect(x, y, _width, 18f), text, _stFigure);
-            return x + _stFigure.CalcSize(new GUIContent(text)).x + 14f;
-        }
-
-        /// Alloy then energy rates side by side in their tints, signed, per
-        /// second; a zero is left out.
-        private static void Figures(float x, float y, float width, float alloy, float energy)
-        {
-            string Show(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
-            if (Mathf.Abs(alloy) >= 0.5f)
-            {
-                var a = Show(alloy);
-                _stFigure.normal.textColor = SanctuaryHudPlugin.AlloyTint;
-                GUI.Label(new Rect(x, y, width, 18f), a, _stFigure);
-                x += _stFigure.CalcSize(new GUIContent(a)).x + 12f;
-            }
-            if (Mathf.Abs(energy) >= 0.5f)
-            {
-                _stFigure.normal.textColor = SanctuaryHudPlugin.EnergyTint;
-                GUI.Label(new Rect(x, y, width, 18f), Show(energy), _stFigure);
-            }
-        }
+        private static string Rate(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
 
         /// The occasional figures, one line, only the ones that apply.
         private static string Extras(UIInformationValues v)
         {
-            var parts = new System.Collections.Generic.List<string>();
+            var parts = new List<string>();
             if (v.veterancy > 0f) parts.Add("VETERANCY " + SanctuaryHudPlugin.Fmt(v.veterancy));
             if (v.transportCapacity > 0f) parts.Add("TRANSPORT " + SanctuaryHudPlugin.Fmt(v.transportCapacity));
             if (v.ammoCapacity > 0f) parts.Add("AMMO " + SanctuaryHudPlugin.Fmt(v.ammoCapacity));
             return parts.Count == 0 ? null : string.Join("    ", parts);
+        }
+
+        /// The card's objects: a plate with a column of rows.
+        private sealed class Card
+        {
+            private RectTransform _rect;
+            private TMP_Text _title, _aside;
+            private readonly Gauge[] _gauges = new Gauge[5];   // shield, health, armour, bubble, building
+            private FigureLine _build, _income, _power;
+            private GameObject _band;
+            private RectTransform _left;
+            private GameObject _queueBlock;
+            private readonly QueueTileView[] _small = new QueueTileView[4];
+            private QueueTileView _job;
+            private TMP_Text _jobPercent;
+
+            internal bool Alive => _rect != null;
+
+            internal static Card Create(RectTransform root)
+            {
+                var card = new Card();
+                var rt = HudCanvas.Plate(root, "Unit card");
+                card._rect = rt;
+                var column = rt.gameObject.AddComponent<VerticalLayoutGroup>();
+                column.padding = new RectOffset((int)Pad, (int)Pad, (int)Pad, (int)(Pad - 4f));
+                column.spacing = 2f;
+                column.childAlignment = TextAnchor.UpperLeft;
+                column.childControlWidth = true;
+                column.childControlHeight = true;
+                column.childForceExpandWidth = true;
+                column.childForceExpandHeight = false;
+                var fitter = rt.gameObject.AddComponent<ContentSizeFitter>();
+                fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                rt.sizeDelta = new Vector2(Width, 100f);
+
+                // The class of thing it is on the left as the title ("Tier 3:
+                // Tank" is what you act on), its given name after it.
+                var titleRow = Row(rt, "Title", 16f, TextAnchor.MiddleLeft);
+                card._title = HudCanvas.Text(titleRow, "Class", 30f, Color.white, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+                card._aside = HudCanvas.Text(titleRow, "Name", 24f, SubtitleColour, TextAlignmentOptions.MidlineLeft);
+                card._aside.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+                var names = new[] { "Shield", "Health", "Armour", "Bubble shield", "Building" };
+                for (var i = 0; i < card._gauges.Length; i++) card._gauges[i] = Gauge.Create(rt, names[i]);
+
+                // One line: alloy, energy, time, each behind its mark — an
+                // ingot, a bolt, a clock — so the figures need no words.
+                card._build = FigureLine.Create(rt, "Build", 3, false);
+
+                // The usage rows share a band with the current job on the
+                // right: its art, large, the percentage under it, and the
+                // rest of the queue as small tiles beside it.
+                var band = Row(rt, "Band", 8f, TextAnchor.UpperLeft);
+                card._band = band.gameObject;
+                var left = new GameObject("Usage", typeof(RectTransform));
+                left.transform.SetParent(band, false);
+                var leftGroup = left.AddComponent<VerticalLayoutGroup>();
+                leftGroup.spacing = 2f;
+                leftGroup.childAlignment = TextAnchor.UpperLeft;
+                leftGroup.childControlWidth = true;
+                leftGroup.childControlHeight = true;
+                leftGroup.childForceExpandWidth = false;
+                leftGroup.childForceExpandHeight = false;
+                left.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                card._left = (RectTransform)left.transform;
+                card._income = FigureLine.Create(card._left, "Income", 2, false);
+                card._power = FigureLine.Create(card._left, "Power", 1, true);
+
+                var queue = Row(band, "Queue", 6f, TextAnchor.UpperLeft);
+                card._queueBlock = queue.gameObject;
+                for (var i = 0; i < card._small.Length; i++) card._small[i] = QueueTileView.Create(queue, "Queued", QueueTile, true);
+                var jobColumn = new GameObject("Job", typeof(RectTransform));
+                jobColumn.transform.SetParent(queue, false);
+                var jobGroup = jobColumn.AddComponent<VerticalLayoutGroup>();
+                jobGroup.spacing = 2f;
+                jobGroup.childAlignment = TextAnchor.UpperCenter;
+                jobGroup.childControlWidth = true;
+                jobGroup.childControlHeight = true;
+                jobGroup.childForceExpandWidth = false;
+                jobGroup.childForceExpandHeight = false;
+                card._job = QueueTileView.Create(jobColumn.transform, "Current", JobTile, false);
+                card._jobPercent = HudCanvas.Text(jobColumn.transform, "Percent", 22f, Color.white, TextAlignmentOptions.Center);
+
+                rt.gameObject.SetActive(false);
+                return card;
+            }
+
+            /// A horizontal row of the column.
+            private static RectTransform Row(Transform parent, string name, float spacing, TextAnchor alignment)
+            {
+                var go = new GameObject(name, typeof(RectTransform));
+                go.transform.SetParent(parent, false);
+                var group = go.AddComponent<HorizontalLayoutGroup>();
+                group.spacing = spacing;
+                group.childAlignment = alignment;
+                group.childControlWidth = true;
+                group.childControlHeight = true;
+                group.childForceExpandWidth = false;
+                group.childForceExpandHeight = false;
+                return (RectTransform)go.transform;
+            }
+
+            internal void Show(bool showing)
+            {
+                if (_rect == null) return;
+                if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+            }
+
+            internal void Place(Vector2 bottomLeft)
+            {
+                if (_rect != null) _rect.anchoredPosition = bottomLeft;
+            }
+
+            internal void Destroy()
+            {
+                if (_rect != null) UnityEngine.Object.Destroy(_rect.gameObject);
+                _rect = null;
+            }
+
+            internal void Fill(UIInformationValues v, bool building, float scale)
+            {
+                _rect.localScale = new Vector3(scale, scale, 1f);
+                var factory = _queue.Count > 0;
+                var width = factory ? Width + QueueExtra : Width;
+                if (Mathf.Abs(_rect.sizeDelta.x - width) > 0.5f) _rect.sizeDelta = new Vector2(width, _rect.sizeDelta.y);
+
+                var title = _display.Length > 0 ? _display : _name;
+                var aside = _display.Length > 0 ? _name : "";
+                HudCanvas.SetText(_title, title);
+                HudCanvas.SetText(_aside, aside);
+                Active(_aside.gameObject, aside.Length > 0);
+
+                var showArmour = v.isArmourShieldEnabled && v.armourShieldMax > 0f;
+                var showBubble = v.isBubbleShieldEnabled && v.bubbleShieldMax > 0f;
+                var showShield = !showBubble && _shieldMax > 0f;
+                var showHealth = v.healthMax > 0f;
+
+                // The shield as the client sees it, read with the queue poll,
+                // above the health: it is what takes the hits first. While it
+                // is coming up the bar is the recharge instead, at which point
+                // the game shows 1 / 10,000 and the figure means nothing.
+                if (showShield && _shieldRecharge >= 0f && _shieldRecharge < 1f)
+                {
+                    var frac = Mathf.Clamp01(_shieldRecharge);
+                    _gauges[0].Set("SHIELD CHARGING", (frac * 100f).ToString("0") + "%", null, frac, new Color(0.55f, 0.78f, 1f, 0.55f));
+                }
+                else if (showShield)
+                {
+                    _gauges[0].Set("SHIELD", _shieldCur, _shieldMax, 0f, UpgradeColour);
+                }
+                _gauges[0].Show(showShield);
+
+                if (showHealth)
+                {
+                    var frac = Mathf.Clamp01(v.healthValue / v.healthMax);
+                    var colour = frac > 0.6f ? GainColour : frac > 0.3f ? new Color(0.95f, 0.72f, 0.2f) : DangerColour;
+                    _gauges[1].Set("HEALTH", v.healthValue, v.healthMax, v.healthRegen, colour);
+                }
+                _gauges[1].Show(showHealth);
+                if (showArmour) _gauges[2].Set("ARMOUR", v.armourShieldValue, v.armourShieldMax, v.armourShieldRegen, UpgradeColour);
+                _gauges[2].Show(showArmour);
+                if (showBubble) _gauges[3].Set("SHIELD", v.bubbleShieldValue, v.bubbleShieldMax, v.bubbleShieldRegen, UpgradeColour);
+                _gauges[3].Show(showBubble);
+                if (v.isConstructionPercentEnabled)
+                {
+                    var frac = Mathf.Clamp01(v.constructionPercent);
+                    _gauges[4].Set("BUILDING", (frac * 100f).ToString("0") + "%", null, frac, UpgradeColour);
+                }
+                _gauges[4].Show(v.isConstructionPercentEnabled);
+
+                // The build card's line: cost and time. Otherwise what the
+                // unit adds to or takes from the economy, per second, behind
+                // the same marks, only where it is not zero (a generator
+                // makes energy, not alloy); no build cost, since it is paid
+                // by the time this card is about a unit.
+                if (building)
+                {
+                    _build.Set(0, "alloy", SanctuaryHudPlugin.AlloyTint, SanctuaryHudPlugin.Fmt(v.alloyBuildCost));
+                    _build.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, SanctuaryHudPlugin.Fmt(v.energyBuildCost));
+                    _build.Set(2, "time", Color.white, _hoverSeconds > 0f ? Duration(_hoverSeconds) : "—");
+                }
+                _build.Show(building);
+
+                var alloy = Mathf.Abs(v.alloyNetIncome) >= 0.5f;
+                var energy = Mathf.Abs(v.energyNetIncome) >= 0.5f;
+                if (alloy) _income.Set(0, "alloy", SanctuaryHudPlugin.AlloyTint, Rate(v.alloyNetIncome));
+                else _income.Clear(0);
+                if (energy) _income.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, Rate(v.energyNetIncome));
+                else _income.Clear(1);
+                _income.Show(alloy || energy);
+
+                // Build power behind a hammer; the rarer figures as words after it.
+                var extras = Extras(v);
+                if (v.buildPower > 0f) _power.Set(0, "power", LabelColour, SanctuaryHudPlugin.Fmt(v.buildPower));
+                else _power.Clear(0);
+                _power.SetExtras(extras);
+                _power.Show(extras != null || v.buildPower > 0f);
+
+                // The current job, large, at the right edge of the band, the
+                // percentage under it; whatever is queued behind it as small
+                // tiles to its left, counts in their corners, nearest first.
+                if (factory)
+                {
+                    _job.Set(_queue[0], false);
+                    var pct = _factoryProgress >= 0f ? (Mathf.Clamp01(_factoryProgress) * 100f).ToString("0") + "%" : "";
+                    HudCanvas.SetText(_jobPercent, pct);
+                    Active(_jobPercent.gameObject, pct.Length > 0);
+                    var queued = Mathf.Min(_queue.Count - 1, _small.Length);
+                    for (var i = 0; i < _small.Length; i++)
+                    {
+                        // Left to right: the furthest first, the next up beside the job.
+                        var at = queued - i;
+                        var on = i < queued;
+                        if (on) _small[i].Set(_queue[at], true);
+                        _small[i].Show(on);
+                    }
+                }
+                Active(_queueBlock, factory);
+                Active(_band, factory || alloy || energy || extras != null || v.buildPower > 0f);
+            }
+
+            private static void Active(GameObject go, bool on)
+            {
+                if (go != null && go.activeSelf != on) go.SetActive(on);
+            }
+        }
+
+        /// A labelled gauge: label left, "value / max" right, regen beside
+        /// the value when there is any, and the bar underneath.
+        private sealed class Gauge
+        {
+            private GameObject _go;
+            private TMP_Text _label, _value, _regen;
+            private Image _fill;
+
+            internal static Gauge Create(Transform parent, string name)
+            {
+                var gauge = new Gauge();
+                var go = new GameObject(name, typeof(RectTransform));
+                go.transform.SetParent(parent, false);
+                gauge._go = go;
+                var column = go.AddComponent<VerticalLayoutGroup>();
+                column.spacing = 2f;
+                column.childAlignment = TextAnchor.UpperLeft;
+                column.childControlWidth = true;
+                column.childControlHeight = true;
+                column.childForceExpandWidth = true;
+                column.childForceExpandHeight = false;
+                var layout = go.AddComponent<LayoutElement>();
+                layout.minHeight = GaugeHeight;
+                layout.preferredHeight = GaugeHeight;
+
+                var texts = new GameObject("Texts", typeof(RectTransform));
+                texts.transform.SetParent(go.transform, false);
+                var row = texts.AddComponent<HorizontalLayoutGroup>();
+                row.spacing = 12f;
+                row.childAlignment = TextAnchor.MiddleLeft;
+                row.childControlWidth = true;
+                row.childControlHeight = true;
+                row.childForceExpandWidth = false;
+                row.childForceExpandHeight = false;
+                gauge._label = HudCanvas.Text(texts.transform, "Label", 22f, LabelColour, TextAlignmentOptions.MidlineLeft);
+                gauge._label.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+                gauge._regen = HudCanvas.Text(texts.transform, "Regen", 22f, GainColour, TextAlignmentOptions.MidlineRight);
+                gauge._value = HudCanvas.Text(texts.transform, "Value", 26f, Color.white, TextAlignmentOptions.MidlineRight);
+
+                var track = SanctuaryHudPlugin.GameAccent;
+                track.a = 0.14f;
+                var bar = HudCanvas.Fill(go.transform, "Bar", track);
+                bar.gameObject.AddComponent<LayoutElement>().preferredHeight = 8f;
+                gauge._fill = HudCanvas.Fill(bar.transform, "Fill", Color.white);
+                gauge._fill.sprite = HudCanvas.White;
+                gauge._fill.type = Image.Type.Filled;
+                gauge._fill.fillMethod = Image.FillMethod.Horizontal;
+                gauge._fill.fillOrigin = 0;
+                var frt = gauge._fill.rectTransform;
+                frt.anchorMin = Vector2.zero;
+                frt.anchorMax = Vector2.one;
+                frt.offsetMin = Vector2.zero;
+                frt.offsetMax = Vector2.zero;
+                go.SetActive(false);
+                return gauge;
+            }
+
+            internal void Show(bool showing)
+            {
+                if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
+            }
+
+            internal void Set(string label, float value, float max, float regen, Color colour)
+            {
+                var text = SanctuaryHudPlugin.Fmt(value) + " / " + SanctuaryHudPlugin.Fmt(max);
+                var frac = max > 0f ? Mathf.Clamp01(value / max) : 0f;
+                Set(label, text, regen >= 0.5f ? "+" + SanctuaryHudPlugin.Fmt(regen) + "/s" : null, frac, colour);
+            }
+
+            internal void Set(string label, string value, string regen, float frac, Color colour)
+            {
+                HudCanvas.SetText(_label, label);
+                HudCanvas.SetText(_value, value);
+                HudCanvas.SetText(_regen, regen ?? "");
+                var showRegen = !string.IsNullOrEmpty(regen);
+                if (_regen.gameObject.activeSelf != showRegen) _regen.gameObject.SetActive(showRegen);
+                _fill.fillAmount = frac;
+                _fill.color = colour;
+            }
+        }
+
+        /// A line of figures, each behind a mark (one of the HUD's glyphs)
+        /// in its tint; optionally a run of words after them.
+        private sealed class FigureLine
+        {
+            private GameObject _go;
+            private RawImage[] _marks;
+            private TMP_Text[] _figures;
+            private GameObject[] _items;
+            private TMP_Text _extras;
+
+            internal static FigureLine Create(Transform parent, string name, int count, bool withExtras)
+            {
+                var line = new FigureLine();
+                var go = new GameObject(name, typeof(RectTransform));
+                go.transform.SetParent(parent, false);
+                line._go = go;
+                var row = go.AddComponent<HorizontalLayoutGroup>();
+                row.spacing = 24f;
+                row.childAlignment = TextAnchor.MiddleLeft;
+                row.childControlWidth = true;
+                row.childControlHeight = true;
+                row.childForceExpandWidth = false;
+                row.childForceExpandHeight = false;
+                line._marks = new RawImage[count];
+                line._figures = new TMP_Text[count];
+                line._items = new GameObject[count];
+                for (var i = 0; i < count; i++)
+                {
+                    var item = new GameObject("Figure", typeof(RectTransform));
+                    item.transform.SetParent(go.transform, false);
+                    var pair = item.AddComponent<HorizontalLayoutGroup>();
+                    pair.spacing = 6f;
+                    pair.childAlignment = TextAnchor.MiddleLeft;
+                    pair.childControlWidth = true;
+                    pair.childControlHeight = true;
+                    pair.childForceExpandWidth = false;
+                    pair.childForceExpandHeight = false;
+                    var mark = new GameObject("Mark", typeof(RectTransform));
+                    mark.transform.SetParent(item.transform, false);
+                    var image = mark.AddComponent<RawImage>();
+                    image.raycastTarget = false;
+                    var markLayout = mark.AddComponent<LayoutElement>();
+                    markLayout.preferredWidth = MarkSize;
+                    markLayout.preferredHeight = MarkSize;
+                    markLayout.minWidth = MarkSize;
+                    markLayout.minHeight = MarkSize;
+                    line._marks[i] = image;
+                    line._figures[i] = HudCanvas.Text(item.transform, "Text", 26f, Color.white, TextAlignmentOptions.MidlineLeft);
+                    line._items[i] = item;
+                    item.SetActive(false);
+                }
+                if (withExtras)
+                {
+                    line._extras = HudCanvas.Text(go.transform, "Extras", 22f, LabelColour, TextAlignmentOptions.MidlineLeft);
+                    line._extras.gameObject.SetActive(false);
+                }
+                go.SetActive(false);
+                return line;
+            }
+
+            internal void Show(bool showing)
+            {
+                if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
+            }
+
+            internal void Set(int index, string glyph, Color tint, string text)
+            {
+                var mark = Glyphs.Get(glyph);
+                _marks[index].texture = mark;
+                _marks[index].color = tint;
+                var showMark = mark != null;
+                if (_marks[index].gameObject.activeSelf != showMark) _marks[index].gameObject.SetActive(showMark);
+                _figures[index].color = tint;
+                HudCanvas.SetText(_figures[index], text);
+                if (!_items[index].activeSelf) _items[index].SetActive(true);
+            }
+
+            internal void Clear(int index)
+            {
+                if (_items[index].activeSelf) _items[index].SetActive(false);
+            }
+
+            internal void SetExtras(string text)
+            {
+                if (_extras == null) return;
+                HudCanvas.SetText(_extras, text ?? "");
+                var on = !string.IsNullOrEmpty(text);
+                if (_extras.gameObject.activeSelf != on) _extras.gameObject.SetActive(on);
+            }
+        }
+
+        /// One queue tile: the game's plate and art, and the count in the
+        /// corner where it is more than one.
+        private sealed class QueueTileView
+        {
+            private GameObject _go;
+            private Image _plate, _icon;
+            private GameObject _countBox;
+            private TMP_Text _count;
+
+            internal static QueueTileView Create(Transform parent, string name, float size, bool withCount)
+            {
+                var view = new QueueTileView();
+                var back = HudCanvas.Fill(parent, name, new Color(0.1f, 0.12f, 0.15f, 0.9f));
+                view._go = back.gameObject;
+                var layout = view._go.AddComponent<LayoutElement>();
+                layout.preferredWidth = size;
+                layout.preferredHeight = size;
+                layout.minWidth = size;
+                layout.minHeight = size;
+                view._plate = Stretched(back.transform, "Plate");
+                view._icon = Stretched(back.transform, "Art");
+                if (withCount)
+                {
+                    var box = HudCanvas.Fill(back.transform, "Count", new Color(0f, 0f, 0f, 0.65f));
+                    view._countBox = box.gameObject;
+                    var brt = box.rectTransform;
+                    brt.anchorMin = brt.anchorMax = brt.pivot = new Vector2(1f, 0f);
+                    brt.sizeDelta = new Vector2(22f, 20f);
+                    view._count = HudCanvas.Text(box.transform, "Text", 18f, Color.white, TextAlignmentOptions.Center);
+                    var crt = view._count.rectTransform;
+                    crt.anchorMin = Vector2.zero;
+                    crt.anchorMax = Vector2.one;
+                    crt.offsetMin = Vector2.zero;
+                    crt.offsetMax = Vector2.zero;
+                }
+                view._go.SetActive(false);
+                return view;
+            }
+
+            private static Image Stretched(Transform parent, string name)
+            {
+                var image = HudCanvas.Fill(parent, name, Color.white);
+                var rt = image.rectTransform;
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                image.enabled = false;
+                return image;
+            }
+
+            internal void Show(bool showing)
+            {
+                if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
+            }
+
+            internal void Set(QueueItem item, bool withCount)
+            {
+                var icon = SpriteFor(item.Icon);
+                var plate = icon != null ? SpriteFor(item.Plate) : null;
+                _plate.sprite = plate;
+                _plate.enabled = plate != null;
+                _icon.sprite = icon;
+                _icon.enabled = icon != null;
+                if (_countBox == null) return;
+                var on = withCount && item.Count > 1;
+                if (on) HudCanvas.SetText(_count, item.Count.ToString());
+                if (_countBox.activeSelf != on) _countBox.SetActive(on);
+            }
         }
 
         // ---- diagnostics ------------------------------------------------------

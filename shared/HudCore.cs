@@ -190,6 +190,9 @@ namespace SanctuaryHud
         /// row shares one indent, rather than rows jumping as their art loads.
         internal static bool HasSprite(uint index) => ResolveSprite(index) != null;
 
+        /// The sprite itself, for a uGUI Image; null when it isn't loaded.
+        internal static Sprite SpriteFor(uint index) => ResolveSprite(index);
+
         /// Draws one in IMGUI. A Sprite's pixels are a window into a packed
         /// atlas, so the draw has to be told which corner of the texture.
         /// `fraction` clips it horizontally, for showing one running off an edge.

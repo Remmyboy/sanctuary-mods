@@ -1,5 +1,6 @@
 using System;
 using SanctuaryUI;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using static SanctuaryHud.HudCore;
@@ -129,6 +130,66 @@ namespace SanctuaryHud
 
         /// The root's size in its own units (the screen, in canvas units).
         internal static Vector2 Size => _root != null ? _root.rect.size : Vector2.zero;
+
+        // ---- text and sprites ----------------------------------------------------
+
+        private static TMP_FontAsset _font;
+        private static Material _fontMaterial;
+
+        /// Takes the game's typeface off one of its own texts, for every
+        /// text made here after: the font asset and the material it is
+        /// rendered with.
+        internal static void TakeFont(TMP_Text from)
+        {
+            if (from == null || from.font == null) return;
+            _font = from.font;
+            _fontMaterial = from.fontSharedMaterial;
+        }
+
+        /// A TextMeshPro text in the game's font (when one has been taken),
+        /// at the given size in canvas units, not catching the mouse.
+        internal static TextMeshProUGUI Text(Transform parent, string name, float size, Color colour, TextAlignmentOptions alignment, FontStyles style = FontStyles.Normal)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var text = go.AddComponent<TextMeshProUGUI>();
+            if (_font != null)
+            {
+                text.font = _font;
+                if (_fontMaterial != null) text.fontSharedMaterial = _fontMaterial;
+            }
+            text.fontSize = size;
+            text.color = colour;
+            text.alignment = alignment;
+            text.fontStyle = style;
+            text.raycastTarget = false;
+            text.overflowMode = TextOverflowModes.Overflow;
+            return text;
+        }
+
+        /// Sets a text only when it changes, so an unchanged card costs no
+        /// layout.
+        internal static void SetText(TMP_Text text, string value)
+        {
+            if (text != null && text.text != value) text.text = value;
+        }
+
+        private static Sprite _white;
+
+        /// A plain white sprite: an Image needs one to fill by amount.
+        internal static Sprite White
+        {
+            get
+            {
+                if (_white != null) return _white;
+                var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+                texture.SetPixels(new[] { Color.white, Color.white, Color.white, Color.white });
+                texture.Apply(false, true);
+                _white = Sprite.Create(texture, new Rect(0f, 0f, 2f, 2f), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+                _white.hideFlags = HideFlags.HideAndDontSave;
+                return _white;
+            }
+        }
 
         // ---- building blocks ----------------------------------------------------
 

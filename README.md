@@ -175,9 +175,10 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   setting applies, the count text is the game's own TextMeshPro in its own
   font, a click over it never reaches the map (the game gates on its event
   system, so no invisible shield is needed), and a fault in one tile's
-  update cannot stop the rest of the HUD taking clicks. The orders row is
-  built the same way; the unit card is to follow. The strip, mini-map and
-  map labels stay IMGUI, which suits them.
+  update cannot stop the rest of the HUD taking clicks. The orders row and
+  the unit card are built the same way (the card's texts are TextMeshPro in
+  the game's font, its gauges filled Images). The strip, mini-map and map
+  labels stay IMGUI, which suits them.
 - **Build strip** (`BuildStrip`) in place of the game's build options, tier
   tabs and build queue, each of which is a dashed panel with paging arrows
   and "coming soon" placeholders. The HUD lays the bottom out itself from
