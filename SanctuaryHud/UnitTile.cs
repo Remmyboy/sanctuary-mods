@@ -19,8 +19,17 @@ namespace SanctuaryHud
     // a build option's figures on the unit card.
     internal sealed class UnitTile : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
     {
-        /// The game's tile is 80 canvas units square.
-        internal const float Size = 80f;
+        /// The size of the panel's own tile, off its prefab (the selection
+        /// list's is 112 by 72 canvas units), so the art keeps its shape;
+        /// 80 square when that can't be read.
+        internal static Vector2 NativeSize(SanctuaryPanelUI panel)
+        {
+            var prefab = panel != null ? panel.buttonPrefab : null;
+            if (prefab != null && prefab.transform is RectTransform rt && rt.rect.width > 1f && rt.rect.height > 1f) return rt.rect.size;
+            return new Vector2(80f, 80f);
+        }
+
+        private Vector2 _native = new Vector2(80f, 80f);
 
         private UnitButtonElement _source;
         private Image _background, _portrait, _icon, _progress;
@@ -53,6 +62,7 @@ namespace SanctuaryHud
                 go = Instantiate(prefab, holder);
                 go.name = "Tile";
                 var tile = go.AddComponent<UnitTile>();
+                tile._native = NativeSize(panel);
 
                 var element = go.GetComponent<UnitButtonElement>();
                 if (element != null)
@@ -133,13 +143,13 @@ namespace SanctuaryHud
         /// Takes the given game button's look for this frame: its art (or
         /// the HUD's element tile behind the portrait), count, progress and
         /// whether it can be clicked; the badge when asked for.
-        internal void Mirror(UnitButtonElement source, float width, bool badge)
+        internal void Mirror(UnitButtonElement source, bool badge)
         {
             _source = source;
-            _layout.preferredWidth = width;
-            _layout.preferredHeight = Size;
-            _layout.minWidth = width;
-            _layout.minHeight = Size;
+            _layout.preferredWidth = _native.x;
+            _layout.preferredHeight = _native.y;
+            _layout.minWidth = _native.x;
+            _layout.minHeight = _native.y;
 
             var portrait = source.portraitImage != null ? source.portraitImage.overrideSprite : null;
             var domain = UnitDomains.Enabled != null && UnitDomains.Enabled.Value ? UnitDomains.Of(portrait) : UnitDomains.Domain.Unknown;

@@ -7,14 +7,16 @@ namespace SanctuaryHud
 {
     // A row of unit tiles (UnitTile) on the HUD canvas: the game's panel
     // colour behind them with the accent hairline along the top, laid out
-    // by a HorizontalLayoutGroup and sized to its contents, with a break —
-    // a gap with a line down its middle — where the game's list put a
-    // separator. Anchored by its bottom-left corner; Place puts that where
-    // the caller wants it, in canvas units from the screen's bottom-left.
+    // by layout groups and sized to the contents, with a break — a gap with
+    // a line down its middle — where the game's list put a separator. A row
+    // given a width limit wraps onto further lines, the first line at the
+    // top, and the plate grows to hold them. Anchored by its bottom-left
+    // corner; Place puts that where the caller wants it, in canvas units
+    // from the screen's bottom-left.
     //
     // Sync takes the entries UnitRow.Collect read off a game panel: the
-    // children are rebuilt only when the sequence of game buttons changes,
-    // and every tile mirrors its button every frame.
+    // children are rebuilt only when the sequence of game buttons, or the
+    // way it wraps, changes, and every tile mirrors its button every frame.
     internal sealed class TileRow
     {
         internal const float Gap = 8f;
@@ -23,10 +25,14 @@ namespace SanctuaryHud
 
         private RectTransform _rect;
         private SanctuaryPanelUI _panel;
+        private Vector2 _tileSize = new Vector2(80f, 80f);
         private readonly List<UnitTile> _tiles = new List<UnitTile>();
         private readonly List<GameObject> _separators = new List<GameObject>();
+        private readonly List<RectTransform> _lines = new List<RectTransform>();
         private readonly List<UnitButtonElement> _shown = new List<UnitButtonElement>();
+        private readonly List<int> _shownLines = new List<int>();
         private readonly List<UnitTile> _live = new List<UnitTile>();
+        private readonly List<int> _wrap = new List<int>();
 
         internal RectTransform Rect => _rect;
         internal bool Alive => _rect != null;
@@ -34,20 +40,8 @@ namespace SanctuaryHud
 
         internal static TileRow Create(RectTransform root, string name)
         {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(root, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.zero;
-            rt.pivot = Vector2.zero;
-
-            // The plate is a raycast target: the gaps between tiles must not
-            // let a click through to the map either.
-            var back = go.AddComponent<Image>();
-            back.color = SanctuaryHudPlugin.GamePanelColour;
-            back.raycastTarget = true;
-
-            var group = go.AddComponent<HorizontalLayoutGroup>();
+            var rt = HudCanvas.Plate(root, name);
+            var group = rt.gameObject.AddComponent<VerticalLayoutGroup>();
             group.padding = new RectOffset((int)Pad, (int)Pad, (int)Pad, (int)Pad);
             group.spacing = Gap;
             group.childAlignment = TextAnchor.LowerLeft;
@@ -55,18 +49,8 @@ namespace SanctuaryHud
             group.childControlHeight = true;
             group.childForceExpandWidth = false;
             group.childForceExpandHeight = false;
-
-            var fitter = go.AddComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var accent = SanctuaryHudPlugin.GameAccent;
-            accent.a = 0.6f;
-            var line = HudCanvas.Fill(rt, "Accent", accent);
-            HudCanvas.StretchAlongTop(line.rectTransform, 2f);
-            line.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-
-            go.SetActive(false);
+            HudCanvas.FitToContents(rt);
+            rt.gameObject.SetActive(false);
             return new TileRow { _rect = rt };
         }
 
@@ -81,8 +65,9 @@ namespace SanctuaryHud
             if (_rect != null) _rect.anchoredPosition = bottomLeft;
         }
 
-        /// The row's width on the canvas, its scale included.
+        /// The row's size on the canvas, its scale included.
         internal float Width => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
+        internal float Height => _rect != null ? _rect.rect.height * _rect.localScale.y : 0f;
 
         internal void Destroy()
         {
@@ -90,13 +75,16 @@ namespace SanctuaryHud
             _rect = null;
             _tiles.Clear();
             _separators.Clear();
+            _lines.Clear();
             _shown.Clear();
+            _shownLines.Clear();
             _live.Clear();
         }
 
         /// Makes the row show these entries, at this scale, mirroring the
-        /// game's buttons; badges puts the strategic icon on each tile.
-        internal void Sync(SanctuaryPanelUI panel, List<UnitRow.Entry> entries, bool badges, float scale)
+        /// game's buttons; badges puts the strategic icon on each tile;
+        /// maxWidth (canvas units, at the given scale) wraps it.
+        internal void Sync(SanctuaryPanelUI panel, List<UnitRow.Entry> entries, bool badges, float scale, float maxWidth = float.MaxValue)
         {
             if (_rect == null) return;
             if (panel != _panel)
@@ -109,12 +97,17 @@ namespace SanctuaryHud
                 _tiles.Clear();
                 _separators.Clear();
                 _shown.Clear();
+                _shownLines.Clear();
                 _live.Clear();
+                _tileSize = UnitTile.NativeSize(panel);
             }
             _rect.localScale = new Vector3(scale, scale, 1f);
 
-            var same = entries.Count == _shown.Count;
+            Wrap(entries, maxWidth / Mathf.Max(scale, 0.01f));
+
+            var same = entries.Count == _shown.Count && _wrap.Count == _shownLines.Count;
             for (var i = 0; same && i < entries.Count; i++) same = entries[i].Element == _shown[i];
+            for (var i = 0; same && i < _wrap.Count; i++) same = _wrap[i] == _shownLines[i];
             if (!same) Rebuild(panel, entries);
 
             for (var i = 0; i < _live.Count && i < entries.Count; i++)
@@ -122,56 +115,125 @@ namespace SanctuaryHud
                 var tile = _live[i];
                 if (tile == null) continue;
                 var entry = entries[i];
-                if (entry.Element != null) tile.Mirror(entry.Element, entry.Width * 2f, badges);
+                if (entry.Element != null) tile.Mirror(entry.Element, badges);
             }
 
-            // So the width is right for whoever lays out beside the row this frame.
+            // So the size is right for whoever lays out beside the row this frame.
             LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+        }
+
+        /// Splits the entries into lines no wider than maxWidth (in unscaled
+        /// canvas units, padding included), breaking between tiles; a
+        /// separator never starts or ends a line. The result is the number
+        /// of entries on each line, in order; a separator dropped at a break
+        /// counts on the line it would have ended.
+        private void Wrap(List<UnitRow.Entry> entries, float maxWidth)
+        {
+            _wrap.Clear();
+            var count = 0;
+            var width = Pad * 2f;
+            foreach (var entry in entries)
+            {
+                var w = entry.Element != null ? _tileSize.x : SeparatorWidth;
+                if (count > 0 && width + w > maxWidth && entry.Element != null)
+                {
+                    _wrap.Add(count);
+                    count = 0;
+                    width = Pad * 2f;
+                }
+                count++;
+                width += w + Gap;
+            }
+            if (count > 0) _wrap.Add(count);
         }
 
         private void Rebuild(SanctuaryPanelUI panel, List<UnitRow.Entry> entries)
         {
             foreach (var tile in _tiles) if (tile != null && tile.gameObject.activeSelf) tile.gameObject.SetActive(false);
             foreach (var separator in _separators) if (separator != null && separator.activeSelf) separator.SetActive(false);
+            foreach (var line in _lines) if (line != null && line.gameObject.activeSelf) line.gameObject.SetActive(false);
             _shown.Clear();
+            _shownLines.Clear();
             _live.Clear();
             var tileAt = 0;
             var separatorAt = 0;
-            // The hairline is child 0; the layout skips it.
-            var sibling = 1;
-            foreach (var entry in entries)
+            var lineAt = 0;
+            var index = 0;
+            // The hairline is child 0 of the plate; the layout skips it.
+            var lineSibling = 1;
+            foreach (var length in _wrap)
             {
-                GameObject child;
-                UnitTile tile = null;
-                if (entry.Element != null)
+                var line = TakeLine(ref lineAt);
+                line.SetSiblingIndex(lineSibling++);
+                if (!line.gameObject.activeSelf) line.gameObject.SetActive(true);
+                var sibling = 0;
+                var end = index + length;
+                // A separator at the start or the end of a line is a gap
+                // with nothing to separate: left out of the layout.
+                var first = index;
+                var last = end - 1;
+                for (; index < end; index++)
                 {
-                    while (tileAt < _tiles.Count && _tiles[tileAt] == null) _tiles.RemoveAt(tileAt);
-                    if (tileAt < _tiles.Count) tile = _tiles[tileAt];
+                    var entry = entries[index];
+                    UnitTile tile = null;
+                    GameObject child;
+                    if (entry.Element != null)
+                    {
+                        while (tileAt < _tiles.Count && _tiles[tileAt] == null) _tiles.RemoveAt(tileAt);
+                        if (tileAt < _tiles.Count) tile = _tiles[tileAt];
+                        else
+                        {
+                            tile = UnitTile.Create(panel, line);
+                            if (tile == null) continue;
+                            _tiles.Add(tile);
+                        }
+                        tileAt++;
+                        child = tile.gameObject;
+                    }
                     else
                     {
-                        tile = UnitTile.Create(panel, _rect);
-                        if (tile == null) continue;
-                        _tiles.Add(tile);
+                        _shown.Add(null);
+                        _live.Add(null);
+                        if (index == first || index == last) continue;
+                        while (separatorAt < _separators.Count && _separators[separatorAt] == null) _separators.RemoveAt(separatorAt);
+                        if (separatorAt < _separators.Count) child = _separators[separatorAt];
+                        else
+                        {
+                            child = MakeSeparator();
+                            _separators.Add(child);
+                        }
+                        separatorAt++;
                     }
-                    tileAt++;
-                    child = tile.gameObject;
-                }
-                else
-                {
-                    while (separatorAt < _separators.Count && _separators[separatorAt] == null) _separators.RemoveAt(separatorAt);
-                    if (separatorAt < _separators.Count) child = _separators[separatorAt];
-                    else
+                    if (child.transform.parent != line) child.transform.SetParent(line, false);
+                    child.transform.SetSiblingIndex(sibling++);
+                    if (!child.activeSelf) child.SetActive(true);
+                    if (tile != null)
                     {
-                        child = MakeSeparator();
-                        _separators.Add(child);
+                        _shown.Add(entry.Element);
+                        _live.Add(tile);
                     }
-                    separatorAt++;
                 }
-                child.transform.SetSiblingIndex(sibling++);
-                if (!child.activeSelf) child.SetActive(true);
-                _shown.Add(entry.Element);
-                _live.Add(tile);
+                _shownLines.Add(length);
             }
+        }
+
+        private RectTransform TakeLine(ref int lineAt)
+        {
+            while (lineAt < _lines.Count && _lines[lineAt] == null) _lines.RemoveAt(lineAt);
+            if (lineAt < _lines.Count) return _lines[lineAt++];
+            var go = new GameObject("Line", typeof(RectTransform));
+            go.transform.SetParent(_rect, false);
+            var group = go.AddComponent<HorizontalLayoutGroup>();
+            group.spacing = Gap;
+            group.childAlignment = TextAnchor.LowerLeft;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = false;
+            var line = (RectTransform)go.transform;
+            _lines.Add(line);
+            lineAt++;
+            return line;
         }
 
         private GameObject MakeSeparator()
@@ -181,14 +243,14 @@ namespace SanctuaryHud
             var layout = go.AddComponent<LayoutElement>();
             layout.preferredWidth = SeparatorWidth;
             layout.minWidth = SeparatorWidth;
-            layout.preferredHeight = UnitTile.Size;
-            layout.minHeight = UnitTile.Size;
+            layout.preferredHeight = _tileSize.y;
+            layout.minHeight = _tileSize.y;
             var accent = SanctuaryHudPlugin.GameAccent;
             accent.a = 0.35f;
             var line = HudCanvas.Fill(go.transform, "Line", accent);
             var lrt = line.rectTransform;
             lrt.anchorMin = lrt.anchorMax = lrt.pivot = new Vector2(0.5f, 0.5f);
-            lrt.sizeDelta = new Vector2(4f, UnitTile.Size - 16f);
+            lrt.sizeDelta = new Vector2(4f, _tileSize.y - 16f);
             go.SetActive(false);
             return go;
         }

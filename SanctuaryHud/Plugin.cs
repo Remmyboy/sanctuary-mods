@@ -16,7 +16,8 @@ namespace SanctuaryHud
     // (MiniMap.cs), and stand-ins for the game's own panels along the bottom:
     // a compact orders row (OrdersBar.cs), a plainer unit card (InfoCard.cs),
     // the selection list as a row (SelectionRow.cs), the build options,
-    // tabs and queue as rows (BuildStrip.cs, on UnitRow.cs), and the tier
+    // tabs and queue as rows (BuildStrip.cs; the rows are on the HUD's own
+    // uGUI canvas, HudCanvas.cs, as clones of the game's buttons), and the tier
     // tabs put away when there is only one (TierTabs.cs).
     // Presentation-only: reads state the game already sends to the render
     // side and draws an IMGUI overlay. Never touches the lobby-hashed Lua
@@ -419,9 +420,6 @@ namespace SanctuaryHud
                 // reach the others. Logged once per site.
                 Fenced("orders row", () => OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip));
                 Fenced("unit card", () => InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip));
-                // The selection row is on the HUD canvas (SelectionRow.Tick);
-                // the strip lays its options out after it.
-                if (BuildStrip.Active) Fenced("build strip", () => BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip));
             }
 
             // The strip and the commander widget are one player's own numbers,
@@ -514,8 +512,6 @@ namespace SanctuaryHud
             Alerts.ApplyFont(font);
             OrdersBar.ApplyFont(font);
             InfoCard.ApplyFont(font);
-            UnitRow.ApplyFont(font);
-            BuildStrip.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
             _stStripVersion = new GUIStyle(_stStripMax) { fontSize = 11, alignment = TextAnchor.MiddleCenter };
             _stStripGlyph = new GUIStyle(_stStripLabel) { fontSize = 16, alignment = TextAnchor.MiddleCenter };

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using BepInEx.Configuration;
 using SanctuaryUI;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using static SanctuaryHud.HudCore;
 
@@ -14,12 +13,13 @@ namespace SanctuaryHud
     // dashed panel with paging arrows and "coming soon" placeholders.
     //
     // With this on, those three panels are made invisible (PanelConceal) and
-    // the HUD lays the bottom out itself, left to right from where the
-    // game's strip starts: the selection row (SelectionRow), then the build
-    // options the selection actually has; above the options, the tier tabs
-    // when more than one is live, then the queue. Every button is the game's
-    // own, so clicks (shift and right included) and hovers do what they do
-    // on the game's panels.
+    // the HUD lays the bottom out itself on its canvas (HudCanvas), left to
+    // right from where the game's strip starts: the selection row
+    // (SelectionRow), then the build options the selection actually has;
+    // above the options, the tier tabs when more than one is live, then the
+    // queue. Every tile is a clone of the game's own button standing in for
+    // one on the concealed panel (UnitTile, TabTile), so clicks (shift and
+    // right included) and hovers do what they do on the game's panels.
     internal static class BuildStrip
     {
         internal static ConfigEntry<bool> Enabled;
@@ -49,13 +49,21 @@ namespace SanctuaryHud
             var options = want ? SelectionRow.FindPanel<ConstructionPanelUI>(UIPanelType.Construction) : null;
             var queue = want ? SelectionRow.FindPanel<ConstructionQueuePanelUI>(UIPanelType.ConstructionQueue) : null;
             var tabs = want ? SelectionRow.FindPanel<ConstructionFilterPanelUI>(UIPanelType.ConstructionFilter) : null;
-            if (_concealOptions.Apply(options)) Describe(options, queue);
+            if (_concealOptions.Apply(options)) Describe(options, queue, tabs);
             _concealQueue.Apply(queue);
             _concealTabs.Apply(tabs);
-            if (!want)
+            try
             {
-                UnitRow.ClearHover();
-                InfoCard.SetHover(null);
+                SyncRows(options, queue, tabs);
+            }
+            catch (Exception e)
+            {
+                if (!_syncLogged)
+                {
+                    _syncLogged = true;
+                    _log?.LogWarning($"Build strip could not be laid out (logged once): {e}");
+                }
+                HideRows();
             }
         }
 
@@ -64,15 +72,18 @@ namespace SanctuaryHud
             _concealOptions.Release();
             _concealQueue.Release();
             _concealTabs.Release();
-            UnitRow.ClearHover();
+            _optionsRow?.Destroy();
+            _queueRow?.Destroy();
+            _tabRow?.Destroy();
+            _optionsRow = null;
+            _queueRow = null;
+            _tabRow = null;
+            InfoCard.SetHover(null);
         }
 
-        /// Where the game's strip draws: its "Panel Dashed" child, sized to
-        /// its contents and sitting lower than the panel's own rectangle.
-        internal static bool StripRect(Component panel, float scale, out Rect rect) =>
-            PanelConceal.GuiRect(StripMeasure(panel), scale, out rect);
-
-        /// The same, in the HUD canvas's units from the screen's bottom-left.
+        /// Where the game's strip draws — its "Panel Dashed" child, sized to
+        /// its contents and sitting lower than the panel's own rectangle —
+        /// in the HUD canvas's units from the screen's bottom-left.
         internal static bool StripLocal(Component panel, out Rect rect) =>
             HudCanvas.LocalRect(StripMeasure(panel), out rect);
 
@@ -88,80 +99,98 @@ namespace SanctuaryHud
             return measure;
         }
 
-        // ---- drawing --------------------------------------------------------------
+        // ---- the rows -----------------------------------------------------------
 
+        private const float RowGap = 8f;
+        private const float ColumnGap = 20f;
+        private const float TabGap = 16f;
+        private const float Margin = 20f;
+
+        private static TileRow _optionsRow, _queueRow;
+        private static TabRow _tabRow;
+        private static bool _syncLogged;
         private static readonly List<UnitRow.Entry> _options = new List<UnitRow.Entry>();
         private static readonly List<UnitRow.Entry> _queue = new List<UnitRow.Entry>();
         private static readonly List<ConstructionFilterToggleElement> _tabs = new List<ConstructionFilterToggleElement>();
 
-        private const float TabHeight = 22f;
-        private const float TabPad = 10f;
-        private const float RowGap = 4f;
-
-        private static GUIStyle _stTab;
-
-        internal static void ApplyFont(Font font)
+        private static void HideRows()
         {
-            _stTab = new GUIStyle(_stStripChip) { fontSize = 13, alignment = TextAnchor.MiddleCenter };
-            if (font != null) _stTab.font = font;
+            _optionsRow?.Show(false);
+            _queueRow?.Show(false);
+            _tabRow?.Show(false);
+            InfoCard.SetHover(null);
         }
 
-        /// From OnGUI, under the 1080-logical matrix.
-        internal static void Draw(float logicalWidth, float logicalHeight, float scale, Texture2D panelTexture)
+        /// From Update, after the conceals and after the selection row has
+        /// placed itself. Fills the three rows from the game's panels and
+        /// lays them out around the selection row.
+        private static void SyncRows(ConstructionPanelUI options, ConstructionQueuePanelUI queue, ConstructionFilterPanelUI tabs)
         {
-            var options = _concealOptions.Panel as ConstructionPanelUI;
-            if (options == null) return;
-            if (_stTab == null) ApplyFont(null);
-            var queue = _concealQueue.Panel as ConstructionQueuePanelUI;
-            var tabs = _concealTabs.Panel as ConstructionFilterPanelUI;
-
-            if (Event.current.type == EventType.Layout)
+            if (options == null || !options.IsVisible)
             {
-                UnitRow.Collect(options.IsVisible ? options : null, _options, true);
-                UnitRow.Collect(queue != null && queue.IsVisible ? queue : null, _queue, false);
-                CollectTabs(tabs != null && tabs.IsVisible ? tabs : null);
+                HideRows();
+                return;
             }
+            var root = HudCanvas.Ensure(options);
+            if (root == null) return;
+            if (_optionsRow == null || !_optionsRow.Alive) _optionsRow = TileRow.Create(root, "Build options");
+            if (_queueRow == null || !_queueRow.Alive) _queueRow = TileRow.Create(root, "Build queue");
+            if (_tabRow == null || !_tabRow.Alive) _tabRow = TabRow.Create(root, "Tier tabs");
+
+            UnitRow.Collect(options, _options, true);
+            UnitRow.Collect(queue != null && queue.IsVisible ? queue : null, _queue, false);
+            CollectTabs(tabs != null && tabs.IsVisible ? tabs : null);
 
             var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
-            var x = 14f;
-            var bottom = logicalHeight - 14f;
-            if (StripRect(options, scale, out var strip))
-            {
-                x = strip.x;
-                bottom = strip.yMax;
-            }
+            var size = HudCanvas.Size;
 
-            // The selection row first, then the options after it.
-            var selectionWidth = SelectionRow.PlacedWidth(scale);
-            var optionsX = selectionWidth > 0f ? x + selectionWidth + 10f : x;
+            // From where the game's strip starts: the selection row first
+            // (it placed itself there this frame), then the options after it.
+            var origin = new Vector2(28f, 28f);
+            if (StripLocal(options, out var strip)) origin = new Vector2(strip.x, strip.y);
+            var selectionWidth = SelectionRow.RowWidth;
+            var optionsX = selectionWidth > 0f ? origin.x + selectionWidth + ColumnGap : origin.x;
+
             // The options wrap onto more lines, upward, rather than run off
             // the screen's right edge.
-            var optionsArea = UnitRow.Draw(optionsX, bottom, s, scale, _options, panelTexture, logicalWidth - optionsX - 10f);
+            if (_options.Count > 0)
+            {
+                _optionsRow.Show(true);
+                _optionsRow.Sync(options, _options, false, s, size.x - optionsX - Margin);
+                _optionsRow.Place(new Vector2(optionsX, origin.y));
+            }
+            else _optionsRow.Show(false);
 
             // Above: the tier tabs (when there is a choice), then the queue.
-            var above = (optionsArea.width > 0f ? optionsArea.y
-                    : bottom - (selectionWidth > 0f ? UnitRow.Height * Mathf.Clamp(SelectionRow.Scale.Value, 0.7f, 1.6f) : 0f)) - RowGap;
+            var above = origin.y + (_options.Count > 0 ? _optionsRow.Height : SelectionRow.RowHeight) + RowGap;
             var ax = optionsX;
             if (_tabs.Count > 1)
             {
-                ax += DrawTabs(ax, above, s, scale, panelTexture) + 8f;
+                _tabRow.Show(true);
+                _tabRow.Sync(tabs, _tabs, s);
+                _tabRow.Place(new Vector2(ax, above));
+                ax += _tabRow.Width + TabGap;
             }
-            UnitRow.Draw(ax, above, s, scale, _queue, panelTexture);
+            else _tabRow.Show(false);
 
-            UnitRow.FlushHover();
+            if (_queue.Count > 0)
+            {
+                _queueRow.Show(true);
+                _queueRow.Sync(queue, _queue, false, s, size.x - ax - Margin);
+                _queueRow.Place(new Vector2(ax, above));
+            }
+            else _queueRow.Show(false);
 
             // A build option under the mouse turns the unit card into a
             // build card: cost and time for that template.
-            if (Event.current.type == EventType.Repaint)
+            var hovered = UnitTile.Hovered;
+            string template = null;
+            if (hovered != null && hovered.Source != null && _options.Exists(e => e.Element == hovered.Source))
             {
-                var hovered = UnitRow.Hovered;
-                string template = null;
-                if (hovered != null && _options.Exists(e => e.Element == hovered))
-                {
-                    template = UnitDomains.TemplateOf(hovered.portraitImage != null ? hovered.portraitImage.overrideSprite : null);
-                }
-                InfoCard.SetHover(template);
+                var portrait = hovered.Source.portraitImage != null ? hovered.Source.portraitImage.overrideSprite : null;
+                template = UnitDomains.TemplateOf(portrait);
             }
+            InfoCard.SetHover(template);
         }
 
         private static void CollectTabs(ConstructionFilterPanelUI panel)
@@ -180,99 +209,124 @@ namespace SanctuaryHud
             }
         }
 
-        /// The tier tabs as a row of chips, the chosen one lit. Returns the width.
-        private static float DrawTabs(float x, float bottom, float s, float scale, Texture2D panelTexture)
+        // ---- the tab row ---------------------------------------------------------
+
+        /// The tier tabs as a row of the game's own toggles (TabTile) on a
+        /// plate, laid out like a TileRow's single line.
+        private sealed class TabRow
         {
-            var widths = new float[_tabs.Count];
-            var total = TabPad;
-            for (var i = 0; i < _tabs.Count; i++)
+            private RectTransform _rect;
+            private SanctuaryPanelUI _panel;
+            private readonly List<TabTile> _tiles = new List<TabTile>();
+            private readonly List<ConstructionFilterToggleElement> _shown = new List<ConstructionFilterToggleElement>();
+
+            internal bool Alive => _rect != null;
+
+            internal static TabRow Create(RectTransform root, string name)
             {
-                var text = _tabs[i].displayText != null ? _tabs[i].displayText.text : "T" + (i + 1);
-                widths[i] = _stTab.CalcSize(new GUIContent(text)).x + 16f;
-                total += widths[i] + 4f;
+                var rt = HudCanvas.Plate(root, name);
+                var group = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
+                group.padding = new RectOffset((int)TileRow.Pad, (int)TileRow.Pad, 6, 6);
+                group.spacing = 4f;
+                group.childAlignment = TextAnchor.MiddleLeft;
+                group.childControlWidth = true;
+                group.childControlHeight = true;
+                group.childForceExpandWidth = false;
+                group.childForceExpandHeight = false;
+                HudCanvas.FitToContents(rt);
+                rt.gameObject.SetActive(false);
+                return new TabRow { _rect = rt };
             }
-            total += TabPad - 4f;
-            var height = TabHeight + 8f;
-            var area = new Rect(x, bottom - height * s, total * s, height * s);
 
-            Shield(area, scale);
-            GUI.DrawTexture(area, panelTexture);
-            var accent = SanctuaryHudPlugin.GameAccent;
-            accent.a = 0.6f;
-            SanctuaryHudPlugin.Fill(new Rect(area.x, area.y, area.width, 1f), accent);
-
-            var previousMatrix = GUI.matrix;
-            GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(area.x, area.y, 0f), Quaternion.identity, new Vector3(s, s, 1f));
-
-            var tx = TabPad;
-            for (var i = 0; i < _tabs.Count; i++)
+            internal void Show(bool showing)
             {
-                var element = _tabs[i];
-                var rect = new Rect(tx, 4f, widths[i], TabHeight);
-                tx += widths[i] + 4f;
-                var e = Event.current;
-                var hover = rect.Contains(e.mousePosition);
-                var on = element.toggle != null && element.toggle.isOn;
-                var fill = SanctuaryHudPlugin.GameAccent;
-                fill.a = on ? 0.55f : hover ? 0.3f : 0.12f;
-                SanctuaryHudPlugin.Fill(rect, fill);
-                var edge = SanctuaryHudPlugin.GameAccent;
-                edge.a = on ? 1f : hover ? 0.8f : 0.4f;
-                SanctuaryHudPlugin.Fill(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), edge);
-                _stTab.normal.textColor = on || hover ? Color.white : new Color(0.78f, 0.85f, 0.95f, 0.9f);
-                GUI.Label(rect, element.displayText != null ? element.displayText.text : "T" + (i + 1), _stTab);
+                if (_rect == null) return;
+                if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+            }
 
-                if (hover && e.type == EventType.MouseUp && e.button == 0)
+            internal void Place(Vector2 bottomLeft)
+            {
+                if (_rect != null) _rect.anchoredPosition = bottomLeft;
+            }
+
+            internal float Width => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
+
+            internal void Destroy()
+            {
+                if (_rect != null) UnityEngine.Object.Destroy(_rect.gameObject);
+                _rect = null;
+                _tiles.Clear();
+                _shown.Clear();
+            }
+
+            internal void Sync(SanctuaryPanelUI panel, List<ConstructionFilterToggleElement> tabs, float scale)
+            {
+                if (_rect == null) return;
+                if (panel != _panel)
                 {
-                    ClickTab(element);
-                    e.Use();
+                    _panel = panel;
+                    foreach (var tile in _tiles) if (tile != null) UnityEngine.Object.Destroy(tile.gameObject);
+                    _tiles.Clear();
+                    _shown.Clear();
                 }
-                else if (hover && e.type == EventType.MouseDown && e.button == 0)
+                _rect.localScale = new Vector3(scale, scale, 1f);
+
+                var same = tabs.Count == _shown.Count;
+                for (var i = 0; same && i < tabs.Count; i++) same = tabs[i] == _shown[i];
+                if (!same)
                 {
-                    e.Use();
+                    _shown.Clear();
+                    foreach (var tile in _tiles) if (tile != null && tile.gameObject.activeSelf) tile.gameObject.SetActive(false);
+                    var at = 0;
+                    var sibling = 1;   // after the hairline
+                    foreach (var tab in tabs)
+                    {
+                        while (at < _tiles.Count && _tiles[at] == null) _tiles.RemoveAt(at);
+                        TabTile tile;
+                        if (at < _tiles.Count) tile = _tiles[at];
+                        else
+                        {
+                            tile = TabTile.Create(panel, _rect);
+                            if (tile == null) continue;
+                            _tiles.Add(tile);
+                        }
+                        at++;
+                        tile.transform.SetSiblingIndex(sibling++);
+                        if (!tile.gameObject.activeSelf) tile.gameObject.SetActive(true);
+                        _shown.Add(tab);
+                    }
                 }
-            }
-
-            GUI.matrix = previousMatrix;
-            return area.width;
-        }
-
-        private static void ClickTab(ConstructionFilterToggleElement element)
-        {
-            try
-            {
-                var data = new PointerEventData(EventSystem.current)
+                for (var i = 0; i < _shown.Count && i < _tiles.Count; i++)
                 {
-                    button = PointerEventData.InputButton.Left,
-                    clickCount = 1,
-                    position = Input.mousePosition,
-                };
-                ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerDownHandler);
-                ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerUpHandler);
-                // The Lua handler (on the release) turns the other tabs off,
-                // and leaves turning this one on to the uGUI Toggle's own
-                // click — so that has to be sent too, after the release, as
-                // a real press would.
-                ExecuteEvents.Execute(element.gameObject, data, ExecuteEvents.pointerClickHandler);
-            }
-            catch (Exception ex)
-            {
-                _log?.LogWarning($"Build strip: the game's tier tab threw ({ex.Message}).");
+                    if (_tiles[i] != null) _tiles[i].Mirror(_shown[i]);
+                }
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
             }
         }
 
         // ---- diagnostics ------------------------------------------------------
 
-        private static void Describe(ConstructionPanelUI options, ConstructionQueuePanelUI queue)
+        private static void Describe(ConstructionPanelUI options, ConstructionQueuePanelUI queue, ConstructionFilterPanelUI tabs)
         {
             try
             {
                 _log?.LogInfo("Build strip concealed; the options panel:");
                 PanelConceal.DumpSubtree(options.transform, 0, _log, 2);
+                if (options.buttonPrefab != null)
+                {
+                    _log?.LogInfo("...its button prefab:");
+                    PanelConceal.DumpSubtree(options.buttonPrefab.transform, 0, _log, 3);
+                }
                 if (queue != null)
                 {
                     _log?.LogInfo("...and the queue panel:");
                     PanelConceal.DumpSubtree(queue.transform, 0, _log, 2);
+                }
+                if (tabs != null)
+                {
+                    _log?.LogInfo("...and the tier tabs, with their prefab:");
+                    PanelConceal.DumpSubtree(tabs.transform, 0, _log, 2);
+                    if (tabs.buttonPrefab != null) PanelConceal.DumpSubtree(tabs.buttonPrefab.transform, 0, _log, 3);
                 }
             }
             catch (Exception e)

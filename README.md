@@ -165,18 +165,19 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   that type, right click drops it, both passed to the game's own button.
   `SelectionScale` sizes it.
 
-  This row is the first stand-in built the game's own way rather than
+  The row and the build strip are built the game's own way rather than
   drawn: uGUI on a root of the HUD's own placed on the game's HUD canvas,
   just above its panels. Each tile is a clone of the panel's own button
-  prefab with the game's element script taken off, mirroring one of the
-  concealed panel's buttons every frame and passing it every pointer
+  prefab (so it keeps the prefab's shape, 112 by 72 canvas units for the
+  selection list) with the game's element script taken off, mirroring one
+  of the concealed panel's buttons every frame and passing it every pointer
   event. What that buys over the IMGUI stand-ins: the game's UI Scale
   setting applies, the count text is the game's own TextMeshPro in its own
   font, a click over it never reaches the map (the game gates on its event
   system, so no invisible shield is needed), and a fault in one tile's
-  update cannot stop the rest of the HUD taking clicks. The other stand-ins
-  are to follow the same route; the strip, mini-map and map labels stay
-  IMGUI, which suits them.
+  update cannot stop the rest of the HUD taking clicks. The orders row and
+  unit card are to follow the same route; the strip, mini-map and map
+  labels stay IMGUI, which suits them.
 - **Build strip** (`BuildStrip`) in place of the game's build options, tier
   tabs and build queue, each of which is a dashed panel with paging arrows
   and "coming soon" placeholders. The HUD lays the bottom out itself from
@@ -185,9 +186,11 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   portrait they wear); above the options the tier tabs, only when more than
   one is live, then the queue with its counts and progress. A long list
   wraps onto further lines upward rather than running off the screen. Every
-  button is the game's own, so clicks (shift and right included) and hovers
-  do what they do on the game's panels, and a tier tab press sends the
-  click the game's toggle needs to light up. `BuildScale` sizes the rows.
+  tile is a clone of the game's own button standing in for one on the
+  concealed panel, and every tier tab a clone of the game's own toggle, so
+  clicks (shift and right included) and hovers do what they do on the
+  game's panels, and a tab press sends the click the game's toggle needs to
+  light up. `BuildScale` sizes the rows.
   With the strip left to the game, `HideLoneTierTab` (on by default) still
   conceals the tier tabs whenever no more than one of them can be clicked —
   a tier-1 factory's single T1, or a structure whose only option is its own

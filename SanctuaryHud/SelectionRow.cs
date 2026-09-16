@@ -158,13 +158,10 @@ namespace SanctuaryHud
             _row.Place(at);
         }
 
-        /// The row's width in the HUD's 1080-logical GUI units, 0 while it is
-        /// not showing: what the build strip lays its options out after.
-        internal static float PlacedWidth(float scale)
-        {
-            if (_row == null || !_row.Showing) return 0f;
-            return PanelConceal.GuiRect(_row.Rect, scale, out var rect) ? rect.width : 0f;
-        }
+        /// The row's size on the canvas, 0 while it is not showing: what the
+        /// build strip lays its rows out around.
+        internal static float RowWidth => _row != null && _row.Showing ? _row.Width : 0f;
+        internal static float RowHeight => _row != null && _row.Showing ? _row.Height : 0f;
 
         // ---- diagnostics ------------------------------------------------------
 

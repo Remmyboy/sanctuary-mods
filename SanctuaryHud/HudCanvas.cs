@@ -132,6 +132,38 @@ namespace SanctuaryHud
 
         // ---- building blocks ----------------------------------------------------
 
+        /// A plate for a row: the game's panel colour with the accent hairline
+        /// along its top, anchored by its bottom-left corner on the root, and
+        /// a raycast target so the gaps between tiles don't let a click
+        /// through to the map either. The caller adds the layout group; the
+        /// hairline is child 0 and stays out of the layout.
+        internal static RectTransform Plate(RectTransform root, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(root, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.zero;
+            rt.pivot = Vector2.zero;
+            var back = go.AddComponent<Image>();
+            back.color = SanctuaryHudPlugin.GamePanelColour;
+            back.raycastTarget = true;
+            var accent = SanctuaryHudPlugin.GameAccent;
+            accent.a = 0.6f;
+            var line = Fill(rt, "Accent", accent);
+            StretchAlongTop(line.rectTransform, 2f);
+            line.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            return rt;
+        }
+
+        /// Sizes a RectTransform to what its layout group asks for.
+        internal static void FitToContents(RectTransform rt)
+        {
+            var fitter = rt.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+
         /// A plain rectangle of colour: an Image with no sprite.
         internal static Image Fill(Transform parent, string name, Color colour)
         {
