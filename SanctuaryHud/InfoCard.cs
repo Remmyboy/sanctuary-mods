@@ -388,6 +388,7 @@ namespace SanctuaryHud
         private const float QueueTile = 40f;
         private const float JobTile = 80f;
         private const float MarkSize = 28f;
+        private const float LineHeight = 30f;
 
         private static readonly Color LabelColour = new Color(0.85f, 0.90f, 0.97f);
         private static readonly Color SubtitleColour = new Color(0.80f, 0.87f, 0.96f);
@@ -491,10 +492,6 @@ namespace SanctuaryHud
                 var names = new[] { "Shield", "Health", "Armour", "Bubble shield", "Building" };
                 for (var i = 0; i < card._gauges.Length; i++) card._gauges[i] = Gauge.Create(rt, names[i]);
 
-                // One line: alloy, energy, time, each behind its mark — an
-                // ingot, a bolt, a clock — so the figures need no words.
-                card._build = FigureLine.Create(rt, "Build", 3, false);
-
                 // The usage rows share a band with the current job on the
                 // right: its art, large, the percentage under it, and the
                 // rest of the queue as small tiles beside it.
@@ -511,8 +508,18 @@ namespace SanctuaryHud
                 leftGroup.childForceExpandHeight = false;
                 left.AddComponent<LayoutElement>().flexibleWidth = 1f;
                 card._left = (RectTransform)left.transform;
+                // The build card's line — alloy, energy, time, each behind its
+                // mark — takes the place of the usage lines while a build
+                // option is hovered. Every line keeps its height when it has
+                // nothing to say, and the band keeps the height a build queue
+                // needs, so the card stays one size whatever is selected.
+                card._build = FigureLine.Create(card._left, "Build", 3, false);
+                card._build.Reserve(LineHeight);
                 card._income = FigureLine.Create(card._left, "Income", 2, false);
+                card._income.Reserve(LineHeight);
                 card._power = FigureLine.Create(card._left, "Power", 1, true);
+                card._power.Reserve(LineHeight);
+                band.gameObject.AddComponent<LayoutElement>().minHeight = JobTile + 24f;
 
                 var queue = Row(band, "Queue", 6f, TextAnchor.UpperLeft);
                 card._queueBlock = queue.gameObject;
@@ -635,14 +642,14 @@ namespace SanctuaryHud
                 else _income.Clear(0);
                 if (energy) _income.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, Rate(v.energyNetIncome));
                 else _income.Clear(1);
-                _income.Show(alloy || energy);
+                _income.Show(!building);
 
                 // Build power behind a hammer; the rarer figures as words after it.
                 var extras = Extras(v);
                 if (v.buildPower > 0f) _power.Set(0, "power", LabelColour, SanctuaryHudPlugin.Fmt(v.buildPower));
                 else _power.Clear(0);
                 _power.SetExtras(extras);
-                _power.Show(extras != null || v.buildPower > 0f);
+                _power.Show(!building);
 
                 // The current job, large, at the right edge of the band, the
                 // percentage under it; whatever is queued behind it as small
@@ -664,7 +671,7 @@ namespace SanctuaryHud
                     }
                 }
                 Active(_queueBlock, factory);
-                Active(_band, factory || alloy || energy || extras != null || v.buildPower > 0f);
+                Active(_band, true);
                 // So the height is right for the dock this frame.
                 LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
             }
@@ -823,6 +830,14 @@ namespace SanctuaryHud
             internal void Show(bool showing)
             {
                 if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
+            }
+
+            /// Keeps this height even with nothing on the line.
+            internal void Reserve(float height)
+            {
+                var layout = _go.GetComponent<LayoutElement>();
+                if (layout == null) layout = _go.AddComponent<LayoutElement>();
+                layout.minHeight = height;
             }
 
             internal void Set(int index, string glyph, Color tint, string text)
