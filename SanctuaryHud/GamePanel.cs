@@ -192,12 +192,8 @@ namespace SanctuaryHud
             _appliedTo = null;
         }
 
-        /// Restore, and remove what the HUD added to the scene. For unload.
-        internal static void Shutdown()
-        {
-            Restore();
-            HudCore.DestroyShield();
-        }
+        /// For unload.
+        internal static void Shutdown() => Restore();
 
         // What survives: the panel's controls. The menu and pause buttons the
         // panel names, plus every other selectable in it (the help button is
@@ -358,122 +354,11 @@ namespace SanctuaryHud
             }
         }
 
-        private static readonly HashSet<int> _unreadableSprites = new HashSet<int>();
-
-        /// Draws a control's icon fitted into rect, tinted by GUI.color, and
-        /// read at draw time so a picture the game swaps (pause to play) shows.
-        /// False when there is nothing drawable: no icon, or a sprite packed
-        /// too tightly for its rectangle in the atlas to be read.
-        internal static bool DrawIcon(Rect rect, Graphic icon)
-        {
-            if (icon == null) return false;
-            if (icon is RawImage raw)
-            {
-                var texture = raw.texture;
-                if (texture == null) return false;
-                var uv = raw.uvRect;
-                return DrawFitted(rect, texture, uv, texture.width * Mathf.Abs(uv.width), texture.height * Mathf.Abs(uv.height));
-            }
-
-            var sprite = icon is Image image ? image.overrideSprite : null;
-            var tex = sprite == null ? null : sprite.texture;
-            if (tex == null || _unreadableSprites.Contains(sprite.GetInstanceID())) return false;
-            Rect tr;
-            try
-            {
-                tr = sprite.textureRect;
-            }
-            catch
-            {
-                _unreadableSprites.Add(sprite.GetInstanceID());
-                return false;
-            }
-            return DrawFitted(rect, tex, new Rect(tr.x / tex.width, tr.y / tex.height, tr.width / tex.width, tr.height / tex.height),
-                tr.width, tr.height);
-        }
-
-        // The game's order icons come out of a top-down atlas with a negative
-        // height in their rectangle; passed through as-is the negative UV
-        // height flips them the right way up, so only the size takes the
-        // magnitude.
-        /// The sprite an Image carries, with its texture and the part of it
-        /// the sprite covers; false where there is nothing drawable.
-        private static bool Resolve(Graphic icon, out Texture texture, out Rect uv, out float width, out float height)
-        {
-            texture = null;
-            uv = default;
-            width = height = 0f;
-            if (icon is RawImage raw)
-            {
-                texture = raw.texture;
-                if (texture == null) return false;
-                uv = raw.uvRect;
-                width = texture.width * Mathf.Abs(uv.width);
-                height = texture.height * Mathf.Abs(uv.height);
-                return width > 0f && height > 0f;
-            }
-            var sprite = icon is Image image ? image.overrideSprite : null;
-            texture = sprite == null ? null : sprite.texture;
-            if (texture == null || _unreadableSprites.Contains(sprite.GetInstanceID())) return false;
-            Rect tr;
-            try
-            {
-                tr = sprite.textureRect;
-            }
-            catch
-            {
-                _unreadableSprites.Add(sprite.GetInstanceID());
-                return false;
-            }
-            uv = new Rect(tr.x / texture.width, tr.y / texture.height, tr.width / texture.width, tr.height / texture.height);
-            width = Mathf.Abs(tr.width);
-            height = Mathf.Abs(tr.height);
-            return width > 0f && height > 0f;
-        }
-
-        /// Width over height of the art an Image carries, or 1 where there
-        /// is none: for sizing a tile to the game's own art.
-        internal static float Aspect(Graphic icon) =>
-            icon != null && Resolve(icon, out _, out _, out var w, out var h) ? w / h : 1f;
-
-        /// Draws an Image's art stretched to rect, tinted by GUI.color.
-        internal static bool DrawStretched(Rect rect, Graphic icon)
-        {
-            if (icon == null || !Resolve(icon, out var texture, out var uv, out _, out _)) return false;
-            GUI.DrawTextureWithTexCoords(rect, texture, uv);
-            return true;
-        }
-
-        private static bool DrawFitted(Rect rect, Texture texture, Rect uv, float width, float height)
-        {
-            width = Mathf.Abs(width);
-            height = Mathf.Abs(height);
-            if (width <= 0f || height <= 0f) return false;
-            var fit = Mathf.Min(rect.width / width, rect.height / height);
-            var w = width * fit;
-            var h = height * fit;
-            GUI.DrawTextureWithTexCoords(new Rect(rect.center.x - w / 2f, rect.center.y - h / 2f, w, h), texture, uv);
-            return true;
-        }
-
         // ---- the game's menus -------------------------------------------------
 
         /// Whether one of the game's menus is up over the match. Moved into
         /// HudCore, because the mini-map has to step aside for the same ones;
         /// this keeps the strip's call sites reading as they did.
         internal static bool GameMenuOpen() => HudCore.MenuOpen();
-
-        // ---- keeping strip clicks off the battlefield -------------------------
-
-        // The shield itself moved into HudCore, because the mini-map panel
-        // needs exactly the same trick; these two keep the strip's call sites
-        // reading as they always did.
-
-        /// Stands the shield over rect (strip coordinates) for this frame.
-        /// Call from OnGUI; TickShield takes it down once the calls stop.
-        internal static void Shield(Rect rect, float scale) => HudCore.Shield(rect, scale);
-
-        /// From Update: down once the strip has stopped drawing its buttons.
-        internal static void TickShield() => HudCore.TickShield();
     }
 }

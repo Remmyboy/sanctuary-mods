@@ -947,23 +947,7 @@ namespace SanctuaryHud
             try
             {
                 _log?.LogInfo("Information panel concealed; its tree:");
-                PanelConceal.DumpSubtree(panel.transform, 0, _log, 6);
-                // The game's resource art, by name, for borrowing: which sprites
-                // it has loaded that sound like alloy or energy.
-                var names = new List<string>();
-                var words = new[] { "alloy", "energy", "resource", "eco", "icon", "bolt", "power", "light" };
-                foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
-                {
-                    var n = sprite != null ? sprite.name ?? "" : "";
-                    if (n.Length == 0) continue;
-                    foreach (var word in words)
-                    {
-                        if (n.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                        names.Add($"{n} {sprite.rect.width:0}x{sprite.rect.height:0}");
-                        break;
-                    }
-                }
-                _log?.LogInfo($"Resource-ish sprites loaded: {names.Count}: {string.Join(", ", names)}");
+                PanelConceal.DumpSubtree(panel.transform, 0, _log, 2);
             }
             catch (Exception e)
             {

@@ -27,7 +27,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.11.2")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.12.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -285,7 +285,6 @@ namespace SanctuaryHud
             // readouts have to come back, or the all-armies view would have no
             // economy display at all.
             GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && OwnArmyFocused && _cfgHideBuiltIn.Value, _log);
-            GamePanel.TickShield();
             _menuOpen = _visible && InMatch && GamePanel.GameMenuOpen();
             // The strip and the commander widget are one player's own numbers,
             // so they step aside in a replay's all-armies view: there is no
@@ -489,15 +488,6 @@ namespace SanctuaryHud
             GamePanel.SampleColours(_ecoPanel, ref alloy, ref energy);
             _alloyTint = alloy;
             _energyTint = energy;
-        }
-
-        private static Texture2D MakeTexture(Color color)
-        {
-            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            tex.SetPixel(0, 0, color);
-            tex.Apply();
-            tex.hideFlags = HideFlags.HideAndDontSave;
-            return tex;
         }
 
         /// Number formatting, matching the game's own readouts (SignedTextElement:

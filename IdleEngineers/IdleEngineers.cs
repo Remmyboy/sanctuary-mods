@@ -22,7 +22,7 @@ namespace SanctuaryHud
     // Standalone mod — the ECS poll, Lua selection bridge and canvas
     // helpers come from shared\, compiled into this assembly, so it works
     // with or without the HUD mod loaded.
-    [BepInPlugin("com.sanctuarydb.idleengineers", "Idle Engineers", "0.4.0")]
+    [BepInPlugin("com.sanctuarydb.idleengineers", "Idle Engineers", "0.5.0")]
     public class IdleEngineersPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
