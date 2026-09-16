@@ -421,7 +421,7 @@ namespace SanctuaryHud
             //
             // Both draw under their own scale on top of the screen's, so the
             // setting sizes them without touching anything else.
-            var stripScale = HudScale;
+            var stripScale = SliderScale;
             if (OwnArmyFocused)
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(scale * stripScale, scale * stripScale, 1f));
@@ -438,10 +438,11 @@ namespace SanctuaryHud
         private const float StripHeight = 48f;
 
         /// The one size setting, for everything the HUD draws in its own
-        /// shape: the strip and widget in OnGUI and the rows and card on the
-        /// canvas. The standard size is a fifth up on the first release's,
-        /// which read small; the setting's 1 is that.
-        internal static float HudScale => (_cfgScale != null ? Mathf.Clamp(_cfgScale.Value, 0.6f, 1.5f) : 1f) * 1.2f;
+        /// shape. The strip and the commander widget take it as it is; the
+        /// rows and card on the canvas take it a fifth up, since at the
+        /// strip's size they read small.
+        private static float SliderScale => _cfgScale != null ? Mathf.Clamp(_cfgScale.Value, 0.6f, 1.5f) : 1f;
+        internal static float HudScale => SliderScale * 1.2f;
 
         // The game's UI palette (Beam UI, as the front menu uses it): near-
         // black blue panels with a hairline of accent blue.

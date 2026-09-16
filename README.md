@@ -84,9 +84,9 @@ has no release of its own yet; build it from source if you need it.
   whenever the overlay is hidden with **F10**, and when the mod unloads.
 - **Size** (`Overlay · Scale`, 0.6 to 1.5): the whole HUD — the strip, the
   commander widget, and the SanctuaryUI rows and card — drawn larger or
-  smaller together, on top of the game's own UI Scale. The standard size
-  is a fifth up on the first release's, which read small. The mini-map
-  has its own size, by dragging its corner. The gross in and gross out figures sit one
+  smaller together, on top of the game's own UI Scale. At 1 the strip is
+  its usual size and the rows and card a fifth up on their first release,
+  which read small. The mini-map has its own size, by dragging its corner. The gross in and gross out figures sit one
   over the other beside the net, so the two figures being compared line up.
   Each half leads with its resource's mark — an ingot for alloy, a bolt for
   energy — in place of the word; the same marks sit in front of every alloy,
