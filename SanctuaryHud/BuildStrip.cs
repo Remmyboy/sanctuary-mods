@@ -179,7 +179,8 @@ namespace SanctuaryHud
             if (_queue.Count > 0)
             {
                 _queueRow.Show(true);
-                _queueRow.Sync(options, _queue, s, size.x - ax - Margin);
+                // One line of it: a long queue past the screen's edge is noise.
+                _queueRow.Sync(options, _queue, s, size.x - ax - Margin, 1);
                 _queueRow.Place(new Vector2(ax, above));
                 BottomDock.Add(new Rect(ax, above, _queueRow.Width, _queueRow.Height));
             }

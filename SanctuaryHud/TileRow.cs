@@ -86,8 +86,9 @@ namespace SanctuaryHud
 
         /// Makes the row show these entries, at this scale, mirroring the
         /// game's buttons with tiles cloned from prefabPanel's prefab;
-        /// maxWidth (canvas units, at the given scale) wraps it.
-        internal void Sync(SanctuaryPanelUI prefabPanel, List<UnitRow.Entry> entries, float scale, float maxWidth = float.MaxValue)
+        /// maxWidth (canvas units, at the given scale) wraps it, and maxLines
+        /// (0 for no limit) cuts it off: what doesn't fit isn't shown.
+        internal void Sync(SanctuaryPanelUI prefabPanel, List<UnitRow.Entry> entries, float scale, float maxWidth = float.MaxValue, int maxLines = 0)
         {
             if (_rect == null) return;
             if (prefabPanel != _panel)
@@ -107,10 +108,10 @@ namespace SanctuaryHud
             HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
             _rect.localScale = new Vector3(scale, scale, 1f);
 
-            Wrap(entries, maxWidth / Mathf.Max(scale, 0.01f));
+            Wrap(entries, maxWidth / Mathf.Max(scale, 0.01f), maxLines);
 
-            var same = entries.Count == _shown.Count && _wrap.Count == _shownLines.Count;
-            for (var i = 0; same && i < entries.Count; i++) same = entries[i].Element == _shown[i];
+            var same = _wrapTotal == _shown.Count && _wrap.Count == _shownLines.Count;
+            for (var i = 0; same && i < _wrapTotal; i++) same = entries[i].Element == _shown[i];
             for (var i = 0; same && i < _wrap.Count; i++) same = _wrap[i] == _shownLines[i];
             if (!same) Rebuild(prefabPanel, entries);
 
@@ -131,9 +132,12 @@ namespace SanctuaryHud
         /// separator never starts or ends a line. The result is the number
         /// of entries on each line, in order; a separator dropped at a break
         /// counts on the line it would have ended.
-        private void Wrap(List<UnitRow.Entry> entries, float maxWidth)
+        private int _wrapTotal;
+
+        private void Wrap(List<UnitRow.Entry> entries, float maxWidth, int maxLines)
         {
             _wrap.Clear();
+            _wrapTotal = 0;
             var count = 0;
             var width = Pad * 2f;
             foreach (var entry in entries)
@@ -141,14 +145,21 @@ namespace SanctuaryHud
                 var w = entry.Element != null ? _tileSize.x : SeparatorWidth;
                 if (count > 0 && width + w > maxWidth && entry.Element != null)
                 {
+                    // Past the last line allowed, the rest is left off.
+                    if (maxLines > 0 && _wrap.Count + 1 >= maxLines) break;
                     _wrap.Add(count);
+                    _wrapTotal += count;
                     count = 0;
                     width = Pad * 2f;
                 }
                 count++;
                 width += w + Gap;
             }
-            if (count > 0) _wrap.Add(count);
+            if (count > 0)
+            {
+                _wrap.Add(count);
+                _wrapTotal += count;
+            }
         }
 
         private void Rebuild(SanctuaryPanelUI panel, List<UnitRow.Entry> entries)
