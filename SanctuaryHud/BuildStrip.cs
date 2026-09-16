@@ -156,7 +156,7 @@ namespace SanctuaryHud
             if (_options.Count > 0)
             {
                 _optionsRow.Show(true);
-                _optionsRow.Sync(options, _options, false, s, size.x - optionsX - Margin);
+                _optionsRow.Sync(options, _options, s, size.x - optionsX - Margin);
                 _optionsRow.Place(new Vector2(optionsX, origin.y));
             }
             else _optionsRow.Show(false);
@@ -176,7 +176,7 @@ namespace SanctuaryHud
             if (_queue.Count > 0)
             {
                 _queueRow.Show(true);
-                _queueRow.Sync(queue, _queue, false, s, size.x - ax - Margin);
+                _queueRow.Sync(options, _queue, s, size.x - ax - Margin);
                 _queueRow.Place(new Vector2(ax, above));
             }
             else _queueRow.Show(false);

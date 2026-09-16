@@ -14,9 +14,11 @@ namespace SanctuaryHud
     // corner; Place puts that where the caller wants it, in canvas units
     // from the screen's bottom-left.
     //
-    // Sync takes the entries UnitRow.Collect read off a game panel: the
-    // children are rebuilt only when the sequence of game buttons, or the
-    // way it wraps, changes, and every tile mirrors its button every frame.
+    // Sync takes the entries UnitRow.Collect read off a game panel, and the
+    // panel whose button prefab the tiles clone (the build panel's, for
+    // every row, so they all match): the children are rebuilt only when the
+    // sequence of game buttons, or the way it wraps, changes, and every tile
+    // mirrors its button every frame.
     internal sealed class TileRow
     {
         internal const float Gap = 8f;
@@ -82,16 +84,16 @@ namespace SanctuaryHud
         }
 
         /// Makes the row show these entries, at this scale, mirroring the
-        /// game's buttons; badges puts the strategic icon on each tile;
+        /// game's buttons with tiles cloned from prefabPanel's prefab;
         /// maxWidth (canvas units, at the given scale) wraps it.
-        internal void Sync(SanctuaryPanelUI panel, List<UnitRow.Entry> entries, bool badges, float scale, float maxWidth = float.MaxValue)
+        internal void Sync(SanctuaryPanelUI prefabPanel, List<UnitRow.Entry> entries, float scale, float maxWidth = float.MaxValue)
         {
             if (_rect == null) return;
-            if (panel != _panel)
+            if (prefabPanel != _panel)
             {
-                // Tiles are clones of the panel's own prefab; a new panel
-                // (a new match) means new tiles.
-                _panel = panel;
+                // Tiles are clones of the panel's prefab; a new panel (a new
+                // match) means new tiles.
+                _panel = prefabPanel;
                 foreach (var tile in _tiles) if (tile != null) Object.Destroy(tile.gameObject);
                 foreach (var separator in _separators) if (separator != null) Object.Destroy(separator);
                 _tiles.Clear();
@@ -99,7 +101,7 @@ namespace SanctuaryHud
                 _shown.Clear();
                 _shownLines.Clear();
                 _live.Clear();
-                _tileSize = UnitTile.NativeSize(panel);
+                _tileSize = UnitTile.NativeSize(prefabPanel);
             }
             _rect.localScale = new Vector3(scale, scale, 1f);
 
@@ -108,14 +110,14 @@ namespace SanctuaryHud
             var same = entries.Count == _shown.Count && _wrap.Count == _shownLines.Count;
             for (var i = 0; same && i < entries.Count; i++) same = entries[i].Element == _shown[i];
             for (var i = 0; same && i < _wrap.Count; i++) same = _wrap[i] == _shownLines[i];
-            if (!same) Rebuild(panel, entries);
+            if (!same) Rebuild(prefabPanel, entries);
 
             for (var i = 0; i < _live.Count && i < entries.Count; i++)
             {
                 var tile = _live[i];
                 if (tile == null) continue;
                 var entry = entries[i];
-                if (entry.Element != null) tile.Mirror(entry.Element, badges);
+                if (entry.Element != null) tile.Mirror(entry.Element);
             }
 
             // So the size is right for whoever lays out beside the row this frame.

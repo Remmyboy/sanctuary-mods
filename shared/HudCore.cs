@@ -2057,18 +2057,6 @@ namespace SanctuaryHud
 
         /// Dropped when a match ends: icons are registered per match, so last
         /// game's indices are not safe to carry into the next one.
-        /// The atlas and the UV rectangle of one icon, for a RawImage: the
-        /// same rectangle DrawStrategicIcon samples, negative height and all,
-        /// which turns the top-down icon the right way up on a quad too.
-        internal static bool IconAtlasUv(int index, out Texture atlas, out Rect uv)
-        {
-            atlas = _iconAtlas;
-            uv = default;
-            if (_iconAtlas == null || _iconUvRects == null || index < 0 || index >= _iconUvRects.Count) return false;
-            uv = _iconUvRects[index];
-            return true;
-        }
-
         internal static void ClearIconRegistry()
         {
             _iconIndexByName = null;

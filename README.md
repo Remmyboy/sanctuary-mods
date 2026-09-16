@@ -156,20 +156,18 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   game's own card and rounds its income figures.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,
   which stacks the selected unit types upwards in a narrow column on the
-  left edge. The same buttons — the game's own plate and portrait, with the
-  count in the corner and the tile shaped to the art, with the type's
-  strategic icon (the map's own, out of the icon atlas) in the top-right
-  corner — stand as a row along the bottom at the left end of the build
-  options, with a clear break between the game's groups (air, land, naval,
+  left edge. The same buttons — the game's own plate, portrait, strategic
+  icon and count, in the build area's tile shape — stand as a row along the
+  bottom at the left end of the build options, with a clear break between the game's groups (air, land, naval,
   structures). Left click keeps just
   that type, right click drops it, both passed to the game's own button.
   `SelectionScale` sizes it.
 
   The row and the build strip are built the game's own way rather than
   drawn: uGUI on a root of the HUD's own placed on the game's HUD canvas,
-  just above its panels. Each tile is a clone of the panel's own button
-  prefab (so it keeps the prefab's shape, 112 by 72 canvas units for the
-  selection list) with the game's element script taken off, mirroring one
+  just above its panels. Each tile is a clone of the build panel's own
+  button prefab (72 by 104 canvas units, so every row matches) with the
+  game's element script taken off, mirroring one
   of the concealed panel's buttons every frame and passing it every pointer
   event. What that buys over the IMGUI stand-ins: the game's UI Scale
   setting applies, the count text is the game's own TextMeshPro in its own

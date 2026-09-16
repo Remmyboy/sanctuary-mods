@@ -135,14 +135,16 @@ namespace SanctuaryHud
                 return;
             }
 
+            // The tiles are clones of the build panel's prefab, so the row
+            // matches the build area; its own panel's if there is no build panel.
+            var construction = FindPanel<ConstructionPanelUI>(UIPanelType.Construction);
             var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
             _row.Show(true);
-            _row.Sync(panel, _entries, true, s);
+            _row.Sync(construction != null ? (SanctuaryPanelUI)construction : panel, _entries, s);
 
             // Where the game's strip starts, in canvas units from the
             // screen's bottom-left; failing that, a little in from the corner.
             var at = new Vector2(28f, 28f);
-            var construction = FindPanel<ConstructionPanelUI>(UIPanelType.Construction);
             if (construction != null && BuildStrip.StripLocal(construction, out var strip))
             {
                 at = new Vector2(strip.x, strip.y);

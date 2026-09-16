@@ -9,8 +9,9 @@ using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
-    // One of the game's unit buttons, cloned: a copy of the panel's own
-    // button prefab — background plate, portrait, strategic icon, count text,
+    // One of the game's unit buttons, cloned: a copy of the build panel's
+    // own button prefab (one prefab for every row, so the selection row and
+    // the build area match) — background plate, portrait, strategic icon, count text,
     // progress bar, hover overlay and the Button with its glow — with the
     // game's element script taken off and this one put on. Each frame it
     // mirrors a live button on the concealed game panel (Mirror), and every
@@ -38,7 +39,6 @@ namespace SanctuaryHud
         private Button _button;
         private LayoutElement _layout;
         private Image _edge;
-        private RawImage _badge;
         private bool _hover;
 
         /// The game button this tile stands for, or null.
@@ -47,8 +47,9 @@ namespace SanctuaryHud
         /// The tile under the mouse, or null.
         internal static UnitTile Hovered { get; private set; }
 
-        /// A clone of the panel's button prefab, stripped and ready, parented
-        /// under parent and active. Null when the prefab can't be cloned.
+        /// A clone of the given panel's button prefab, stripped and ready,
+        /// parented under parent and active. Null when the prefab can't be
+        /// cloned.
         internal static UnitTile Create(SanctuaryPanelUI panel, Transform parent)
         {
             var prefab = panel != null ? panel.buttonPrefab : null;
@@ -93,20 +94,10 @@ namespace SanctuaryHud
                 if (tile._progress != null) tile._progress.gameObject.SetActive(false);
                 if (tile._textContainer != null) tile._textContainer.SetActive(false);
 
-                // The HUD's own additions: a line along the bottom edge in the
-                // unit's element colour, and the strategic icon badge in the
-                // top-right corner, raised a little above the tile's edge.
+                // The HUD's own addition: a line along the bottom edge in the
+                // unit's element colour.
                 tile._edge = HudCanvas.Fill(rt, "Edge", Color.white);
                 HudCanvas.StretchAlongBottom(tile._edge.rectTransform, 2f);
-                var badge = new GameObject("Badge", typeof(RectTransform));
-                badge.transform.SetParent(rt, false);
-                tile._badge = badge.AddComponent<RawImage>();
-                tile._badge.raycastTarget = false;
-                var brt = tile._badge.rectTransform;
-                brt.anchorMin = brt.anchorMax = brt.pivot = new Vector2(1f, 1f);
-                brt.sizeDelta = new Vector2(44f, 44f);
-                brt.anchoredPosition = new Vector2(0f, 6f);
-                badge.SetActive(false);
 
                 go.transform.SetParent(parent, false);
                 go.SetActive(true);
@@ -141,9 +132,9 @@ namespace SanctuaryHud
         // ---- mirroring ------------------------------------------------------------
 
         /// Takes the given game button's look for this frame: its art (or
-        /// the HUD's element tile behind the portrait), count, progress and
-        /// whether it can be clicked; the badge when asked for.
-        internal void Mirror(UnitButtonElement source, bool badge)
+        /// the HUD's element tile behind the portrait), strategic icon,
+        /// count, progress and whether it can be clicked.
+        internal void Mirror(UnitButtonElement source)
         {
             _source = source;
             _layout.preferredWidth = _native.x;
@@ -216,24 +207,6 @@ namespace SanctuaryHud
             var edge = UnitRow.EdgeFor(domain);
             edge.a = _hover ? 1f : 0.7f;
             _edge.color = edge;
-
-            // The type's strategic icon — the same image the map draws over
-            // the unit, out of the game's icon atlas — for telling one type
-            // from the next in a mixed selection.
-            var showBadge = false;
-            if (badge)
-            {
-                EnsureIconRegistry();
-                var index = IconIndexByName(UnitDomains.IconOf(portrait));
-                if (index >= 0 && IconAtlasUv(index, out var atlas, out var uv))
-                {
-                    _badge.texture = atlas;
-                    _badge.uvRect = uv;
-                    _badge.color = Color.white;
-                    showBadge = true;
-                }
-            }
-            if (_badge.gameObject.activeSelf != showBadge) _badge.gameObject.SetActive(showBadge);
         }
 
         // ---- pointer events, passed to the game's button -----------------------
