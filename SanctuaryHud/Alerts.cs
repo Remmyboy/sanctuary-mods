@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using HarmonyLib;
 using SanctuaryUI;
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
@@ -454,77 +457,137 @@ namespace SanctuaryHud
             _rendered.Clear();
         }
 
-        // ---- drawing -------------------------------------------------------
+        // ---- the toasts on the canvas ----------------------------------------------
+        //
+        // Stacked top-centre just under the strip; newest on top. Fades in
+        // fast and out over the last second. Clicking a commander toast is
+        // the same as clicking the widget. Each toast is a card of the
+        // strip's colour (or a white card with dark type) with a bar of the
+        // alert's colour down its left edge and along its bottom.
 
-        private static GUIStyle _stToast;
-        private static bool _stylesReady;
+        private static RectTransform _column;
+        private static readonly List<ToastView> _views = new List<ToastView>();
+        private static bool _syncLogged;
 
-        private static void EnsureToastStyles()
+        /// From Update: shows the live toasts, or nothing.
+        internal static void SyncCanvas(bool showing, float scale)
         {
-            if (_stylesReady) return;
-            _stylesReady = true;
-            EnsureStyles();
-            _stToast = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-        }
-
-        internal static void ApplyFont(Font font)
-        {
-            EnsureToastStyles();
-            if (font == null) return;
-            _stToast.font = font;
-            _stToast.fontSize = 16;
-        }
-
-        /// Stacked top-centre just under the strip; newest on top. Fades in
-        /// fast and out over the last second. Clicking a commander toast is
-        /// the same as clicking the widget.
-        internal static void Draw(float logicalWidth, float top, Texture2D panelTexture)
-        {
-            if (_toasts.Count == 0) return;
-            EnsureToastStyles();
-            var now = Time.realtimeSinceStartup;
-            var y = top;
-            foreach (var t in _toasts)
+            try
             {
-                var age = now - t.Shown;
-                var left = t.Expires - now;
-                var alpha = Mathf.Clamp01(age / 0.15f) * Mathf.Clamp01(left / 1f);
-                var width = _stToast.CalcSize(new GUIContent(t.Text)).x + 36f;
-                var rect = new Rect(logicalWidth / 2f - width / 2f, y, width, 28f);
-
-                var previous = GUI.color;
-                if (t.Light)
+                var show = showing && _toasts.Count > 0;
+                if (!show)
                 {
-                    GUI.color = new Color(0.95f, 0.96f, 0.97f, 0.95f * alpha);
-                    GUI.DrawTexture(rect, _texWhite);
+                    if (_column != null && _column.gameObject.activeSelf) _column.gameObject.SetActive(false);
+                    return;
                 }
-                else
-                {
-                    GUI.color = new Color(1f, 1f, 1f, alpha);
-                    GUI.DrawTexture(rect, panelTexture);
-                }
-                var bar = t.Colour;
-                bar.a *= alpha;
-                GUI.color = bar;
-                GUI.DrawTexture(new Rect(rect.x, rect.y, 4f, rect.height), _texWhite);
-                GUI.DrawTexture(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), _texWhite);
-                GUI.color = previous;
+                var root = HudCanvas.Ensure();
+                if (root == null) return;
+                if (_column == null) BuildColumn(root);
+                if (!_column.gameObject.activeSelf) _column.gameObject.SetActive(true);
+                _column.localScale = new Vector3(scale, scale, 1f);
+                _column.anchoredPosition = new Vector2(0f, -(EcoStrip.Height + 24f) * scale);
 
+                var now = Time.realtimeSinceStartup;
+                for (var i = 0; i < _toasts.Count; i++)
+                {
+                    if (i >= _views.Count) _views.Add(ToastView.Create(_column));
+                    var view = _views[i];
+                    view.transform.SetSiblingIndex(i);
+                    if (!view.gameObject.activeSelf) view.gameObject.SetActive(true);
+                    var t = _toasts[i];
+                    var age = now - t.Shown;
+                    var left = t.Expires - now;
+                    view.Set(t, Mathf.Clamp01(age / 0.15f) * Mathf.Clamp01(left / 1f));
+                }
+                for (var i = _toasts.Count; i < _views.Count; i++)
+                    if (_views[i].gameObject.activeSelf) _views[i].gameObject.SetActive(false);
+            }
+            catch (Exception e)
+            {
+                if (!_syncLogged)
+                {
+                    _syncLogged = true;
+                    _log?.LogWarning($"Alerts could not be laid out (logged once): {e}");
+                }
+            }
+        }
+
+        private static void BuildColumn(RectTransform root)
+        {
+            var go = new GameObject("Alerts", typeof(RectTransform));
+            go.transform.SetParent(root, false);
+            _column = (RectTransform)go.transform;
+            _column.anchorMin = _column.anchorMax = new Vector2(0.5f, 1f);
+            _column.pivot = new Vector2(0.5f, 1f);
+            var group = go.AddComponent<VerticalLayoutGroup>();
+            group.spacing = 12f;
+            group.childAlignment = TextAnchor.UpperCenter;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = false;
+            HudCanvas.FitToContents(_column);
+            _views.Clear();
+        }
+
+        private sealed class ToastView : MonoBehaviour, IPointerClickHandler
+        {
+            private Toast _toast;
+            private CanvasGroup _group;
+            private Image _card, _bar, _line;
+            private TMP_Text _text;
+
+            internal static ToastView Create(Transform parent)
+            {
+                var card = HudCanvas.Fill(parent, "Toast", PanelColour);
+                card.raycastTarget = true;
+                var go = card.gameObject;
+                var view = go.AddComponent<ToastView>();
+                view._card = card;
+                view._group = go.AddComponent<CanvasGroup>();
+                var row = go.AddComponent<HorizontalLayoutGroup>();
+                row.padding = new RectOffset(36, 36, 0, 0);
+                row.childAlignment = TextAnchor.MiddleCenter;
+                row.childControlWidth = true;
+                row.childControlHeight = true;
+                row.childForceExpandWidth = false;
+                row.childForceExpandHeight = false;
+                var layout = go.AddComponent<LayoutElement>();
+                layout.minHeight = 56f;
+                layout.preferredHeight = 56f;
+                view._text = HudCanvas.Text(go.transform, "Text", 32f, Color.white, TextAlignmentOptions.Center);
+                view._bar = HudCanvas.Fill(go.transform, "Bar", Color.white);
+                view._bar.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                var brt = view._bar.rectTransform;
+                brt.anchorMin = new Vector2(0f, 0f);
+                brt.anchorMax = new Vector2(0f, 1f);
+                brt.pivot = new Vector2(0f, 0.5f);
+                brt.offsetMin = Vector2.zero;
+                brt.offsetMax = new Vector2(8f, 0f);
+                view._line = HudCanvas.Fill(go.transform, "Line", Color.white);
+                view._line.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                HudCanvas.StretchAlongBottom(view._line.rectTransform, 2f);
+                return view;
+            }
+
+            internal void Set(Toast toast, float alpha)
+            {
+                _toast = toast;
+                _group.alpha = alpha;
+                _card.color = toast.Light ? new Color(0.95f, 0.96f, 0.97f, 0.95f) : PanelColour;
+                _bar.color = toast.Colour;
+                _line.color = toast.Colour;
                 // Dark type on a light card; on the dark panel, the alert's
                 // colour lifted towards white so it reads.
-                var textColour = t.Light ? t.Colour : Color.Lerp(t.Colour, Color.white, 0.55f);
-                textColour.a = alpha;
-                _stToast.normal.textColor = textColour;
-                GUI.Label(rect, t.Text, _stToast);
+                _text.color = toast.Light ? toast.Colour : Color.Lerp(toast.Colour, Color.white, 0.55f);
+                HudCanvas.SetText(_text, toast.Text);
+            }
 
-                if (t.JumpToCommander && Event.current.type == EventType.MouseDown && Event.current.button == 0 &&
-                    rect.Contains(Event.current.mousePosition))
-                {
-                    _pendingCommander = true;
-                    _applyOnFrame = -1;
-                    Event.current.Use();
-                }
-                y += rect.height + 6f;
+            public void OnPointerClick(PointerEventData eventData)
+            {
+                if (eventData.button != PointerEventData.InputButton.Left || _toast == null || !_toast.JumpToCommander) return;
+                _pendingCommander = true;
+                _applyOnFrame = -1;
             }
         }
     }

@@ -293,6 +293,7 @@ namespace SanctuaryHud
             // last seat's figures going stale. The mini-map stays — it is the
             // one thing here that reads just as well watching everybody.
             EcoStrip.Tick(_visible && InMatch && !_menuOpen && OwnArmyFocused, SliderScale);
+            Alerts.SyncCanvas(_visible && InMatch && !_menuOpen, SliderScale);
             // The HUD canvas (the uGUI stand-ins) hides with the rest of the
             // HUD, and under the game's menus, as everything else here does.
             HudCanvas.SetShowing(_visible && InMatch && !_menuOpen);
@@ -424,10 +425,8 @@ namespace SanctuaryHud
             // The stand-ins for the game's own bottom panels are on the HUD
             // canvas (HudCanvas), not drawn here.
 
-            // The strip and the commander widget are on the HUD canvas too
-            // (EcoStrip); the alerts sit under the strip's edge.
-            Alerts.Draw(logicalWidth, StripHeight * SliderScale + 12f, _texStrip);
-            MiniMap.Draw(logicalWidth, logicalHeight, scale);
+            // The strip, the commander widget, the alerts and the mini-map are
+            // on the HUD canvas too (EcoStrip, Alerts, MiniMap).
 
             GUI.matrix = previousMatrix;
         }
@@ -447,7 +446,6 @@ namespace SanctuaryHud
         internal static Color GameAccent => AccentColour;
         internal static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
 
-        private static Texture2D _texStrip;
         private static bool _gameStyleReady;
         private static Color _alloyTint = AlloyColour;
         private static Color _energyTint = EnergyColour;
@@ -464,8 +462,6 @@ namespace SanctuaryHud
         {
             if (_gameStyleReady) return;
             _gameStyleReady = true;
-
-            _texStrip = MakeTexture(GamePanelColour);
 
             var font = GamePanel.ResolveFont(_log);
             if (font != null)
@@ -486,7 +482,6 @@ namespace SanctuaryHud
                 _stCmdLabel.fontSize = 12;
             }
             WorldOverlays.ApplyFont(font);
-            Alerts.ApplyFont(font);
             _stStripMax.normal.textColor = MutedText;
 
             var alloy = AlloyColour;

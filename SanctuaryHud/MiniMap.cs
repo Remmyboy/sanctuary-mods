@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using BepInEx.Configuration;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
@@ -18,7 +21,10 @@ namespace SanctuaryHud
     // The work is split four ways: MapSurface knows about the map (all from
     // the game's own C#), Contacts knows what is on it (all from the client's
     // Lua), FogOverlay knows what can be seen, and this is the panel, the
-    // settings and the clicking.
+    // settings and the clicking. The panel stands on the game's HUD canvas
+    // (HudCanvas): the map's picture, the fog and every icon are Images, a
+    // press on the map is a pointer event that never reaches the battlefield,
+    // and the frame is dragged and the corner pulled as uGUI drags.
     internal static class MiniMap
     {
         private static ConfigEntry<bool> _cfgEnabled;
@@ -38,36 +44,23 @@ namespace SanctuaryHud
         /// starts as and what the Mods page shows.
         private static bool _shown = true;
 
-        // 1080p-logical pixels, like every other panel in this repo, rescaled
-        // to the real resolution by the caller's GUI matrix.
+        // 1080p-logical pixels, like every other panel in this repo; the
+        // canvas converts (HudCanvas.UnitsPerLogical).
         private static Rect _rect = new Rect(16, 802, 250, 250);
-
-        /// The map inside the window, in window coordinates, for drawing and
-        /// hit-testing.
-        private static Rect _mapArea;
 
         /// The border doubles as the handle that moves the panel, so the map
         /// itself is free to mean "go here".
         private const float Frame = 5f;
         private const float Grip = 14f;
 
-        /// Its own window id, distinct from the other mods' (0x5DC, 0x5DD,
-        /// 0x43414D55): "MMAP".
-        private const int WindowId = 0x4D4D4150;
-
         /// The live size, so a resize drag doesn't write the config file on
         /// every frame of the drag; it is stored when the mouse comes up.
         private static float _size;
         private static bool _resizing;
-        private static float _resizeStartSize;
-        private static Vector2 _resizeStartMouse;
 
         private static float _lastJump;
         private static bool _dragging;
         private static bool _wasInMatch;
-
-        private static Texture2D _texFill;
-        private static Texture2D _texLine;
 
         internal static void Bind(ConfigFile config)
         {
@@ -105,11 +98,11 @@ namespace SanctuaryHud
         }
 
         /// Whether something in here has thrown. The mini-map shares the HUD's
-        /// Update and OnGUI now, so an exception escaping it would take the
-        /// economy strip and the alerts down with it — everything below is
-        /// guarded, and a fault costs the mini-map and nothing else.
+        /// Update now, so an exception escaping it would take the economy
+        /// strip and the alerts down with it — everything below is guarded,
+        /// and a fault costs the mini-map and nothing else.
         private static bool _tickFailed;
-        private static bool _drawFailed;
+        private static bool _syncLogged;
 
         /// From the HUD's Update. `hudShowing` is the overlay's own state, so
         /// the mini-map goes away with the rest of the HUD on F10 and under
@@ -122,18 +115,6 @@ namespace SanctuaryHud
             {
                 _tickFailed = true;
                 _log?.LogError($"Mini-map update failed; the rest of the HUD carries on without it: {e}");
-            }
-        }
-
-        /// From the HUD's OnGUI, inside its 1080p-logical GUI matrix.
-        internal static void Draw(float logicalWidth, float logicalHeight, float scale)
-        {
-            if (_drawFailed) return;
-            try { DrawCore(logicalWidth, logicalHeight, scale); }
-            catch (Exception e)
-            {
-                _drawFailed = true;
-                _log?.LogError($"Mini-map draw failed; the rest of the HUD carries on without it: {e}");
             }
         }
 
@@ -154,10 +135,10 @@ namespace SanctuaryHud
                 }
             }
 
-            // A release outside the window may never reach the window's own
-            // event handler, and a drag stuck on would leave the full-screen
-            // shield up with nothing drawing under it — every click in the
-            // game swallowed. The real button state is the backstop.
+            // A release outside the window may never reach the handler, and
+            // a drag stuck on would leave the full-screen shield up with
+            // nothing under it — every click in the game swallowed. The real
+            // button state is the backstop.
             if (!Input.GetMouseButton(0))
             {
                 if (_dragging) _dragging = false;
@@ -168,7 +149,11 @@ namespace SanctuaryHud
                 }
             }
 
-            if (!InMatch) return;
+            if (!InMatch)
+            {
+                ShowPanel(false);
+                return;
+            }
 
             MapSurface.Refresh();
 
@@ -194,6 +179,20 @@ namespace SanctuaryHud
             // the corner isn't being dragged.
             if (!_resizing && Math.Abs(_cfgSize.Value - _size) > 0.5f) _size = _cfgSize.Value;
 
+            try
+            {
+                SyncPanel(showing);
+            }
+            catch (Exception e)
+            {
+                if (!_syncLogged)
+                {
+                    _syncLogged = true;
+                    _log?.LogWarning($"Mini-map could not be laid out (logged once): {e}");
+                }
+                ShowPanel(false);
+            }
+
             // Persist the panel position once the drag is over.
             if (!Input.GetMouseButton(0) &&
                 (Math.Abs(_cfgPosX.Value - _rect.x) > 0.5f || Math.Abs(_cfgPosY.Value - _rect.y) > 0.5f))
@@ -203,199 +202,350 @@ namespace SanctuaryHud
             }
         }
 
-        private static void DrawCore(float logicalWidth, float logicalHeight, float scale)
+        // ---- the panel on the canvas ----------------------------------------------
+
+        private static RectTransform _plate, _map;
+        private static Image _plateImage, _mapBack, _dragShield;
+        private static RawImage _backdrop, _fog;
+        private static HudPanel.PanelDrag _drag;
+        private static MapInput _input;
+        private static ResizeGrip _grip;
+        private static readonly Image[] _border = new Image[4];
+        private static readonly List<Image> _gripMarks = new List<Image>();
+        private static readonly List<RawImage> _icons = new List<RawImage>();
+        private static readonly List<Image> _spots = new List<Image>();
+
+        private static readonly Color FillColour = new Color(0.05f, 0.07f, 0.09f, 1f);
+        private static readonly Color MapBackColour = new Color(0.09f, 0.11f, 0.14f, 1f);
+        private static readonly Color BorderColour = new Color(0.35f, 0.55f, 0.8f, 0.7f);
+
+        private static void ShowPanel(bool showing)
         {
-            if (_cfgEnabled == null || !_shown || !MapSurface.Ready) return;
-            EnsureUi();
+            if (_plate != null && _plate.gameObject.activeSelf != showing) _plate.gameObject.SetActive(showing);
+            if (!showing && _dragShield != null && _dragShield.gameObject.activeSelf) _dragShield.gameObject.SetActive(false);
+        }
+
+        private static void SyncPanel(bool showing)
+        {
+            if (!showing || !MapSurface.Ready)
+            {
+                ShowPanel(false);
+                return;
+            }
+            var root = HudCanvas.Ensure();
+            if (root == null) return;
+            if (_plate == null) BuildPanel(root);
+            ShowPanel(true);
 
             // The map keeps its own proportions inside a Size-by-Size box, so
             // a non-square map is letter-boxed rather than stretched.
-            var side = Mathf.Clamp(_size, 120f, 640f);
+            var k = HudCanvas.UnitsPerLogical;
+            var side = Mathf.Clamp(_size, 120f, 640f) * k;
             var aspect = MapSurface.FrameL / Mathf.Max(1f, MapSurface.FrameW);
             var mapW = aspect <= 1f ? side : side / aspect;
             var mapH = aspect <= 1f ? side * aspect : side;
+            var frame = Frame * k;
+            var plateW = mapW + frame * 2f;
+            var plateH = mapH + frame * 2f;
+            _plate.sizeDelta = new Vector2(plateW, plateH);
+            _map.anchoredPosition = new Vector2(frame, -frame);
+            _map.sizeDelta = new Vector2(mapW, mapH);
+            var area = new Rect(0f, 0f, mapW, mapH);
+            _input.Area = area;
 
-            _rect.width = mapW + Frame * 2f;
-            _rect.height = mapH + Frame * 2f;
-            // Kept wholly on screen, whatever the resolution or the panel's size.
-            _rect.x = Mathf.Clamp(_rect.x, 0f, Mathf.Max(0f, logicalWidth - _rect.width));
-            _rect.y = Mathf.Clamp(_rect.y, 0f, Mathf.Max(0f, logicalHeight - _rect.height));
+            // Where it sits: where the frame was dragged to, else the saved
+            // place; kept wholly on screen whatever the size.
+            var size = HudCanvas.Size;
+            var dragged = _drag.Dragging || _drag.Moved;
+            var x = dragged ? _plate.anchoredPosition.x : _rect.x * k;
+            var y = dragged ? -_plate.anchoredPosition.y : _rect.y * k;
+            _drag.Moved = false;
+            x = Mathf.Clamp(x, 0f, Mathf.Max(0f, size.x - plateW));
+            y = Mathf.Clamp(y, 0f, Mathf.Max(0f, size.y - plateH));
+            _plate.anchoredPosition = new Vector2(x, -y);
+            _rect = new Rect(x / k, y / k, plateW / k, plateH / k);
 
-            _mapArea = new Rect(Frame, Frame, mapW, mapH);
-
-            _rect = GUI.Window(WindowId, _rect, DrawPanel, GUIContent.none, GUIStyle.none);
-
-            // Keep the click off the battlefield underneath. Without this the
-            // same press would also clear the selection or start a box drag,
-            // because the game's input only knows about uGUI.
-            //
-            // A drag covers the whole screen, because the release is what the
-            // game acts on: letting go outside the panel while a build is
-            // queued would otherwise plant a building wherever the cursor
-            // happened to end up.
-            Shield(_dragging || _resizing ? new Rect(0f, 0f, logicalWidth, logicalHeight) : _rect, scale);
-        }
-
-        private static void DrawPanel(int id)
-        {
             var opacity = _cfgOpacity.Value;
-            var previousColour = GUI.color;
-
-            GUI.color = new Color(1f, 1f, 1f, opacity);
-            GUI.DrawTexture(new Rect(0f, 0f, _rect.width, _rect.height), _texFill);
+            var fill = FillColour;
+            fill.a = opacity;
+            _plateImage.color = fill;
+            var back = MapBackColour;
+            back.a = opacity;
+            _mapBack.color = back;
 
             // The map area always spans the whole world; on a map whose
             // preview only covers the middle, the picture is drawn into just
             // that part and the rest stays backdrop.
-            GUI.color = new Color(0.09f, 0.11f, 0.14f, opacity);
-            GUI.DrawTexture(_mapArea, _texFill);
-            if (MapSurface.Backdrop != null)
+            var backdrop = MapSurface.Backdrop;
+            var haveBackdrop = backdrop != null;
+            if (_backdrop.gameObject.activeSelf != haveBackdrop) _backdrop.gameObject.SetActive(haveBackdrop);
+            if (haveBackdrop)
             {
-                GUI.color = new Color(1f, 1f, 1f, opacity);
-                GUI.DrawTexture(MapSurface.BackdropRect(_mapArea), MapSurface.Backdrop);
+                _backdrop.texture = backdrop;
+                _backdrop.color = new Color(1f, 1f, 1f, opacity);
+                var r = MapSurface.BackdropRect(area);
+                _backdrop.rectTransform.anchoredPosition = new Vector2(r.x, -r.y);
+                _backdrop.rectTransform.sizeDelta = new Vector2(r.width, r.height);
             }
 
             // Fog over the ground, under everything the player is being told
-            // about — a contact is drawn because the game says it can be seen,
-            // so it must not be shaded out by the fog it is standing in.
-            if (_cfgFog.Value && FogOverlay.Mask != null)
+            // about — a contact is drawn because the game says it can be
+            // seen, so it must not be shaded out by the fog it is standing in.
+            var fog = _cfgFog.Value ? FogOverlay.Mask : null;
+            var haveFog = fog != null;
+            if (_fog.gameObject.activeSelf != haveFog) _fog.gameObject.SetActive(haveFog);
+            if (haveFog)
             {
-                GUI.color = new Color(1f, 1f, 1f, opacity);
-                GUI.DrawTexture(_mapArea, FogOverlay.Mask);
+                _fog.texture = fog;
+                _fog.color = new Color(1f, 1f, 1f, opacity);
             }
 
-            GUI.color = Color.white;
-            DrawAlloySpots();
-            DrawContacts();
-            DrawBorder(_mapArea, new Color(0.35f, 0.55f, 0.8f, 0.7f), 1f);
-            DrawGrip();
+            SyncSpots(area, k);
+            SyncContacts(area, k);
 
-            GUI.color = previousColour;
+            // The border round the map, and the grip in the corner.
+            var line = Mathf.Max(1f, k);
+            Edge(_border[0], 0f, 0f, mapW, line);
+            Edge(_border[1], 0f, mapH - line, mapW, line);
+            Edge(_border[2], 0f, 0f, line, mapH);
+            Edge(_border[3], mapW - line, 0f, line, mapH);
+            var gripColour = new Color(0.55f, 0.7f, 0.9f, _resizing ? 0.95f : 0.5f);
+            for (var i = 0; i < 3; i++)
+            {
+                var inset = (i + 1) * 4f * k;
+                var mark = 2f * k;
+                _gripMarks[i * 2].color = gripColour;
+                _gripMarks[i * 2 + 1].color = gripColour;
+                Edge(_gripMarks[i * 2], plateW - inset - mark / 2f, plateH - 2f * k - mark, mark, mark);
+                Edge(_gripMarks[i * 2 + 1], plateW - 2f * k - mark, plateH - inset - mark / 2f, mark, mark);
+            }
+            ((RectTransform)_grip.transform).sizeDelta = new Vector2(Grip * k, Grip * k);
 
-            HandleMapInput();
-
-            // Whatever the map and the grip didn't claim is the frame, and the
-            // frame is the handle: a press on the map itself is always a camera
-            // move, never a nudge of the window.
-            if (!_cfgLocked.Value) GUI.DragWindow(new Rect(0f, 0f, _rect.width, _rect.height));
+            // Keep a release off the battlefield while a drag is on: the
+            // release is what the game acts on, and letting go outside the
+            // panel with a build queued would plant a building wherever the
+            // cursor ended up.
+            var shield = _dragging || _resizing;
+            if (_dragShield.gameObject.activeSelf != shield) _dragShield.gameObject.SetActive(shield);
         }
 
-        private static void DrawContacts()
+        private static void Edge(Image image, float x, float y, float w, float h)
+        {
+            var rt = image.rectTransform;
+            rt.anchoredPosition = new Vector2(x, -y);
+            rt.sizeDelta = new Vector2(w, h);
+        }
+
+        private static void SyncSpots(Rect area, float k)
+        {
+            var spots = _cfgAlloySpots.Value ? Contacts.AlloySpots : null;
+            var count = spots != null ? spots.Count : 0;
+            var dot = 3f * k;
+            for (var i = 0; i < count; i++)
+            {
+                if (i >= _spots.Count) _spots.Add(Dot(_map, "Alloy", AlloyColour));
+                var image = _spots[i];
+                if (!image.gameObject.activeSelf) image.gameObject.SetActive(true);
+                var p = MapSurface.WorldToPanel(new Vector3(spots[i].x, 0f, spots[i].y), area);
+                image.rectTransform.anchoredPosition = new Vector2(p.x, -p.y);
+                image.rectTransform.sizeDelta = new Vector2(dot, dot);
+            }
+            for (var i = count; i < _spots.Count; i++)
+                if (_spots[i].gameObject.activeSelf) _spots[i].gameObject.SetActive(false);
+        }
+
+        private static void SyncContacts(Rect area, float k)
         {
             var contacts = Contacts.Live;
-            if (contacts == null) return;
-
-            var size = _cfgIconSize.Value;
-            var half = size * 0.5f;
-            for (var i = 0; i < contacts.Count; i++)
+            var count = contacts != null ? contacts.Count : 0;
+            var size = _cfgIconSize.Value * k;
+            var haveAtlas = _iconAtlas != null && _iconUvRects != null;
+            for (var i = 0; i < count; i++)
             {
+                if (i >= _icons.Count) _icons.Add(Icon(_map));
+                var image = _icons[i];
+                if (!image.gameObject.activeSelf) image.gameObject.SetActive(true);
                 var c = contacts[i];
-                var p = MapSurface.WorldToPanel(new Vector3(c.X, 0f, c.Z), _mapArea);
-                var rect = new Rect(p.x - half, p.y - half, size, size);
+                var p = MapSurface.WorldToPanel(new Vector3(c.X, 0f, c.Z), area);
+                image.rectTransform.anchoredPosition = new Vector2(p.x, -p.y);
+                image.rectTransform.sizeDelta = new Vector2(size, size);
                 // A radar-only contact is drawn white, as the game draws it:
                 // it has told the player something is there and what size of
                 // plate it is, but not whose it is.
-                GUI.color = c.Seen ? Contacts.ColourFor(c.Army) : new Color(0.95f, 0.95f, 0.95f, 0.9f);
+                image.color = c.Seen ? Contacts.ColourFor(c.Army) : new Color(0.95f, 0.95f, 0.95f, 0.9f);
                 // The icon is the whole point of drawing these as icons rather
                 // than dots, but the registry fills in during match load, so
                 // early contacts get a plain square until it does.
-                if (!DrawStrategicIcon(rect, c.Icon)) GUI.DrawTexture(rect, _texLine);
+                if (haveAtlas && c.Icon >= 0 && c.Icon < _iconUvRects.Count)
+                {
+                    image.texture = _iconAtlas;
+                    image.uvRect = _iconUvRects[c.Icon];
+                }
+                else
+                {
+                    image.texture = null;
+                    image.uvRect = new Rect(0f, 0f, 1f, 1f);
+                }
             }
-            GUI.color = Color.white;
+            for (var i = count; i < _icons.Count; i++)
+                if (_icons[i].gameObject.activeSelf) _icons[i].gameObject.SetActive(false);
         }
 
-        private static void DrawAlloySpots()
+        private static void BuildPanel(RectTransform root)
         {
-            if (!_cfgAlloySpots.Value) return;
-            var spots = Contacts.AlloySpots;
-            if (spots == null) return;
+            _plateImage = HudCanvas.Fill(root, "Mini-map", FillColour);
+            _plateImage.raycastTarget = true;
+            _plate = _plateImage.rectTransform;
+            _plate.anchorMin = _plate.anchorMax = new Vector2(0f, 1f);
+            _plate.pivot = new Vector2(0f, 1f);
+            _drag = _plate.gameObject.AddComponent<HudPanel.PanelDrag>();
+            _drag.Locked = () => _cfgLocked.Value;
 
-            GUI.color = AlloyColour;
-            for (var i = 0; i < spots.Count; i++)
-            {
-                var p = MapSurface.WorldToPanel(new Vector3(spots[i].x, 0f, spots[i].y), _mapArea);
-                GUI.DrawTexture(new Rect(p.x - 1.5f, p.y - 1.5f, 3f, 3f), _texLine);
-            }
-            GUI.color = Color.white;
+            _mapBack = HudCanvas.Fill(_plate, "Map", MapBackColour);
+            _mapBack.raycastTarget = true;
+            _map = _mapBack.rectTransform;
+            _map.anchorMin = _map.anchorMax = new Vector2(0f, 1f);
+            _map.pivot = new Vector2(0f, 1f);
+            _input = _map.gameObject.AddComponent<MapInput>();
+
+            _backdrop = Raw(_map, "Backdrop");
+            _fog = Raw(_map, "Fog");
+            var frt = _fog.rectTransform;
+            frt.anchorMin = Vector2.zero;
+            frt.anchorMax = Vector2.one;
+            frt.offsetMin = Vector2.zero;
+            frt.offsetMax = Vector2.zero;
+
+            for (var i = 0; i < _border.Length; i++) _border[i] = Dot(_map, "Border", BorderColour);
+            _gripMarks.Clear();
+            for (var i = 0; i < 6; i++) _gripMarks.Add(Dot(_plate, "Grip", Color.white));
+            foreach (var mark in _gripMarks) mark.rectTransform.pivot = new Vector2(0f, 1f);
+
+            var grip = HudCanvas.Fill(_plate, "Resize", Color.clear);
+            grip.raycastTarget = true;
+            grip.canvasRenderer.cullTransparentMesh = false;
+            var grt = grip.rectTransform;
+            grt.anchorMin = grt.anchorMax = new Vector2(1f, 0f);
+            grt.pivot = new Vector2(1f, 0f);
+            grt.anchoredPosition = Vector2.zero;
+            _grip = grip.gameObject.AddComponent<ResizeGrip>();
+
+            // The whole-screen shield for a drag, on the canvas root so it
+            // covers everything; off until a drag starts.
+            _dragShield = HudCanvas.Fill(root, "Mini-map drag shield", Color.clear);
+            _dragShield.raycastTarget = true;
+            _dragShield.canvasRenderer.cullTransparentMesh = false;
+            var srt = _dragShield.rectTransform;
+            srt.anchorMin = Vector2.zero;
+            srt.anchorMax = Vector2.one;
+            srt.offsetMin = Vector2.zero;
+            srt.offsetMax = Vector2.zero;
+            _dragShield.gameObject.SetActive(false);
         }
 
-        /// Three small steps in the bottom-right corner, so the corner reads as
-        /// something to pull rather than just more border.
-        private static void DrawGrip()
+        private static Image Dot(Transform parent, string name, Color colour)
         {
-            GUI.color = new Color(0.55f, 0.7f, 0.9f, _resizing ? 0.95f : 0.5f);
-            for (var i = 1; i <= 3; i++)
-            {
-                var inset = i * 4f;
-                GUI.DrawTexture(new Rect(_rect.width - inset - 1f, _rect.height - 4f, 2f, 2f), _texLine);
-                GUI.DrawTexture(new Rect(_rect.width - 4f, _rect.height - inset - 1f, 2f, 2f), _texLine);
-            }
-            GUI.color = Color.white;
+            var image = HudCanvas.Fill(parent, name, colour);
+            var rt = image.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            return image;
+        }
+
+        private static RawImage Raw(Transform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var image = go.AddComponent<RawImage>();
+            image.raycastTarget = false;
+            var rt = image.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            return image;
+        }
+
+        private static RawImage Icon(Transform parent)
+        {
+            var image = Raw(parent, "Contact");
+            image.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            return image;
         }
 
         // ---- clicking ---------------------------------------------------------
 
-        private static void HandleMapInput()
+        /// The map's pointer events: a press or a drag on the map moves the
+        /// camera there; the release lands exactly where the button came up.
+        private sealed class MapInput : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
         {
-            var ev = Event.current;
-            if (ev == null || ev.button != 0) return;
+            internal Rect Area;
 
-            var gripRect = new Rect(_rect.width - Grip, _rect.height - Grip, Grip, Grip);
-
-            if (ev.type == EventType.MouseUp)
+            private bool Point(PointerEventData eventData, out Vector2 point)
             {
-                if (_resizing) { _resizing = false; _cfgSize.Value = _size; ev.Use(); return; }
-                if (!_dragging) return;
-                _dragging = false;
-                // Land exactly where the button came up, whatever the rate
-                // limit was doing.
-                JumpTo(MapSurface.PanelToWorld(ev.mousePosition, _mapArea));
-                ev.Use();
-                return;
+                point = default;
+                if (!RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)transform, eventData.position, eventData.pressEventCamera, out var local)) return false;
+                point = new Vector2(local.x, -local.y);
+                return true;
             }
 
-            if (ev.type == EventType.MouseDown)
+            public void OnPointerDown(PointerEventData eventData)
             {
-                if (gripRect.Contains(ev.mousePosition) && !_cfgLocked.Value)
-                {
-                    _resizing = true;
-                    _resizeStartSize = _size;
-                    _resizeStartMouse = GUIUtility.GUIToScreenPoint(ev.mousePosition);
-                    ev.Use();
-                    return;
-                }
-                if (!_mapArea.Contains(ev.mousePosition)) return;
+                if (eventData.button != PointerEventData.InputButton.Left || !Point(eventData, out var point)) return;
                 _dragging = true;
+                _lastJump = Time.realtimeSinceStartup;
+                JumpTo(MapSurface.PanelToWorld(point, Area));
             }
-            else if (ev.type == EventType.MouseDrag)
-            {
-                if (_resizing)
-                {
-                    // The panel's top-left stays put, so the corner moving out
-                    // and down is the size going up. Both axes count, so a
-                    // diagonal pull does what it looks like.
-                    var delta = GUIUtility.GUIToScreenPoint(ev.mousePosition) - _resizeStartMouse;
-                    _size = Mathf.Clamp(_resizeStartSize + (delta.x + delta.y) * 0.5f, 120f, 640f);
-                    ev.Use();
-                    return;
-                }
-                if (!_dragging) return;
-            }
-            else return;
 
-            // Dragging across the map is a continuous pan, but each move is a
-            // chunk through the Lua bridge, so it is held to a rate a person
-            // cannot tell from every frame.
-            var now = Time.realtimeSinceStartup;
-            if (ev.type == EventType.MouseDrag && now - _lastJump < 0.06f)
+            public void OnDrag(PointerEventData eventData)
             {
-                ev.Use();
-                return;
+                if (eventData.button != PointerEventData.InputButton.Left || !_dragging) return;
+                // Dragging across the map is a continuous pan, but each move
+                // is a chunk through the Lua bridge, so it is held to a rate
+                // a person cannot tell from every frame.
+                var now = Time.realtimeSinceStartup;
+                if (now - _lastJump < 0.06f) return;
+                if (!Point(eventData, out var point)) return;
+                _lastJump = now;
+                JumpTo(MapSurface.PanelToWorld(point, Area));
             }
-            _lastJump = now;
 
-            JumpTo(MapSurface.PanelToWorld(ev.mousePosition, _mapArea));
-            ev.Use();
+            public void OnPointerUp(PointerEventData eventData)
+            {
+                if (eventData.button != PointerEventData.InputButton.Left || !_dragging) return;
+                _dragging = false;
+                if (Point(eventData, out var point)) JumpTo(MapSurface.PanelToWorld(point, Area));
+            }
+        }
+
+        /// The corner grip: pulling it out and down is the size going up.
+        /// Both axes count, so a diagonal pull does what it looks like.
+        private sealed class ResizeGrip : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+        {
+            private float _startSize;
+            private Vector2 _startMouse;
+
+            public void OnBeginDrag(PointerEventData eventData)
+            {
+                if (_cfgLocked.Value || eventData.button != PointerEventData.InputButton.Left) return;
+                _resizing = true;
+                _startSize = _size;
+                _startMouse = eventData.position;
+            }
+
+            public void OnDrag(PointerEventData eventData)
+            {
+                if (!_resizing) return;
+                var pxPerLogical = Screen.height / 1080f;
+                var delta = (eventData.position - _startMouse) / pxPerLogical;
+                // Screen y runs up; the corner goes down as the panel grows.
+                _size = Mathf.Clamp(_startSize + (delta.x - delta.y) * 0.5f, 120f, 640f);
+            }
+
+            public void OnEndDrag(PointerEventData eventData)
+            {
+                if (!_resizing) return;
+                _resizing = false;
+                _cfgSize.Value = _size;
+            }
         }
 
         /// Moves the camera over a world position without changing the zoom.
@@ -423,7 +573,7 @@ namespace SanctuaryHud
             RunLua(chunk);
         }
 
-        // ---- lifecycle and drawing helpers ------------------------------------
+        // ---- lifecycle ----------------------------------------------------------
 
         /// For unload: a hot reload leaves this assembly in memory for the rest
         /// of the session, so anything left standing here is left for good.
@@ -432,33 +582,13 @@ namespace SanctuaryHud
             FogOverlay.Release();
             MapSurface.Clear();
             Contacts.Clear();
-        }
-
-        private static void DrawBorder(Rect rect, Color colour, float width)
-        {
-            var previousColour = GUI.color;
-            GUI.color = colour;
-            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, width), _texLine);
-            GUI.DrawTexture(new Rect(rect.x, rect.yMax - width, rect.width, width), _texLine);
-            GUI.DrawTexture(new Rect(rect.x, rect.y, width, rect.height), _texLine);
-            GUI.DrawTexture(new Rect(rect.xMax - width, rect.y, width, rect.height), _texLine);
-            GUI.color = previousColour;
-        }
-
-        private static void EnsureUi()
-        {
-            if (_texLine != null) return;
-            _texFill = Solid(new Color(0.05f, 0.07f, 0.09f, 1f));
-            _texLine = Solid(Color.white);
-        }
-
-        private static Texture2D Solid(Color colour)
-        {
-            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            tex.SetPixel(0, 0, colour);
-            tex.Apply();
-            tex.hideFlags = HideFlags.HideAndDontSave;
-            return tex;
+            if (_plate != null) UnityEngine.Object.Destroy(_plate.gameObject);
+            if (_dragShield != null) UnityEngine.Object.Destroy(_dragShield.gameObject);
+            _plate = null;
+            _dragShield = null;
+            _icons.Clear();
+            _spots.Clear();
+            _gripMarks.Clear();
         }
     }
 }

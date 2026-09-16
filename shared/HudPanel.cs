@@ -130,7 +130,7 @@ namespace SanctuaryHud
 
         /// The drag handler: moves the plate with the mouse, in canvas
         /// units, and tells the panel it moved.
-        private sealed class PanelDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+        internal sealed class PanelDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
         {
             internal Func<bool> Locked;
             internal bool Dragging;
