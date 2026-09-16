@@ -180,8 +180,9 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   the unit card are built the same way (the card's texts are TextMeshPro in
   the game's font, its gauges filled Images), and so are the EcoManager and
   IdleEngineers panels, on the shared helpers in `shared/HudCanvas.cs` and
-  `shared/HudPanel.cs`. The strip, mini-map and map labels stay IMGUI,
-  which suits them.
+  `shared/HudPanel.cs`, as are the economy strip, the commander widget, the
+  alerts and the mini-map. Only the labels over the map (reclaim values
+  and build countdowns) are still drawn in OnGUI, which suits them.
 - **Build strip** (`BuildStrip`) in place of the game's build options, tier
   tabs and build queue, each of which is a dashed panel with paging arrows
   and "coming soon" placeholders. The HUD lays the bottom out itself from
