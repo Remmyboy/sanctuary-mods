@@ -106,6 +106,15 @@ stay live — and gives it back when the overlay is hidden with **F10**, when
 the switch goes off, or when the mod unloads. All of them step aside under
 the game's menus, the F8 Mods page and the result screen, as the strip does.
 
+They dock into one panel: a left column the width of the game's own orders
+and information panels, the unit card standing on the orders row, and the
+build area against its right edge, the selection row and the options along
+the bottom with the tier tabs and the queue above them, no gaps between.
+One hairline runs along every exposed top edge of the combined shape, with
+thin dividers where pieces meet. `PanelArt` (on by default) dresses the
+plates in the game's own dashed panel sprite instead, so they are framed
+as its panels are.
+
 - **Orders row** (`OrdersRow`) in place of the game's orders panel
   bottom-left. The game draws all twenty-one order buttons for any selection
   and dims the ones that don't apply; of the bright ones only Stop and the
