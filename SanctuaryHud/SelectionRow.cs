@@ -14,9 +14,11 @@ namespace SanctuaryHud
     // sight.
     //
     // With this on, the game's panel is made invisible (PanelConceal) and the
-    // same buttons draw as a row along the bottom (UnitRow), at the left end
+    // same buttons stand as a row along the bottom on the HUD's own canvas
+    // (TileRow of UnitTile: clones of the game's button, each mirroring one
+    // of the panel's and passing it every click and hover), at the left end
     // of the build strip. With the build strip replaced too (BuildStrip),
-    // that draws the row as part of its layout; otherwise the row goes where
+    // that lays its options out after the row; otherwise the row goes where
     // the game's own strip starts, or off its right end when it is showing.
     internal static class SelectionRow
     {
@@ -56,9 +58,27 @@ namespace SanctuaryHud
             var want = hudShowing && InMatch && Enabled.Value;
             var panel = want ? FindPanel<SelectionPanelUI>(UIPanelType.Selection) : null;
             if (_conceal.Apply(panel)) Describe(panel);
+            try
+            {
+                SyncRow(panel);
+            }
+            catch (Exception e)
+            {
+                if (!_syncLogged)
+                {
+                    _syncLogged = true;
+                    _log?.LogWarning($"Selection row could not be laid out (logged once): {e}");
+                }
+                _row?.Show(false);
+            }
         }
 
-        internal static void Shutdown() => _conceal.Release();
+        internal static void Shutdown()
+        {
+            _conceal.Release();
+            _row?.Destroy();
+            _row = null;
+        }
 
         private static int _countFrame = -1;
         private static int _count;
@@ -88,44 +108,62 @@ namespace SanctuaryHud
             return _count;
         }
 
-        // ---- drawing --------------------------------------------------------------
+        // ---- the row ----------------------------------------------------------------
 
-        private static readonly List<UnitRow.Entry> _row = new List<UnitRow.Entry>();
+        private static TileRow _row;
+        private static bool _syncLogged;
+        private static readonly List<UnitRow.Entry> _entries = new List<UnitRow.Entry>();
 
-        /// Draws the row with its bottom-left corner at (x, bottom), for a
-        /// layout that owns the bottom of the screen. Returns the width
-        /// drawn, 0 when there is nothing to draw.
-        internal static float DrawAt(float x, float bottom, float scale, Texture2D panelTexture)
+        /// From Update, after the conceal. Builds the row on the HUD canvas
+        /// the first time, fills it from the game's list, and puts it where
+        /// it goes this frame.
+        private static void SyncRow(SelectionPanelUI panel)
         {
-            var panel = _conceal.Panel as SelectionPanelUI;
-            if (panel == null || !panel.IsVisible) return 0f;
-            if (Event.current.type == EventType.Layout) UnitRow.Collect(panel, _row, false);
+            if (panel == null || !panel.IsVisible)
+            {
+                _row?.Show(false);
+                return;
+            }
+            var root = HudCanvas.Ensure(panel);
+            if (root == null) return;
+            if (_row == null || !_row.Alive) _row = TileRow.Create(root, "Selection row");
+
+            UnitRow.Collect(panel, _entries, false);
+            if (_entries.Count == 0)
+            {
+                _row.Show(false);
+                return;
+            }
+
             var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
-            return UnitRow.Draw(x, bottom, s, scale, _row, panelTexture, float.MaxValue, true).width;
+            _row.Show(true);
+            _row.Sync(panel, _entries, true, s);
+
+            // Where the game's strip starts, in canvas units from the
+            // screen's bottom-left; failing that, a little in from the corner.
+            var at = new Vector2(28f, 28f);
+            var construction = FindPanel<ConstructionPanelUI>(UIPanelType.Construction);
+            if (construction != null && BuildStrip.StripLocal(construction, out var strip))
+            {
+                at = new Vector2(strip.x, strip.y);
+                if (!BuildStrip.Active && construction.IsVisible)
+                {
+                    // Off the right end of the game's own strip, pulled back
+                    // in if that would run off the screen.
+                    at.x = strip.xMax + 20f;
+                    var limit = HudCanvas.Size.x - 20f;
+                    if (at.x + _row.Width > limit) at.x = Mathf.Max(0f, limit - _row.Width);
+                }
+            }
+            _row.Place(at);
         }
 
-        /// From OnGUI, under the 1080-logical matrix: the row on its own,
-        /// beside the game's build strip.
-        internal static void Draw(float logicalWidth, float logicalHeight, float scale, Texture2D panelTexture)
+        /// The row's width in the HUD's 1080-logical GUI units, 0 while it is
+        /// not showing: what the build strip lays its options out after.
+        internal static float PlacedWidth(float scale)
         {
-            var panel = _conceal.Panel as SelectionPanelUI;
-            if (panel == null || !panel.IsVisible) return;
-            if (Event.current.type == EventType.Layout) UnitRow.Collect(panel, _row, false);
-            if (_row.Count == 0) return;
-
-            var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
-            var width = UnitRow.Width(_row) * s;
-            var x = 14f;
-            var bottom = logicalHeight - 14f;
-            var construction = FindPanel<ConstructionPanelUI>(UIPanelType.Construction);
-            if (construction != null && BuildStrip.StripRect(construction, scale, out var strip))
-            {
-                bottom = strip.yMax;
-                x = construction.IsVisible ? strip.xMax + 10f : strip.x;
-                if (x + width > logicalWidth - 10f) x = Mathf.Max(0f, logicalWidth - 10f - width);
-            }
-            UnitRow.Draw(x, bottom, s, scale, _row, panelTexture, float.MaxValue, true);
-            UnitRow.FlushHover();
+            if (_row == null || !_row.Showing) return 0f;
+            return PanelConceal.GuiRect(_row.Rect, scale, out var rect) ? rect.width : 0f;
         }
 
         // ---- diagnostics ------------------------------------------------------
@@ -136,6 +174,11 @@ namespace SanctuaryHud
             {
                 _log?.LogInfo("Selection panel concealed; its tree:");
                 PanelConceal.DumpSubtree(panel.transform, 0, _log, 2);
+                if (panel.buttonPrefab != null)
+                {
+                    _log?.LogInfo("...and its button prefab:");
+                    PanelConceal.DumpSubtree(panel.buttonPrefab.transform, 0, _log, 3);
+                }
             }
             catch (Exception e)
             {

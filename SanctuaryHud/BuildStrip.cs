@@ -69,7 +69,14 @@ namespace SanctuaryHud
 
         /// Where the game's strip draws: its "Panel Dashed" child, sized to
         /// its contents and sitting lower than the panel's own rectangle.
-        internal static bool StripRect(Component panel, float scale, out Rect rect)
+        internal static bool StripRect(Component panel, float scale, out Rect rect) =>
+            PanelConceal.GuiRect(StripMeasure(panel), scale, out rect);
+
+        /// The same, in the HUD canvas's units from the screen's bottom-left.
+        internal static bool StripLocal(Component panel, out Rect rect) =>
+            HudCanvas.LocalRect(StripMeasure(panel), out rect);
+
+        private static Component StripMeasure(Component panel)
         {
             Component measure = panel;
             try
@@ -78,7 +85,7 @@ namespace SanctuaryHud
                 if (dashed != null) measure = dashed;
             }
             catch { /* the root will do */ }
-            return PanelConceal.GuiRect(measure, scale, out rect);
+            return measure;
         }
 
         // ---- drawing --------------------------------------------------------------
@@ -125,7 +132,7 @@ namespace SanctuaryHud
             }
 
             // The selection row first, then the options after it.
-            var selectionWidth = SelectionRow.DrawAt(x, bottom, scale, panelTexture);
+            var selectionWidth = SelectionRow.PlacedWidth(scale);
             var optionsX = selectionWidth > 0f ? x + selectionWidth + 10f : x;
             // The options wrap onto more lines, upward, rather than run off
             // the screen's right edge.

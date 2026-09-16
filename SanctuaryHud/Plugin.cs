@@ -209,6 +209,7 @@ namespace SanctuaryHud
             SelectionRow.Shutdown();
             TierTabs.Shutdown();
             BuildStrip.Shutdown();
+            HudCanvas.Destroy();
             _harmony?.UnpatchSelf();
         }
 
@@ -283,6 +284,9 @@ namespace SanctuaryHud
             GamePanel.SetBuiltInBarsHidden(_ecoPanel, _visible && InMatch && OwnArmyFocused && _cfgHideBuiltIn.Value, _log);
             GamePanel.TickShield();
             _menuOpen = _visible && InMatch && GamePanel.GameMenuOpen();
+            // The HUD canvas (the uGUI stand-ins) hides with the rest of the
+            // HUD, and under the game's menus, as everything else here does.
+            HudCanvas.SetShowing(_visible && InMatch && !_menuOpen && _cfgSanctuaryUi.Value);
 
             // The mini-map hides with the rest of the HUD, and under the
             // game's own menus, as everything else here does.
@@ -415,8 +419,9 @@ namespace SanctuaryHud
                 // reach the others. Logged once per site.
                 Fenced("orders row", () => OrdersBar.Draw(logicalWidth, logicalHeight, scale, _texStrip));
                 Fenced("unit card", () => InfoCard.Draw(logicalWidth, logicalHeight, scale, _texStrip));
+                // The selection row is on the HUD canvas (SelectionRow.Tick);
+                // the strip lays its options out after it.
                 if (BuildStrip.Active) Fenced("build strip", () => BuildStrip.Draw(logicalWidth, logicalHeight, scale, _texStrip));
-                else Fenced("selection row", () => SelectionRow.Draw(logicalWidth, logicalHeight, scale, _texStrip));
             }
 
             // The strip and the commander widget are one player's own numbers,

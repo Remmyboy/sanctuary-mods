@@ -52,7 +52,7 @@ namespace SanctuaryHud
         private static readonly Color UnknownColour = new Color(0.15f, 0.19f, 0.25f, 0.95f);
         private static readonly Dictionary<UnitDomains.Domain, Texture2D> _tiles = new Dictionary<UnitDomains.Domain, Texture2D>();
 
-        private static Texture2D Tile(UnitDomains.Domain domain)
+        internal static Texture2D Tile(UnitDomains.Domain domain)
         {
             if (_tiles.TryGetValue(domain, out var tile)) return tile;
             const int size = 32;
@@ -87,7 +87,7 @@ namespace SanctuaryHud
             return tile;
         }
 
-        private static Color EdgeFor(UnitDomains.Domain domain)
+        internal static Color EdgeFor(UnitDomains.Domain domain)
         {
             switch (domain)
             {
