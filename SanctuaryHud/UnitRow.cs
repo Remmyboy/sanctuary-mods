@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using SanctuaryUI;
 using UnityEngine;
 using UnityEngine.UI;
+using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
@@ -111,7 +112,7 @@ namespace SanctuaryHud
                 case UnitDomains.Domain.Naval: return new Color(0.35f, 0.62f, 1f);
                 case UnitDomains.Domain.Amphibious: return new Color(0.4f, 0.8f, 0.8f);
                 case UnitDomains.Domain.Air: return new Color(0.6f, 0.85f, 1f);
-                default: return SanctuaryHudPlugin.GameAccent;
+                default: return AccentColour;
             }
         }
     }

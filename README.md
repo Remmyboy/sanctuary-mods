@@ -149,7 +149,9 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   `buildTime`); the card widens to fit.
 
   Hovering a **build option** turns it into a build card: one line of alloy
-  cost, energy cost and time behind their marks. The time is the template's
+  cost, energy cost and time behind their marks. The alloy, energy and
+  build-power marks are the game's own: its card draws them as icon glyphs
+  in a TextMeshPro font, which are cloned; the clock is the HUD's. The time is the template's
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
   counts. With the replacement off,
@@ -175,8 +177,10 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   system, so no invisible shield is needed), and a fault in one tile's
   update cannot stop the rest of the HUD taking clicks. The orders row and
   the unit card are built the same way (the card's texts are TextMeshPro in
-  the game's font, its gauges filled Images). The strip, mini-map and map
-  labels stay IMGUI, which suits them.
+  the game's font, its gauges filled Images), and so are the EcoManager and
+  IdleEngineers panels, on the shared helpers in `shared/HudCanvas.cs` and
+  `shared/HudPanel.cs`. The strip, mini-map and map labels stay IMGUI,
+  which suits them.
 - **Build strip** (`BuildStrip`) in place of the game's build options, tier
   tabs and build queue, each of which is a dashed panel with paging arrows
   and "coming soon" placeholders. The HUD lays the bottom out itself from
@@ -487,6 +491,10 @@ with the count in the corner and the tier under it. Hidden entirely when
 nothing is idle; only as wide as what it is showing; draggable within the
 screen, and its position persists (`Panel · PosX`, `PosY`), with `Panel ·
 Scale` for its size and `Panel · Locked` to stop it moving during a game.
+The panel is uGUI on the game's own HUD canvas (see the SanctuaryUI
+notes above): the drag is a uGUI drag and a click on a tile stops at the
+tile, so nothing of either reaches the map, and the texts are the game's
+font at its UI Scale.
 On the right half of the screen it keeps its right edge fixed as it changes
 width and lays itself out from that edge. It steps aside under the game's
 menus, the F8 Mods page and the result screen.
@@ -547,7 +555,7 @@ spend in the corner, the count, and the tier. Each column is headed by its
 total and sorted by its own resource, so the top of the left column is what
 is eating the alloy and the top of the right what is eating the energy.
 Hovering a tile shows both rates, the progress, and how many builders are on
-it. **Left-click selects the builders** working on that template — engineers,
+it, in the game's own tooltip. **Left-click selects the builders** working on that template — engineers,
 factories, or the extractors upgrading themselves. **Right-click pauses them**,
 and right-click again resumes them: the tile dims and shows a pause mark while
 the panel is holding its builders. That is what an eco manager is for — see
@@ -560,8 +568,11 @@ it. Clicking a tile selects that group.
 
 Each panel has its own `Enabled` switch, `Scale` and position (draggable,
 persists), so either can be dropped or shrunk without the other; `Tooltips`
-turns the hover boxes off for both. The BUILD panel is hidden until the first
-build is under way, the ALLOY panel until the first extractor.
+turns the hover text off for both. The BUILD panel is hidden until the first
+build is under way, the ALLOY panel until the first extractor. Both are uGUI
+on the game's own HUD canvas, like the idle panel: the column marks are the
+game's own alloy and energy icons, a drag never reaches the map, and no
+click shield is needed.
 
 ### Where the spend comes from
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using SanctuaryUI;
 using UnityEngine;
 using UnityEngine.UI;
+using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
@@ -247,7 +248,7 @@ namespace SanctuaryHud
             layout.minWidth = SeparatorWidth;
             layout.preferredHeight = _tileSize.y;
             layout.minHeight = _tileSize.y;
-            var accent = SanctuaryHudPlugin.GameAccent;
+            var accent = AccentColour;
             accent.a = 0.35f;
             var line = HudCanvas.Fill(go.transform, "Line", accent);
             var lrt = line.rectTransform;

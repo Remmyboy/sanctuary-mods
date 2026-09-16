@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
@@ -26,15 +27,40 @@ namespace SanctuaryHud
     {
         private static RectTransform _root;
         private static Transform _holder;
+        private static Canvas _canvas;
         private static float _retryAt;
 
         /// The root, or null while there is none.
         internal static RectTransform Root => _root;
 
+        /// The game's HUD canvas the root is on, or null.
+        internal static Canvas Canvas => _canvas;
+
+        /// Canvas units per 1080-logical pixel (the unit the IMGUI code and
+        /// the saved panel positions use): 2 with the game's UI Scale at 1.
+        internal static float UnitsPerLogical => _canvas != null && _canvas.scaleFactor > 0f ? Screen.height / 1080f / _canvas.scaleFactor : 2f;
+
         /// An inactive holder under the root: a clone instantiated here has
         /// nothing run on it until it is moved into a live row, so it can be
         /// stripped and configured first.
         internal static Transform Holder => _holder;
+
+        /// The root, built beside the game's economy panel: for a mod with no
+        /// panel of its own to stand beside.
+        internal static RectTransform Ensure()
+        {
+            if (_root != null) return _root;
+            try
+            {
+                var ui = SanctuaryUIManager.Instance;
+                if (ui == null) return null;
+                return ui.TryGetPanel(UIPanelType.Economy, out var panel) ? Ensure(panel) : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         /// The root, built on the canvas the given game panel is on the
         /// first time (and again after a match change destroys it with the
@@ -54,7 +80,9 @@ namespace SanctuaryHud
                 var top = beside.transform;
                 while (top.parent != null && top.parent != canvasTransform) top = top.parent;
 
-                var go = new GameObject("SanctuaryHud", typeof(RectTransform));
+                // Named for the mod, since every mod that draws this way has a
+                // root of its own on the canvas.
+                var go = new GameObject(typeof(HudCanvas).Assembly.GetName().Name, typeof(RectTransform));
                 _root = (RectTransform)go.transform;
                 _root.SetParent(canvasTransform, false);
                 _root.SetSiblingIndex(top.GetSiblingIndex() + 1);
@@ -69,6 +97,10 @@ namespace SanctuaryHud
                 holder.SetActive(false);
                 holder.transform.SetParent(_root, false);
                 _holder = holder.transform;
+                _canvas = canvas.rootCanvas;
+                // The game's typeface, off any text on its canvas, unless a
+                // caller has picked one.
+                if (_font == null) TakeFont(canvasTransform.GetComponentInChildren<TMP_Text>(true));
 
                 _log?.LogInfo($"HUD canvas: root on '{canvas.rootCanvas.name}' after '{top.name}', scale factor {canvas.scaleFactor:0.###}.");
                 return _root;
@@ -78,6 +110,7 @@ namespace SanctuaryHud
                 _retryAt = Time.realtimeSinceStartup + 5f;
                 _log?.LogWarning($"HUD canvas could not be built; trying again in a few seconds ({e.Message}).");
                 if (_root != null) UnityEngine.Object.Destroy(_root.gameObject);
+                _canvas = null;
                 _root = null;
                 _holder = null;
                 return null;
@@ -97,6 +130,7 @@ namespace SanctuaryHud
         internal static void Destroy()
         {
             if (_root != null) UnityEngine.Object.Destroy(_root.gameObject);
+            _canvas = null;
             _root = null;
             _holder = null;
         }
@@ -191,6 +225,88 @@ namespace SanctuaryHud
             }
         }
 
+        // ---- the game's own icons ---------------------------------------------
+        //
+        // The game's unit card shows its figures behind small icons that are
+        // TextMeshPro texts (an icon glyph in a font), one per figure, under
+        // info-bar-bottom. They can be cloned wherever the HUD shows the
+        // same figure, so an alloy mark here is the game's own.
+
+        private static readonly Dictionary<string, TMP_Text> _gameIcons = new Dictionary<string, TMP_Text>();
+
+        private static string IconPath(string key)
+        {
+            const string bar = "info-bar-bottom/content/";
+            switch (key)
+            {
+                case "alloy": return bar + "alloy-info/content/icons/hud-icon-bottom";
+                case "energy": return bar + "energy-info/content/icons/hud-icon-bottom";
+                case "power": return bar + "constant-info/content/icons/hud-icon-top";
+                case "veterancy": return bar + "constant-info/content/icons/hud-icon-bottom";
+                case "transport": return bar + "capacity-info/content/icons/hud-icon-top";
+                case "ammo": return bar + "capacity-info/content/icons/hud-icon-bottom";
+                default: return null;
+            }
+        }
+
+        /// One of the game's icon texts, as a template to clone; null when
+        /// the game's card isn't there or has no such icon.
+        internal static TMP_Text GameIcon(string key)
+        {
+            if (_gameIcons.TryGetValue(key, out var found) && found != null) return found;
+            var path = IconPath(key);
+            if (path == null) return null;
+            try
+            {
+                var ui = SanctuaryUIManager.Instance;
+                if (ui == null || !ui.TryGetPanel(UIPanelType.Information, out var panel)) return null;
+                var node = panel.transform.Find(path);
+                var text = node != null ? node.GetComponent<TMP_Text>() : null;
+                if (text != null) _gameIcons[key] = text;
+                return text;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// A clone of one of the game's icons under parent, fitted to a box
+        /// of the given size and tinted. Null when the game has none.
+        internal static TMP_Text Icon(Transform parent, string key, float size, Color tint)
+        {
+            var template = GameIcon(key);
+            if (template == null) return null;
+            try
+            {
+                var go = UnityEngine.Object.Instantiate(template.gameObject, parent);
+                go.name = "Icon " + key;
+                foreach (var trigger in go.GetComponents<TooltipTrigger>()) UnityEngine.Object.Destroy(trigger);
+                var text = go.GetComponent<TMP_Text>();
+                text.color = tint;
+                text.raycastTarget = false;
+                text.alignment = TextAlignmentOptions.Center;
+                text.enableAutoSizing = true;
+                text.fontSizeMin = 8f;
+                text.fontSizeMax = size;
+                var layout = go.GetComponent<LayoutElement>();
+                if (layout == null) layout = go.AddComponent<LayoutElement>();
+                layout.ignoreLayout = false;
+                layout.preferredWidth = size;
+                layout.preferredHeight = size;
+                layout.minWidth = size;
+                layout.minHeight = size;
+                var rt = (RectTransform)go.transform;
+                rt.localScale = Vector3.one;
+                go.SetActive(true);
+                return text;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         // ---- building blocks ----------------------------------------------------
 
         /// A plate for a row: the game's panel colour with the accent hairline
@@ -207,9 +323,9 @@ namespace SanctuaryHud
             rt.anchorMax = Vector2.zero;
             rt.pivot = Vector2.zero;
             var back = go.AddComponent<Image>();
-            back.color = SanctuaryHudPlugin.GamePanelColour;
+            back.color = PanelColour;
             back.raycastTarget = true;
-            var accent = SanctuaryHudPlugin.GameAccent;
+            var accent = AccentColour;
             accent.a = 0.6f;
             var line = Fill(rt, "Accent", accent);
             StretchAlongTop(line.rectTransform, 2f);

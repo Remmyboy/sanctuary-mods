@@ -709,7 +709,7 @@ namespace SanctuaryHud
                 gauge._regen = HudCanvas.Text(texts.transform, "Regen", 22f, GainColour, TextAlignmentOptions.MidlineRight);
                 gauge._value = HudCanvas.Text(texts.transform, "Value", 26f, Color.white, TextAlignmentOptions.MidlineRight);
 
-                var track = SanctuaryHudPlugin.GameAccent;
+                var track = AccentColour;
                 track.a = 0.14f;
                 var bar = HudCanvas.Fill(go.transform, "Bar", track);
                 bar.gameObject.AddComponent<LayoutElement>().preferredHeight = 8f;
@@ -757,6 +757,8 @@ namespace SanctuaryHud
         {
             private GameObject _go;
             private RawImage[] _marks;
+            private TMP_Text[] _icons;
+            private string[] _keys;
             private TMP_Text[] _figures;
             private GameObject[] _items;
             private TMP_Text _extras;
@@ -775,6 +777,8 @@ namespace SanctuaryHud
                 row.childForceExpandWidth = false;
                 row.childForceExpandHeight = false;
                 line._marks = new RawImage[count];
+                line._icons = new TMP_Text[count];
+                line._keys = new string[count];
                 line._figures = new TMP_Text[count];
                 line._items = new GameObject[count];
                 for (var i = 0; i < count; i++)
@@ -818,11 +822,28 @@ namespace SanctuaryHud
 
             internal void Set(int index, string glyph, Color tint, string text)
             {
-                var mark = Glyphs.Get(glyph);
-                _marks[index].texture = mark;
-                _marks[index].color = tint;
-                var showMark = mark != null;
-                if (_marks[index].gameObject.activeSelf != showMark) _marks[index].gameObject.SetActive(showMark);
+                // The game's own icon for the figure where it has one, made
+                // once per mark; the HUD's glyph behind the rest.
+                if (_keys[index] != glyph)
+                {
+                    _keys[index] = glyph;
+                    if (_icons[index] != null) UnityEngine.Object.Destroy(_icons[index].gameObject);
+                    _icons[index] = HudCanvas.Icon(_items[index].transform, glyph, MarkSize, tint);
+                    if (_icons[index] != null) _icons[index].transform.SetSiblingIndex(0);
+                }
+                if (_icons[index] != null)
+                {
+                    _icons[index].color = tint;
+                    if (_marks[index].gameObject.activeSelf) _marks[index].gameObject.SetActive(false);
+                }
+                else
+                {
+                    var mark = Glyphs.Get(glyph);
+                    _marks[index].texture = mark;
+                    _marks[index].color = tint;
+                    var showMark = mark != null;
+                    if (_marks[index].gameObject.activeSelf != showMark) _marks[index].gameObject.SetActive(showMark);
+                }
                 _figures[index].color = tint;
                 HudCanvas.SetText(_figures[index], text);
                 if (!_items[index].activeSelf) _items[index].SetActive(true);
@@ -920,7 +941,23 @@ namespace SanctuaryHud
             try
             {
                 _log?.LogInfo("Information panel concealed; its tree:");
-                PanelConceal.DumpSubtree(panel.transform, 0, _log, 2);
+                PanelConceal.DumpSubtree(panel.transform, 0, _log, 6);
+                // The game's resource art, by name, for borrowing: which sprites
+                // it has loaded that sound like alloy or energy.
+                var names = new List<string>();
+                var words = new[] { "alloy", "energy", "resource", "eco", "icon", "bolt", "power", "light" };
+                foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+                {
+                    var n = sprite != null ? sprite.name ?? "" : "";
+                    if (n.Length == 0) continue;
+                    foreach (var word in words)
+                    {
+                        if (n.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        names.Add($"{n} {sprite.rect.width:0}x{sprite.rect.height:0}");
+                        break;
+                    }
+                }
+                _log?.LogInfo($"Resource-ish sprites loaded: {names.Count}: {string.Join(", ", names)}");
             }
             catch (Exception e)
             {

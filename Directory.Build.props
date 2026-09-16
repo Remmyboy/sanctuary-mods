@@ -56,6 +56,11 @@
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- TextMeshPro: the HUD canvas (shared/HudCanvas.cs) makes its texts with it. -->
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.UIModule">
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UIModule.dll</HintPath>
       <Private>false</Private>

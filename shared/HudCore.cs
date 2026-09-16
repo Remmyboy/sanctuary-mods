@@ -1928,6 +1928,10 @@ namespace SanctuaryHud
             return new RowLayout { Indent = indent, CountX = countX, Width = width };
         }
 
+        /// The game's own panel colour and accent (its front menu's
+        /// near-black blue and accent blue), for anything drawn in its shape.
+        internal static readonly Color PanelColour = new Color(0.098f, 0.137f, 0.176f, 0.80f);   // #19232D
+        internal static readonly Color AccentColour = new Color(0.239f, 0.686f, 1f);              // #3DAFFF
         internal static readonly Color AlloyColour = new Color(0.16f, 0.75f, 0.72f, 0.92f);  // teal
         internal static readonly Color EnergyColour = new Color(0.9f, 0.68f, 0.16f, 0.92f);  // amber
         internal static readonly Color DangerColour = new Color(0.88f, 0.16f, 0.12f, 0.95f);

@@ -446,8 +446,8 @@ namespace SanctuaryHud
 
         // The game's UI palette (Beam UI, as the front menu uses it): near-
         // black blue panels with a hairline of accent blue.
-        internal static readonly Color GamePanelColour = new Color(0.098f, 0.137f, 0.176f, 0.80f);   // #19232D
-        internal static readonly Color GameAccent = new Color(0.239f, 0.686f, 1f);                    // #3DAFFF
+        internal static Color GamePanelColour => PanelColour;
+        internal static Color GameAccent => AccentColour;
         internal static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
 
         private static Texture2D _texStrip;

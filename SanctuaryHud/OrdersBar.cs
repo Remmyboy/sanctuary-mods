@@ -172,7 +172,7 @@ namespace SanctuaryHud
                     Element = element,
                     Key = key,
                     Label = LabelOf(key),
-                    Tint = element.background != null ? element.background.color : SanctuaryHudPlugin.GameAccent,
+                    Tint = element.background != null ? element.background.color : AccentColour,
                     // SetColorTint gives the frame an alpha of 1/255 at rest
                     // and 1 while the toggle is on; SetActive swaps between them.
                     Active = button.colors.normalColor.a > 0.5f,
