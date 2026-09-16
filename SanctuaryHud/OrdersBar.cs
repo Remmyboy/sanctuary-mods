@@ -25,7 +25,6 @@ namespace SanctuaryHud
     internal static class OrdersBar
     {
         internal static ConfigEntry<bool> Enabled, HideInert;
-        internal static ConfigEntry<float> Scale;
 
         internal static void Bind(ConfigFile config)
         {
@@ -35,8 +34,6 @@ namespace SanctuaryHud
             HideInert = config.Bind("SanctuaryUI", "OrdersHideInert", true,
                 "Leave out the buttons the game has not wired up yet: move, attack, patrol, assist and the rest do nothing when clicked " +
                 "in the current build (they are hotkeys and right-clicks). Stop and the toggles — pause, repeat build, shield, intel, production — stay.");
-            Scale = config.Bind("SanctuaryUI", "OrdersScale", 1f,
-                new ConfigDescription("Size of the compact row, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
         // ---- the game's panel -------------------------------------------------
@@ -211,7 +208,7 @@ namespace SanctuaryHud
                 return;
             }
 
-            var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
+            var s = SanctuaryHudPlugin.HudScale;
             _bar.Show(true);
             _bar.Sync(panel, _row, s);
 

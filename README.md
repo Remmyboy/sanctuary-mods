@@ -82,9 +82,11 @@ has no release of its own yet; build it from source if you need it.
   the game's button does, and an invisible uGUI target under that part of
   the strip keeps the click from also landing on the map. It all comes back
   whenever the overlay is hidden with **F10**, and when the mod unloads.
-- **Size** (`Overlay · StripScale`, 0.7 to 1.6): the strip and the commander
-  widget drawn larger or smaller, on top of the usual scaling to screen
-  height; nothing else moves. The gross in and gross out figures sit one
+- **Size** (`Overlay · Scale`, 0.6 to 1.5): the whole HUD — the strip, the
+  commander widget, and the SanctuaryUI rows and card — drawn larger or
+  smaller together, on top of the game's own UI Scale. The standard size
+  is a fifth up on the first release's, which read small. The mini-map
+  has its own size, by dragging its corner. The gross in and gross out figures sit one
   over the other beside the net, so the two figures being compared line up.
   Each half leads with its resource's mark — an ingot for alloy, a bolt for
   energy — in place of the word; the same marks sit in front of every alloy,
@@ -116,8 +118,7 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   order's colour, its icon, and the frame its glow shader lights while the
   toggle is on or the mouse is over it — mirroring the concealed one and
   passing it every click, so whatever Lua hung on it runs unchanged. The
-  button's name comes up as the game's own tooltip. `OrdersScale` sizes
-  the row.
+  button's name comes up as the game's own tooltip.
 - **Unit card** (`UnitCard`) in place of the game's unit information panel.
   The game's card is a bitmap mock-up with fifteen text fields over it: the
   template id next to the name, income to three decimal places, and no
@@ -151,7 +152,7 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   cost, energy cost and time behind their marks. The time is the template's
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
-  counts. `UnitCardScale` sizes the card. With the replacement off,
+  counts. With the replacement off,
   `UnitCardTidyGameCard` (on by default) still hides the template id on the
   game's own card and rounds its income figures.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,
@@ -161,7 +162,6 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   bottom at the left end of the build options, with a clear break between the game's groups (air, land, naval,
   structures). Left click keeps just
   that type, right click drops it, both passed to the game's own button.
-  `SelectionScale` sizes it.
 
   The row and the build strip are built the game's own way rather than
   drawn: uGUI on a root of the HUD's own placed on the game's HUD canvas,
@@ -189,7 +189,7 @@ the game's menus, the F8 Mods page and the result screen, as the strip does.
   concealed panel, and every tier tab a clone of the game's own toggle, so
   clicks (shift and right included) and hovers do what they do on the
   game's panels, and a tab press sends the click the game's toggle needs to
-  light up. `BuildScale` sizes the rows.
+  light up.
   With the strip left to the game, `HideLoneTierTab` (on by default) still
   conceals the tier tabs whenever no more than one of them can be clicked —
   a tier-1 factory's single T1, or a structure whose only option is its own

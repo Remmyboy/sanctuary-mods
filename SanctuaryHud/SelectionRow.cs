@@ -23,7 +23,6 @@ namespace SanctuaryHud
     internal static class SelectionRow
     {
         internal static ConfigEntry<bool> Enabled;
-        internal static ConfigEntry<float> Scale;
 
         internal static void Bind(ConfigFile config)
         {
@@ -31,8 +30,6 @@ namespace SanctuaryHud
                 "Draw the selected unit types as a row along the bottom, at the left end of the build options, instead of the game's " +
                 "column up the left edge. Left click keeps just that type, right click drops it. " +
                 "The game's list comes back whenever the overlay is hidden or the mod is unloaded.");
-            Scale = config.Bind("SanctuaryUI", "SelectionScale", 1f,
-                new ConfigDescription("Size of the row, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
         // ---- the game's panels ------------------------------------------------
@@ -138,7 +135,7 @@ namespace SanctuaryHud
             // The tiles are clones of the build panel's prefab, so the row
             // matches the build area; its own panel's if there is no build panel.
             var construction = FindPanel<ConstructionPanelUI>(UIPanelType.Construction);
-            var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
+            var s = SanctuaryHudPlugin.HudScale;
             _row.Show(true);
             _row.Sync(construction != null ? (SanctuaryPanelUI)construction : panel, _entries, s);
 

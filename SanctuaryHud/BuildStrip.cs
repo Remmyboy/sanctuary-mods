@@ -23,7 +23,6 @@ namespace SanctuaryHud
     internal static class BuildStrip
     {
         internal static ConfigEntry<bool> Enabled;
-        internal static ConfigEntry<float> Scale;
 
         internal static void Bind(ConfigFile config)
         {
@@ -31,8 +30,6 @@ namespace SanctuaryHud
                 "Replace the game's build options, tier tabs and build queue with the HUD's own rows: the selection row, then the " +
                 "options the selection actually has (no placeholders, no paging), with the tier tabs — only when there is more than one — " +
                 "and the queue above. Clicks and hovers go to the game's own buttons. It all comes back whenever the overlay is hidden or the mod is unloaded.");
-            Scale = config.Bind("SanctuaryUI", "BuildScale", 1f,
-                new ConfigDescription("Size of the build rows, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
         // ---- the game's panels ------------------------------------------------
@@ -141,7 +138,7 @@ namespace SanctuaryHud
             UnitRow.Collect(queue != null && queue.IsVisible ? queue : null, _queue, false);
             CollectTabs(tabs != null && tabs.IsVisible ? tabs : null);
 
-            var s = Mathf.Clamp(Scale.Value, 0.7f, 1.6f);
+            var s = SanctuaryHudPlugin.HudScale;
             var size = HudCanvas.Size;
 
             // From where the game's strip starts: the selection row first

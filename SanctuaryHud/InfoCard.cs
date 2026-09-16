@@ -30,7 +30,6 @@ namespace SanctuaryHud
     internal static class InfoCard
     {
         internal static ConfigEntry<bool> Enabled, TidyBuiltIn;
-        internal static ConfigEntry<float> Scale;
 
         internal static void Bind(ConfigFile config)
         {
@@ -40,8 +39,6 @@ namespace SanctuaryHud
                 "The game's card comes back whenever the overlay is hidden or the mod is unloaded.");
             TidyBuiltIn = config.Bind("SanctuaryUI", "UnitCardTidyGameCard", true,
                 "With the game's own card kept (ReplaceCard off): hide the unit's template id and round its income figures.");
-            Scale = config.Bind("SanctuaryUI", "UnitCardScale", 1f,
-                new ConfigDescription("Size of the replacement card, as a multiple of the standard size.", new AcceptableValueRange<float>(0.7f, 1.6f)));
         }
 
         // ---- the values ---------------------------------------------------------
@@ -427,7 +424,7 @@ namespace SanctuaryHud
             }
 
             _card.Show(true);
-            _card.Fill(_values, building, Mathf.Clamp(Scale.Value, 0.7f, 1.6f));
+            _card.Fill(_values, building, SanctuaryHudPlugin.HudScale);
 
             // Where the game's own card sits: the replacement takes its bottom-left corner.
             var at = new Vector2(28f, 28f);

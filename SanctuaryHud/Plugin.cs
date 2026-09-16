@@ -36,7 +36,7 @@ namespace SanctuaryHud
         private ConfigEntry<bool> _cfgVisible;
         private ConfigEntry<KeyCode> _cfgToggleKey;
         private ConfigEntry<bool> _cfgHideBuiltIn;
-        private ConfigEntry<float> _cfgStripScale;
+        private static ConfigEntry<float> _cfgScale;
         private ConfigEntry<bool> _cfgSanctuaryUi;
         private ConfigEntry<bool> _cfgReclaim;
         private ConfigEntry<KeyCode> _cfgReclaimHoldKey;
@@ -68,9 +68,10 @@ namespace SanctuaryHud
                 "Hide the game's own alloy and energy readouts at the top of the screen, so the strip is the only economy display. " +
                 "The menu and pause buttons that share that panel move into the middle of the strip. " +
                 "It all comes back whenever the overlay is hidden or the mod is unloaded.");
-            _cfgStripScale = Config.Bind("Overlay", "StripScale", 1f,
-                new ConfigDescription("Size of the economy strip and the commander widget, as a multiple of the standard size.",
-                    new AcceptableValueRange<float>(0.7f, 1.6f)));
+            _cfgScale = Config.Bind("Overlay", "Scale", 1f,
+                new ConfigDescription("Size of the whole HUD — the economy strip, the commander widget, the orders row, the unit card, " +
+                    "the selection row and the build strip — as a multiple of the standard size, on top of the game's own UI Scale.",
+                    new AcceptableValueRange<float>(0.6f, 1.5f)));
             _cfgCommanderZoom = Config.Bind("Commander", "JumpZoomFactor", 0.5f,
                 "How wide the camera sits after jumping to the commander, as a fraction of the current camera height. " +
                 "Higher = further out. 0.5 keeps roughly your current zoom.");
@@ -420,7 +421,7 @@ namespace SanctuaryHud
             //
             // Both draw under their own scale on top of the screen's, so the
             // setting sizes them without touching anything else.
-            var stripScale = Mathf.Clamp(_cfgStripScale.Value, 0.7f, 1.6f);
+            var stripScale = HudScale;
             if (OwnArmyFocused)
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(scale * stripScale, scale * stripScale, 1f));
@@ -435,6 +436,12 @@ namespace SanctuaryHud
         }
 
         private const float StripHeight = 48f;
+
+        /// The one size setting, for everything the HUD draws in its own
+        /// shape: the strip and widget in OnGUI and the rows and card on the
+        /// canvas. The standard size is a fifth up on the first release's,
+        /// which read small; the setting's 1 is that.
+        internal static float HudScale => (_cfgScale != null ? Mathf.Clamp(_cfgScale.Value, 0.6f, 1.5f) : 1f) * 1.2f;
 
         // The game's UI palette (Beam UI, as the front menu uses it): near-
         // black blue panels with a hairline of accent blue.
