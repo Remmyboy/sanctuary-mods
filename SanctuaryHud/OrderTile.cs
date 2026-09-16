@@ -54,6 +54,10 @@ namespace SanctuaryHud
                     DestroyImmediate(element);
                 }
                 foreach (var trigger in go.GetComponentsInChildren<TooltipTrigger>(true)) DestroyImmediate(trigger);
+                // The game lights the glyph with a glow material that blooms it
+                // into a blob at this size; the plain UI material draws the
+                // glyph as it is. The frame keeps its glow.
+                if (tile._icon != null) tile._icon.material = null;
 
                 tile._button = go.GetComponent<Button>();
                 if (tile._button != null) tile._button.onClick.RemoveAllListeners();
