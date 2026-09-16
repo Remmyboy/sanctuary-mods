@@ -139,13 +139,14 @@ namespace SanctuaryHud
             _row.Show(true);
             _row.Sync(construction != null ? (SanctuaryPanelUI)construction : panel, _entries, s);
 
-            // Where the game's strip starts, in canvas units from the
-            // screen's bottom-left; failing that, a little in from the corner.
-            var at = new Vector2(28f, 28f);
-            if (construction != null && BuildStrip.StripLocal(construction, out var strip))
+            // Against the left column's right edge, on the baseline; with
+            // the strip left to the game, where the game's strip starts, or
+            // off its right end when it is showing.
+            var at = new Vector2(BottomDock.ColumnRight, BottomDock.Origin.y);
+            if (!BuildStrip.Active && construction != null && BuildStrip.StripLocal(construction, out var strip))
             {
                 at = new Vector2(strip.x, strip.y);
-                if (!BuildStrip.Active && construction.IsVisible)
+                if (construction.IsVisible)
                 {
                     // Off the right end of the game's own strip, pulled back
                     // in if that would run off the screen.
@@ -155,6 +156,7 @@ namespace SanctuaryHud
                 }
             }
             _row.Place(at);
+            if (BuildStrip.Active) BottomDock.Add(new Rect(at.x, at.y, _row.Width, _row.Height));
         }
 
         /// The row's size on the canvas, 0 while it is not showing: what the

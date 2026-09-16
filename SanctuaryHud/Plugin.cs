@@ -155,6 +155,7 @@ namespace SanctuaryHud
             SelectionRow.Bind(Config);
             TierTabs.Bind(Config);
             BuildStrip.Bind(Config);
+            BottomDock.Bind(Config);
             UnitDomains.Bind(Config);
 
             _visible = _cfgVisible.Value;
@@ -211,6 +212,7 @@ namespace SanctuaryHud
             SelectionRow.Shutdown();
             TierTabs.Shutdown();
             BuildStrip.Shutdown();
+            BottomDock.Shutdown();
             EcoStrip.Shutdown();
             HudCanvas.Destroy();
             _harmony?.UnpatchSelf();
@@ -306,13 +308,18 @@ namespace SanctuaryHud
             // stand-ins just don't draw. Only hiding the overlay, or leaving
             // the match, gives them back.
             var ui = _visible && _cfgSanctuaryUi.Value;
+            // Docked in order: the orders row and the card make the left
+            // column, the rows go against it, and the dock outlines the whole.
+            BottomDock.Begin();
             OrdersBar.Tick(ui);
             InfoCard.Tick(ui);
+            OrdersBar.FitColumn();
             SelectionRow.Tick(ui);
             // The build strip takes the tier tabs with it; TierTabs only
             // minds them while the strip is the game's own.
             BuildStrip.Tick(ui);
             TierTabs.Tick(ui && !BuildStrip.Active);
+            BottomDock.End();
             // The domain map is per match: the sprite registry reloads with
             // each one, so it is dropped between matches and rebuilt.
             if (InMatch) UnitDomains.Tick();

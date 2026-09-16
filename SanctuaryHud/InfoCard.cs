@@ -382,7 +382,7 @@ namespace SanctuaryHud
 
         private const float Width = 528f;
         private const float QueueExtra = 120f;
-        private const float Pad = 16f;
+        private const float Pad = BottomDock.Pad;
         private const float GaugeHeight = 52f;
         private const float QueueTile = 40f;
         private const float JobTile = 80f;
@@ -425,16 +425,11 @@ namespace SanctuaryHud
 
             _card.Show(true);
             _card.Fill(_values, building, SanctuaryHudPlugin.HudScale);
-
-            // Where the game's own card sits: the replacement takes its bottom-left corner.
-            var at = new Vector2(28f, 28f);
-            if (HudCanvas.LocalRect(panel, out var anchor)) at = new Vector2(anchor.x, anchor.y);
-            // The build strip stacks its tabs and queue upward from the
-            // options, into where the game's card sat; where the two share a
-            // span the card goes above the stack (as of last frame).
-            if (BuildStrip.RowsTop > 0f && at.x < BuildStrip.RowsXMax && at.x + _card.PlacedWidth > BuildStrip.RowsXMin)
-                at.y = Mathf.Max(at.y, BuildStrip.RowsTop + 8f);
+            // On top of the orders row, in the left column.
+            var at = new Vector2(BottomDock.Origin.x, BottomDock.Origin.y + BottomDock.OrdersHeight);
             _card.Place(at);
+            BottomDock.Column(_card.PlacedWidth);
+            BottomDock.Add(new Rect(at.x, at.y, _card.PlacedWidth, _card.PlacedHeight));
         }
 
         private static string Rate(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
@@ -465,6 +460,7 @@ namespace SanctuaryHud
 
             internal bool Alive => _rect != null;
             internal float PlacedWidth => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
+            internal float PlacedHeight => _rect != null ? _rect.rect.height * _rect.localScale.y : 0f;
 
             internal static Card Create(RectTransform root)
             {
@@ -571,6 +567,7 @@ namespace SanctuaryHud
             internal void Fill(UIInformationValues v, bool building, float scale)
             {
                 _rect.localScale = new Vector3(scale, scale, 1f);
+                HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
                 var factory = _queue.Count > 0;
                 var width = factory ? Width + QueueExtra : Width;
                 if (Mathf.Abs(_rect.sizeDelta.x - width) > 0.5f) _rect.sizeDelta = new Vector2(width, _rect.sizeDelta.y);
@@ -668,6 +665,8 @@ namespace SanctuaryHud
                 }
                 Active(_queueBlock, factory);
                 Active(_band, factory || alloy || energy || extras != null || v.buildPower > 0f);
+                // So the height is right for the dock this frame.
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
             }
 
             private static void Active(GameObject go, bool on)

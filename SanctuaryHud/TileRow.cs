@@ -23,7 +23,7 @@ namespace SanctuaryHud
     internal sealed class TileRow
     {
         internal const float Gap = 8f;
-        internal const float Pad = 10f;
+        internal const float Pad = BottomDock.Pad;
         internal const float SeparatorWidth = 32f;
 
         private RectTransform _rect;
@@ -104,6 +104,7 @@ namespace SanctuaryHud
                 _live.Clear();
                 _tileSize = UnitTile.NativeSize(prefabPanel);
             }
+            HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
             _rect.localScale = new Vector3(scale, scale, 1f);
 
             Wrap(entries, maxWidth / Mathf.Max(scale, 0.01f));

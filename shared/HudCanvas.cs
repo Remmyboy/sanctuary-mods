@@ -307,6 +307,68 @@ namespace SanctuaryHud
             }
         }
 
+        // ---- the game's panel art ------------------------------------------------
+        //
+        // The game frames its panels in a dashed panel sprite (the "Panel
+        // Dashed" Image under each). Captured once off the build panel, it
+        // can dress the HUD's plates the same way.
+
+        private static Sprite _artSprite;
+        private static Color _artColour = Color.white;
+        private static Image.Type _artType = Image.Type.Sliced;
+        private static Material _artMaterial;
+        private static float _artPpu = 1f;
+
+        internal static bool HaveGamePanelArt => _artSprite != null;
+
+        internal static void CaptureGamePanelArt(Transform panel)
+        {
+            if (_artSprite != null || panel == null) return;
+            try
+            {
+                var image = panel.GetComponent<Image>();
+                if (image == null || image.sprite == null) return;
+                _artSprite = image.sprite;
+                _artColour = image.color;
+                _artType = image.type;
+                _artMaterial = image.material;
+                _artPpu = image.pixelsPerUnitMultiplier;
+                _log?.LogInfo($"Game panel art: sprite '{_artSprite.name}' {_artSprite.rect.width:0}x{_artSprite.rect.height:0}, " +
+                              $"border {_artSprite.border}, type {_artType}, colour {_artColour}, ppu x{_artPpu:0.##}.");
+            }
+            catch { /* the plain plate will do */ }
+        }
+
+        /// Dresses a plate: the game's panel art when asked for and had,
+        /// else the HUD's plain plate; the hairline along its top as asked.
+        internal static void PlateStyle(RectTransform plate, bool art, bool hairline)
+        {
+            if (plate == null) return;
+            var image = plate.GetComponent<Image>();
+            if (image == null) return;
+            var useArt = art && _artSprite != null;
+            if (useArt)
+            {
+                if (image.sprite != _artSprite)
+                {
+                    image.sprite = _artSprite;
+                    image.type = _artSprite.border.sqrMagnitude > 0f ? Image.Type.Sliced : _artType;
+                    image.material = _artMaterial;
+                    image.pixelsPerUnitMultiplier = _artPpu;
+                    image.color = _artColour;
+                }
+            }
+            else if (image.sprite != null || image.color != PanelColour)
+            {
+                image.sprite = null;
+                image.material = null;
+                image.color = PanelColour;
+            }
+            var line = plate.childCount > 0 ? plate.GetChild(0) : null;
+            var showLine = hairline && !useArt;
+            if (line != null && line.name == "Accent" && line.gameObject.activeSelf != showLine) line.gameObject.SetActive(showLine);
+        }
+
         // ---- building blocks ----------------------------------------------------
 
         /// A plate for a row: the game's panel colour with the accent hairline

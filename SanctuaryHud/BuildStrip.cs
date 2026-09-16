@@ -49,6 +49,12 @@ namespace SanctuaryHud
             if (_concealOptions.Apply(options)) Describe(options, queue, tabs);
             _concealQueue.Apply(queue);
             _concealTabs.Apply(tabs);
+            // The game's dashed panel art, off its build panel, for the plates.
+            if (options != null)
+            {
+                try { HudCanvas.CaptureGamePanelArt(options.transform.Find("Panel Dashed")); }
+                catch { /* the plain plate will do */ }
+            }
             try
             {
                 SyncRows(options, queue, tabs);
@@ -98,9 +104,6 @@ namespace SanctuaryHud
 
         // ---- the rows -----------------------------------------------------------
 
-        private const float RowGap = 8f;
-        private const float ColumnGap = 20f;
-        private const float TabGap = 16f;
         private const float Margin = 20f;
 
         private static TileRow _optionsRow, _queueRow;
@@ -110,14 +113,8 @@ namespace SanctuaryHud
         private static readonly List<UnitRow.Entry> _queue = new List<UnitRow.Entry>();
         private static readonly List<ConstructionFilterToggleElement> _tabs = new List<ConstructionFilterToggleElement>();
 
-        /// Where the strip's rows reached last frame, in canvas units: the
-        /// top of the highest and the span they cover, so the unit card can
-        /// keep above them. Zero while nothing is showing.
-        internal static float RowsTop, RowsXMin, RowsXMax;
-
         private static void HideRows()
         {
-            RowsTop = RowsXMin = RowsXMax = 0f;
             _optionsRow?.Show(false);
             _queueRow?.Show(false);
             _tabRow?.Show(false);
@@ -147,12 +144,12 @@ namespace SanctuaryHud
             var s = SanctuaryHudPlugin.HudScale;
             var size = HudCanvas.Size;
 
-            // From where the game's strip starts: the selection row first
-            // (it placed itself there this frame), then the options after it.
-            var origin = new Vector2(28f, 28f);
-            if (StripLocal(options, out var strip)) origin = new Vector2(strip.x, strip.y);
-            var selectionWidth = SelectionRow.RowWidth;
-            var optionsX = selectionWidth > 0f ? origin.x + selectionWidth + ColumnGap : origin.x;
+            // Against the left column's right edge, on the baseline: the
+            // selection row (it placed itself there this frame), then the
+            // options after it, with no gap.
+            var origin = BottomDock.Origin;
+            var left = BottomDock.ColumnRight;
+            var optionsX = left + SelectionRow.RowWidth;
 
             // The options wrap onto more lines, upward, rather than run off
             // the screen's right edge.
@@ -161,18 +158,21 @@ namespace SanctuaryHud
                 _optionsRow.Show(true);
                 _optionsRow.Sync(options, _options, s, size.x - optionsX - Margin);
                 _optionsRow.Place(new Vector2(optionsX, origin.y));
+                BottomDock.Add(new Rect(optionsX, origin.y, _optionsRow.Width, _optionsRow.Height));
             }
             else _optionsRow.Show(false);
 
-            // Above: the tier tabs (when there is a choice), then the queue.
-            var above = origin.y + (_options.Count > 0 ? _optionsRow.Height : SelectionRow.RowHeight) + RowGap;
-            var ax = optionsX;
+            // Above the baseline row, from the column's edge: the tier tabs
+            // (when there is a choice), then the queue against them.
+            var above = origin.y + Mathf.Max(BottomDock.RowHeight * s, _options.Count > 0 ? _optionsRow.Height : 0f);
+            var ax = left;
             if (_tabs.Count > 1)
             {
                 _tabRow.Show(true);
                 _tabRow.Sync(tabs, _tabs, s);
                 _tabRow.Place(new Vector2(ax, above));
-                ax += _tabRow.Width + TabGap;
+                BottomDock.Add(new Rect(ax, above, _tabRow.Width, _tabRow.Height));
+                ax += _tabRow.Width;
             }
             else _tabRow.Show(false);
 
@@ -181,6 +181,7 @@ namespace SanctuaryHud
                 _queueRow.Show(true);
                 _queueRow.Sync(options, _queue, s, size.x - ax - Margin);
                 _queueRow.Place(new Vector2(ax, above));
+                BottomDock.Add(new Rect(ax, above, _queueRow.Width, _queueRow.Height));
             }
             else _queueRow.Show(false);
 
@@ -193,22 +194,6 @@ namespace SanctuaryHud
                 var portrait = hovered.Source.portraitImage != null ? hovered.Source.portraitImage.overrideSprite : null;
                 template = UnitDomains.TemplateOf(portrait);
             }
-            // What the card has to clear.
-            RowsXMin = origin.x;
-            RowsXMax = origin.x + selectionWidth;
-            RowsTop = origin.y + SelectionRow.RowHeight;
-            if (_options.Count > 0)
-            {
-                RowsXMax = Mathf.Max(RowsXMax, optionsX + _optionsRow.Width);
-                RowsTop = Mathf.Max(RowsTop, origin.y + _optionsRow.Height);
-            }
-            if (_tabs.Count > 1) RowsTop = Mathf.Max(RowsTop, above + _tabRow.Height);
-            if (_queue.Count > 0)
-            {
-                RowsXMax = Mathf.Max(RowsXMax, ax + _queueRow.Width);
-                RowsTop = Mathf.Max(RowsTop, above + _queueRow.Height);
-            }
-            InfoCard.SetHover(template);
         }
 
         private static void CollectTabs(ConstructionFilterPanelUI panel)
@@ -244,7 +229,7 @@ namespace SanctuaryHud
             {
                 var rt = HudCanvas.Plate(root, name);
                 var group = rt.gameObject.AddComponent<HorizontalLayoutGroup>();
-                group.padding = new RectOffset((int)TileRow.Pad, (int)TileRow.Pad, 6, 6);
+                group.padding = new RectOffset((int)TileRow.Pad, (int)TileRow.Pad, 8, 8);
                 group.spacing = 4f;
                 group.childAlignment = TextAnchor.MiddleLeft;
                 group.childControlWidth = true;
@@ -289,6 +274,7 @@ namespace SanctuaryHud
                     _shown.Clear();
                 }
                 _rect.localScale = new Vector3(scale, scale, 1f);
+                HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
 
                 var same = tabs.Count == _shown.Count;
                 for (var i = 0; same && i < tabs.Count; i++) same = tabs[i] == _shown[i];

@@ -211,11 +211,18 @@ namespace SanctuaryHud
             var s = SanctuaryHudPlugin.HudScale;
             _bar.Show(true);
             _bar.Sync(panel, _row, s);
+            // The bottom of the left column; the card stands on it.
+            _bar.Place(BottomDock.Origin);
+            BottomDock.Column(_bar.Width, _bar.Height);
+        }
 
-            // Where the game's own panel sits: the row takes its bottom-left corner.
-            var at = new Vector2(28f, 28f);
-            if (HudCanvas.LocalRect(panel, out var anchor)) at = new Vector2(anchor.x, anchor.y);
-            _bar.Place(at);
+        /// After the card has placed itself: the row takes the column's
+        /// width, and the dock its rectangle.
+        internal static void FitColumn()
+        {
+            if (_bar == null || !_bar.Showing) return;
+            _bar.SetWidth(BottomDock.ColumnWidth);
+            BottomDock.Add(new Rect(BottomDock.Origin.x, BottomDock.Origin.y, _bar.Width, _bar.Height));
         }
 
         /// The order buttons (OrderTile) on a plate, one line.
@@ -227,6 +234,12 @@ namespace SanctuaryHud
             private readonly List<OrderButtonElement> _shown = new List<OrderButtonElement>();
 
             internal bool Alive => _rect != null;
+            internal bool Showing => _rect != null && _rect.gameObject.activeSelf;
+            internal float Width => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
+            internal float Height => _rect != null ? _rect.rect.height * _rect.localScale.y : 0f;
+
+            /// The column is never narrower than the game's own panels.
+            private const float MinWidth = 528f;
 
             internal static OrderRow Create(RectTransform root, string name)
             {
@@ -239,7 +252,8 @@ namespace SanctuaryHud
                 group.childControlHeight = true;
                 group.childForceExpandWidth = false;
                 group.childForceExpandHeight = false;
-                HudCanvas.FitToContents(rt);
+                // Sized here, not to its contents: a row's height, the column's width.
+                rt.sizeDelta = new Vector2(MinWidth, BottomDock.RowHeight);
                 rt.gameObject.SetActive(false);
                 return new OrderRow { _rect = rt };
             }
@@ -253,6 +267,15 @@ namespace SanctuaryHud
             internal void Place(Vector2 bottomLeft)
             {
                 if (_rect != null) _rect.anchoredPosition = bottomLeft;
+            }
+
+            /// The plate's width on the canvas (its scale included), never
+            /// less than its buttons need.
+            internal void SetWidth(float width)
+            {
+                if (_rect == null) return;
+                var unscaled = Mathf.Max(width / Mathf.Max(_rect.localScale.x, 0.01f), LayoutUtility.GetPreferredWidth(_rect), MinWidth);
+                if (Mathf.Abs(_rect.sizeDelta.x - unscaled) > 0.5f) _rect.sizeDelta = new Vector2(unscaled, BottomDock.RowHeight);
             }
 
             internal void Destroy()
@@ -274,6 +297,7 @@ namespace SanctuaryHud
                     _shown.Clear();
                 }
                 _rect.localScale = new Vector3(scale, scale, 1f);
+                HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
 
                 var same = buttons.Count == _shown.Count;
                 for (var i = 0; same && i < buttons.Count; i++) same = buttons[i].Element == _shown[i];
@@ -306,6 +330,7 @@ namespace SanctuaryHud
                     if (_tiles[i] != null) _tiles[i].Mirror(button.Element, button.Label + (button.Active ? "  ·  ON" : ""));
                 }
                 LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                SetWidth(0f);
             }
         }
 
