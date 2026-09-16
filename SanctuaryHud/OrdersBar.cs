@@ -90,6 +90,7 @@ namespace SanctuaryHud
             _conceal.Release();
             _bar?.Destroy();
             _bar = null;
+            OrderTile.ReleaseGlyphs();
         }
 
         // ---- the buttons -------------------------------------------------------

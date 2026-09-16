@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using SanctuaryUI;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -54,10 +55,6 @@ namespace SanctuaryHud
                     DestroyImmediate(element);
                 }
                 foreach (var trigger in go.GetComponentsInChildren<TooltipTrigger>(true)) DestroyImmediate(trigger);
-                // The game lights the glyph with a glow material that blooms it
-                // into a blob at this size; the plain UI material draws the
-                // glyph as it is. The frame keeps its glow.
-                if (tile._icon != null) tile._icon.material = null;
 
                 tile._button = go.GetComponent<Button>();
                 if (tile._button != null) tile._button.onClick.RemoveAllListeners();
@@ -95,6 +92,14 @@ namespace SanctuaryHud
             Copy(source.background, _background);
             Copy(source.frame, _frame);
             Copy(source.icon, _icon);
+            // The glyph on its own, without the game's glow: drawn plain,
+            // white, in the tint the game gave it.
+            var glyph = source.icon != null ? Glyph(source.icon.overrideSprite) : null;
+            if (glyph != null && _icon != null)
+            {
+                _icon.sprite = glyph;
+                _icon.material = null;
+            }
             if (_button != null)
             {
                 var sourceButton = source.GetComponent<Button>();
@@ -118,6 +123,105 @@ namespace SanctuaryHud
                 Destroy(_tooltip);
                 _tooltip = null;
             }
+        }
+
+        // ---- the glyph without the glow ------------------------------------------
+        //
+        // The game's order icons are not pictures: the sprite holds the glyph
+        // in its red channel and a halo region in its green, and the
+        // ButtonIconGlow shader (which exposes no strength to turn down)
+        // blooms the halo over the glyph until, at this size, the glyph is a
+        // white blob. So the glyph channel is lifted out once per icon into a
+        // sprite of its own — white where the glyph is, clear elsewhere — and
+        // drawn with the plain UI material. The atlas isn't readable, so it
+        // goes through a render texture once.
+
+        private static readonly Dictionary<Sprite, Sprite> _glyphs = new Dictionary<Sprite, Sprite>();
+        private static Texture _copiedFrom;
+        private static Texture2D _atlasCopy;
+        private static bool _glyphFailed;
+
+        private static Sprite Glyph(Sprite source)
+        {
+            if (source == null || _glyphFailed) return null;
+            if (_glyphs.TryGetValue(source, out var made)) return made;
+            try
+            {
+                var atlas = source.texture;
+                if (atlas == null) return null;
+                var rect = source.textureRect;
+                var x = Mathf.RoundToInt(rect.x);
+                var y = Mathf.RoundToInt(rect.height < 0f ? rect.y + rect.height : rect.y);
+                var w = Mathf.RoundToInt(Mathf.Abs(rect.width));
+                var h = Mathf.RoundToInt(Mathf.Abs(rect.height));
+                if (w < 2 || h < 2) return null;
+
+                if (_atlasCopy == null || _copiedFrom != atlas)
+                {
+                    if (_atlasCopy != null) UnityEngine.Object.Destroy(_atlasCopy);
+                    _atlasCopy = ReadBack(atlas);
+                    _copiedFrom = atlas;
+                    if (_atlasCopy == null) { _glyphFailed = true; return null; }
+                }
+
+                var pixels = _atlasCopy.GetPixels(x, y, w, h);
+                var glyph = new Texture2D(w, h, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                for (var i = 0; i < pixels.Length; i++)
+                {
+                    var p = pixels[i];
+                    pixels[i] = new Color(1f, 1f, 1f, p.r * p.a);
+                }
+                glyph.SetPixels(pixels);
+                glyph.Apply(false, true);
+                made = Sprite.Create(glyph, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+                made.hideFlags = HideFlags.HideAndDontSave;
+                _glyphs[source] = made;
+                if (_glyphs.Count == 1) _log?.LogInfo($"Order glyphs: lifted out of '{atlas.name}' ({w}x{h}, rect y {rect.y:0} h {rect.height:0}).");
+                return made;
+            }
+            catch (Exception e)
+            {
+                _glyphFailed = true;
+                _log?.LogWarning($"Order glyphs could not be lifted out of the atlas; the game's glow stays ({e.Message}).");
+                return null;
+            }
+        }
+
+        /// A CPU copy of a texture the CPU can't read, by way of the GPU.
+        private static Texture2D ReadBack(Texture texture)
+        {
+            var rt = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            var previous = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(texture, rt);
+                RenderTexture.active = rt;
+                var copy = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+                copy.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+                copy.Apply(false, false);
+                return copy;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+            }
+        }
+
+        /// For unload: the copies go with the assembly's objects.
+        internal static void ReleaseGlyphs()
+        {
+            foreach (var glyph in _glyphs.Values)
+            {
+                if (glyph == null) continue;
+                if (glyph.texture != null) UnityEngine.Object.Destroy(glyph.texture);
+                UnityEngine.Object.Destroy(glyph);
+            }
+            _glyphs.Clear();
+            if (_atlasCopy != null) UnityEngine.Object.Destroy(_atlasCopy);
+            _atlasCopy = null;
+            _copiedFrom = null;
+            _glyphFailed = false;
         }
 
         private static void Copy(Image from, Image to)

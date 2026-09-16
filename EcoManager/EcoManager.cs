@@ -222,6 +222,8 @@ namespace SanctuaryHud
 
             _extractors = HudPanel.Create(root, "Eco manager: alloy", () => _cfgLocked.Value);
             var head = _extractors.Row("Heading", 8f, TextAnchor.MiddleCenter);
+            // Across the panel, so the mark sits centred over the tiles.
+            head.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             var mark = HudCanvas.Icon(head, "alloy", MarkSize + 4f, AlloyColour);
             if (mark == null)
             {
