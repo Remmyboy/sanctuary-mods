@@ -375,13 +375,14 @@ namespace SanctuaryHud
 
         // ---- the card ----------------------------------------------------------------
         //
-        // As wide as the game's own card (528 canvas units), wider while a
-        // build queue shares the usage band; as tall as its rows. Built once
+        // As wide as the game's own card (528 canvas units) and no wider —
+        // the left column must not change width with the selection — so a
+        // build queue shares the usage band at three small tiles; as tall as
+        // its rows. Built once
         // on the HUD canvas (Card) and filled every frame from the values,
         // rows switched on and off as they apply.
 
         private const float Width = 528f;
-        private const float QueueExtra = 120f;
         private const float Pad = BottomDock.Pad;
         private const float GaugeHeight = 52f;
         private const float QueueTile = 40f;
@@ -454,7 +455,7 @@ namespace SanctuaryHud
             private GameObject _band;
             private RectTransform _left;
             private GameObject _queueBlock;
-            private readonly QueueTileView[] _small = new QueueTileView[4];
+            private readonly QueueTileView[] _small = new QueueTileView[3];
             private QueueTileView _job;
             private TMP_Text _jobPercent;
 
@@ -569,8 +570,7 @@ namespace SanctuaryHud
                 _rect.localScale = new Vector3(scale, scale, 1f);
                 HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
                 var factory = _queue.Count > 0;
-                var width = factory ? Width + QueueExtra : Width;
-                if (Mathf.Abs(_rect.sizeDelta.x - width) > 0.5f) _rect.sizeDelta = new Vector2(width, _rect.sizeDelta.y);
+                if (Mathf.Abs(_rect.sizeDelta.x - Width) > 0.5f) _rect.sizeDelta = new Vector2(Width, _rect.sizeDelta.y);
 
                 var title = _display.Length > 0 ? _display : _name;
                 var aside = _display.Length > 0 ? _name : "";
