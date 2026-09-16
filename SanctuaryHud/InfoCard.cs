@@ -515,10 +515,11 @@ namespace SanctuaryHud
                 // needs, so the card stays one size whatever is selected.
                 card._build = FigureLine.Create(card._left, "Build", 3, false);
                 card._build.Reserve(LineHeight);
-                card._income = FigureLine.Create(card._left, "Income", 2, false);
+                // Income, spend and build power on one line; the rarer figures
+                // as words on a line under it, only when there are any.
+                card._income = FigureLine.Create(card._left, "Income", 3, false);
                 card._income.Reserve(LineHeight);
-                card._power = FigureLine.Create(card._left, "Power", 1, true);
-                card._power.Reserve(LineHeight);
+                card._power = FigureLine.Create(card._left, "Extras", 0, true);
                 band.gameObject.AddComponent<LayoutElement>().minHeight = JobTile + 24f;
 
                 var queue = Row(band, "Queue", 6f, TextAnchor.UpperLeft);
@@ -642,14 +643,14 @@ namespace SanctuaryHud
                 else _income.Clear(0);
                 if (energy) _income.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, Rate(v.energyNetIncome));
                 else _income.Clear(1);
+                // Build power behind its mark, on the same line.
+                if (v.buildPower > 0f) _income.Set(2, "power", LabelColour, SanctuaryHudPlugin.Fmt(v.buildPower));
+                else _income.Clear(2);
                 _income.Show(!building);
 
-                // Build power behind a hammer; the rarer figures as words after it.
                 var extras = Extras(v);
-                if (v.buildPower > 0f) _power.Set(0, "power", LabelColour, SanctuaryHudPlugin.Fmt(v.buildPower));
-                else _power.Clear(0);
                 _power.SetExtras(extras);
-                _power.Show(!building);
+                _power.Show(!building && extras != null);
 
                 // The current job, large, at the right edge of the band, the
                 // percentage under it; whatever is queued behind it as small
