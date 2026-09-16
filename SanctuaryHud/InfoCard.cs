@@ -429,6 +429,11 @@ namespace SanctuaryHud
             // Where the game's own card sits: the replacement takes its bottom-left corner.
             var at = new Vector2(28f, 28f);
             if (HudCanvas.LocalRect(panel, out var anchor)) at = new Vector2(anchor.x, anchor.y);
+            // The build strip stacks its tabs and queue upward from the
+            // options, into where the game's card sat; where the two share a
+            // span the card goes above the stack (as of last frame).
+            if (BuildStrip.RowsTop > 0f && at.x < BuildStrip.RowsXMax && at.x + _card.PlacedWidth > BuildStrip.RowsXMin)
+                at.y = Mathf.Max(at.y, BuildStrip.RowsTop + 8f);
             _card.Place(at);
         }
 
@@ -459,6 +464,7 @@ namespace SanctuaryHud
             private TMP_Text _jobPercent;
 
             internal bool Alive => _rect != null;
+            internal float PlacedWidth => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
 
             internal static Card Create(RectTransform root)
             {
@@ -481,7 +487,7 @@ namespace SanctuaryHud
                 // The class of thing it is on the left as the title ("Tier 3:
                 // Tank" is what you act on), its given name after it.
                 var titleRow = Row(rt, "Title", 16f, TextAnchor.MiddleLeft);
-                card._title = HudCanvas.Text(titleRow, "Class", 30f, Color.white, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+                card._title = HudCanvas.Text(titleRow, "Class", 30f, Color.white, TextAlignmentOptions.MidlineLeft);
                 card._aside = HudCanvas.Text(titleRow, "Name", 24f, SubtitleColour, TextAlignmentOptions.MidlineLeft);
                 card._aside.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 

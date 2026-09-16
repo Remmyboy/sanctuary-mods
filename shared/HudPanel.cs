@@ -203,7 +203,7 @@ namespace SanctuaryHud
             artRect.sizeDelta = new Vector2(Art, Art);
             tile._plate = Stretched(art.transform, "Plate");
             tile._icon = Stretched(art.transform, "Icon");
-            tile._fallback = HudCanvas.Text(art.transform, "Name", 22f, new Color(1f, 1f, 1f, 0.8f), TextAlignmentOptions.Center, FontStyles.Bold);
+            tile._fallback = HudCanvas.Text(art.transform, "Name", 22f, new Color(1f, 1f, 1f, 0.8f), TextAlignmentOptions.Center);
             Fill(tile._fallback.rectTransform);
             tile._fallback.enableWordWrapping = true;
             tile._fallback.gameObject.SetActive(false);
@@ -284,7 +284,7 @@ namespace SanctuaryHud
             var fitter = box.gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            text = HudCanvas.Text(box.transform, "Text", size, Color.white, alignment, FontStyles.Bold);
+            text = HudCanvas.Text(box.transform, "Text", size, Color.white, alignment);
             return box.gameObject;
         }
 
@@ -394,7 +394,7 @@ namespace SanctuaryHud
             hrt.offsetMin = Vector2.zero;
             hrt.offsetMax = Vector2.zero;
             heading._hover.gameObject.SetActive(false);
-            heading.Text = HudCanvas.Text(go.transform, "Text", size, colour, alignment, FontStyles.Bold);
+            heading.Text = HudCanvas.Text(go.transform, "Text", size, colour, alignment);
             return heading;
         }
 

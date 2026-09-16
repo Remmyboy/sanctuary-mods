@@ -134,7 +134,7 @@ namespace SanctuaryHud
             _panel = HudPanel.Create(root, "Idle engineers", () => _cfgLocked.Value);
 
             var head = _panel.Row("Heading", 8f, TextAnchor.MiddleLeft);
-            _title = HudCanvas.Text(head, "Title", 26f, IdleColour, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+            _title = HudCanvas.Text(head, "Title", 26f, IdleColour, TextAlignmentOptions.MidlineLeft);
             HudCanvas.SetText(_title, "IDLE");
             _status = HudCanvas.Text(head, "Status", 18f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.MidlineLeft);
 

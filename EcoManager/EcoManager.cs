@@ -221,7 +221,7 @@ namespace SanctuaryHud
             var mark = HudCanvas.Icon(head, "alloy", MarkSize + 4f, AlloyColour);
             if (mark == null)
             {
-                var label = HudCanvas.Text(head, "Label", 24f, AlloyColour, TextAlignmentOptions.Center, FontStyles.Bold);
+                var label = HudCanvas.Text(head, "Label", 24f, AlloyColour, TextAlignmentOptions.Center);
                 HudCanvas.SetText(label, "ALLOY");
             }
             _extractorStatus = HudCanvas.Text(head, "Status", 18f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.MidlineLeft);
@@ -247,10 +247,10 @@ namespace SanctuaryHud
             var head = new ColumnHead { Go = go };
             if (HudCanvas.Icon(go.transform, key, MarkSize, colour) == null)
             {
-                head.Label = HudCanvas.Text(go.transform, "Label", 22f, colour, TextAlignmentOptions.Center, FontStyles.Bold);
+                head.Label = HudCanvas.Text(go.transform, "Label", 22f, colour, TextAlignmentOptions.Center);
                 HudCanvas.SetText(head.Label, fallback);
             }
-            head.Total = HudCanvas.Text(go.transform, "Total", 24f, Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            head.Total = HudCanvas.Text(go.transform, "Total", 24f, Color.white, TextAlignmentOptions.Center);
             return head;
         }
 

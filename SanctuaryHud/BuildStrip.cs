@@ -110,8 +110,14 @@ namespace SanctuaryHud
         private static readonly List<UnitRow.Entry> _queue = new List<UnitRow.Entry>();
         private static readonly List<ConstructionFilterToggleElement> _tabs = new List<ConstructionFilterToggleElement>();
 
+        /// Where the strip's rows reached last frame, in canvas units: the
+        /// top of the highest and the span they cover, so the unit card can
+        /// keep above them. Zero while nothing is showing.
+        internal static float RowsTop, RowsXMin, RowsXMax;
+
         private static void HideRows()
         {
+            RowsTop = RowsXMin = RowsXMax = 0f;
             _optionsRow?.Show(false);
             _queueRow?.Show(false);
             _tabRow?.Show(false);
@@ -187,6 +193,21 @@ namespace SanctuaryHud
                 var portrait = hovered.Source.portraitImage != null ? hovered.Source.portraitImage.overrideSprite : null;
                 template = UnitDomains.TemplateOf(portrait);
             }
+            // What the card has to clear.
+            RowsXMin = origin.x;
+            RowsXMax = origin.x + selectionWidth;
+            RowsTop = origin.y + SelectionRow.RowHeight;
+            if (_options.Count > 0)
+            {
+                RowsXMax = Mathf.Max(RowsXMax, optionsX + _optionsRow.Width);
+                RowsTop = Mathf.Max(RowsTop, origin.y + _optionsRow.Height);
+            }
+            if (_tabs.Count > 1) RowsTop = Mathf.Max(RowsTop, above + _tabRow.Height);
+            if (_queue.Count > 0)
+            {
+                RowsXMax = Mathf.Max(RowsXMax, ax + _queueRow.Width);
+                RowsTop = Mathf.Max(RowsTop, above + _queueRow.Height);
+            }
             InfoCard.SetHover(template);
         }
 
@@ -246,6 +267,7 @@ namespace SanctuaryHud
                 if (_rect != null) _rect.anchoredPosition = bottomLeft;
             }
 
+            internal float Height => _rect != null ? _rect.rect.height * _rect.localScale.y : 0f;
             internal float Width => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
 
             internal void Destroy()
