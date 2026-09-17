@@ -195,6 +195,7 @@ namespace SanctuaryHud
                 var portrait = hovered.Source.portraitImage != null ? hovered.Source.portraitImage.overrideSprite : null;
                 template = UnitDomains.TemplateOf(portrait);
             }
+            InfoCard.SetHover(template);
         }
 
         private static void CollectTabs(ConstructionFilterPanelUI panel)

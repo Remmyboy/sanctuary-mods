@@ -59,6 +59,8 @@ namespace SanctuaryHud
         internal static void Begin()
         {
             _pieces.Clear();
+            // Lines from a match that has ended went with its scene.
+            _lines.RemoveAll(line => line == null);
             ColumnWidth = 0f;
             OrdersHeight = 0f;
             try

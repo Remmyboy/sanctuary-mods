@@ -393,6 +393,9 @@ namespace SanctuaryHud
 
         private static void BuildPanel(RectTransform root)
         {
+            // The last match's images went with its scene.
+            _icons.Clear();
+            _spots.Clear();
             _plateImage = HudCanvas.Fill(root, "Mini-map", FillColour);
             _plateImage.raycastTarget = true;
             _plate = _plateImage.rectTransform;
