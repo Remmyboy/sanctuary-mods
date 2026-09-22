@@ -26,6 +26,7 @@ namespace SanctuaryHud
         private VerticalLayoutGroup _column;
         private PanelDrag _drag;
         private bool _rightAligned;
+        private float _lastWidth;
 
         internal RectTransform Rect => _rect;
         internal bool Alive => _rect != null;
@@ -110,9 +111,11 @@ namespace SanctuaryHud
             var x = dragged ? _rect.anchoredPosition.x - (_rightAligned ? width : 0f) : logical.x * k;
             var y = dragged ? -_rect.anchoredPosition.y : logical.y * k;
             if (_drag != null) _drag.Moved = false;
-
             // On the right half the panel hangs from its right edge, so a
-            // change of width leaves that edge where it was.
+            // change of width leaves that edge where it was: the saved left
+            // edge moves by the change, and the caller saves that.
+            if (!dragged && _rightAligned && _lastWidth > 0f) x += _lastWidth - width;
+            _lastWidth = width;
             var centre = x + width / 2f;
             var right = centre > size.x / 2f;
             if (right != _rightAligned)
@@ -182,7 +185,7 @@ namespace SanctuaryHud
         private GameObject _rateBox, _countBox, _tagBox;
         private TooltipTrigger _tooltip;
 
-        internal Action<PointerEventData.InputButton> OnClick;
+        internal Action<PointerEventData.InputButton> OnClick = null;   // set by the mods that click tiles
 
         internal static PanelTile Create(Transform parent, string name)
         {
@@ -209,7 +212,7 @@ namespace SanctuaryHud
             tile._icon = Stretched(art.transform, "Icon");
             tile._fallback = HudCanvas.Text(art.transform, "Name", 22f, new Color(1f, 1f, 1f, 0.8f), TextAlignmentOptions.Center);
             Fill(tile._fallback.rectTransform);
-            tile._fallback.enableWordWrapping = true;
+            tile._fallback.textWrappingMode = TextWrappingModes.Normal;
             tile._fallback.gameObject.SetActive(false);
 
             var track = AccentColour;
@@ -376,7 +379,7 @@ namespace SanctuaryHud
     {
         private Image _hover;
         internal TMP_Text Text;
-        internal Action OnClick;
+        internal Action OnClick = null;   // set by the mods that click headings
 
         internal static PanelHeading Create(Transform parent, string name, float size, Color colour, TextAlignmentOptions alignment)
         {

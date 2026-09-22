@@ -200,7 +200,7 @@ namespace SanctuaryHud
             text.overflowMode = TextOverflowModes.Overflow;
             // A figure never breaks across lines; a caller that wants
             // wrapping turns it on.
-            text.enableWordWrapping = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
             return text;
         }
 

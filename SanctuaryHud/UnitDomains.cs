@@ -28,6 +28,7 @@ namespace SanctuaryHud
         private static readonly List<KeyValuePair<uint, Info>> _pending = new List<KeyValuePair<uint, Info>>();
         private static bool _queried;
         private static float _nextTry;
+        private static int _cursor;   // where the next batch starts, so every entry gets its turn
 
         private const string Chunk =
             "local ok, err = pcall(function() " +
@@ -61,6 +62,7 @@ namespace SanctuaryHud
             if (!_queried && _bySprite.Count == 0) return;
             _bySprite.Clear();
             _pending.Clear();
+            _cursor = 0;
             _queried = false;
             _nextTry = 0f;
         }
@@ -99,24 +101,19 @@ namespace SanctuaryHud
             // Resolve a batch per frame; an id whose art has not loaded yet
             // stays pending and is tried again.
             if (_pending.Count == 0 || Time.realtimeSinceStartup < _nextTry) return;
-            var budget = 40;
-            for (var i = _pending.Count - 1; i >= 0 && budget > 0; i--, budget--)
+            // The batch walks on from where the last one stopped: starting
+            // at the same end each time, forty entries that never load (a
+            // faction's art not in memory) would starve all the rest.
+            for (var budget = 40; budget > 0 && _pending.Count > 0; budget--)
             {
-                var sprite = ResolveSprite(_pending[i].Key);
-                if (sprite == null) continue;
-                _bySprite[sprite] = _pending[i].Value;
-                _pending.RemoveAt(i);
+                if (_cursor >= _pending.Count) _cursor = 0;
+                var sprite = ResolveSprite(_pending[_cursor].Key);
+                if (sprite == null) { _cursor++; continue; }
+                _bySprite[sprite] = _pending[_cursor].Value;
+                _pending.RemoveAt(_cursor);   // the next entry slides into _cursor
             }
             if (_pending.Count > 0) _nextTry = Time.realtimeSinceStartup + 1f;
         }
-
-        internal static Domain Of(Sprite portrait) =>
-            portrait != null && _bySprite.TryGetValue(portrait, out var info) ? info.Domain : Domain.Unknown;
-
-        /// The map's strategic icon image name for the type behind a button's
-        /// portrait, or null.
-        internal static string IconOf(Sprite portrait) =>
-            portrait != null && _bySprite.TryGetValue(portrait, out var info) && !string.IsNullOrEmpty(info.IconName) ? info.IconName : null;
 
         /// The template id behind a button's portrait, or null.
         internal static string TemplateOf(Sprite portrait) =>

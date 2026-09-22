@@ -38,7 +38,7 @@ namespace SanctuaryHud
                 "build cost, income and build power in labelled rows, figures rounded, template id left off. " +
                 "The game's card comes back whenever the overlay is hidden or the mod is unloaded.");
             TidyBuiltIn = config.Bind("SanctuaryUI", "UnitCardTidyGameCard", true,
-                "With the game's own card kept (ReplaceCard off): hide the unit's template id and round its income figures.");
+                "With the game's own card kept (UnitCard off): hide the unit's template id and round its income figures.");
         }
 
         // ---- the values ---------------------------------------------------------
@@ -344,7 +344,7 @@ namespace SanctuaryHud
         /// in for it, and gives it back otherwise.
         internal static void Tick(bool hudShowing)
         {
-            var replace = hudShowing && InMatch && Enabled.Value;
+            var replace = hudShowing && InMatch && Enabled.Value && !PanelConceal.Unavailable;
             var panel = replace ? FindPanel() : null;
             if (_conceal.Apply(panel)) Describe(panel);
             if (Enabled.Value || !TidyBuiltIn.Value) RestoreBuiltIn();

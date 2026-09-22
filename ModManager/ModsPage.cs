@@ -35,6 +35,7 @@ namespace SanctuaryHud
         private Sprite _icon;
 
         private MainMenuInterface _builtFor;
+        private MainMenuInterface _failedFor;   // the menu a build failed on; not retried
         private GameObject _page;
         private GameObject _sidebarButton;
         private Transform _templates;
@@ -109,13 +110,19 @@ namespace SanctuaryHud
         {
             var mmi = MainMenuInterface.Instance;
             if (mmi == null) return;
-            if (!ReferenceEquals(mmi, _builtFor) || _page == null)
+            if ((!ReferenceEquals(mmi, _builtFor) || _page == null) && !ReferenceEquals(mmi, _failedFor))
             {
                 try { Build(mmi); }
                 catch (Exception e)
                 {
                     _log.LogError($"Mods page could not be built: {e}");
-                    _builtFor = mmi; // don't retry every frame
+                    // Nothing half-built left to open, and no retry every
+                    // frame: the next menu (a new scene) gets another go.
+                    if (_page != null) Object.Destroy(_page);
+                    if (_sidebarButton != null) Object.Destroy(_sidebarButton);
+                    _page = null;
+                    _sidebarButton = null;
+                    _failedFor = mmi;
                     return;
                 }
             }
@@ -703,7 +710,7 @@ namespace SanctuaryHud
             slider.wholeNumbers = whole;
             slider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
             var field = sliderT.Find("Text Input")?.GetComponent<TMP_InputField>();
-            string Show(float v) => whole ? Mathf.RoundToInt(v).ToString() : v.ToString("0.#");
+            string Show(float v) => whole ? Mathf.RoundToInt(v).ToString(System.Globalization.CultureInfo.InvariantCulture) : v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);   // as the box parses it
             if (field != null) field.SetTextWithoutNotify(Show(slider.value));
             sm.onValueChanged.AddListener(v =>
             {
@@ -799,7 +806,7 @@ namespace SanctuaryHud
                 box.anchorMin = new Vector2(from + 0.5f, box.anchorMin.y);
                 box.anchorMax = new Vector2(from + 0.5f, box.anchorMax.y);
                 box.pivot = new Vector2(1f, 0.5f);
-                box.anchoredPosition = new Vector2(from > 0f ? -20f : -20f, box.anchoredPosition.y);
+                box.anchoredPosition = new Vector2(-20f, box.anchoredPosition.y);
                 box.sizeDelta = new Vector2(boxWidth, box.sizeDelta.y);
 
                 var field = box.Find("Text Input").GetComponent<TMP_InputField>();
@@ -940,11 +947,11 @@ namespace SanctuaryHud
             _pluginSignature = PluginSignature();
         }
 
-        /// One row per config entry the mod bound, only while it is loaded
-        /// (the settings live on the running instance). Booleans get the
-        /// game's switch; everything else is edited as text and committed
-        /// through the entry's own serializer, so a half-typed value simply
-        /// doesn't take until it parses.
+        /// One row per config entry the mod bound. Booleans get the game's
+        /// switch, allowed-value lists a selector, ranges a slider; everything
+        /// else is edited as text and committed through the entry's own
+        /// serializer, so a half-typed value simply doesn't take until it
+        /// parses.
         private void FillPluginGroup(ModManagerPlugin.PluginEntry plugin, Transform group)
         {
             List<ConfigEntryBase> entries;

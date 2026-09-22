@@ -91,6 +91,9 @@ function Invoke-Git([string]$What, [string[]]$GitArgs) {
     return (($out | Out-String).Trim())
 }
 
+# The loader lives in BepInEx\plugins and ships in every Standalone zip; a copy
+# under SanctuaryMods would load itself, and that copy would load itself again.
+if ($Mod -eq 'ModLoader') { Fail "no ModLoader mode: its zip would put the loader under SanctuaryMods; it ships inside every Standalone zip" }
 if (-not (Test-Path $Body)) { Fail "body file not found: $Body" }
 $bodyText = (Get-Content $Body -Raw).TrimEnd()
 if ($bodyText -match '\*\*|\[.+\]\(') {

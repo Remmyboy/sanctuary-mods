@@ -43,7 +43,7 @@ namespace SanctuaryHud
     // watching. Spectators in a ladder game don't stop it reporting. The
     // server ignores reports for games that aren't an open ladder match, so
     // playing unranked with a friend is fine.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.3.1")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.3.2")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -540,7 +540,7 @@ namespace SanctuaryHud
                                           $"(attempt {attempt}/3): {request.error}");
                     }
                 }
-                yield return new WaitForSecondsRealtime(5f * attempt);
+                if (attempt < 3) yield return new WaitForSecondsRealtime(5f * attempt);
             }
             Logger.LogWarning("Ladder reporter: giving up — report the result on the site instead.");
         }

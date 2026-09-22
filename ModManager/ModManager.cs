@@ -26,7 +26,7 @@ namespace SanctuaryHud
     // Toggling is blocked while in a lobby or match: the VMs snapshot the
     // cache at match launch, and swapping content under a live session would
     // change the hash out from under the lobby's compatibility check.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.5.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.5.1")]
     public class ModManagerPlugin : BaseUnityPlugin
     {
         /// Tells ModLoader 1.3+ that this manager lists the loader's registry,
@@ -220,7 +220,9 @@ namespace SanctuaryHud
 
         private static bool InLobbyOrMatch()
         {
-            try { return EM.Network.LobbyManager.IsInLobby; }
+            // A replay has no lobby, but RESTART rebuilds its VMs from the
+            // cache, which must still match the recording.
+            try { return EM.Network.LobbyManager.IsInLobby || EM.Network.NetworkManager.IsReplayPlayback; }
             catch { return false; }
         }
 

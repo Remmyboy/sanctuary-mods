@@ -60,7 +60,7 @@ namespace SanctuaryHud
 
         internal static void Tick(bool hudShowing)
         {
-            var want = hudShowing && InMatch && Enabled.Value;
+            var want = hudShowing && InMatch && Enabled.Value && !PanelConceal.Unavailable;
             var panel = InMatch ? FindPanel() : null;
             // Once per panel (a new match brings a new one), whether or not
             // the row is standing in for it: what the game's panel holds.

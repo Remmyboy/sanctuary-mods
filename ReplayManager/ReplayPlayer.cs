@@ -259,8 +259,6 @@ namespace SanctuaryHud.Replays
             Paused = _seekPausedBefore;
         }
 
-        internal static void SkipBy(int seconds) => SeekTo(CurrentTick + seconds * 10);
-
         // After the game's quit path has reloaded the scene, start the same
         // file again the way the replay menu does.
         private static void ContinueRestart()

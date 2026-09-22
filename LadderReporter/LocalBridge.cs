@@ -23,7 +23,7 @@ namespace SanctuaryHud
     // Two endpoints, plus OPTIONS preflights for both:
     //
     //   GET  /status  -> { modVersion, gameVersion, state, match | null }
-    //   POST /match   <- the match object (as /api/mm/heartbeat returned it)
+    //   POST /match   <- the match object (as the site's match API has it)
     //                    or null; -> { ok: true } or { ok: false, error }
     //
     // A browser sends Origin on every cross-origin request, and only an
@@ -187,11 +187,14 @@ namespace SanctuaryHud
                 {
                     // Stop() closes the socket under us; anything else here
                     // is fatal for this listener, and the main thread will
-                    // notice _bridgeListener is gone and rebind.
+                    // notice _bridgeListener is gone and rebind — which it
+                    // can only do once this socket (ExclusiveAddressUse) is
+                    // closed.
                     if (ReferenceEquals(_bridgeListener, listener))
                     {
                         _bridgeListener = null;
                         _bridgeNextBindTry = 0f;
+                        try { listener.Stop(); } catch { }
                     }
                     return;
                 }

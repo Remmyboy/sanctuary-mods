@@ -53,18 +53,18 @@ namespace SanctuaryHud
             // still names anything before counting it.
             "    if not p.deleted and p.localId and Engine.IsValidLocalID(p.localId) then " +
             "      local c = cache[id] " +
-            "      if c == nil or (c and c[7] ~= p) then " +
+            "      if c == nil or c[7] ~= p then " +
             "        local eco = p.tp and p.tp.economy " +
             "        local h = eco and eco.harvest " +
             "        if h and ((h.alloys or 0) > 0 or (h.energy or 0) > 0) and p.GetPosition then " +
             "          local pos = p:GetPosition() " +
             "          c = { pos.x, pos.y, pos.z, h.alloys or 0, h.energy or 0, eco.harvestTime or 1, p } " +
             "        else " +
-            "          c = false " +
+            "          c = { false, [7] = p } " +
             "        end " +
             "        cache[id] = c " +
             "      end " +
-            "      if c then " +
+            "      if c[1] then " +
             "        local frac = 1 - (p.reclaimProgress or 0) / c[6] " +
             "        if frac > 0.001 then " +
             "          n = n + 1 " +

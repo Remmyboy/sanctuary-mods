@@ -22,7 +22,7 @@ namespace SanctuaryHud.Replays
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.4.0")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.4.1")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -110,7 +110,6 @@ namespace SanctuaryHud.Replays
             try
             {
                 _harmony = new Harmony("com.sanctuarydb.replays." + Guid.NewGuid().ToString("N").Substring(0, 8));
-                ApplyEconomyPatch(_harmony);   // the in-match signal, same as the other mods
                 ReplayPlayer.ApplyPatches(_harmony);
                 _harmony.Patch(AccessTools.Method(typeof(EngineLoader), nameof(EngineLoader.CleanUpGame)),
                     prefix: new HarmonyMethod(typeof(ReplaysPlugin), nameof(CleanUpPrefix)));
@@ -181,16 +180,22 @@ namespace SanctuaryHud.Replays
                     _cfgScale.Value = _scale;
                 }
             }
-            else if (_luaHooked || _armies.Count > 0 || _seatNames.Count > 0)
+            else
             {
-                _luaHooked = false;
-                _armies = new List<ArmyRow>();
-                _eco = new Dictionary<int, EcoRow>();
-                _seatNames = new Dictionary<int, string>();
-                _played = new HashSet<int>();
-                _focus = int.MinValue;
-                _lastFocus = int.MinValue;
-                _lastRowCount = -1;
+                // A rewind carries its view over; one that failed must not
+                // hand it to the next replay opened from the menu.
+                if (!ReplayPlayer.Restarting) _pendingFocus = int.MinValue;
+                if (_luaHooked || _armies.Count > 0 || _seatNames.Count > 0)
+                {
+                    _luaHooked = false;
+                    _armies = new List<ArmyRow>();
+                    _eco = new Dictionary<int, EcoRow>();
+                    _seatNames = new Dictionary<int, string>();
+                    _played = new HashSet<int>();
+                    _focus = int.MinValue;
+                    _lastFocus = int.MinValue;
+                    _lastRowCount = -1;
+                }
             }
         }
 
@@ -449,7 +454,7 @@ namespace SanctuaryHud.Replays
         private static bool _uiReady;
         private static Texture2D _texPanelBg, _texBtn, _texBtnHover, _texBtnOn, _texBtnOnHover, _texKnob, _texTrack, _texRestartIcon;
         private static GUIStyle _stPanel, _stTitle, _stTime, _stBody, _stDim, _stHead, _stButton, _stToggleBtn;
-        private static GUIStyle _stNet, _stIn, _stOut, _stBar;
+        private static GUIStyle _stNet, _stIn, _stOut, _stBar, _stHeadRight, _stBodyRight;
 
         private static void EnsureUi()
         {
@@ -501,6 +506,8 @@ namespace SanctuaryHud.Replays
             _stIn = new GUIStyle { fontSize = 11, alignment = TextAnchor.MiddleRight, normal = { textColor = GainColour } };
             _stOut = new GUIStyle { fontSize = 11, alignment = TextAnchor.MiddleRight, normal = { textColor = OutColour } };
             _stBar = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+            _stHeadRight = new GUIStyle(_stHead) { alignment = TextAnchor.LowerRight };
+            _stBodyRight = new GUIStyle(_stBody) { alignment = TextAnchor.MiddleRight };
         }
 
         // A rounded square with an anti-aliased edge; sliced by the style's
@@ -934,7 +941,7 @@ namespace SanctuaryHud.Replays
                 GUILayout.Label(name, _stHead, GUILayout.Width(BarW));
             }
             GUI.color = old;
-            var right = new GUIStyle(_stHead) { alignment = TextAnchor.LowerRight };
+            var right = _stHeadRight;
             GUILayout.Space(RuleW);
             GUILayout.Label("NET", right, GUILayout.Width(CellW));
             GUILayout.Space(RuleW);
@@ -969,7 +976,7 @@ namespace SanctuaryHud.Replays
             VRule(RowH);
             GUILayout.Label("-" + req, _stOut, GUILayout.Width(CellW), GUILayout.Height(RowH));
             VRule(RowH);
-            var right = new GUIStyle(_stBody) { alignment = TextAnchor.MiddleRight };
+            var right = _stBodyRight;
             GUILayout.Label(Short(used), right, GUILayout.Width(UsedW), GUILayout.Height(RowH));
         }
     }

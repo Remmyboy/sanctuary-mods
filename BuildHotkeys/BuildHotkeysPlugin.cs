@@ -30,7 +30,7 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.3.0")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.3.1")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
@@ -544,6 +544,10 @@ namespace SanctuaryHud
                 _installed = true;
                 _installedSignature = signature;
                 _builds = 0;
+                // The new install starts from the chunk's own snap and a fresh
+                // press counter, so last install's readings no longer hold.
+                _snapPushed = -1f;
+                _cycleSeq = -1;
                 // Each match reloads the sprites through Engine.LoadSprite, so
                 // last match's AssetIDs are not safe to assume still valid.
                 ClearSpriteCache();

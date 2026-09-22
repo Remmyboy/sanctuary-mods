@@ -14,9 +14,9 @@ namespace SanctuaryHud
     // Toasts under the economy strip for the things a player must not miss
     // while looking elsewhere: the commander taking damage, the commander
     // getting low, a structure finishing, and a player dropping out of the
-    // match. Each comes with a short generated tone (no audio assets to ship)
-    // and the commander ones jump the camera to it on click, the same way the
-    // widget does.
+    // match. Each can sound too (Sound, off by default: a voice pack line or
+    // a short generated tone), and the commander ones jump the camera to it
+    // on click, the same way the widget does.
     internal static class Alerts
     {
         internal enum Kind { CommanderAttacked, CommanderCritical, BuildComplete, PlayerDisconnected }

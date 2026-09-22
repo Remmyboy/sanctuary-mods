@@ -208,8 +208,11 @@ namespace SanctuaryHud
             image.color = colour;
             image.rectTransform.anchoredPosition = new Vector2(x, y);
             image.rectTransform.sizeDelta = new Vector2(w, h);
-            // Over the plates, which were made before the lines.
-            image.transform.SetAsLastSibling();
+            // Over the plates, which were made before the lines. Only when
+            // something else has come after the lines: moving one every
+            // frame would re-batch the whole canvas every frame.
+            var t = image.transform;
+            if (t.GetSiblingIndex() < t.parent.childCount - _lines.Count) t.SetAsLastSibling();
         }
     }
 }
