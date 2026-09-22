@@ -117,6 +117,13 @@ version unless they have already said to go ahead.
   got in.
 - **`MapLocalFiles` has no release** and is built from source; leave its
   Download cell as `—`.
+- **ModLoader has no packer mode** (the packer refuses `-Mod ModLoader`: it
+  would put the loader under SanctuaryMods, where it loads itself). Bump both
+  `[BepInPlugin]` and `<AssemblyVersion>` in `ModLoader.csproj`, pack any
+  other mod from the same commit, and hand-build one `ModLoader-<ver>.zip`
+  from that Standalone zip minus `SanctuaryMods/<Mod>/`, with the previous
+  ModLoader zip's README.txt updated (header, a `NEW IN` section). Publish
+  with an annotated tag at that commit and `gh release create --verify-tag`.
 - **A stale `[BepInPlugin]` version** has happened before: LadderReporter shipped
   0.2.3 while its attribute still read 0.2.1. Bumping the attribute first is
   what stops that.
