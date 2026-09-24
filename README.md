@@ -32,13 +32,15 @@ source.
 | [BuildHotkeys](BuildHotkeys/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
 | [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.0) | Watch the game's replays fog-free from any seat, with every economy |
+| [MatchStats](MatchStats/) | — | Post-game stats on the result screen: every army's economy and units as a table, and charts of income, spend, army value and more over the match |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.5.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
-has no release of its own yet; build it from source if you need it.
+and MatchStats have no release of their own yet; build them from source if you
+need them.
 
 ## SanctuaryHud
 
@@ -1053,6 +1055,86 @@ with; the game's own list greys out mismatches. Playback is a normal client,
 so the other mods in this repo behave as they would in a match and follow
 the focused army. A recorded change of sim speed by the host would override
 the speed slider for a moment; the panel re-applies its value.
+
+## MatchStats
+
+The post-game screen FAF players know from the score panel: when the game's
+VICTORY or DEFEAT text comes up, a window opens over it with the whole match
+for every army. Nothing shows while the match is being played. **CLOSE**
+leaves a **MATCH STATS** button under the game's result text to bring it
+back, and **F3** (`Screen · ToggleKey`) opens and closes it too, but only
+once the match has a result. `Screen · AutoOpen` off keeps it to the button.
+
+- **The table**, one row per army, allies together (the best-scoring team
+  first, by score within it), each in its colour with its faction, the
+  result (and when a defeated army went out), and YOU on your own row. Both
+  tabs lead with the **SCORE**. Two tabs:
+  - **ECONOMY**: alloy and energy gathered and spent, the peak alloy
+    income, alloy and energy **wasted** (income above spend while the store
+    sat full), and the time spent **stalling** on each (ticks where the
+    host throttled spending below what was asked for).
+  - **UNITS**: built, by land, air, naval, engineers and structures, with
+    the alloy value built; lost, with the alloy value lost; the alloy value
+    of enemy units killed; the peak army value and the peak number of units.
+- **The charts**, one line per army over the match, time along the bottom:
+  score, alloy income, energy income, alloy spent (those three smoothed over ten
+  seconds, since a raw second jumps with every reclaim and stall), alloy
+  gathered as a running total, army value, units, and alloy stored. Hovering
+  the chart puts a cursor on it and a readout of every army's value at that
+  moment, highest first. Your own line is drawn thicker and on top.
+
+**Where the figures come from.** The host sends every army's economy totals
+to every client every tick, and every unit's creation, build progress and
+death, carrying its army; the client keeps only what it needs to draw its
+own army (see ReplayManager's notes above). The mod wraps those commands'
+`Receive` fields in the client VM — a table-field swap, no file touched, so
+the lobby's Lua hash is unchanged — and keeps count there, in the client's
+memory, reading it out every two seconds. Nothing is sent anywhere.
+
+- Economy figures are per tick in the stream (`economy.lua` adds income
+  straight into the store), so a second's figures are ten ticks summed.
+  Income already includes reclaim: the host computes `income = generation ×
+  multiplier + harvest`.
+- A unit counts as **built** when it finishes, which counts an upgrade too
+  (the new tier is a new entity); a placement ghost never finishes, so never
+  counts, and the commander isn't "built". A `DestroyUnit` is a **loss**
+  (killed, dashed through, self-destructed); a removal — an upgrade's old
+  tier, a cancelled site — only takes the unit off the army value.
+- **Army value** is the alloy cost of the finished mobile units alive,
+  commander aside. The commander counts as a loss when it dies, but not in
+  the lost value, where its cost would swamp everything else.
+- **Kills** are shared. The host's `DestroyUnit` carries no killer (the
+  game has no score of its own either), so each loss is split evenly among
+  the loser's enemies still in the game. In a 1v1 that is exact; in a team
+  game it credits the team, evenly across its players; in a free-for-all it
+  is an approximation.
+- Empty map slots get an army from the host but never any storage, and are
+  left out, and take no share of a kill.
+
+**The score** is FAF's (`CalculateBrainScore` in its `lua/sim/score.lua`)
+with alloy for mass:
+
+```
+score = (alloy spent + energy spent / 10) / 2
+      + max(0, ((alloy killed − alloy lost) + (energy killed − energy lost) / 10) / 2)
+      + 5000 × commander kills
+```
+
+Half of everything spent, plus half of the battle's net value, which never
+goes below nothing, plus a bonus a commander. FA brings energy to mass at
+20 : 1; Sanctuary's unit costs are set at 10 : 1 (the median over its 295
+unit templates, and nearly every one), so that is the rate here. FAF takes
+a commander's own value back out of a kill so that the kill is worth only
+its bonus; a commander here costs 100,000 alloy, so it is never counted in,
+killed or lost.
+
+**What it can't see.** Only what happened while the mod was loaded: hot-load
+it mid-match and the charts start there, and the totals count from then
+(units already standing are tracked, but not counted as built). The window
+is uGUI on the game's HUD canvas, just above the result panel, so it takes
+the game's UI Scale and font; its dimmed backdrop takes every click. The
+first time the result screen comes up, the mod logs the result panel's
+object tree.
 
 ## CameraUtilities
 
