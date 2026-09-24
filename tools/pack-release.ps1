@@ -55,7 +55,7 @@ param(
     [switch]$Publish,
 
     # Which game build the release notes claim to target.
-    [string]$BuiltFor = '4 September 2026'
+    [string]$BuiltFor = '24 September 2026 (0.0.1.20)'
 )
 
 $ErrorActionPreference = 'Stop'
