@@ -91,15 +91,12 @@ namespace SanctuaryHud
             _source = source;
             Copy(source.background, _background);
             Copy(source.frame, _frame);
-            Copy(source.icon, _icon);
             // The glyph on its own, without the game's glow: drawn plain,
-            // white, in the tint the game gave it.
+            // white, in the tint the game gave it. Handed to Copy rather than
+            // set after it, as a sprite set twice a frame dirties the canvas.
             var glyph = source.icon != null ? Glyph(source.icon.overrideSprite) : null;
-            if (glyph != null && _icon != null)
-            {
-                _icon.sprite = glyph;
-                _icon.material = null;
-            }
+            Copy(source.icon, _icon, glyph);
+            if (glyph != null && _icon != null) _icon.material = null;
             if (_button != null)
             {
                 var sourceButton = source.GetComponent<Button>();
@@ -224,7 +221,7 @@ namespace SanctuaryHud
             _glyphFailed = false;
         }
 
-        private static void Copy(Image from, Image to)
+        private static void Copy(Image from, Image to, Sprite instead = null)
         {
             if (to == null) return;
             if (from == null)
@@ -233,7 +230,7 @@ namespace SanctuaryHud
                 return;
             }
             var sprite = from.overrideSprite;
-            to.sprite = sprite;
+            to.sprite = instead != null ? instead : sprite;
             to.color = from.color;
             var on = sprite != null && from.enabled && from.gameObject.activeSelf;
             if (to.enabled != on) to.enabled = on;

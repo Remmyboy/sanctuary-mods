@@ -18,24 +18,29 @@ namespace SanctuaryHud
     {
         private static readonly List<PanelConceal> _all = new List<PanelConceal>();
 
+        /// Set when the hooks the stand-ins need failed to apply: every
+        /// stand-in then leaves the game's panels alone, without writing
+        /// "off" into the player's settings.
+        internal static bool Unavailable;
+
         private SanctuaryPanelUI _panel;
+        private SanctuaryPanelUI _taken;   // the last panel Apply said was new
 
         internal PanelConceal()
         {
             _all.Add(this);
         }
 
-        /// The panel being stood in for, or null.
-        internal SanctuaryPanelUI Panel => _panel;
-
         /// Conceal this panel (null: conceal nothing). A change of panel — a
         /// new match brings new ones — releases the old one first. Returns
-        /// true the first time a given panel is taken.
+        /// true the first time a given panel is taken, not each time it is
+        /// taken again after a release (the overlay toggled back on).
         internal bool Apply(SanctuaryPanelUI panel)
         {
             if (panel != _panel) Release();
             if (panel == null) return false;
-            var first = _panel == null;
+            var first = panel != _taken;
+            _taken = panel;
             _panel = panel;
             Hide(panel);
             return first;
@@ -80,36 +85,6 @@ namespace SanctuaryHud
             {
                 if (conceal._panel != null && conceal._panel == __instance) Hide(__instance);
             }
-        }
-
-        // ---- where the panel sits ---------------------------------------------
-
-        private static readonly Vector3[] _corners = new Vector3[4];
-
-        /// The panel's on-screen rectangle in the HUD's own GUI coordinates
-        /// (1080-logical, y down), so a stand-in can draw where the original
-        /// was. False when the panel has no measurable rectangle.
-        internal static bool GuiRect(Component panel, float scale, out Rect rect)
-        {
-            rect = default;
-            if (panel == null || !(panel.transform is RectTransform rt)) return false;
-            var canvas = panel.GetComponentInParent<Canvas>();
-            if (canvas == null) return false;
-            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-
-            rt.GetWorldCorners(_corners);
-            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
-            foreach (var corner in _corners)
-            {
-                var p = RectTransformUtility.WorldToScreenPoint(camera, corner);
-                if (p.x < minX) minX = p.x;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.y > maxY) maxY = p.y;
-            }
-            // Screen y runs up; GUI y runs down.
-            rect = new Rect(minX / scale, (Screen.height - maxY) / scale, (maxX - minX) / scale, (maxY - minY) / scale);
-            return rect.width > 1f && rect.height > 1f;
         }
 
         /// The panel's tree, once, into the log: what it holds and where,

@@ -52,7 +52,7 @@ namespace SanctuaryHud
 
         internal static void Tick(bool hudShowing)
         {
-            var want = hudShowing && InMatch && Enabled.Value;
+            var want = hudShowing && InMatch && Enabled.Value && !PanelConceal.Unavailable;
             var panel = want ? FindPanel<SelectionPanelUI>(UIPanelType.Selection) : null;
             if (_conceal.Apply(panel)) Describe(panel);
             try

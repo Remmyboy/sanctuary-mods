@@ -761,6 +761,7 @@ namespace SanctuaryHud
         // Client-side only: no sim state, no hashed files touched.
         private static Func<string, int> _runLuaChunk;
         private static Func<string, string> _getLuaGlobal;
+        private static float _nextLuaBridgeTry;
 
         /// True once the client VM exists and can be called into.
         internal static bool LuaReady => _luaStateReady != null && _luaStateReady();
@@ -772,6 +773,11 @@ namespace SanctuaryHud
         internal static void EnsureLuaBridge()
         {
             if (_runLuaChunk != null) return;
+            // Callers poll this every frame; a bridge that won't resolve (a
+            // game update renamed something) would rescan every assembly and
+            // log a warning each time.
+            if (Time.realtimeSinceStartup < _nextLuaBridgeTry) return;
+            _nextLuaBridgeTry = Time.realtimeSinceStartup + 5f;
             try
             {
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
@@ -1159,8 +1165,10 @@ namespace SanctuaryHud
         /// representative template per panel row for its art.
         private static void RefreshArmyLookups()
         {
-            // A failed refresh shows no factory rows rather than last poll's.
+            // A failed refresh shows no factory or extractor rows rather than
+            // last poll's (or, local ids being reused, last match's).
             _factoryKindsValid = false;
+            _extractorIdsValid = false;
             if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
             try
             {
@@ -1828,6 +1836,12 @@ namespace SanctuaryHud
                     // Each match reloads its sprites through Engine.LoadSprite,
                     // so a reused id could otherwise draw last game's art.
                     ClearSpriteCache();
+                    // Icons register per match too; resolved again on demand.
+                    ClearIconRegistry();
+                    _idleImageIndex = -1;
+                    _upgradeImageIndex = -1;
+                    _extractorIdsValid = false;
+                    _extractorLocalIds.Clear();
                     _rowIcons.Clear();
                     _rowPlates.Clear();
                     _loggedRowIcons = null;
@@ -1878,55 +1892,10 @@ namespace SanctuaryHud
 
         // ---- shared IMGUI styles ------------------------------------------
 
+        // Only the textures are left in use: the panels, strip and rows that
+        // had IMGUI styles here are all on the game's canvas now.
         private static bool _stylesReady;
-        internal static GUIStyle _stWindow, _stName, _stSub, _stBarText, _stChevron, _stRowLabel, _stRowCount, _stIdleNone;
-        internal static GUIStyle _stStripLabel, _stStripValue, _stStripMax, _stStripIn, _stStripOut, _stStripNet, _stStripChip;
-        internal static GUIStyle _stCmdLabel, _stCmdGlyph, _stSubHeading;
-        internal static Texture2D _texPanel, _texBarBack, _texWhite, _texRowHover;
-
-        // Row geometry for the list panels, shared so they stack alike. The
-        // row is sized around its build-menu art rather than its 12px label.
-        internal const float RowHeight = 20f;
-        internal const float IconSize = 18f;
-
-        /// Where a row's three columns sit, and how wide that makes the panel.
-        internal struct RowLayout
-        {
-            /// Label x, from the row's left edge. Leaves room for the art when
-            /// any row has some, decided once for the whole panel: a row that
-            /// slid over when its own sprite loaded would read as a glitch.
-            public float Indent;
-            /// Count x, likewise: one column, so the numbers stack.
-            public float CountX;
-            public float Width;
-        }
-
-        /// Measures a panel from the rows it is about to draw. A fixed width is
-        /// always wrong one way or the other — dead space right of "T1 2", or
-        /// one long label from clipping — so ask the styles how wide the text is.
-        internal static RowLayout MeasureRows(List<IdleGroup> rows, bool withAllRow, int widestCount, bool roomForStatus)
-        {
-            var indent = 5f;
-            foreach (var row in rows)
-            {
-                if (!HasSprite(row.IconId)) continue;
-                indent = IconSize + 6f;
-                break;
-            }
-
-            var label = 0f;
-            foreach (var row in rows) label = Mathf.Max(label, _stRowLabel.CalcSize(new GUIContent(row.Label)).x);
-            if (withAllRow) label = Mathf.Max(label, _stRowLabel.CalcSize(new GUIContent("ALL")).x);
-
-            var countX = indent + label + 10f;
-            var count = _stRowCount.CalcSize(new GUIContent(widestCount.ToString())).x;
-            // 4px of window margin each side of the row, 8px past the count.
-            var width = countX + count + 16f;
-            // The poll-status note in the header is wider than any row, and only
-            // shows when something is wrong, so only then does it widen things.
-            if (roomForStatus) width = Mathf.Max(width, 152f);
-            return new RowLayout { Indent = indent, CountX = countX, Width = width };
-        }
+        internal static Texture2D _texPanel, _texWhite, _texRowHover;
 
         /// The game's own panel colour and accent (its front menu's
         /// near-black blue and accent blue), for anything drawn in its shape.
@@ -1947,29 +1916,8 @@ namespace SanctuaryHud
             _stylesReady = true;
 
             _texPanel = MakeTex(new Color(0.04f, 0.06f, 0.08f, 0.82f));
-            _texBarBack = MakeTex(new Color(1f, 1f, 1f, 0.08f));
             _texWhite = MakeTex(Color.white);
             _texRowHover = MakeTex(new Color(1f, 1f, 1f, 0.12f));
-
-            _stWindow = new GUIStyle { normal = { background = _texPanel } };
-            _stRowLabel = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.72f, 0.79f, 0.9f) } };
-            _stRowCount = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(1f, 0.68f, 0.25f) } };
-            _stIdleNone = new GUIStyle { fontSize = 12, normal = { textColor = new Color(1, 1, 1, 0.35f) } };
-            _stName = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
-            _stSub = new GUIStyle { fontSize = 12, normal = { textColor = new Color(1, 1, 1, 0.6f) }, alignment = TextAnchor.UpperRight };
-            _stBarText = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-            _stChevron = new GUIStyle { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, normal = { textColor = Color.white } };
-
-            _stStripLabel = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            _stStripValue = new GUIStyle { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
-            _stStripMax = new GUIStyle { fontSize = 13, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(1, 1, 1, 0.45f) } };
-            _stStripIn = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, normal = { textColor = GainColour } };
-            _stStripOut = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, normal = { textColor = new Color(1f, 0.55f, 0.5f, 0.95f) } };
-            _stStripNet = new GUIStyle { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
-            _stStripChip = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-            _stSubHeading = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = UpgradeColour } };
-            _stCmdLabel = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _stCmdGlyph = new GUIStyle { fontSize = 17, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
         }
 
         private static Texture2D MakeTex(Color color)
@@ -2050,15 +1998,6 @@ namespace SanctuaryHud
             return _iconIndexByName.TryGetValue(swapped, out index) ? index : -1;
         }
 
-        /// Draws one from the atlas. False when the atlas or the index isn't
-        /// there, so the caller can fall back to something plainer.
-        internal static bool DrawStrategicIcon(Rect rect, int index)
-        {
-            if (_iconAtlas == null || _iconUvRects == null || index < 0 || index >= _iconUvRects.Count) return false;
-            GUI.DrawTextureWithTexCoords(rect, _iconAtlas, _iconUvRects[index]);
-            return true;
-        }
-
         /// Dropped when a match ends: icons are registered per match, so last
         /// game's indices are not safe to carry into the next one.
         internal static void ClearIconRegistry()
@@ -2081,13 +2020,13 @@ namespace SanctuaryHud
             try
             {
                 var ui = SanctuaryUI.SanctuaryUIManager.Instance;
-                if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.PauseMenu, out var pause) && pause.IsVisible) return true;
                 // The end-of-match result screen counts too: the game's own
                 // HUD is done by then, so the mods' panels should be as well.
                 if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.GameResult, out var result) && result.IsVisible) return true;
                 // InterfaceManager.TransitionTo turns this backdrop on for
                 // every screen except None, and None is what a match runs
-                // under.
+                // under. Since 0.0.1.20 that includes the pause menu, which
+                // left the SanctuaryUI panels to become the InGameMenu screen.
                 var screens = EM.UI.InterfaceManager.Instance;
                 return screens != null && screens.background != null && screens.background.activeInHierarchy;
             }

@@ -19,7 +19,10 @@ channel count. Keep them short (under two seconds) and normalised; the
 `Alerts · Volume` setting scales them. A missing file falls back to the tone,
 an unreadable one logs a warning and falls back too. Files are read once per
 plugin load, so a hot reload (or a game restart) picks up a replaced file.
-Sounds are off by default (`Alerts · Sound`).
+Sounds are off by default (`Alerts · Sound`). With them on, and the
+commander-attacked alert on, the game's own commander damage voice line (new
+in 0.0.1.20) is muted on this client so the two don't talk over each other;
+turn either off and the game's line comes back.
 
 From an MP3 (ElevenLabs only exports MP3 on the lower tiers), trimmed to the
 voice and made mono:

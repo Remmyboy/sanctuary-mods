@@ -16,6 +16,8 @@
          reloads silently reuse the old code. -->
     <Deterministic>false</Deterministic>
     <AssemblyVersion>0.2.*</AssemblyVersion>
+    <!-- ...which the compiler flags as an unusual version format, per project. -->
+    <NoWarn>$(NoWarn);CS7035</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

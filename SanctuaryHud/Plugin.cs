@@ -27,7 +27,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.12.1")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.13.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -123,7 +123,7 @@ namespace SanctuaryHud
             Rule("strategic", "Strategic", true, true);
             Rule("other", "Other", false, false);
             _cfgAlertSound = Config.Bind("Alerts", "Sound", false,
-                "Play a sound with each alert: a voice line from the mod's sounds folder where one is shipped, else a short tone. Off by default; the toasts show either way.");
+                "Play a sound with each alert: a voice line from the mod's sounds folder where one is shipped, else a short tone. Off by default; the toasts show either way. While on (with the commander-attacked alert), the game's own commander damage voice line is muted so the two don't overlap.");
             _cfgAlertVolume = Config.Bind("Alerts", "Volume", 50,
                 new ConfigDescription("Alert volume, 0 to 100, like the game's own audio sliders.", new AcceptableValueRange<int>(0, 100)));
             // The packs on disk plus the built-in tones, as a fixed list so
@@ -189,11 +189,7 @@ namespace SanctuaryHud
             catch (Exception e)
             {
                 _log.LogWarning($"Panel stand-ins unavailable (hook failed): {e.Message}");
-                OrdersBar.Enabled.Value = false;
-                InfoCard.Enabled.Value = false;
-                SelectionRow.Enabled.Value = false;
-                TierTabs.HideLone.Value = false;
-                BuildStrip.Enabled.Value = false;
+                PanelConceal.Unavailable = true;
             }
             _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log.");
         }
@@ -203,18 +199,26 @@ namespace SanctuaryHud
         // and give the game its readouts back.
         private void OnDestroy()
         {
-            GamePanel.Shutdown();
-            Alerts.Shutdown();
-            MiniMap.Shutdown();
-            OrdersBar.Shutdown();
-            InfoCard.Shutdown();
-            SelectionRow.Shutdown();
-            TierTabs.Shutdown();
-            BuildStrip.Shutdown();
-            BottomDock.Shutdown();
-            EcoStrip.Shutdown();
-            HudCanvas.Destroy();
-            _harmony?.UnpatchSelf();
+            // Unpatch whatever else throws, or the reloaded copy's postfixes
+            // would run beside these.
+            try
+            {
+                GamePanel.Shutdown();
+                Alerts.Shutdown();
+                MiniMap.Shutdown();
+                OrdersBar.Shutdown();
+                InfoCard.Shutdown();
+                SelectionRow.Shutdown();
+                TierTabs.Shutdown();
+                BuildStrip.Shutdown();
+                BottomDock.Shutdown();
+                EcoStrip.Shutdown();
+                HudCanvas.Destroy();
+            }
+            finally
+            {
+                _harmony?.UnpatchSelf();
+            }
         }
 
         // ---- input --------------------------------------------------------
@@ -409,6 +413,9 @@ namespace SanctuaryHud
             // Under the game's pause menu or a settings screen nothing of the
             // game's own shows through, so nothing of ours should either.
             if (!_visible || !InMatch || _menuOpen) return;
+            // Only labels here, nothing that takes input: laying them out
+            // for Layout and every mouse and key event too is wasted work.
+            if (Event.current.type != EventType.Repaint) return;
             EnsureStyles();
             EnsureGameStyle();
 
@@ -436,8 +443,6 @@ namespace SanctuaryHud
             GUI.matrix = previousMatrix;
         }
 
-        private const float StripHeight = 48f;
-
         /// The one size setting, for everything the HUD draws in its own
         /// shape. The strip and the commander widget take it as it is; the
         /// rows and card on the canvas take it a fifth up, since at the
@@ -460,34 +465,15 @@ namespace SanctuaryHud
         internal static Color AlloyTint => _alloyTint;
         internal static Color EnergyTint => _energyTint;
 
-        /// Once, in a match: put the game's typeface on the strip and take
-        /// its resource tints off the game's own panel, so the two read as
-        /// one UI. Falls back to the built-in styles piece by piece.
+        /// Once, in a match: put the game's typeface on the map labels and
+        /// take its resource tints off the game's own panel, so the two read
+        /// as one UI. Falls back to the built-in styles piece by piece.
         private void EnsureGameStyle()
         {
             if (_gameStyleReady) return;
             _gameStyleReady = true;
 
-            var font = GamePanel.ResolveFont(_log);
-            if (font != null)
-            {
-                foreach (var style in new[] { _stStripLabel, _stStripValue, _stStripMax, _stStripIn, _stStripOut, _stStripNet, _stStripChip, _stCmdLabel })
-                {
-                    style.font = font;
-                }
-                // Rajdhani/Bahnschrift run narrower and lighter than the
-                // default face; a size up keeps the strip legible.
-                _stStripLabel.fontSize = 14;
-                _stStripValue.fontSize = 22;
-                _stStripMax.fontSize = 14;
-                _stStripIn.fontSize = 15;
-                _stStripOut.fontSize = 15;
-                _stStripNet.fontSize = 19;
-                _stStripChip.fontSize = 12;
-                _stCmdLabel.fontSize = 12;
-            }
-            WorldOverlays.ApplyFont(font);
-            _stStripMax.normal.textColor = MutedText;
+            WorldOverlays.ApplyFont(GamePanel.ResolveFont(_log));
 
             var alloy = AlloyColour;
             var energy = EnergyColour;
@@ -506,14 +492,6 @@ namespace SanctuaryHud
             if (a > 999_999f) return (a / 1_000_000f).ToString("0.##") + "M";
             if (a > 999f) return (a / 1_000f).ToString("0.#") + "K";
             return a.ToString("0");
-        }
-
-        internal static void Fill(Rect rect, Color colour)
-        {
-            var previous = GUI.color;
-            GUI.color = colour;
-            GUI.DrawTexture(rect, _texWhite);
-            GUI.color = previous;
         }
 
         /// The host's economy ticks ten times a second; the stream's rates are

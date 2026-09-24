@@ -14,9 +14,9 @@ namespace SanctuaryHud
     // Toasts under the economy strip for the things a player must not miss
     // while looking elsewhere: the commander taking damage, the commander
     // getting low, a structure finishing, and a player dropping out of the
-    // match. Each comes with a short generated tone (no audio assets to ship)
-    // and the commander ones jump the camera to it on click, the same way the
-    // widget does.
+    // match. Each can sound too (Sound, off by default: a voice pack line or
+    // a short generated tone), and the commander ones jump the camera to it
+    // on click, the same way the widget does.
     internal static class Alerts
     {
         internal enum Kind { CommanderAttacked, CommanderCritical, BuildComplete, PlayerDisconnected }
@@ -97,10 +97,12 @@ namespace SanctuaryHud
                 _lastHealth = -1f;
                 _lastCommander = -1;
                 _criticalArmed = true;
+                _muteSent = -1;
                 return;
             }
 
             _toasts.RemoveAll(t => now >= t.Expires);
+            SyncGameAlertMute();
 
             if (_commanderLocalIndex < 0) return;
             if (_commanderLocalIndex != _lastCommander)
@@ -154,6 +156,85 @@ namespace SanctuaryHud
                     _criticalArmed = true;
                 }
             }
+        }
+
+        // ---- the game's own commander alert -------------------------------
+        //
+        // Since 0.0.1.20 the game plays a voice line of its own when your
+        // commander takes damage: the host sends PlayUnitDamagedAlert to the
+        // owner (at most once per 15 s of quiet), and the client's Receive
+        // posts the unit's onDamagedAlert Wwise event. With our sound on too,
+        // the two talk over each other, so while ours will play, the client's
+        // handler drops the commander's event. It's a runtime wrapper, no
+        // file changes, so the lobby hash is untouched; it only acts on this
+        // client, and any other unit given an onDamagedAlert still sounds.
+        //
+        // The registry looks Receive up on the command at dispatch, and
+        // Receive is already a raw field, so replacing it bypasses the
+        // command table's assignment guard. Guarded by a global, and each
+        // match builds a fresh VM, so re-running the chunk is harmless.
+        private const string GameAlertHookChunk =
+            // pcall'd so a game without the command (older, or renamed) is
+            // a quiet no-op rather than a failed chunk logged every second.
+            "if not __SdbCmdAlertHook then pcall(function() " +
+            "  local c = Import('common/commands/definitions/session.lua').PlayUnitDamagedAlert " +
+            "  if c and type(c.Receive) == 'function' then " +
+            "    __SdbCmdAlertHook = true " +
+            "    local orig = c.Receive " +
+            "    local commanderEvent = {} " +
+            // An event name is the commander's if every template carrying it
+            // is a commander. Worked out once per name, the first time it
+            // arrives, when the templates are certainly loaded.
+            "    local function isCommanderEvent(name) " +
+            "      local known = commanderEvent[name] " +
+            "      if known ~= nil then return known end " +
+            "      local any, all = false, true " +
+            "      local ok = pcall(function() " +
+            "        for _, tp in pairs((__Templates and __Templates.Units) or {}) do " +
+            "          local a = tp.audio and tp.audio.onDamagedAlert " +
+            "          if a and a.name == name then " +
+            "            any = true " +
+            "            local cmd = false " +
+            "            for k, v in pairs(tp.tags or {}) do " +
+            "              if v == 'COMMAND' or k == 'COMMAND' then cmd = true end " +
+            "            end " +
+            "            if not cmd then all = false end " +
+            "          end " +
+            "        end " +
+            "      end) " +
+            "      local result = ok and any and all " +
+            "      commanderEvent[name] = result " +
+            "      return result " +
+            "    end " +
+            "    rawset(c, 'Receive', function(data, ...) " +
+            "      if __SdbMuteGameCmdAlert == 1 and data and isCommanderEvent(data.eventName) then return end " +
+            "      return orig(data, ...) " +
+            "    end) " +
+            "  end " +
+            "end) end " +
+            "__SdbMuteGameCmdAlert = __MUTE__";
+
+        private static float _muteAccum;
+        private static int _muteSent = -1;
+
+        /// Ours plays whenever the attacked alert fires with sound on.
+        private static bool OursSounds => AttackedEnabled && SoundEnabled && Volume > 0f && !_audioFailed;
+
+        /// Installs the wrapper and sets its switch, once a second while in a
+        /// match: cheap, and it catches a fresh VM or a changed setting.
+        private static void SyncGameAlertMute()
+        {
+            _muteAccum += Time.unscaledDeltaTime;
+            var want = OursSounds ? 1 : 0;
+            if (_muteAccum < 1f && want == _muteSent) return;
+            _muteAccum = 0f;
+            if (!LuaReady) return;
+            if (!RunLua(GameAlertHookChunk.Replace("__MUTE__", want.ToString()))) return;
+            if (want != _muteSent)
+                _log?.LogInfo(want == 1
+                    ? "Game's commander damage alert muted: ours sounds instead."
+                    : "Game's commander damage alert left on: ours is silent.");
+            _muteSent = want;
         }
 
         private static void Push(Kind kind, string text, Color colour, bool jump,
@@ -453,6 +534,10 @@ namespace SanctuaryHud
 
         internal static void Shutdown()
         {
+            // The wrapper stays in the VM (a reloaded copy finds it by its
+            // guard); switched off, it passes everything through.
+            if (_muteSent == 1 && LuaReady) RunLua("__SdbMuteGameCmdAlert = 0");
+            _muteSent = -1;
             _toasts.Clear();
             _rendered.Clear();
         }

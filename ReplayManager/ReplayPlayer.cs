@@ -259,8 +259,6 @@ namespace SanctuaryHud.Replays
             Paused = _seekPausedBefore;
         }
 
-        internal static void SkipBy(int seconds) => SeekTo(CurrentTick + seconds * 10);
-
         // After the game's quit path has reloaded the scene, start the same
         // file again the way the replay menu does.
         private static void ContinueRestart()
@@ -280,11 +278,11 @@ namespace SanctuaryHud.Replays
                 return;
             }
             _restart = null;
-            ui.TransitionTo(InterfaceManager.Window.Loading);
+            ui.TransitionTo(InterfaceManager.Window.GameLoading);
             if (!NetworkManager.StartReplayPlayback(r.Path, out var error))
             {
                 _log.LogError($"Replay: rewind failed: {error}");
-                ui.TransitionTo(InterfaceManager.Window.Main);
+                ui.TransitionTo(InterfaceManager.Window.Home);
                 SeekTarget = -1;
                 return;
             }

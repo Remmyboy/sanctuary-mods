@@ -32,9 +32,13 @@ namespace SanctuaryHud
         private readonly ModManagerPlugin _owner;
         private readonly BepInEx.Logging.ManualLogSource _log;
         private Harmony _harmony;
-        private Sprite _icon;
+        private Sprite _icon, _cover;
 
-        private MainMenuInterface _builtFor;
+        // Since 0.0.1.20 the front menu is a side bar shown beside each
+        // screen (SideBarInterface) rather than a MainMenuInterface page of
+        // its own; the page is built once per side bar, i.e. per menu scene.
+        private SideBarInterface _builtFor;
+        private SideBarInterface _failedFor;   // the side bar a build failed on; not retried
         private GameObject _page;
         private GameObject _sidebarButton;
         private Transform _templates;
@@ -43,10 +47,13 @@ namespace SanctuaryHud
         private bool _sidebarRegistered;
 
         // The InterfaceManager window that was up when the page opened
-        // (Main in the front menu, None during a match), restored on close.
-        private InterfaceManager.Window _returnWindow = InterfaceManager.Window.Main;
+        // (Home, Play or Replays in the front menu, None or InGameMenu during
+        // a match), restored on close.
+        private InterfaceManager.Window _returnWindow = InterfaceManager.Window.Home;
         private static readonly AccessTools.FieldRef<InterfaceManager, InterfaceManager.Window> CurrentWindow =
             AccessTools.FieldRefAccess<InterfaceManager, InterfaceManager.Window>("currentWindow");
+        private static readonly AccessTools.FieldRef<InterfaceManager, InterfaceManager.Window> ReturnWindow =
+            AccessTools.FieldRefAccess<InterfaceManager, InterfaceManager.Window>("returnWindow");
 
         // Templates lifted out of the cloned Settings screen before its
         // lists are emptied. They sit under an inactive holder so a clone can
@@ -70,20 +77,37 @@ namespace SanctuaryHud
             _current = this;
         }
 
-        public bool IsOpen => _page != null && _page.activeSelf;
+        /// Ours is the menu's current screen. Not the page's activeSelf: the
+        /// PanelManager keeps a panel active through its out-animation.
+        public bool IsOpen => _page != null && _open;
+        private bool _open;
 
-        /// True while the front menu is showing, during a match, or while
-        /// our page is up. Not from the lobby, loading or Settings screens:
-        /// the page would replace them, and they are not ours to restore.
+        private const string PanelName = "Mods";
+        private PanelManager _registeredIn;
+
+        /// True while a side-bar screen of the front menu (Settings included)
+        /// is showing, during a match (pause menu included), or while our
+        /// page is up. Not from the lobby or loading screens: the page would
+        /// replace them, and they are not ours to restore.
         public bool CanOpen
         {
             get
             {
                 if (IsOpen) return true;
-                if (_page == null || InterfaceManager.Instance == null) return false;
-                var mmi = MainMenuInterface.Instance;
-                if (mmi != null && mmi.gameObject.activeInHierarchy) return true;
-                return InMatch;
+                var im = InterfaceManager.Instance;
+                if (_page == null || im == null) return false;
+                switch (CurrentWindow(im))
+                {
+                    case InterfaceManager.Window.Home:
+                    case InterfaceManager.Window.Play:
+                    case InterfaceManager.Window.Replays:
+                    case InterfaceManager.Window.Settings:
+                        return true;
+                    case InterfaceManager.Window.InGameMenu:
+                        return SanctuaryUI.SanctuaryUIManager.Instance != null;
+                    default:
+                        return InMatch;
+                }
             }
         }
 
@@ -107,15 +131,22 @@ namespace SanctuaryHud
         /// plugin list fresh while the page is open.
         public void Tick()
         {
-            var mmi = MainMenuInterface.Instance;
-            if (mmi == null) return;
-            if (!ReferenceEquals(mmi, _builtFor) || _page == null)
+            var bar = SideBarInterface.Instance;
+            if (bar == null) return;
+            if ((!ReferenceEquals(bar, _builtFor) || _page == null) && !ReferenceEquals(bar, _failedFor))
             {
-                try { Build(mmi); }
+                try { Build(bar); }
                 catch (Exception e)
                 {
                     _log.LogError($"Mods page could not be built: {e}");
-                    _builtFor = mmi; // don't retry every frame
+                    // Nothing half-built left to open, and no retry every
+                    // frame: the next menu (a new scene) gets another go.
+                    Unregister();
+                    if (_page != null) Object.Destroy(_page);
+                    if (_sidebarButton != null) Object.Destroy(_sidebarButton);
+                    _page = null;
+                    _sidebarButton = null;
+                    _failedFor = bar;
                     return;
                 }
             }
@@ -147,54 +178,87 @@ namespace SanctuaryHud
         {
             if (_page == null) return;
             var im = InterfaceManager.Instance;
-            if (im == null) return;
-            _returnWindow = CurrentWindow(im);
-            // Mid-match the pause menu may be up; it does the same before
-            // handing over to the Settings screen.
-            if (InMatch)
-            {
-                try { SanctuaryUI.SanctuaryUIManager.Instance.SetPanelVisibility(SanctuaryUI.UIPanelType.PauseMenu, false); }
-                catch (Exception e) { _log.LogWarning($"Could not hide the pause menu: {e.Message}"); }
-            }
-            // Hides every game interface (and, via the prefix, ours) without
-            // showing another one; then ours goes on top of the background,
-            // which also covers the game when opened mid-match.
-            im.TransitionTo(InterfaceManager.Window.Background);
-            _page.SetActive(true);
+            var pm = im != null ? im.GetComponent<PanelManager>() : null;
+            if (pm == null) return;
+            // From Settings, back goes where Settings' own back would have.
+            var from = CurrentWindow(im);
+            _returnWindow = from == InterfaceManager.Window.Settings ? ReturnWindow(im) : from;
+            // Front menu or match, by the screen we go back to: the game's UI
+            // manager outlives a match, so its Instance can't tell them apart.
+            var frontMenu = _returnWindow == InterfaceManager.Window.Home || _returnWindow == InterfaceManager.Window.Play
+                            || _returnWindow == InterfaceManager.Window.Replays;
+            // Since 0.0.1.20 every screen is a panel of the InterfaceManager's
+            // PanelManager, animated in and out by name, and ours is one of
+            // them. currentWindow goes to Background, a screen the game never
+            // stays on, so its next TransitionTo (a side bar button, a lobby
+            // invite, escape in a match) always goes through and animates our
+            // panel out like any other.
+            //
+            // Outside a match only currentWindow moves: the side bar stays
+            // beside the page, as beside Settings, where a real TransitionTo
+            // would play its hide animation (and a Show() in the same frame
+            // does not undo that). In a match the real one is wanted: it
+            // hides the side bar and puts up the backdrop over the game.
+            if (frontMenu) CurrentWindow(im) = InterfaceManager.Window.Background;
+            else im.TransitionTo(InterfaceManager.Window.Background);
             RebuildUiTab();
             RebuildLuaTab();
+            pm.OpenPanel(PanelName);
+            _open = true;
         }
 
         public void Close()
         {
-            if (_page != null) _page.SetActive(false);
+            if (!_open) return;
+            // TransitionTo opens the screen we came from, which animates ours
+            // out; the prefix clears _open.
             var im = InterfaceManager.Instance;
             if (im != null) im.TransitionTo(_returnWindow);
+            _open = false;
         }
 
         public void Destroy()
         {
             // A hot reload while the page is up would otherwise leave the
-            // menu hidden with nothing in its place.
+            // menu on an empty screen.
             if (IsOpen) Close();
             try { _harmony?.UnpatchSelf(); } catch { }
             _harmony = null;
+            Unregister();
             if (_page != null) Object.Destroy(_page);
             if (_sidebarButton != null) Object.Destroy(_sidebarButton);
             if (_icon != null) { Object.Destroy(_icon.texture); Object.Destroy(_icon); }
+            if (_cover != null) { Object.Destroy(_cover.texture); Object.Destroy(_cover); }
             _page = null;
             _sidebarButton = null;
             _icon = null;
+            _cover = null;
             _builtFor = null;
             if (ReferenceEquals(_current, this)) _current = null;
         }
 
-        // The game switching screens itself (a lobby invite, a match
-        // starting) must take our page down with the others.
+        // Any screen change (a side bar button, a lobby invite, a match
+        // starting) takes our panel out: the PanelManager animates it away,
+        // and this only has to note that it is no longer open.
         private static void TransitionPrefix()
         {
-            var page = _current?._page;
-            if (page != null && page.activeSelf) page.SetActive(false);
+            if (_current != null) _current._open = false;
+        }
+
+        /// Takes our panel back out of the menu's PanelManager, so it never
+        /// holds a destroyed Animator. Ours is always appended last, and is
+        /// never the current panel by the time this runs, so no index moves.
+        private void Unregister()
+        {
+            try
+            {
+                var pm = _registeredIn;
+                _registeredIn = null;
+                if (pm == null) return;
+                var at = pm.panels.FindIndex(p => p.panelName == PanelName);
+                if (at >= 0 && at != pm.currentPanelIndex) pm.panels.RemoveAt(at);
+            }
+            catch (Exception e) { _log.LogWarning($"Mods page: could not unregister its panel: {e.Message}"); }
         }
 
         private string PluginSignature() =>
@@ -202,16 +266,24 @@ namespace SanctuaryHud
 
         // ---- construction ---------------------------------------------------
 
-        private void Build(MainMenuInterface mmi)
+        private void Build(SideBarInterface bar)
         {
-            _builtFor = mmi;
+            _builtFor = bar;
             _pluginGroups.Clear();
+            _open = false;
+            Unregister();
             if (_page != null) Object.Destroy(_page);
             if (_sidebarButton != null) Object.Destroy(_sidebarButton);
 
-            var root = mmi.transform.parent; // InterfaceManager canvas
-            var settings = root.Find("SettingsInterface")?.gameObject
-                           ?? throw new InvalidOperationException("SettingsInterface not found under the menu canvas.");
+            // The Settings screen as the menu's PanelManager holds it: the
+            // Animator it plays In/Out on, with SettingsInterface on it or
+            // inside it.
+            var menu = InterfaceManager.Instance?.GetComponent<PanelManager>()
+                       ?? throw new InvalidOperationException("The menu's PanelManager was not found.");
+            var settingsItem = menu.panels.Find(p => p.panelName == InterfaceManager.Window.Settings.ToString())
+                               ?? throw new InvalidOperationException("The menu has no Settings panel.");
+            var settings = settingsItem.panelObject.gameObject;
+            var root = settings.transform.parent; // the InterfaceManager's list of screens
 
             if (_harmony == null)
             {
@@ -220,26 +292,31 @@ namespace SanctuaryHud
                     prefix: new HarmonyMethod(typeof(ModsPage), nameof(TransitionPrefix)));
             }
             if (_icon == null) _icon = MakeIcon();
+            if (_cover == null) _cover = MakeCover();
 
             // -- the page: a clone of the Settings screen, kept inactive
             //    while it is rearranged so no Awake sees the half-built state.
             _page = Object.Instantiate(settings, root);
+            // Right after Settings, not last: the screens draw under the side
+            // bar, and each one's full-screen backdrop would hide it.
+            _page.transform.SetSiblingIndex(settings.transform.GetSiblingIndex() + 1);
             _page.name = "ModsInterface";
             _page.SetActive(false);
-            Object.DestroyImmediate(_page.GetComponent<SanctuaryUI.SettingsInterface>());
+            var settingsClone = _page.GetComponentInChildren<SanctuaryUI.SettingsInterface>(true)
+                                ?? throw new InvalidOperationException("The Settings panel has no SettingsInterface.");
+            var screen = settingsClone.transform;
+            Object.DestroyImmediate(settingsClone);
 
-            var content = _page.transform.Find("Content");
+            var content = screen.Find("Content");
             var categories = content.Find("Categories");
             var panels = (RectTransform)content.Find("Panels");
             var buttons = (RectTransform)content.Find("Buttons");
 
-            // No description column: the list and the button row take the
-            // full width, with the same side margins the tab bar has.
-            Object.DestroyImmediate(content.Find("Description Area").gameObject);
-            panels.anchoredPosition = new Vector2(0f, panels.anchoredPosition.y);
-            panels.sizeDelta = new Vector2(-70f, panels.sizeDelta.y);
-            buttons.anchoredPosition = new Vector2(0f, buttons.anchoredPosition.y);
-            buttons.sizeDelta = new Vector2(-70f, buttons.sizeDelta.y);
+            // The screen's title badge reads MODS, and the description
+            // column stays, as on the Settings screen: it shows what the page
+            // is for, and whichever mod or setting the pointer is over.
+            RetitleScreen(screen, content, "Mods");
+            SetUpDescription(content.Find("Description Area"));
 
             _templates = new GameObject("Templates", typeof(RectTransform)).transform;
             _templates.SetParent(_page.transform, false);
@@ -282,7 +359,7 @@ namespace SanctuaryHud
             Clear(_uiList);
             Clear(_luaList);
 
-            var pm = _page.GetComponent<PanelManager>();
+            var pm = screen.GetComponent<PanelManager>();
             pm.panels = new List<PanelManager.PanelItem>
             {
                 new PanelManager.PanelItem { panelName = "UI Mods", panelObject = uiPanel.GetComponent<Animator>(), panelButton = uiTab },
@@ -323,7 +400,8 @@ namespace SanctuaryHud
             open.onClick.AddListener(_owner.OpenModsFolder);
 
             // -- the sidebar entry: a clone of the Settings button, right after it.
-            var settingsButton = mmi.transform.Find("Left Sidebar/Content/Button List/Settings");
+            var settingsButton = bar.settingsButton?.transform
+                                 ?? throw new InvalidOperationException("The side bar has no Settings button.");
             _sidebarButton = Object.Instantiate(settingsButton.gameObject, settingsButton.parent);
             _sidebarButton.name = "Mods";
             _sidebarButton.transform.SetSiblingIndex(settingsButton.GetSiblingIndex() + 1);
@@ -338,8 +416,84 @@ namespace SanctuaryHud
             ForceNormal(pb);
             _sidebarRegistered = false;
 
+            // -- one more screen of the menu. Appended, so the game's own
+            //    panels keep their indices; culled (inactive) until opened.
+            // With our side bar button as its button, the PanelManager lights
+            // it (and moves the side bar's indicator line to it) while the
+            // page is up, and puts it back when another screen opens.
+            menu.panels.Add(new PanelManager.PanelItem
+            {
+                panelName = PanelName,
+                panelButton = pb,
+                panelObject = _page.GetComponent<Animator>()
+                              ?? throw new InvalidOperationException("The cloned Settings panel has no Animator."),
+            });
+            _registeredIn = menu;
+
             _pluginSignature = "";
             _log.LogInfo("Mods page built into the front menu.");
+        }
+
+        /// The screen's own title ("Settings" in its badge), outside the
+        /// description column, renamed. Its localisation goes first or it
+        /// would write the old word back.
+        private void RetitleScreen(Transform screen, Transform content, string title)
+        {
+            var description = content.Find("Description Area");
+            var found = false;
+            foreach (var tmp in screen.GetComponentsInChildren<TMP_Text>(true))
+            {
+                if (description != null && tmp.transform.IsChildOf(description)) continue;
+                if (!string.Equals(tmp.text?.Trim(), "Settings", StringComparison.OrdinalIgnoreCase)) continue;
+                var loc = tmp.GetComponent<LocalizedObject>();
+                if (loc != null) Object.DestroyImmediate(loc);
+                tmp.text = title;
+                found = true;
+            }
+            if (!found) _log.LogWarning("Mods page: the Settings title was not found; the badge keeps its text.");
+        }
+
+        private SettingsDescriptionManager _description;
+        private string _pendingTitle, _pendingText;
+
+        private const string PageDescription =
+            "Switch mods on and off, and change their settings. Click a mod to show its settings. " +
+            "UI mods run on this PC only; Lua mods change the game's own scripts, so everyone in a lobby needs the same ones.";
+
+        /// The description column, with our text as its resting state and
+        /// the mod's icon as its picture. Rows fill it on hover (see Place).
+        private void SetUpDescription(Transform area)
+        {
+            _description = area != null ? area.GetComponentInChildren<SettingsDescriptionManager>(true) : null;
+            if (_description == null)
+            {
+                _log.LogWarning("Mods page: the Settings description column was not found; rows show no descriptions.");
+                return;
+            }
+            foreach (var loc in area.GetComponentsInChildren<LocalizedObject>(true)) Object.DestroyImmediate(loc);
+            var t = Traverse.Create(_description);
+            t.Field("title").SetValue("Mods");
+            t.Field("description").SetValue(PageDescription);
+            t.Field("titleKey").SetValue("");
+            t.Field("descriptionKey").SetValue("");
+            t.Field("cover").SetValue(_cover);
+            _description.useLocalization = false;
+            _description.localizedObject = null;
+            var cover = t.Field("coverImage").GetValue<Image>();
+            if (cover != null) cover.preserveAspect = true;
+        }
+
+        /// Rows describe themselves in the description column while the
+        /// pointer is over them, through the row's own SettingsElement hover
+        /// events, the way the Settings screen's rows do.
+        private void Describe(GameObject row, string title, string text)
+        {
+            if (_description == null || string.IsNullOrEmpty(text)) return;
+            var element = row.GetComponent<SettingsElement>();
+            if (element == null) return;
+            var d = _description;
+            element.onHover.AddListener(() => d.UpdateUI(title, text, null));
+            element.onLeave.AddListener(d.SetDefault);
         }
 
         private GameObject TakeTemplate(Transform list, string childName, string newName)
@@ -523,20 +677,29 @@ namespace SanctuaryHud
         /// The sidebar's icons are 64px white line drawings tinted by the
         /// game, so ours is drawn the same way: a wireframe cube ("package"),
         /// rasterised from line segments with an anti-aliased edge.
-        private static Sprite MakeIcon()
+        // The game's icons are ~6px lines at 64px: a half-width of 3.
+        private static Sprite MakeIcon() => DrawCube("Mods (64x)", 64, 25f, 3f, new Color32(255, 255, 255, 255), 0f);
+
+        /// The description column's picture: the same cube, drawn at the
+        /// size and weight of the Settings screen's hex, in the menu's accent
+        /// blue with a soft glow, rather than the side bar icon blown up.
+        private static Sprite MakeCover() => DrawCube("Mods cover", 512, 78f, 13f, new Color32(0x3D, 0xAF, 0xFF, 255), 0.45f);
+
+        /// A cube (hexagon with three spokes) as a distance field: `stroke`
+        /// is the half-width of the lines, with a 1px anti-aliased edge, and
+        /// `glow` the strength of a halo fading out from them.
+        private static Sprite DrawCube(string name, int size, float r, float stroke, Color32 ink, float glow)
         {
-            const int size = 64;
-            const float stroke = 3f; // half-width; the game's icons are ~6px lines at this size
             var c = new Vector2(size / 2f, size / 2f);
-            var r = 25f;
             Vector2 V(float deg) => c + new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad)) * r;
             var segs = new List<(Vector2 a, Vector2 b)>();
             for (var i = 0; i < 6; i++) segs.Add((V(30 + 60 * i), V(30 + 60 * (i + 1))));
             foreach (var deg in new[] { 30f, 150f, 270f }) segs.Add((c, V(deg)));
+            var glowReach = r * 0.35f;
 
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
-                name = "Mods (64x)",
+                name = name,
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
                 hideFlags = HideFlags.HideAndDontSave,
@@ -554,7 +717,12 @@ namespace SanctuaryHud
                     d = Mathf.Min(d, (p - (a + ab * t)).magnitude);
                 }
                 var alpha = Mathf.Clamp01(stroke + 0.5f - d); // 1px anti-aliased edge
-                px[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+                if (glow > 0f && d > stroke)
+                {
+                    var halo = Mathf.Exp(-(d - stroke) / glowReach * 2.5f) * glow;
+                    alpha = Mathf.Max(alpha, halo);
+                }
+                px[y * size + x] = new Color32(ink.r, ink.g, ink.b, (byte)(alpha * 255f));
             }
             tex.SetPixels32(px);
             tex.Apply(false, true);
@@ -575,7 +743,24 @@ namespace SanctuaryHud
             return go;
         }
 
-        private static void Place(GameObject go, Transform list) => go.transform.SetParent(list, false);
+        /// Into the live list, taking the description set up for it by the
+        /// caller (a setting's config description, a mod's summary).
+        private void Place(GameObject go, Transform list)
+        {
+            if (_pendingText != null)
+            {
+                Describe(go, _pendingTitle, _pendingText);
+                _pendingTitle = _pendingText = null;
+            }
+            go.transform.SetParent(list, false);
+        }
+
+        /// The next row placed describes itself with this.
+        private void DescribeNext(string title, string text)
+        {
+            _pendingTitle = title;
+            _pendingText = string.IsNullOrEmpty(text) ? null : text;
+        }
 
         private void Heading(Transform list, string text)
         {
@@ -703,7 +888,7 @@ namespace SanctuaryHud
             slider.wholeNumbers = whole;
             slider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
             var field = sliderT.Find("Text Input")?.GetComponent<TMP_InputField>();
-            string Show(float v) => whole ? Mathf.RoundToInt(v).ToString() : v.ToString("0.#");
+            string Show(float v) => whole ? Mathf.RoundToInt(v).ToString(System.Globalization.CultureInfo.InvariantCulture) : v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);   // as the box parses it
             if (field != null) field.SetTextWithoutNotify(Show(slider.value));
             sm.onValueChanged.AddListener(v =>
             {
@@ -729,6 +914,7 @@ namespace SanctuaryHud
         /// own serializer so a half-typed value doesn't take until it parses.
         private void SettingRow(Transform group, string label, ConfigEntryBase e)
         {
+            DescribeNext(label, e.Description?.Description);
             if (e.SettingType == typeof(bool))
             {
                 SwitchRow(group, label, e.BoxedValue is bool b && b, true, v => e.BoxedValue = v);
@@ -799,7 +985,7 @@ namespace SanctuaryHud
                 box.anchorMin = new Vector2(from + 0.5f, box.anchorMin.y);
                 box.anchorMax = new Vector2(from + 0.5f, box.anchorMax.y);
                 box.pivot = new Vector2(1f, 0.5f);
-                box.anchoredPosition = new Vector2(from > 0f ? -20f : -20f, box.anchoredPosition.y);
+                box.anchoredPosition = new Vector2(-20f, box.anchoredPosition.y);
                 box.sizeDelta = new Vector2(boxWidth, box.sizeDelta.y);
 
                 var field = box.Find("Text Input").GetComponent<TMP_InputField>();
@@ -898,6 +1084,7 @@ namespace SanctuaryHud
                 if (!first) Line(_uiList);
                 first = false;
                 var p = plugin;
+                DescribeNext(p.Name, PluginSummary(p));
                 _sectionLabels[p.Guid] = SectionRow(_uiList, p.Name, p.Enabled, _expanded.Contains(p.Guid),
                     on =>
                     {
@@ -929,6 +1116,17 @@ namespace SanctuaryHud
             ScrollToTop(_uiList);
         }
 
+        /// A UI mod's hover text: its version, and what the row does.
+        private static string PluginSummary(ModManagerPlugin.PluginEntry p)
+        {
+            string version = null;
+            try { version = p.Type != null ? BepInEx.MetadataHelper.GetMetadata(p.Type)?.Version?.ToString() : null; }
+            catch { }
+            return (version != null ? $"Version {version}. " : "") +
+                   (p.Enabled ? "Running. " : "Switched off. ") +
+                   "The switch starts or stops it straight away; click the row to show or hide its settings.";
+        }
+
         private void RebuildPluginGroup(ModManagerPlugin.PluginEntry plugin)
         {
             if (!_pluginGroups.TryGetValue(plugin.Guid, out var group) || group == null) { RebuildUiTab(); return; }
@@ -940,11 +1138,11 @@ namespace SanctuaryHud
             _pluginSignature = PluginSignature();
         }
 
-        /// One row per config entry the mod bound, only while it is loaded
-        /// (the settings live on the running instance). Booleans get the
-        /// game's switch; everything else is edited as text and committed
-        /// through the entry's own serializer, so a half-typed value simply
-        /// doesn't take until it parses.
+        /// One row per config entry the mod bound. Booleans get the game's
+        /// switch, allowed-value lists a selector, ranges a slider; everything
+        /// else is edited as text and committed through the entry's own
+        /// serializer, so a half-typed value simply doesn't take until it
+        /// parses.
         private void FillPluginGroup(ModManagerPlugin.PluginEntry plugin, Transform group)
         {
             List<ConfigEntryBase> entries;
@@ -1032,6 +1230,9 @@ namespace SanctuaryHud
             {
                 var m = mod;
                 var files = $"{m.LuaCount} lua" + (m.SantpCount > 0 ? $", {m.SantpCount} santp — not hash-checked" : "");
+                DescribeNext(m.Name,
+                    $"{m.LuaCount} Lua file(s)" + (m.SantpCount > 0 ? $" and {m.SantpCount} unit template(s), which the lobby's check does not cover" : "") +
+                    ". A change applies at the next match launch, and everyone in the lobby needs the same Lua mods switched on.");
                 SwitchRow(_luaList, $"{m.Name}   <alpha=#80>{files}", m.Enabled, !locked, on =>
                 {
                     _owner.SetModEnabled(m, on);

@@ -268,14 +268,27 @@ namespace SanctuaryHud
                 if (_tickAccum >= 0.2f)
                 {
                     _tickAccum = 0f;
-                    // pcall so one dead unit reference cannot spam the log five times a second.
-                    RunLua("if __SdbAssistTick then pcall(__SdbAssistTick) end");
+                    // pcall so one dead unit reference cannot spam the log five
+                    // times a second, but say so once: a tick that keeps failing
+                    // leaves upgrades held paused.
+                    RunLua("if __SdbAssistTick then local ok, err = pcall(__SdbAssistTick) " +
+                           "if not ok and not __SdbAssistTickWarned then __SdbAssistTickWarned = true " +
+                           "Warn('EcoManager assist tick: ' .. tostring(err)) end end");
                 }
             }
 
             _installAccum += deltaTime;
             if (_installAccum < 1f) return;
             _installAccum = 0f;
+
+            // A quick restart can bring up a new match's VM, without the hook,
+            // before InMatch ever drops. (A number: the read-back bridge is
+            // lua_tostring, which reads no booleans.)
+            if (_assistHookInstalled && GetLuaGlobal("__SdbAssistPauseDelay") == null)
+            {
+                _assistHookInstalled = false;
+                _assistSignature = null;
+            }
 
             if (_assistHookInstalled)
             {

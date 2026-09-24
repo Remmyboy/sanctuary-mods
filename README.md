@@ -26,17 +26,17 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.12.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.12.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map |
-| [IdleEngineers](IdleEngineers/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.5.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas |
-| [EcoManager](EcoManager/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.0) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
-| [BuildHotkeys](BuildHotkeys/) | [**0.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
-| [LadderReporter](LadderReporter/) | [**0.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.1) | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.0) | Watch the game's replays fog-free from any seat, with every economy |
+| [SanctuaryHud](SanctuaryHud/) | [**0.13.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.13.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map |
+| [IdleEngineers](IdleEngineers/) | [**0.5.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.5.2) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas |
+| [EcoManager](EcoManager/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
+| [BuildHotkeys](BuildHotkeys/) | [**0.3.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.2) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
+| [LadderReporter](LadderReporter/) | [**0.3.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.3) | Reports ranked results; launches matchmade games |
+| [ReplayManager](ReplayManager/) | [**0.4.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.2) | Watch the game's replays fog-free from any seat, with every economy |
 | [MatchStats](MatchStats/) | — | Post-game stats on the result screen: every army's economy and units as a table, and charts of income, spend, army value and more over the match |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.5.0) | Mods page in the menu and on F8 in a match: mod toggles, settings (switches, sliders, text), Lua overlays |
+| [ModManager](ModManager/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.0) | Loads and hot-reloads every mod above from `SanctuaryMods` |
+| [ModLoader](ModLoader/) | [**1.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.1) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 and MatchStats have no release of their own yet; build them from source if you
@@ -257,7 +257,8 @@ answerable from the log alone.
   would overlap another is skipped, and `MaxLabels` (12) caps them, so a
   busy base shows the handful nearest completion rather than a wall.
 - **Alerts** (`Alerts · …`): toasts top-centre under the strip, with a short
-  generated tone (no audio assets) at `Volume`. *Commander under attack* on
+  sound at `Volume` when `Sound` is on (it is off by default; voice packs
+  below). *Commander under attack* on
   any health loss, re-sounding at most every eight seconds while it goes on;
   *commander critical* once below `CriticalFraction` (35%), re-armed after
   repair; *structure complete* when a countdown finishes; *player
@@ -331,7 +332,7 @@ A panel showing the map from above, shaded where you cannot see, with every
 contact you are allowed to see drawn as its strategic icon in its army's
 colour, and the alloy deposits nobody has taken yet. Clicking or dragging
 anywhere on the map moves the camera there; the border drags the panel and the
-bottom-right corner resizes it (`MiniMap · Locked` stops both, and the panel stays wholly on screen). **F2** shows and hides it (`UI · ToggleKey`).
+bottom-right corner resizes it (`MiniMap · Locked` stops both, and the panel stays wholly on screen). **F2** shows and hides it (`MiniMap · ToggleKey`).
 
 There is deliberately no outline of what the camera is looking at. One was
 built and then taken out again: at the zoom levels that matter it is either the
@@ -963,8 +964,9 @@ path inside the game), and a malformed one is answered with a 400. Nobody
 needs the mod to queue: the site only picks the
 automatic path when *both* players' games are seen in the main menu with
 the mod, and falls back to today's manual hosting otherwise. The mod's own
-calls to the site (session id, progress events, the result) carry a bearer
-token from one Steam ticket, minted when the first match arrives. When a
+calls to the site (session id, progress events) carry a bearer
+token from one Steam ticket, minted when the first match arrives, and the
+result report carries a Steam ticket of its own. When a
 match reaches `launch`:
 
 - the host's mod creates the lobby on the assigned map (`CreateLobby`),
@@ -1007,7 +1009,7 @@ version + Lua hash, recording client). Playback goes through
 and then reads recorded packets into the client's receive buffer, paced by
 the sim speed, at most 32 ticks ahead. The client only steps a tick once its
 packet is buffered, so the socket's feed rate is the playback rate. This is
-the same design the mod used before (see [archive/](Replays/archive/)), so
+the same design the mod used before (see [archive/](ReplayManager/archive/)), so
 the mod now only drives the game's socket:
 
 - **pause** is a Harmony prefix on the socket's `Receive` that feeds nothing
@@ -1311,7 +1313,9 @@ Each loaded mod's settings sit in its section — panel positions, the commander
 zoom factor, `AssistStartsUpgrade`, hotkeys, anything a mod binds. The list
 is read from the mod's BepInEx `ConfigFile`, so a mod's settings appear here
 simply by being bound, with no work in the manager. Booleans get the game's
-on/off switch; everything else is edited in a text field and committed
+on/off switch, a setting with a list of allowed strings gets a left/right
+selector, one with an allowed range gets a slider, and everything else is
+edited in a text field and committed
 through the entry's own serializer (the same one that writes the config
 file), so floats, enums and `KeyCode`s all work and a half-typed value just
 doesn't take until it parses (it snaps back to the last good value when the

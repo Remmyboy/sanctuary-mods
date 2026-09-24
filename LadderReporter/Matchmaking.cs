@@ -37,11 +37,14 @@ namespace SanctuaryHud
     // here is driven by that match object (see docs/matchmaking-site-plan.md
     // and the site's docs/local-bridge.md). A local timeout mirrors each of
     // the site's, so both sides converge even when a push is late. The only
-    // calls the mod makes to the site itself are the rare ones that carry a
-    // bearer token: the session id, progress events and the result report.
+    // calls the mod makes to the site itself are the rare ones: the session
+    // id and progress events, which carry a bearer token, and the result
+    // report, which carries a Steam ticket of its own.
     public partial class LadderReporterPlugin
     {
-        private const string ModVersion = "0.3.1";
+        // From [BepInPlugin], so /status can't drift from the release.
+        private static readonly string ModVersion =
+            BepInEx.MetadataHelper.GetMetadata(typeof(LadderReporterPlugin)).Version.ToString();
 
         private ConfigEntry<bool> _cfgMmEnabled;
         private ConfigEntry<string> _cfgMmBaseUrl;
@@ -710,7 +713,7 @@ namespace SanctuaryHud
                 try
                 {
                     LobbyManager.LeaveLobby();
-                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Main);
+                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Home);
                 }
                 catch (Exception e)
                 {
@@ -838,7 +841,16 @@ namespace SanctuaryHud
             var m = _match;
             if (m == null)
             {
+                // The site can drop the match (done, or a null push) while the
+                // game is still on, so leave Started from here as well as from
+                // the Started case below; otherwise its match id would ride
+                // along on the next ranked-shaped game's report.
                 if (_phase != Phase.Started) SetPhase(Phase.Idle);
+                else if (!LobbyManager.IsInLobby && !InMatch)
+                {
+                    _mmReportMatchId = null;
+                    SetPhase(Phase.Idle);
+                }
                 return;
             }
             var now = Time.realtimeSinceStartup;
@@ -1025,7 +1037,7 @@ namespace SanctuaryHud
                 try
                 {
                     LobbyManager.LeaveLobby();
-                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Main);
+                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Home);
                 }
                 catch (Exception e) { Logger.LogWarning($"Matchmaking: leaving the lobby failed: {e.Message}"); }
             }

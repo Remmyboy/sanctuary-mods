@@ -28,7 +28,7 @@ namespace SanctuaryHud
         internal static void Tick(bool hudShowing)
         {
             ConstructionFilterPanelUI panel = null;
-            if (hudShowing && InMatch && HideLone.Value)
+            if (hudShowing && InMatch && HideLone.Value && !PanelConceal.Unavailable)
             {
                 try
                 {

@@ -475,8 +475,8 @@ namespace SanctuaryHud
                     // stay on the original, which gets the click.
                     foreach (var behaviour in go.GetComponentsInChildren<Behaviour>(true))
                     {
-                        if (behaviour is Graphic || behaviour is CanvasRenderer) continue;
-                        if (behaviour is Selectable || !(behaviour is Graphic)) DestroyImmediate(behaviour);
+                        // (CanvasRenderer is a Component, never listed here.)
+                        if (!(behaviour is Graphic)) DestroyImmediate(behaviour);
                     }
                     foreach (var graphic in go.GetComponentsInChildren<Graphic>(true))
                     {
@@ -623,7 +623,7 @@ namespace SanctuaryHud
                 if (!show) return;
 
                 var frac = _commanderMaxHealth > 0f ? Mathf.Clamp01(_commanderHealth / _commanderMaxHealth) : 1f;
-                var critical = frac < 0.35f;
+                var critical = frac < Alerts.CriticalFraction;
                 _label.color = critical ? DangerColour : new Color(0.85f, 0.9f, 0.97f);
 
                 var haveIcon = _iconAtlas != null && _iconUvRects != null && _commanderIconIndex >= 0 && _commanderIconIndex < _iconUvRects.Count;

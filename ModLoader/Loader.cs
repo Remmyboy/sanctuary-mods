@@ -34,7 +34,7 @@ namespace SanctuaryModLoader
     // off on the Mods page is held back before it is ever created, so none of
     // its code runs, and the manager lists, starts and stops plugins through
     // the static methods at the bottom rather than adding components itself.
-    [BepInPlugin("com.sanctuarydb.modloader", "Sanctuary Mod Loader", "1.3.0")]
+    [BepInPlugin("com.sanctuarydb.modloader", "Sanctuary Mod Loader", "1.3.1")]
     public class LoaderPlugin : BaseUnityPlugin
     {
         private const string LoaderGuid = "com.sanctuarydb.modloader";
@@ -193,6 +193,13 @@ namespace SanctuaryModLoader
                     BepInPlugin meta = null;
                     try { meta = type.GetCustomAttributes(typeof(BepInPlugin), false).OfType<BepInPlugin>().FirstOrDefault(); }
                     catch (Exception e) { Logger.LogWarning($"{type.FullName}: unreadable [BepInPlugin] ({e.Message})."); }
+                    // A copy of the loader under SanctuaryMods would load
+                    // itself from its own Awake, without end.
+                    if (meta?.GUID == LoaderGuid)
+                    {
+                        Logger.LogWarning($"{Path.GetFileName(path)}: the mod loader belongs in BepInEx\\plugins, not SanctuaryMods; skipped.");
+                        continue;
+                    }
                     plugins.Add(new Managed { Type = type, Guid = meta?.GUID ?? type.FullName, Name = meta?.Name ?? type.Name });
                 }
                 _live[path] = plugins;

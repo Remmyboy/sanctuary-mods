@@ -38,11 +38,11 @@ namespace SanctuaryHud
         private static readonly PanelConceal _concealQueue = new PanelConceal();
         private static readonly PanelConceal _concealTabs = new PanelConceal();
 
-        internal static bool Active => Enabled != null && Enabled.Value;
+        internal static bool Active => Enabled != null && Enabled.Value && !PanelConceal.Unavailable;
 
         internal static void Tick(bool hudShowing)
         {
-            var want = hudShowing && InMatch && Enabled.Value;
+            var want = hudShowing && InMatch && Enabled.Value && !PanelConceal.Unavailable;
             var options = want ? SelectionRow.FindPanel<ConstructionPanelUI>(UIPanelType.Construction) : null;
             var queue = want ? SelectionRow.FindPanel<ConstructionQueuePanelUI>(UIPanelType.ConstructionQueue) : null;
             var tabs = want ? SelectionRow.FindPanel<ConstructionFilterPanelUI>(UIPanelType.ConstructionFilter) : null;
