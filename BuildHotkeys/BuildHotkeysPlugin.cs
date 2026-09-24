@@ -296,6 +296,7 @@ namespace SanctuaryHud
         private void Update()
         {
             PushSnap();
+            PushMenuOpen();
 
             // The overlay has to keep up with keypresses, so it polls far more
             // often than the once-a-second install upkeep below. Both are a
@@ -340,6 +341,32 @@ namespace SanctuaryHud
             }
 
             Install(signature);
+        }
+
+        private int _menuPushed = -1;
+        private static readonly HarmonyLib.AccessTools.FieldRef<EM.UI.InterfaceManager, EM.UI.InterfaceManager.Window> CurrentWindow =
+            HarmonyLib.AccessTools.FieldRefAccess<EM.UI.InterfaceManager, EM.UI.InterfaceManager.Window>("currentWindow");
+
+        /// Mirrors "a menu screen is over the match" into BH.menuOpen, every
+        /// frame but only running Lua on a change. A match runs under the
+        /// None screen; the pause menu, and Settings opened from it, are any
+        /// other — the same test the game's own escape toggle makes.
+        private void PushMenuOpen()
+        {
+            if (!_installed) return;
+            try
+            {
+                var im = EM.UI.InterfaceManager.Instance;
+                var open = im != null && CurrentWindow(im) != EM.UI.InterfaceManager.Window.None ? 1 : 0;
+                if (open == _menuPushed || !LuaReady) return;
+                if (RunLua("if __SdbBuildHotkeys then __SdbBuildHotkeys.menuOpen = " + (open == 1 ? "true" : "false") + " end"))
+                    _menuPushed = open;
+            }
+            catch (Exception e)
+            {
+                if (_menuPushed != -2) Logger.LogWarning($"Build hotkeys: can't read the pause menu ({e.Message}); escape keeps the game's binding.");
+                _menuPushed = -2;
+            }
         }
 
         private string Signature() =>
@@ -548,6 +575,7 @@ namespace SanctuaryHud
                 // press counter, so last install's readings no longer hold.
                 _snapPushed = -1f;
                 _cycleSeq = -1;
+                _menuPushed = -1;
                 // Each match reloads the sprites through Engine.LoadSprite, so
                 // last match's AssetIDs are not safe to assume still valid.
                 ClearSpriteCache();
@@ -854,15 +882,11 @@ if not __SdbBuildHotkeys then
     return true
   end
 
-  -- Escape has to keep closing the pause menu, and there is no getter for
-  -- panel visibility — only a setter. So mirror it by watching that setter,
-  -- which every caller goes through, the menu's own close button included.
+  -- Escape has to keep closing the pause menu, and Lua has no getter for
+  -- it. Since 0.0.1.20 the menu is an InterfaceManager screen that Lua
+  -- opens but the C# Resume button closes, so the plugin mirrors it here
+  -- from the screen it reads (see PushMenuOpen).
   BH.menuOpen = false
-  BH.origSetVis = Engine.UI_SetPanelVisibility
-  Engine.UI_SetPanelVisibility = function(panelType, visible)
-    if panelType == UIPanelType.PauseMenu then BH.menuOpen = visible and true or false end
-    return BH.origSetVis(panelType, visible)
-  end
 
   -- Placing an extractor snaps it onto a deposit within a few world units
   -- of the cursor. The game's FindClosestResourceSpot fixes that at 8, which
@@ -1035,7 +1059,6 @@ if __SdbBuildHotkeys then
     end
   end
   if BH.CH and BH.origLabel then BH.CH.GetHotkeyForTemplate = BH.origLabel end
-  if BH.origSetVis then Engine.UI_SetPanelVisibility = BH.origSetVis end
   if BH.CPS and BH.origFindSpot then BH.CPS.FindClosestResourceSpot = BH.origFindSpot end
   if BH.gm and BH.gmSaved then
     for hk, saved in pairs(BH.gmSaved) do

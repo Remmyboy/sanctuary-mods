@@ -123,7 +123,7 @@ namespace SanctuaryHud
             Rule("strategic", "Strategic", true, true);
             Rule("other", "Other", false, false);
             _cfgAlertSound = Config.Bind("Alerts", "Sound", false,
-                "Play a sound with each alert: a voice line from the mod's sounds folder where one is shipped, else a short tone. Off by default; the toasts show either way.");
+                "Play a sound with each alert: a voice line from the mod's sounds folder where one is shipped, else a short tone. Off by default; the toasts show either way. While on (with the commander-attacked alert), the game's own commander damage voice line is muted so the two don't overlap.");
             _cfgAlertVolume = Config.Bind("Alerts", "Volume", 50,
                 new ConfigDescription("Alert volume, 0 to 100, like the game's own audio sliders.", new AcceptableValueRange<int>(0, 100)));
             // The packs on disk plus the built-in tones, as a fixed list so

@@ -2020,13 +2020,13 @@ namespace SanctuaryHud
             try
             {
                 var ui = SanctuaryUI.SanctuaryUIManager.Instance;
-                if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.PauseMenu, out var pause) && pause.IsVisible) return true;
                 // The end-of-match result screen counts too: the game's own
                 // HUD is done by then, so the mods' panels should be as well.
                 if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.GameResult, out var result) && result.IsVisible) return true;
                 // InterfaceManager.TransitionTo turns this backdrop on for
                 // every screen except None, and None is what a match runs
-                // under.
+                // under. Since 0.0.1.20 that includes the pause menu, which
+                // left the SanctuaryUI panels to become the InGameMenu screen.
                 var screens = EM.UI.InterfaceManager.Instance;
                 return screens != null && screens.background != null && screens.background.activeInHierarchy;
             }

@@ -713,7 +713,7 @@ namespace SanctuaryHud
                 try
                 {
                     LobbyManager.LeaveLobby();
-                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Main);
+                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Home);
                 }
                 catch (Exception e)
                 {
@@ -1037,7 +1037,7 @@ namespace SanctuaryHud
                 try
                 {
                     LobbyManager.LeaveLobby();
-                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Main);
+                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Home);
                 }
                 catch (Exception e) { Logger.LogWarning($"Matchmaking: leaving the lobby failed: {e.Message}"); }
             }
