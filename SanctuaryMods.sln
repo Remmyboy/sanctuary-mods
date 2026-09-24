@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildHotkeys", "BuildHotkey
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CameraUtilities", "CameraUtilities\CameraUtilities.csproj", "{F83263AA-54D7-4938-B92C-15B08231AF17}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MatchStats", "MatchStats\MatchStats.csproj", "{0FBF8C88-776E-4F12-A518-52A021037527}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,5 +74,9 @@ Global
 		{F83263AA-54D7-4938-B92C-15B08231AF17}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F83263AA-54D7-4938-B92C-15B08231AF17}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F83263AA-54D7-4938-B92C-15B08231AF17}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FBF8C88-776E-4F12-A518-52A021037527}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FBF8C88-776E-4F12-A518-52A021037527}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FBF8C88-776E-4F12-A518-52A021037527}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FBF8C88-776E-4F12-A518-52A021037527}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

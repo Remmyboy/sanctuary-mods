@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>MatchStats</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The Lua bridge and the canvas helpers; the ECS poll stays idle. -->
+    <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
