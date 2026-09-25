@@ -30,7 +30,7 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.3.2")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.3.3")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
@@ -297,6 +297,7 @@ namespace SanctuaryHud
         {
             PushSnap();
             PushMenuOpen();
+            ReleaseStuckModifiers();
 
             // The overlay has to keep up with keypresses, so it polls far more
             // often than the once-a-second install upkeep below. Both are a
@@ -336,7 +337,7 @@ namespace SanctuaryHud
             {
                 // Rebound from the mod manager mid-match: swap the layout over.
                 if (signature != _installedSignature) Remove();
-                else if (StillInstalled()) return;
+                else if (StillInstalled()) { LogUnstuck(); return; }
                 else _installed = false;   // VM swapped under us; rebind below.
             }
 
@@ -367,6 +368,48 @@ namespace SanctuaryHud
                 if (_menuPushed != -2) Logger.LogWarning($"Build hotkeys: can't read the pause menu ({e.Message}); escape keeps the game's binding.");
                 _menuPushed = -2;
             }
+        }
+
+        private float _modPoll;
+        private int _unstuck;
+
+        /// Ten times a second while focused: which of Ctrl, Shift and Alt are
+        /// physically up, into the hook's ReleaseMods, which clears any the
+        /// input system still thinks are down (see the chunk for how Alt-Tab
+        /// strands one). Safe against a key-down still waiting in the game's
+        /// queue: the physical state is read after that event, so a key that
+        /// reads up has its key-up queued behind it. Unfocused, the game's own
+        /// focus reset owns the state, so this keeps out.
+        private void ReleaseStuckModifiers()
+        {
+            if (!_installed || !Application.isFocused) return;
+            _modPoll += Time.unscaledDeltaTime;
+            if (_modPoll < 0.1f) return;
+            _modPoll = 0f;
+
+            var ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            var shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            var alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || Input.GetKey(KeyCode.AltGr);
+            if (ctrl && shift && alt) return;
+
+            string Up(bool held) => held ? "false" : "true";
+            try
+            {
+                if (LuaReady)
+                    RunLua("if __SdbBuildHotkeys and __SdbBuildHotkeys.ReleaseMods then __SdbBuildHotkeys.ReleaseMods(" +
+                           Up(ctrl) + "," + Up(shift) + "," + Up(alt) + ") end");
+            }
+            catch { /* next poll tries again */ }
+        }
+
+        /// Says so in the log when a stuck modifier had to be cleared, so a
+        /// report of keys acting modified can be matched against it.
+        private void LogUnstuck()
+        {
+            var raw = GetLuaGlobal("__SdbBuildHotkeysUnstuck");
+            if (raw == null || !int.TryParse(raw, out var n) || n <= _unstuck) return;
+            _unstuck = n;
+            Logger.LogInfo($"Build hotkeys: released a modifier the game still had held after the key was let go ({n} this match).");
         }
 
         private string Signature() =>
@@ -571,6 +614,7 @@ namespace SanctuaryHud
                 _installed = true;
                 _installedSignature = signature;
                 _builds = 0;
+                _unstuck = 0;
                 // The new install starts from the chunk's own snap and a fresh
                 // press counter, so last install's readings no longer hold.
                 _snapPushed = -1f;
@@ -882,6 +926,32 @@ if not __SdbBuildHotkeys then
     return true
   end
 
+  -- The input system builds a key's modifier prefix from its own record of
+  -- which keys are down, and only an Alt-up clears Alt from it. Alt-Tab out
+  -- during a loading screen can lose that key-up — the focus-change reset
+  -- lands ahead of the Alt-down it was meant to undo — so Alt stays 'held'
+  -- and every W arrives as Alt-W: the reverse cycle, which opens on the air
+  -- factory. Every other hotkey breaks the same way. The plugin reads the
+  -- physical keys and passes in which modifiers are up; any the record still
+  -- holds down are cleared. The record is fetched per call because
+  -- ReleaseAllKeys swaps the table out.
+  __SdbBuildHotkeysUnstuck = 0
+  local modKeys = {
+    Ctrl = { 'Ctrl', 'LeftCtrl', 'RightCtrl' },
+    Shift = { 'Shift', 'LeftShift', 'RightShift' },
+    Alt = { 'Alt', 'LeftAlt', 'RightAlt' },
+  }
+  BH.ReleaseMods = function(ctrlUp, shiftUp, altUp)
+    local raw = IS.InputStatesRawKeys
+    if not raw then return end
+    for name, up in pairs({ Ctrl = ctrlUp, Shift = shiftUp, Alt = altUp }) do
+      if up and raw[name] then
+        for _, k in ipairs(modKeys[name]) do raw[k] = false end
+        __SdbBuildHotkeysUnstuck = __SdbBuildHotkeysUnstuck + 1
+      end
+    end
+  end
+
   -- Escape has to keep closing the pause menu, and Lua has no getter for
   -- it. Since 0.0.1.20 the menu is an InterfaceManager screen that Lua
   -- opens but the C# Resume button closes, so the plugin mirrors it here
@@ -1068,6 +1138,7 @@ if __SdbBuildHotkeys then
   __SdbBuildHotkeys = nil
   __SdbBuildHotkeysCount = nil
   __SdbBuildHotkeysCycle = nil
+  __SdbBuildHotkeysUnstuck = nil
 end";
     }
 }
