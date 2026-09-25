@@ -26,7 +26,7 @@ namespace SanctuaryHud
     // Toggling is blocked while in a lobby or match: the VMs snapshot the
     // cache at match launch, and swapping content under a live session would
     // change the hash out from under the lobby's compatibility check.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.6.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.6.1")]
     public class ModManagerPlugin : BaseUnityPlugin
     {
         /// Tells ModLoader 1.3+ that this manager lists the loader's registry,
