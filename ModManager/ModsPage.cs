@@ -296,12 +296,23 @@ namespace SanctuaryHud
 
             // -- the page: a clone of the Settings screen, kept inactive
             //    while it is rearranged so no Awake sees the half-built state.
-            _page = Object.Instantiate(settings, root);
+            //    It is cloned under an inactive holder, since cloning the live
+            //    screen straight into the menu runs every Awake at once: the
+            //    resolution Dropdown's then throws, re-adding the Canvas its
+            //    original's Awake already added. That row is cleared below.
+            var holder = new GameObject("ModsInterface Holder");
+            holder.SetActive(false);
+            try
+            {
+                _page = Object.Instantiate(settings, holder.transform, false);
+                _page.SetActive(false);
+                _page.transform.SetParent(root, false);
+            }
+            finally { Object.DestroyImmediate(holder); }
             // Right after Settings, not last: the screens draw under the side
             // bar, and each one's full-screen backdrop would hide it.
             _page.transform.SetSiblingIndex(settings.transform.GetSiblingIndex() + 1);
             _page.name = "ModsInterface";
-            _page.SetActive(false);
             var settingsClone = _page.GetComponentInChildren<SanctuaryUI.SettingsInterface>(true)
                                 ?? throw new InvalidOperationException("The Settings panel has no SettingsInterface.");
             var screen = settingsClone.transform;
