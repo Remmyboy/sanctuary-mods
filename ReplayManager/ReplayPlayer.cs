@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using EM.DOTS.Engine.Loader;
+using EM.Engine;
 using EM.Lua.Client;
 using EM.Network;
 using EM.Network.Replay;
@@ -19,7 +20,7 @@ namespace SanctuaryHud.Replays
     // buffered, so everything here is about that socket:
     //
     //   pause        a prefix on its Receive that feeds nothing
-    //   speed        the client's own SetSimulationSpeed (0.1x to 16x)
+    //   speed        the engine's own ClientEngine.SetReplaySpeed (0.1x to 16x)
     //   position     frames read (a postfix on TryReadFrame) minus queued
     //   length       a scan of the file's frame headers
     //   fast-forward speed 16x until the target tick is reached
@@ -167,9 +168,23 @@ namespace SanctuaryHud.Replays
                 if (SeekTarget >= 0 && (CurrentTick >= SeekTarget || Current == Stage.Finished)) EndSeek();
             }
 
+            // Straight into the engine rather than through client Lua: game
+            // 0.0.1.20 renamed the Lua call (SetSimulationSpeed is host-only
+            // now), and a pcall around a missing function failed silently.
+            // A compiled call breaks the build instead. LuaReady stands for
+            // "the client engine is up".
             if (_speedDirty && LuaReady)
             {
-                _speedDirty = !RunLua($"pcall(function() Engine.SetSimulationSpeed({_speed.ToString(System.Globalization.CultureInfo.InvariantCulture)}) end)");
+                try
+                {
+                    ClientEngine.SetReplaySpeed(_speed);
+                    _speedDirty = false;
+                }
+                catch (Exception e)
+                {
+                    _speedDirty = false;   // once, not every frame
+                    _log.LogWarning($"Replay: could not set the speed: {e.Message}");
+                }
             }
         }
 

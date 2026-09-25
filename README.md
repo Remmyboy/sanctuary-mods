@@ -31,7 +31,7 @@ source.
 | [EcoManager](EcoManager/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
 | [BuildHotkeys](BuildHotkeys/) | [**0.3.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.2) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
 | [LadderReporter](LadderReporter/) | [**0.3.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.3) | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | [**0.4.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.2) | Watch the game's replays fog-free from any seat, with every economy |
+| [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover, Lua overlays |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
@@ -1012,7 +1012,7 @@ the mod now only drives the game's socket:
 
 - **pause** is a Harmony prefix on the socket's `Receive` that feeds nothing
   once the launch messages are through;
-- **speed** is the client's own `Engine.SetSimulationSpeed` (0.1× to 16×),
+- **speed** is the engine's own `ClientEngine.SetReplaySpeed` (0.1× to 16×),
   which is what the socket paces by;
 - **position** is frames read (a postfix on `TryReadFrame`) minus frames
   still queued; **length** is a scan of the file's frame headers;
