@@ -407,7 +407,6 @@ namespace SanctuaryHud
         private static bool _loggedResolveFail;
         private static bool _loggedIdleIndexWait;
         // Cached for the late-resolve retries (see PollIdleBuilders).
-        private static Type _cliType;
         private static Type _iconLoaderType;
         private static int _idleAllCount;
         private static int _idleBuilderCount;
@@ -690,33 +689,23 @@ namespace SanctuaryHud
         // Adornment images are registered by Lua during match load, often
         // after the economy stream (our in-match signal) has started — so
         // these can fail on the first polls and are retried until they stick.
+        //
+        // Read straight from IconLoader.iconLookup, which is all the game's
+        // ClientLuaInterface.CheckValidIcon does: its (functionName, name)
+        // form logs an error to Player.log on every miss, a dozen lines a
+        // session while we wait for the first match's icons.
         private static int ResolveAdornmentIndex(string iconName)
         {
             try
             {
-                if (_cliType == null) return -1;
-                var checkValidIcon = _cliType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-                    .FirstOrDefault(m => m.Name == "CheckValidIcon");
-                if (checkValidIcon == null) return -1;
-
-                var ps = checkValidIcon.GetParameters();
-                var args = new object[ps.Length];
-                var stringSeen = 0;
-                var outPos = -1;
-                for (var i = 0; i < ps.Length; i++)
-                {
-                    if (ps[i].IsOut) { outPos = i; continue; }
-                    if (ps[i].ParameterType == typeof(string))
-                    {
-                        args[i] = stringSeen++ == 0 ? "SanctuaryHud" : iconName;
-                    }
-                }
-                // (functionName, iconName, out index) — if there is only
-                // one string param it is the icon name.
-                if (stringSeen == 1) args[Array.FindIndex(ps, p => p.ParameterType == typeof(string))] = iconName;
-                var ok = checkValidIcon.Invoke(null, args);
-                if (ok is bool b && b && outPos >= 0) return Convert.ToInt32(args[outPos]);
-                return -1;
+                if (_iconLoaderType == null) return -1;
+                var lookup = _iconLoaderType.GetField("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
+                             ?? _iconLoaderType.GetProperty("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+                var tryGetValue = lookup?.GetType().GetMethod("TryGetValue");
+                if (tryGetValue == null) return -1;
+                var args = new object[] { iconName, null };
+                var ok = tryGetValue.Invoke(lookup, args);
+                return ok is bool b && b ? Convert.ToInt32(args[1]) : -1;
             }
             catch
             {
@@ -1429,7 +1418,6 @@ namespace SanctuaryHud
                 // alone overcounts badly. Registration happens during match
                 // load, so this (and the other icon lookups below) may not
                 // succeed yet — PollIdleBuilders keeps retrying them.
-                _cliType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
                 _iconLoaderType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
                 TryResolveIdleImageIndex();
                 TryResolveUpgradeImageIndex();
