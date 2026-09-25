@@ -35,7 +35,7 @@ namespace SanctuaryHud
     // HUD canvas (HudCanvas, HudPanel): dragged as uGUI, so nothing of a
     // drag or a click reaches the map, with the game's font, its UI Scale
     // and its tooltip.
-    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.7.2")]
+    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.7.3")]
     public partial class EcoManagerPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
