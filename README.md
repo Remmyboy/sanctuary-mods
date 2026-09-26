@@ -29,7 +29,7 @@ source.
 | [SanctuaryHud](SanctuaryHud/) | [**0.13.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.13.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map |
 | [IdleEngineers](IdleEngineers/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.5.3) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas |
 | [EcoManager](EcoManager/) | [**0.7.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.3) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
-| [BuildHotkeys](BuildHotkeys/) | [**0.3.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.3) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
+| [BuildHotkeys](BuildHotkeys/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
@@ -749,7 +749,7 @@ sitting on the cursor — which has no time limit, since you may be lining a
 placement up. Placing it, cancelling, or changing selection starts the cycle
 over. A factory never enters build mode, so repeat presses there queue another
 of the same rather than walking the cycle; FAF instead resets its cycle on a
-timer, which is what makes its factories cycle too, and `Cycle.Seconds` (0 by
+timer, which is what makes its factories cycle too, and `Building · CycleSeconds` (0 by
 default, 1.1 to match FAF) turns that on here.
 
 **Escape stops every selected factory**, as it does in FAF, rather than opening
@@ -763,9 +763,9 @@ untouched, so escape still opens the menu; and because there is no getter for
 panel visibility, only a setter, the mod mirrors the menu's state by watching
 that setter (which the menu's own close button goes through too) so escape
 still *closes* the menu rather than stopping a factory behind it.
-`Cancel.ClearFactoryQueue` rebinds or blanks it.
+`Builder keys · StopFactoriesKey` rebinds or blanks it.
 
-`Menu.PauseMenuKey` moves the pause menu off escape — to **F11**, say; F1 is
+`Game interface · PauseMenuKey` moves the pause menu off escape — to **F11**, say; F1 is
 taken by the game's debug menu — so it never opens by accident when escape had
 no factory to stop. The game's own toggle moves to the new key as it is, and
 escape keeps only the closing half: an open menu still shuts on escape.
@@ -832,7 +832,47 @@ when a factory is selected and has something to build, and orders like repair
 and reclaim mean nothing to a factory. Any other selection falls straight
 through to the order, because Construction runs at a higher group priority and
 returning `false` lets the event carry on. `M` is left unbound, so the stock
-"upgrade structure" hotkey still works.
+"upgrade structure" hotkey still works; `Builder keys · UpgradeKey` moves it.
+The other stock construction letters are not offered for moving: they find
+their template through the button labels the roles take over, so W, E, S, D,
+X, C and R are the roles' keys under another name, and Y (mobile anti-air,
+the **N** role) no longer finds anything.
+
+The settings page lists keys first and tuning after: the structure and unit
+roles; **Builder keys** (pause, repeat build, stop factories, upgrade); the
+game's own keys in their `Game …` sections, the pause menu's key among
+**Game interface** with chat; then **Building** (cycle time, extractor snap)
+and **Overlay**. Keys saved under the sections from before 0.4.0 (`Toggles`,
+`Cancel`, `Menu`, `Cycle`, `Placement`) are carried over the first time 0.4.0
+loads.
+
+**Every other game hotkey can move too.** The `Game …` sections of the
+settings list the game's own actions — orders, selection, control groups,
+camera, chat, and the rest (self-destruct,
+game speed, the HUD and icon toggles) — each defaulting to the keys the game
+ships it on, so the box shows what the key is today. Type the keys it should
+answer to instead, comma-separated in the game's format: `Q, Shift-Q` for
+attack (the `Shift-` form is what queues it), `F5` for control group 1,
+`AnyModifier-K` for a camera pan that works whatever modifier is held. Blank
+unbinds it; `LeftButton`, `RightButton` and `MiddleButton` are keys as well.
+F1 is best avoided, since the game's debug menu sits on it.
+
+The game keeps every hotkey in one table, `inputActions.lua`, which
+`inputSystem.lua` copies into `LoadedActionMap` as one entry per key, each a
+shallow copy of the action's handlers. The move is made on that live map, so
+the Lua tree and the lobby hash are untouched. Because each copy shares its
+action's functions, the mod finds an action's current keys by matching them,
+wherever they are. It takes every moved action off its keys before putting
+any back, so two can swap. A key taken from an action you left alone comes off
+that action; a key another group also binds fires both, since few actions
+consume the press. Both kinds are written to the log, as is a moved action
+this version of the game doesn't have. Taking the mod out puts the game's own
+map back exactly. Actions left at their defaults are not touched at all, so if
+a game update changes a default, the new one applies. The mouse itself
+(pointer, clicks, zoom, rotation), the append and alt modifiers, and the pause
+menu (`Game interface · PauseMenuKey` covers that) are left out. An action a later game
+version adds is read out of the live table at the first match and gets a
+setting from then on.
 
 **The construction buttons relabel themselves.** Each one draws its hotkey in
 the corner, filled from `constructionPanelHotkeys.GetHotkeyForTemplate` —
@@ -852,7 +892,7 @@ behind it (`backgroundIconID`, keyed on `iconUIType`: land, air, water,
 amphibious), so the strip reads like a slice of the panel rather than floating
 cut-outs, and land/air/naval separate at a glance. The live one is lit and
 underlined, the rest faded. A factory shows only its pick unless
-`Cycle.Seconds` is set: without a cycle window a repeat press queues another of
+`Building · CycleSeconds` is set: without a cycle window a repeat press queues another of
 the same, so the rest of the list would advertise options pressing again cannot
 reach.
 
@@ -910,27 +950,32 @@ command a button click sends. Returning `false` when nothing matched lets the
 key fall through to whatever it normally does, and because chat disables every
 action group but `MouseControls`, typing already suppresses these for free.
 
-### Toggles
+### Pause and repeat build
 
-`Toggles · PauseKey` (**X**) pauses the selected factories and engineers and
-again resumes them; `Toggles · RepeatBuildKey` (**Z**) switches repeat build
-on the selected factories and again off. Each does what the orders panel's
-toggle does — on if any selected unit has it off, else off — through the
-game's own `SetToggle` command. Both sit *behind* whatever else the key does
-here: a build role on the same key fires first, and the toggle only when
-that had nothing to build for the selection. X is the point-defence role by
-default, so with engineers selected X builds point defence and with
-factories selected, which have nothing under that role, X pauses them.
-Blank either to unbind.
+`Builder keys · RepeatBuildKey` (**Z**) switches repeat build on the selected
+factories and again off, as the orders panel's toggle does — on if any
+selected unit has it off, else off — through the game's own `SetToggle`
+command. It sits *behind* whatever else the key does here: a build role on
+the same key fires first, and the toggle only when that had nothing to build
+for the selection. Blank to unbind.
+
+`Builder keys · PauseKey` is the game's own pause toggle (**P**), moved like any
+other game hotkey. Until 0.4.0 the mod had a pause key of its own; the
+game's does the same job, so the setting now moves the game's instead, and a
+key saved for the old one carries over — anyone who had it on **X** keeps X.
+The game's pause is in the Orders group, below the build keys, so it stacks
+the same way: X is the point-defence role by default, so with engineers
+selected X builds point defence, and with factories selected, which have
+nothing under that role, X pauses them.
 
 ### Extractor placement
 
 Placing an extractor snaps it onto a deposit near the cursor. The game's
 `FindClosestResourceSpot` fixes that at 8 world units, which zoomed out is a
-couple of pixels. `Placement · ExtractorSnapPixels` (40) makes the snap a
+couple of pixels. `Building · ExtractorSnapPixels` (40) makes the snap a
 fixed size on screen instead: the mod turns that pixel radius into world
 units from the camera's height and field of view and pushes it into the
-hook a few times a second as you zoom. `Placement · ExtractorSnapDistance`
+hook a few times a second as you zoom. `Building · ExtractorSnapDistance`
 (8) is the floor in world units, however far in you zoom; set the pixel
 value to 0 to use the floor alone. The hook is the same search as the
 game's, swapped in on the module table so the game's own callers reach it,

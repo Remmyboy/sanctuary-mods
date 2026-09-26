@@ -30,14 +30,19 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.3.3")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.4.0")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
             new Dictionary<string, ConfigEntry<string>>();
 
+        // The game's own hotkeys, keyed "Group.Action", in the order bound:
+        // the catalogue first, then anything the live table adds to it.
+        private readonly Dictionary<string, ConfigEntry<string>> _cfgRemaps =
+            new Dictionary<string, ConfigEntry<string>>(StringComparer.Ordinal);
+        private readonly List<GameAction> _remapActions = new List<GameAction>();
+
         private ConfigEntry<string> _cfgCancelKey;
-        private ConfigEntry<string> _cfgPauseKey;
         private ConfigEntry<string> _cfgRepeatKey;
         private ConfigEntry<string> _cfgMenuKey;
         private ConfigEntry<float> _cfgCycleSeconds;
@@ -62,6 +67,9 @@ namespace SanctuaryHud
         private float _cyclePoll;
         private string _installedSignature;
         private int _builds;
+        // Whether a live action table has been read for hotkeys the catalogue
+        // lacks. Once a session is enough: the table is the game's own file.
+        private bool _discovered;
 
         // The cycle the last press landed in, for the overlay.
         private int _cycleSeq = -1;
@@ -97,42 +105,76 @@ namespace SanctuaryHud
             return set;
         }
 
+        /// Mouse buttons the input system also indexes as keys. Only the
+        /// game-hotkey remaps take them: the camera's drag is on the middle
+        /// button, and moving it means naming one.
+        private static readonly HashSet<string> MouseKeys =
+            new HashSet<string>(StringComparer.Ordinal) { "LeftButton", "RightButton", "MiddleButton" };
+
+        /// inputSystem.lua's modifierKeyCombos: what AnyModifier stands for.
+        private static readonly string[] ModifierCombos =
+            { "", "Ctrl-", "Shift-", "Alt-", "Ctrl-Alt-", "Ctrl-Shift-", "Shift-Alt-", "Ctrl-Shift-Alt-" };
+
         private void Awake()
         {
             _log ??= Logger;
 
-            _cfgPauseKey = Config.Bind("Toggles", "PauseKey", "X",
-                "Pauses the selected factories and engineers, and again resumes them: the orders panel's Pause toggle, " +
-                "on if any selected unit is unpaused, else off. A build role on the same key fires first; the toggle only " +
-                "when that had nothing to build. Blank to unbind.");
-            _cfgRepeatKey = Config.Bind("Toggles", "RepeatBuildKey", "Z",
+            // The mod manager lists sections in the order they are first bound
+            // and settings as bound, so this order is the page's: every key
+            // first — the build roles, the other keys for builders, then the
+            // game's own — and what tunes them after.
+            foreach (var role in Roles.All)
+            {
+                var section = role.Mode == RoleMode.Structure ? "Structures" : "Units";
+                _cfgKeys[role.Name] = Config.Bind(section, role.Name, role.DefaultKey,
+                    role.Description + " Hotkey in the game's own format, e.g. G, Ctrl-G, Ctrl-Alt-G. " +
+                    "Holding Shift queues five. Blank to unbind.");
+            }
+
+            // Sections and names from before 0.4.0 are carried over by Rebind,
+            // so a key someone already moved stays moved.
+            // Pause is the game's own key, in the slot the mod's own pause key
+            // had until 0.4.0; the other three are the mod's.
+            BindRemap(GameActions.All.First(a => a.Id == GameActions.PauseId));
+            _cfgRepeatKey = Rebind("Toggles", "RepeatBuildKey", "BuilderKeys", "RepeatBuildKey", "Z",
                 "Switches repeat build on the selected factories, and again off: the orders panel's Repeat toggle. " +
-                "A build role on the same key fires first; the toggle only when that had nothing to build. Blank to unbind.");
-            _cfgCancelKey = Config.Bind("Cancel", "ClearFactoryQueue", "Escape",
+                "A build role on the same key fires first; the toggle only when that had nothing to build. " +
+                "Hotkey in the game's own format; blank to unbind.");
+            _cfgCancelKey = Rebind("Cancel", "ClearFactoryQueue", "BuilderKeys", "StopFactoriesKey", "Escape",
                 "Stops every selected factory, as escape does in FAF: the same order as the Stop button, so its " +
                 "build queue is cleared and an assist on another factory is dropped rather than left to refill it. " +
                 "With no selected factory queued or assisting -- or the pause menu already open -- the key falls " +
-                "through to whatever it normally does, so escape still opens the menu unless PauseMenuKey has " +
-                "moved it. Blank to unbind.");
-            _cfgMenuKey = Config.Bind("Menu", "PauseMenuKey", "Escape",
-                "Key that opens the pause menu, in the game's own format, e.g. F11 or Ctrl-M (not F1, which opens " +
-                "the game's debug menu). Moving it off escape leaves escape to stopping factories; escape still " +
-                "closes the menu once it is open. Escape or blank keeps the game's own binding.");
-            _cfgSnapPixels = Config.Bind("Placement", "ExtractorSnapPixels", 40f,
-                new ConfigDescription("How close to a deposit, in screen pixels, the cursor has to be for an extractor being placed to snap onto it, " +
-                    "whatever the zoom. 0 turns this off and leaves the world-unit distance below.",
-                    new AcceptableValueRange<float>(0f, 200f)));
-            _cfgSnapDistance = Config.Bind("Placement", "ExtractorSnapDistance", 8f,
-                new ConfigDescription("The least snap distance in world units, however far in you zoom. The game's own is 8.",
-                    new AcceptableValueRange<float>(4f, 80f)));
-            _cfgCycleSeconds = Config.Bind("Cycle", "Seconds", 0f,
+                "through to whatever it normally does, so escape still opens the menu unless the pause menu key has " +
+                "moved it. Hotkey in the game's own format; blank to unbind.");
+            BindRemap(GameActions.All.First(a => a.Id == GameActions.UpgradeId));
+
+            foreach (var action in GameActions.All)
+            {
+                // The pause menu's key goes with chat, the other keys for the
+                // game's interface, ahead of them.
+                if (_cfgMenuKey == null && action.Section == "GameInterface")
+                    _cfgMenuKey = Rebind("Menu", "PauseMenuKey", "GameInterface", "PauseMenuKey", "Escape",
+                        "Key that opens the pause menu, e.g. F11 or Ctrl-M (not F1, which opens the game's debug menu). " +
+                        "Moving it off escape leaves escape to stopping factories; escape still closes the menu once " +
+                        "it is open. Hotkey in the game's own format; escape or blank keeps the game's own binding.");
+                BindRemap(action);
+            }
+
+            _cfgCycleSeconds = Rebind("Cycle", "Seconds", "Building", "CycleSeconds", 0f,
                 "How long a key keeps cycling after a press, the way FAF hotbuild's cycle reset time does " +
                 "(theirs is 1.1). Off by default: a structure already cycles for as long as its template is " +
                 "on the cursor, and this only adds anything for factories, where it would turn a second press " +
                 "into \"cycle\" instead of \"queue another\". Set 1.1 to match FAF.");
+            _cfgSnapPixels = Rebind("Placement", "ExtractorSnapPixels", "Building", "ExtractorSnapPixels", 40f,
+                new ConfigDescription("How close to a deposit, in screen pixels, the cursor has to be for an extractor being placed to snap onto it, " +
+                    "whatever the zoom. 0 turns this off and leaves the world-unit distance below.",
+                    new AcceptableValueRange<float>(0f, 200f)));
+            _cfgSnapDistance = Rebind("Placement", "ExtractorSnapDistance", "Building", "ExtractorSnapDistance", 8f,
+                new ConfigDescription("The least snap distance in world units, however far in you zoom. The game's own is 8.",
+                    new AcceptableValueRange<float>(4f, 80f)));
             _cfgOverlay = Config.Bind("Overlay", "Show", true,
                 "After a build hotkey, show what it picked and the rest of that key's cycle. A factory only " +
-                "cycles with Cycle.Seconds set, so without it the overlay shows just the pick.");
+                "cycles with Cycle seconds set, so without it the overlay shows just the pick.");
             _cfgOverlaySeconds = Config.Bind("Overlay", "Seconds", 2.5f,
                 "How long the overlay stays up after the last press.");
             _cfgOverlayIcon = Config.Bind("Overlay", "IconSize", 40f,
@@ -147,18 +189,153 @@ namespace SanctuaryHud
                 "Overlay's distance from the top of the screen, in 1080p-logical pixels, sitting just clear of " +
                 "the build panel. It is always centred horizontally.");
 
-            foreach (var role in Roles.All)
-            {
-                var section = role.Mode == RoleMode.Structure ? "Structures" : "Units";
-                _cfgKeys[role.Name] = Config.Bind(section, role.Name, role.DefaultKey,
-                    role.Description + " Hotkey in the game's own format, e.g. G, Ctrl-G, Ctrl-Alt-G. " +
-                    "Holding Shift queues five. Blank to unbind.");
-            }
-
             Logger.LogInfo($"Build Hotkeys loaded with {Roles.All.Count} roles (configure them from the F8 mod manager).");
         }
 
         private void OnDestroy() => Remove();
+
+        /// One setting per game hotkey, defaulting to the keys the game ships
+        /// it on, so the box shows what the key is today.
+        private void BindRemap(GameAction action)
+        {
+            var id = action.Id;
+            if (_cfgRemaps.ContainsKey(id)) return;
+            var queued = action.Group == "Orders" && action.Defaults.Contains("Shift-")
+                ? " Keep a Shift- form so the order can be queued." : "";
+            var description = action.Description + " The game's own hotkey, in its own format, comma-separated, e.g. Q, Shift-Q; " +
+                "AnyModifier-Q takes Q whatever Ctrl, Shift or Alt is held." + queued + " Blank to unbind.";
+            _cfgRemaps[id] = action.OldSection != null
+                ? Rebind(action.OldSection, action.OldKey, action.Section, action.Key, action.Defaults, description)
+                : Config.Bind(action.Section, action.Key, action.Defaults, description);
+            _remapActions.Add(action);
+        }
+
+        private ConfigEntry<T> Rebind<T>(string oldSection, string oldKey, string section, string key, T defaultValue, string description) =>
+            Rebind(oldSection, oldKey, section, key, defaultValue, new ConfigDescription(description));
+
+        /// Binds a setting that used to live under another section or name,
+        /// carrying across a value saved there. BepInEx keeps a saved value
+        /// that nothing binds as an orphan, which a Bind under the new name
+        /// never looks at; taking it out of the orphans and saving drops the
+        /// old line from the file, so this happens once.
+        private ConfigEntry<T> Rebind<T>(string oldSection, string oldKey, string section, string key, T defaultValue, ConfigDescription description)
+        {
+            var entry = Config.Bind(section, key, defaultValue, description);
+            try
+            {
+                var orphans = HarmonyLib.AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(Config, null)
+                    as Dictionary<ConfigDefinition, string>;
+                var old = new ConfigDefinition(oldSection, oldKey);
+                if (orphans != null && orphans.TryGetValue(old, out var saved))
+                {
+                    entry.Value = (T)TomlTypeConverter.ConvertToValue(saved, typeof(T));
+                    orphans.Remove(old);
+                    Config.Save();
+                    Logger.LogInfo($"Build hotkeys: moved setting {oldSection}.{oldKey} = '{saved}' to {section}.{key}.");
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning($"Build hotkeys: could not carry {oldSection}.{oldKey} over to {section}.{key} ({e.Message}); it is back at its default.");
+            }
+            return entry;
+        }
+
+        /// The keys an action should move to, or false when it stays where the
+        /// game put it: left at its default, or set to something that does not
+        /// parse (which is warned about). An empty list means unbound.
+        private bool TryRemap(GameAction action, bool quiet, out List<string> hotkeys)
+        {
+            var id = action.Id;
+            var value = (_cfgRemaps[id].Value ?? "").Trim();
+            hotkeys = null;
+            if (value == action.Defaults) return false;
+            if (!TryHotkeyList(value, id, quiet, out hotkeys)) return false;
+            // A default that is written differently but means the same keys —
+            // "Shift-A, A" — is still the default, and left to the game.
+            return !(TryHotkeyList(action.Defaults, id, true, out var defaults) && Canon(hotkeys) == Canon(defaults));
+        }
+
+        /// A remap's value as the exact keys LoadedActionMap is indexed by:
+        /// each comma-separated key canonicalised as a role key is, and
+        /// AnyModifier- expanded into all eight combinations the way
+        /// inputSystem.lua expands the defaults. Blank is a valid empty list.
+        private bool TryHotkeyList(string raw, string name, bool quiet, out List<string> hotkeys)
+        {
+            hotkeys = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw)) return true;
+            const string any = "AnyModifier-";
+            foreach (var item in raw.Split(','))
+            {
+                var key = item.Trim();
+                if (key.Length == 0) continue;
+                var anyModifier = key.StartsWith(any, StringComparison.OrdinalIgnoreCase);
+                if (anyModifier) key = key.Substring(any.Length);
+                if (!TryBindings(key, name, out var canonical, out _, mouse: true, quiet: quiet)) return false;
+                // Base key names have no dash, so one means a modifier, which
+                // AnyModifier already covers.
+                if (anyModifier && canonical.Contains("-"))
+                {
+                    if (!quiet) Logger.LogWarning($"Build hotkeys: {name} = '{item.Trim()}' — AnyModifier takes a bare key. Ignored.");
+                    return false;
+                }
+                foreach (var hk in anyModifier ? ModifierCombos.Select(m => m + canonical) : new[] { canonical })
+                    if (!hotkeys.Contains(hk)) hotkeys.Add(hk);
+            }
+            return true;
+        }
+
+        private static string Canon(IEnumerable<string> hotkeys) =>
+            string.Join(",", hotkeys.OrderBy(h => h, StringComparer.Ordinal).ToArray());
+
+        /// The inverse of the AnyModifier expansion, for showing a list of
+        /// keys the way inputActions.lua writes it.
+        private static string Compress(IList<string> hotkeys)
+        {
+            var shown = new List<string>();
+            foreach (var hk in hotkeys)
+            {
+                var b = hk.Substring(hk.LastIndexOf('-') + 1);
+                var item = ModifierCombos.All(m => hotkeys.Contains(m + b)) ? "AnyModifier-" + b : hk;
+                if (!shown.Contains(item)) shown.Add(item);
+            }
+            return string.Join(", ", shown.ToArray());
+        }
+
+        /// Binds a setting for every game hotkey the live table has and the
+        /// catalogue lacks, so an action a game update adds is remappable
+        /// from the next match on. Returns whether any of them already had a
+        /// saved remap (BepInEx keeps a value for a key nobody has bound yet),
+        /// which needs an install to take effect.
+        private bool DiscoverActions()
+        {
+            var raw = GetLuaGlobal("__SdbBuildHotkeysActions");
+            if (string.IsNullOrEmpty(raw)) return false;
+
+            var added = new List<string>();
+            var pending = false;
+            foreach (var line in raw.Split('\n'))
+            {
+                var f = line.Split('\t');
+                if (f.Length < 4) continue;
+                var group = f[0];
+                var name = f[1];
+                if (_cfgRemaps.ContainsKey(group + "." + name)) continue;
+                if (GameActions.SkippedGroups.Contains(group) || GameActions.SkippedActions.Contains(group + "." + name)) continue;
+
+                var desc = f[2].Trim();
+                var action = new GameAction(group, name,
+                    Compress(f[3].Split(',').Where(k => k.Length > 0).ToList()),
+                    desc.Length > 0 ? desc.TrimEnd('.') + "." : name + ".");
+                BindRemap(action);
+                added.Add(group + "." + name);
+                if (TryRemap(action, true, out _)) pending = true;
+            }
+            if (added.Count > 0)
+                Logger.LogInfo($"Build hotkeys: the game has {added.Count} hotkey(s) this version doesn't list, now in the settings too: " +
+                               string.Join(", ", added.ToArray()));
+            return pending;
+        }
 
         /// How much of the next entry leans into view past the band edge.
         private const float PeekFraction = 0.45f;
@@ -413,7 +590,8 @@ namespace SanctuaryHud
         }
 
         private string Signature() =>
-            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value + "|menu=" + _cfgMenuKey.Value + "|snap=" + _cfgSnapDistance.Value + "|pause=" + _cfgPauseKey.Value + "|repeat=" + _cfgRepeatKey.Value;
+            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value + "|menu=" + _cfgMenuKey.Value + "|snap=" + _cfgSnapDistance.Value + "|repeat=" + _cfgRepeatKey.Value +
+            "|" + string.Join("|", _cfgRemaps.Select(p => p.Key + "=" + p.Value.Value).ToArray());
 
         /// Reads the cycle the last press landed in: press counter, key, live
         /// index, then every option in order. The counter leads so two presses
@@ -489,7 +667,8 @@ namespace SanctuaryHud
         /// order Ctrl, Shift, Alt (inputSystem.lua's modifierInputCodes), so
         /// "Shift-Ctrl-S" typed by a user has to become "Ctrl-Shift-S" or the
         /// lookup would never match.
-        private bool TryBindings(string raw, string roleName, out string roleKey, out List<Binding> bindings)
+        private bool TryBindings(string raw, string roleName, out string roleKey, out List<Binding> bindings,
+            bool mouse = false, bool quiet = false)
         {
             roleKey = null;
             bindings = null;
@@ -507,7 +686,7 @@ namespace SanctuaryHud
                     case "shift": shift = true; break;
                     case "alt": alt = true; break;
                     default:
-                        Logger.LogWarning($"Build hotkeys: {roleName} = '{raw}' — '{parts[i]}' is not a modifier " +
+                        if (!quiet) Logger.LogWarning($"Build hotkeys: {roleName} = '{raw}' — '{parts[i]}' is not a modifier " +
                                           "(use Ctrl, Shift or Alt). Ignored.");
                         return false;
                 }
@@ -515,10 +694,11 @@ namespace SanctuaryHud
 
             // Case-correct the base key so 'ctrl-g' works as well as 'Ctrl-G'.
             var baseKey = parts[parts.Length - 1];
-            var match = ValidKeys.FirstOrDefault(k => string.Equals(k, baseKey, StringComparison.OrdinalIgnoreCase));
+            var match = ValidKeys.Concat(mouse ? MouseKeys : Enumerable.Empty<string>())
+                .FirstOrDefault(k => string.Equals(k, baseKey, StringComparison.OrdinalIgnoreCase));
             if (match == null)
             {
-                Logger.LogWarning($"Build hotkeys: {roleName} = '{raw}' — '{baseKey}' is not a key name. Ignored.");
+                if (!quiet) Logger.LogWarning($"Build hotkeys: {roleName} = '{raw}' — '{baseKey}' is not a key name. Ignored.");
                 return false;
             }
 
@@ -571,11 +751,8 @@ namespace SanctuaryHud
             // no Shift or Alt variants, since it takes no count and has no
             // cycle to walk.
             var cancelKey = "";
-            if (TryBindings(_cfgCancelKey.Value, "ClearFactoryQueue", out var canonicalCancel, out _))
+            if (TryBindings(_cfgCancelKey.Value, "StopFactoriesKey", out var canonicalCancel, out _))
                 cancelKey = canonicalCancel;
-            var pauseKey = "";
-            if (TryBindings(_cfgPauseKey.Value, "PauseKey", out var canonicalPause, out _))
-                pauseKey = canonicalPause;
             var repeatKey = "";
             if (TryBindings(_cfgRepeatKey.Value, "RepeatBuildKey", out var canonicalRepeat, out _))
                 repeatKey = canonicalRepeat;
@@ -586,7 +763,24 @@ namespace SanctuaryHud
             if (TryBindings(_cfgMenuKey.Value, "PauseMenuKey", out var canonicalMenu, out _) && canonicalMenu != "Escape")
                 menuKey = canonicalMenu;
 
-            if (roleEntries.Count == 0 && cancelKey.Length == 0 && menuKey.Length == 0 && pauseKey.Length == 0 && repeatKey.Length == 0)
+            // Only actions moved off their defaults go over; the rest are left
+            // exactly as the game loaded them.
+            var remapEntries = new List<string>();
+            var remapLog = new List<string>();
+            foreach (var action in _remapActions)
+            {
+                if (!TryRemap(action, false, out var hotkeys)) continue;
+                remapEntries.Add("{g=" + Quote(action.Group) + ",a=" + Quote(action.Name) +
+                                 ",hks={" + string.Join(",", hotkeys.Select(Quote).ToArray()) + "}}");
+                remapLog.Add(action.Id + " -> " + (hotkeys.Count == 0 ? "unbound" : Compress(hotkeys)));
+            }
+
+            // Nothing of ours to bind still installs when it is the first
+            // match of the session: the install is what lists the game's
+            // hotkeys, so a remap of one this version doesn't know about
+            // has to go through it to be found.
+            if (roleEntries.Count == 0 && cancelKey.Length == 0 && menuKey.Length == 0 && repeatKey.Length == 0
+                && remapEntries.Count == 0 && _discovered)
             {
                 Logger.LogWarning("Build hotkeys: nothing bound — every role's key is blank or invalid.");
                 _installed = true;
@@ -604,9 +798,9 @@ namespace SanctuaryHud
                 .Replace("__CYCLE__", Mathf.Max(0f, _cfgCycleSeconds.Value).ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("__SNAP__", Mathf.Clamp(_cfgSnapDistance.Value, 4f, 80f).ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Replace("__CANCELKEY__", Quote(cancelKey))
-                .Replace("__PAUSEKEY__", Quote(pauseKey))
                 .Replace("__REPEATKEY__", Quote(repeatKey))
-                .Replace("__MENUKEY__", Quote(menuKey));
+                .Replace("__MENUKEY__", Quote(menuKey))
+                .Replace("__REMAPS__", string.Join(",", remapEntries.ToArray()));
 
             try
             {
@@ -630,13 +824,30 @@ namespace SanctuaryHud
                 }
                 if (cancelKey.Length > 0)
                     Logger.LogInfo($"Build hotkeys: {cancelKey} -> stop selected factories");
-                if (pauseKey.Length > 0)
-                    Logger.LogInfo($"Build hotkeys: {pauseKey} -> pause/resume selected builders");
                 if (repeatKey.Length > 0)
                     Logger.LogInfo($"Build hotkeys: {repeatKey} -> repeat build on/off");
                 if (menuKey.Length > 0)
                     Logger.LogInfo($"Build hotkeys: {menuKey} -> pause menu (escape only closes it)");
-                Logger.LogInfo($"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys.");
+                foreach (var line in remapLog)
+                    Logger.LogInfo($"Build hotkeys: {line}");
+                // What the moves ran into: an action missing from this game
+                // version, a key taken off another action, a key another group
+                // also answers to.
+                var report = GetLuaGlobal("__SdbBuildHotkeysRemapReport");
+                if (!string.IsNullOrEmpty(report))
+                    foreach (var line in report.Split('\n'))
+                        Logger.LogWarning($"Build hotkeys: {line}");
+                Logger.LogInfo($"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys, " +
+                               $"{remapEntries.Count} game hotkey(s) moved.");
+
+                if (!_discovered)
+                {
+                    _discovered = true;
+                    // With nothing new already remapped, the new settings are
+                    // at their defaults and the install stands; otherwise the
+                    // changed signature reinstalls next tick to apply them.
+                    if (!DiscoverActions()) _installedSignature = Signature();
+                }
             }
             catch (Exception e)
             {
@@ -1036,8 +1247,8 @@ if not __SdbBuildHotkeys then
     return res
   end
 
-  -- Pause and repeat build on the selection, as the orders panel's toggles
-  -- do it: on if any selected unit has it off, else off. SetToggle sends
+  -- Repeat build on the selection, as the orders panel's toggle does
+  -- it: on if any selected unit has it off, else off. SetToggle sends
   -- the game's own command, and errors with nothing valid selected, hence
   -- the pcall. False with no unit that has the toggle, so the key falls
   -- through to whatever else it does.
@@ -1063,6 +1274,64 @@ if not __SdbBuildHotkeys then
     return res
   end
 
+  -- The game's own hotkeys, moved. LoadedActionMap holds a shallow copy of
+  -- an action's defaultActions under each of its keys, so every copy shares
+  -- the action's functions: that is how its current keys are found and how
+  -- a key's owner is named. Import is cached, so this is the very table
+  -- inputSystem.lua loaded from. Every moved action comes off its keys
+  -- before any goes on, so two can swap; and all of it happens before the
+  -- build roles bind below, which then sit on top as they would anyway.
+  local IA = Import('client/input/inputActions.lua').InputActions
+  local LAM = IS.LoadedActionMap
+  BH.LAM = LAM
+  BH.remapSaved = {}
+  local events = { 'press', 'release', 'doublePress', 'valueChange' }
+  local function isAction(entry, da)
+    if type(entry) ~= 'table' or type(da) ~= 'table' then return false end
+    for _, ev in ipairs(events) do
+      if da[ev] and entry[ev] == da[ev] then return true end
+    end
+    return false
+  end
+  local function ownerOf(g, entry)
+    for name, data in pairs(IA[g] or {}) do
+      if type(data) == 'table' and isAction(entry, data.defaultActions) then return g .. '.' .. name end
+    end
+    if g == 'Construction' then return 'a BuildHotkeys key' end
+    return g
+  end
+  local function touch(g, hk)
+    local id = g .. '|' .. hk
+    if BH.remapSaved[id] == nil then BH.remapSaved[id] = { g = g, hk = hk, v = LAM[g][hk] or BH.NIL } end
+  end
+  local report = {}
+  BH.remaps = { __REMAPS__ }
+  for _, r in ipairs(BH.remaps) do
+    local data = IA[r.g] and IA[r.g][r.a]
+    if type(data) == 'table' and type(data.defaultActions) == 'table' and LAM[r.g] then
+      r.da = data.defaultActions
+      -- Clearing a field mid-traversal is allowed; adding one is not.
+      for hk, entry in pairs(LAM[r.g]) do
+        if isAction(entry, r.da) then touch(r.g, hk); LAM[r.g][hk] = nil end
+      end
+    else
+      table.insert(report, r.g .. '.' .. r.a .. ' is not in this version of the game; nothing moved')
+    end
+  end
+  for _, r in ipairs(BH.remaps) do
+    if r.da then
+      local map = LAM[r.g]
+      for _, hk in ipairs(r.hks) do
+        if map[hk] then table.insert(report, r.g .. '.' .. r.a .. ' takes ' .. hk .. ' from ' .. ownerOf(r.g, map[hk])) end
+        touch(r.g, hk)
+        -- A copy, as LoadInputActions makes one per key.
+        local copy = {}
+        for ev, fn in pairs(r.da) do copy[ev] = fn end
+        map[hk] = copy
+      end
+    end
+  end
+
   -- Construction has the highest group priority, so these run before the
   -- Orders group; returning false when nothing matched lets the event fall
   -- through to whatever the key normally does.
@@ -1080,12 +1349,12 @@ if not __SdbBuildHotkeys then
     grp[BH.cancelKey] = { press = function() return BH.Cancel() end }
   end
 
-  -- The toggle keys sit behind whatever the key already does here: a build
+  -- The repeat key sits behind whatever the key already does here: a build
   -- role on the same key fires first, and the toggle only when that had
-  -- nothing to build for the selection.
-  BH.pauseKey = __PAUSEKEY__
+  -- nothing to build for the selection. (Pause is the game's own key since
+  -- 0.4.0, moved like any other; its Orders group is below this one anyway.)
   BH.repeatKey = __REPEATKEY__
-  for name, hk in pairs({ Pause = BH.pauseKey, RepeatBuild = BH.repeatKey }) do
+  for name, hk in pairs({ RepeatBuild = BH.repeatKey }) do
     if hk ~= '' then
       if BH.saved[hk] == nil then BH.saved[hk] = grp[hk] or BH.NIL end
       local before = grp[hk]
@@ -1114,6 +1383,49 @@ if not __SdbBuildHotkeys then
     end }
   end
 
+  -- A moved key that another group also binds: the input system runs every
+  -- group in priority order until one says it consumed the press, which
+  -- most actions never do, so both usually fire. Construction is the
+  -- exception, and left out: its keys consume a press only when they act
+  -- on it, so a key shared with a build key goes to it only when the
+  -- selection can build and falls through otherwise, which is the point.
+  for _, r in ipairs(BH.remaps) do
+    if r.da then
+      local shared = {}
+      for _, hk in ipairs(r.hks) do
+        for g2, map2 in pairs(LAM) do
+          if g2 ~= r.g and g2 ~= 'Construction' and map2[hk] then
+            local o = ownerOf(g2, map2[hk])
+            if not shared[o] then
+              shared[o] = true
+              table.insert(report, r.g .. '.' .. r.a .. ' shares ' .. hk .. ' with ' .. o)
+            end
+          end
+        end
+      end
+    end
+  end
+  __SdbBuildHotkeysRemapReport = table.concat(report, '\n')
+
+  -- Every action in the game's table, for the plugin to find any its own
+  -- list lacks: group, name, description, keys (already AnyModifier-expanded).
+  local catalogue = {}
+  for g, acts in pairs(IA) do
+    if type(acts) == 'table' then
+      for name, data in pairs(acts) do
+        if type(data) == 'table' and type(data.defaultActions) == 'table' and type(data.defaultHotkeys) == 'table' then
+          local da = data.defaultActions
+          if da.press or da.release or da.doublePress then
+            local desc = (string.gsub(tostring(data.uiDescription or ''), '%s', ' '))
+            table.insert(catalogue, g .. '\t' .. name .. '\t' .. desc .. '\t' .. table.concat(data.defaultHotkeys, ','))
+          end
+        end
+      end
+    end
+  end
+  table.sort(catalogue)
+  __SdbBuildHotkeysActions = table.concat(catalogue, '\n')
+
   __SdbBuildHotkeys = BH
 end";
 
@@ -1135,7 +1447,16 @@ if __SdbBuildHotkeys then
       if saved == BH.NIL then BH.gm[hk] = nil else BH.gm[hk] = saved end
     end
   end
+  -- Last: the build keys above saved what the moves had left, so undoing
+  -- them first and the moves after lands back on the game's own map.
+  if BH.LAM and BH.remapSaved then
+    for _, s in pairs(BH.remapSaved) do
+      if s.v == BH.NIL then BH.LAM[s.g][s.hk] = nil else BH.LAM[s.g][s.hk] = s.v end
+    end
+  end
   __SdbBuildHotkeys = nil
+  __SdbBuildHotkeysRemapReport = nil
+  __SdbBuildHotkeysActions = nil
   __SdbBuildHotkeysCount = nil
   __SdbBuildHotkeysCycle = nil
   __SdbBuildHotkeysUnstuck = nil
