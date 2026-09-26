@@ -27,7 +27,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.13.1")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.14.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -158,6 +158,8 @@ namespace SanctuaryHud
                 _cfgCompleteRules[role + ".upgrade"] = Config.Bind(StructureAlerts, label + "Upgraded", upgradeDefault, $"A {label.ToLowerInvariant()} finishes upgrading to its next tier.");
             }
             foreach (var (role, label, newDefault, upgradeDefault) in CompleteRules) Rule(role, label, newDefault, upgradeDefault);
+
+            MatchStats.Bind(Config);
 
             // Extras for the game's own controls, all off until switched on.
             CursorHint.Bind(Config);
@@ -325,6 +327,7 @@ namespace SanctuaryHud
                 Waypoints.Shutdown();
                 CursorHint.Shutdown();
                 SelectSameType.Shutdown();
+                MatchStats.Shutdown();
                 HudCanvas.Destroy();
             }
             finally
@@ -405,6 +408,7 @@ namespace SanctuaryHud
             GameClock.Tick();
             CursorHint.Tick();
             SelectSameType.Tick();
+            MatchStats.Tick();
 
             // The built-in readouts only go while the strip is standing in for
             // them: overlay on, in a match, option set. Anything else restores.
