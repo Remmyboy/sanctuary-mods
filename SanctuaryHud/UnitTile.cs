@@ -42,6 +42,21 @@ namespace SanctuaryHud
         /// The game button this tile stands for, or null.
         internal UnitButtonElement Source => _source;
 
+        /// The art the tile is showing.
+        internal Sprite Portrait => _portrait != null ? _portrait.sprite : null;
+
+        private bool _pressCancelled;
+
+        /// Takes back a press already passed to the game's button, for a
+        /// drag that started from it: the button hears the pointer leave,
+        /// which disarms its release (ButtonElement only emits ClickUp while
+        /// isHoldingClick), and the release itself is not passed on.
+        internal void CancelPress(PointerEventData eventData)
+        {
+            _pressCancelled = true;
+            Forward(eventData, ExecuteEvents.pointerExitHandler);
+        }
+
         /// The tile under the mouse, or null.
         internal static UnitTile Hovered { get; private set; }
 
@@ -179,9 +194,21 @@ namespace SanctuaryHud
 
         // ---- pointer events, passed to the game's button -----------------------
 
-        public void OnPointerDown(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerDownHandler);
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            _pressCancelled = false;
+            Forward(eventData, ExecuteEvents.pointerDownHandler);
+        }
 
-        public void OnPointerUp(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerUpHandler);
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (_pressCancelled)
+            {
+                _pressCancelled = false;
+                return;
+            }
+            Forward(eventData, ExecuteEvents.pointerUpHandler);
+        }
 
         public void OnPointerEnter(PointerEventData eventData)
         {

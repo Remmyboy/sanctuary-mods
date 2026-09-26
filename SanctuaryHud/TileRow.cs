@@ -39,6 +39,13 @@ namespace SanctuaryHud
 
         internal RectTransform Rect => _rect;
         internal bool Alive => _rect != null;
+
+        /// Its tiles can be dragged to reorder them (QueueReorder.Drag).
+        internal bool Reorderable;
+
+        /// The tiles on show, in order: the index is the entry's.
+        internal int LiveCount => _live.Count;
+        internal UnitTile LiveAt(int index) => index >= 0 && index < _live.Count ? _live[index] : null;
         internal bool Showing => _rect != null && _rect.gameObject.activeSelf;
 
         internal static TileRow Create(RectTransform root, string name)
@@ -226,6 +233,13 @@ namespace SanctuaryHud
                     {
                         _shown.Add(entry.Element);
                         _live.Add(tile);
+                        if (Reorderable)
+                        {
+                            var drag = tile.GetComponent<QueueReorder.Drag>();
+                            if (drag == null) drag = tile.gameObject.AddComponent<QueueReorder.Drag>();
+                            drag.Row = this;
+                            drag.Index = _live.Count - 1;
+                        }
                     }
                 }
                 _shownLines.Add(length);

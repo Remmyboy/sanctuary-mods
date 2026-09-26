@@ -8,4 +8,9 @@
     <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- Right-click cursors (CursorHint.cs): Kenney's Cursor Pack, CC0; see cursors\License.txt. -->
+  <ItemGroup>
+    <EmbeddedResource Include="cursors\*.png" LogicalName="SanctuaryHud.cursors.%(Filename).png" />
+  </ItemGroup>
+
 </Project>

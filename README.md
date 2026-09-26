@@ -26,7 +26,7 @@ source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.13.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.13.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map |
+| [SanctuaryHud](SanctuaryHud/) | [**0.13.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.13.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging |
 | [IdleEngineers](IdleEngineers/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.5.3) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas |
 | [EcoManager](EcoManager/) | [**0.7.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.3) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
 | [BuildHotkeys](BuildHotkeys/) | [**0.3.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.3.3) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size |
@@ -206,6 +206,22 @@ as its panels are.
   clicks (shift and right included) and hovers do what they do on the
   game's panels, and a tab press sends the click the game's toggle needs to
   light up.
+
+  **Drag a queue tile to reorder the factory's queue** (`QoL.QueueDragReorder`,
+  off by default, like everything in the QoL section). A bar shows where it will land. Dropped at the very front,
+  it cancels what the factory is building and starts the moved item instead;
+  anywhere else, the current build carries on. The host has no reorder: its
+  one queue command adds or takes away N of an item, and a new item goes on
+  the end. So a move takes off everything from the first position that
+  changes to the back, last first, and puts it back in the new order, each
+  step predicted and sent the way a queue click is. Taking off the item in
+  hand is what makes the host cancel the current build. A move that would put
+  a unit ahead of the factory upgrade it needs is refused, since the queue
+  would drop it. The drag disarms the press it started from, so letting go
+  never also counts as a click on the tile. With several factories selected
+  the queue only shows when they share it, and the move applies to all of
+  them.
+
   With the strip left to the game, `HideLoneTierTab` (on by default) still
   conceals the tier tabs whenever no more than one of them can be clicked —
   a tier-1 factory's single T1, or a structure whose only option is its own
@@ -490,6 +506,93 @@ hierarchy to the log.
 Everything the HUD draws steps aside while the game's pause menu or a
 front-end screen (settings, the Mods page) is open over the match, as the
 game's own HUD does: IMGUI would otherwise draw on top of them.
+
+### QoL
+
+Everything here lives in the **QoL** section of the Mods page and is **off by
+default**; the factory queue drag above (`QueueDragReorder`) is there too.
+
+**Match clock** (`ShowClock`): the time since the match started and the sim
+speed (`12:34   1.5×`, or `PAUSED`), under the menu buttons in the middle of
+the economy strip, where the game's version line was. The game has no clock.
+The speed is the one the host last announced (its "Speed changed to …" log
+line), since a client's own engine speed need not follow the host's.
+
+**Right-click cursors** (`RightClickHint`): the cursor shows what a
+right-click there would do — a sword for attack-move (with Alt held), a
+crosshair for attack, an open hand for assist, a wrench for repair (which also
+resumes a half-built structure), a pickaxe for reclaim, a fist for capture —
+and the pack's plain arrow for a move and everywhere else over the map. The
+UI, the pause menu and the Mods page keep the normal cursor. The game never changes its cursor, so without this there
+is no telling whether a right-click on a frame will assist it or finish
+building it. It runs the same decision the game's right-click handler makes,
+from the same inputs, every frame. The cursors are from Kenney's
+[Cursor Pack](https://kenney.nl/assets/cursor-pack) (CC0), embedded in the DLL
+and scaled to the screen: 32 pixels at 1080p, 48 at 1440p, 64 at 4K.
+
+**Ctrl-A selects every unit of the selected types** (`CtrlASelectsSameType`):
+with a T1 tank and a T1 scout selected, Ctrl-A selects every finished T1 tank
+and T1 scout of yours on the map. The game's double-click does this for one
+type and only on screen. With nothing selected, Ctrl-A keeps the game's own
+meaning (hold it to box-select only air units). It swaps the press handler on
+the game's live key map, as BuildHotkeys does, so no file changes.
+
+**Factory rally points you can see.** Right-clicking the ground with a factory
+selected sets where its units go, but the game keeps that point on the host
+(`HostFactory.rallyPoint`) and never tells the client, so nothing draws it.
+This remembers the point your client sent and draws it the way a move order is
+drawn — a line from the factory and a blue marker — for the selected
+factories, and for all of your factories while **Shift** shows every order. An
+upgraded factory keeps its rally point on the host, and here too. Points set
+before the mod loaded, or in an earlier match, are not known.
+
+**Waypoints you can drag.** Left-press a move, attack-move or build marker —
+your selected units', or any of yours while Shift is held — and drag it; let
+go to move it there. A building shows its placement ghost as it moves, with
+the usual green and red footprint, and an extractor snaps onto the nearest
+deposit. Rally points drag the same way. Right-click while holding one puts it
+back.
+
+**Ctrl-click** a move, attack-move or build marker to delete that waypoint
+from every unit that has it; deleting a unit's only waypoint stops it.
+**Double-click** a marker to select the units sharing it (Shift adds them to
+the selection); on a rally point that is its factory. A single click on a
+marker over open ground does nothing, where it would otherwise empty the
+selection and take the markers with it; over a unit it is the ordinary click.
+Only positional markers take these clicks, so Ctrl-clicking a unit that
+happens to be the target of an assist or attack still toggles it in the
+selection.
+
+The game has no way to edit an order: the host takes only *add* and *clear*
+(`commonOrders.lua`), and the game's own order manager carries
+`todo !! draggable waypoints`. So moving a waypoint **re-issues the queue** of
+every unit that shares it, with that one position changed, through the same
+`ClientIssueOrder` a right-click uses. Units with identical queues go as one
+group, so a shared order stays shared. Other orders in the queue go back as
+they were: a move with its formation alignment, an assist or attack on the
+same target, a building on the same spot. A building someone has started
+comes back as *repair* of the frame, which continues its construction; a
+building still at 0% is deleted with its order on the host, so the mod clears
+the queue first and places it again once the old placement has gone. That
+costs the engineers a brief pause (a sim tick plus your latency), during which
+the queue they are about to get is drawn in its place. The game only
+re-predicts orders on its next sim tick, so the mod runs that prediction
+itself the moment it re-issues, and the marker lands where you dropped it
+rather than flicking back first. Markers on
+a target (attack, assist, repair, reclaim, capture) do not drag, and neither
+does a building already under construction.
+
+To re-issue an order the mod needs what it was issued with (which building,
+which target), which the client does not keep. It records that from your own
+order commands, so a queue holding an order from before the mod loaded does not
+drag.
+
+Everything it sends is a command an unmodded client sends, and no Lua file
+changes, so it stays lobby-compatible. `QoL.ShowRallyPoints`,
+`QoL.DraggableWaypoints` and `QoL.GrabPixels` (how close a press has to land)
+are in the QoL section of the Mods page, and the first two are off by default:
+turn them on to use them. They work with the overlay hidden too:
+they are controls, not display.
 
 ## IdleEngineers
 
@@ -1176,7 +1279,6 @@ agent reinstalls itself; a hot reload of the DLL finds it already there and
 re-wraps without stacking (the version global carries a hash of the install
 chunk, so an edit to it forces a reinstall rather than leaving the last build's
 agent running).
-
 ## ModManager
 
 A **Mods** entry in the front menu's sidebar (the cube icon, just below

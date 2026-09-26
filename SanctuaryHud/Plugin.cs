@@ -155,6 +155,11 @@ namespace SanctuaryHud
             SelectionRow.Bind(Config);
             TierTabs.Bind(Config);
             BuildStrip.Bind(Config);
+            QueueReorder.Bind(Config);
+            Waypoints.Bind(Config);
+            GameClock.Bind(Config);
+            CursorHint.Bind(Config);
+            SelectSameType.Bind(Config);
             BottomDock.Bind(Config);
 
             _visible = _cfgVisible.Value;
@@ -213,6 +218,9 @@ namespace SanctuaryHud
                 BuildStrip.Shutdown();
                 BottomDock.Shutdown();
                 EcoStrip.Shutdown();
+                Waypoints.Shutdown();
+                CursorHint.Shutdown();
+                SelectSameType.Shutdown();
                 HudCanvas.Destroy();
             }
             finally
@@ -222,6 +230,11 @@ namespace SanctuaryHud
         }
 
         // ---- input --------------------------------------------------------
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) Waypoints.FocusLost();
+        }
 
         // ---- cost meter ------------------------------------------------------
         // How long the HUD's own Update and OnGUI take per frame, logged every
@@ -283,6 +296,11 @@ namespace SanctuaryHud
             Alerts.DisconnectEnabled = _cfgAlertDisconnect.Value;
             WorldOverlays.Tick();
             Alerts.Tick();
+            // Controls, not display: on whether the overlay is showing or not.
+            Waypoints.Tick();
+            GameClock.Tick();
+            CursorHint.Tick();
+            SelectSameType.Tick();
 
             // The built-in readouts only go while the strip is standing in for
             // them: overlay on, in a match, option set. Anything else restores.
