@@ -274,7 +274,10 @@ namespace SanctuaryHud
 
         private static void LogTextPostfix(string message)
         {
-            if (!DisconnectEnabled || string.IsNullOrEmpty(message)) return;
+            if (string.IsNullOrEmpty(message)) return;
+            try { GameClock.OnLogLine(message.Trim()); }
+            catch { /* the clock falls back to the engine's speed */ }
+            if (!DisconnectEnabled) return;
             try
             {
                 var line = message.Trim();

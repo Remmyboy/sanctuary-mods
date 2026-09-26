@@ -419,7 +419,11 @@ namespace SanctuaryHud
             /// the width it needs, 0 when there is nothing to show.
             internal float Sync(List<GamePanel.PanelControl> controls, string versionText)
             {
-                var show = controls.Count > 0;
+                // The clock (GameClock) takes the version line's place, and
+                // keeps the middle up on its own when the game's panel, and
+                // so its buttons, are still showing.
+                var clock = GameClock.Text;
+                var show = controls.Count > 0 || clock != null;
                 if (_rect.gameObject.activeSelf != show) _rect.gameObject.SetActive(show);
                 if (!show) return 0f;
 
@@ -439,9 +443,19 @@ namespace SanctuaryHud
                     }
                 }
 
-                string caption = versionText;
-                foreach (var tile in _tiles) if (tile != null && tile.Hovered) caption = tile.Control.Label;
+                string caption = clock ?? versionText;
+                var hovered = false;
+                foreach (var tile in _tiles)
+                {
+                    if (tile != null && tile.Hovered)
+                    {
+                        caption = tile.Control.Label;
+                        hovered = true;
+                    }
+                }
                 HudCanvas.SetText(_caption, caption ?? "");
+                // Muted like the version line, but the clock is something to read.
+                _caption.color = clock != null && !hovered ? Color.white : SanctuaryHudPlugin.MutedText;
                 _versionText = versionText;
                 LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
                 return _rect.rect.width;

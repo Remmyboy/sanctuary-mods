@@ -134,7 +134,11 @@ namespace SanctuaryHud
             var root = HudCanvas.Ensure(options);
             if (root == null) return;
             if (_optionsRow == null || !_optionsRow.Alive) _optionsRow = TileRow.Create(root, "Build options");
-            if (_queueRow == null || !_queueRow.Alive) _queueRow = TileRow.Create(root, "Build queue");
+            if (_queueRow == null || !_queueRow.Alive)
+            {
+                _queueRow = TileRow.Create(root, "Build queue");
+                _queueRow.Reorderable = true;
+            }
             if (_tabRow == null || !_tabRow.Alive) _tabRow = TabRow.Create(root, "Tier tabs");
 
             UnitRow.Collect(options, _options, true);
