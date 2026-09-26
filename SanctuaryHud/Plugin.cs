@@ -62,66 +62,69 @@ namespace SanctuaryHud
         {
             _log ??= Logger;
 
-            _cfgVisible = Config.Bind("Overlay", "Visible", true, "Show the overlay.");
-            _cfgToggleKey = Config.Bind("Overlay", "ToggleKey", KeyCode.F10, "Key that shows/hides the overlay.");
-            _cfgHideBuiltIn = Config.Bind("Overlay", "HideGameEconomyBars", false,
-                "Hide the game's own alloy and energy readouts at the top of the screen, so the strip is the only economy display. " +
-                "The menu and pause buttons that share that panel move into the middle of the strip. " +
-                "It all comes back whenever the overlay is hidden or the mod is unloaded.");
+            // The Mods page lists sections in the order they are bound, and the
+            // entries within each as bound, so this order is the page's:
+            // the HUD as a whole, then its pieces top to bottom of the
+            // screen, then what it draws over the map, the alerts, and the
+            // QoL extras last. Keys renamed since 0.13.1 are carried over by
+            // MigrateRenamedSettings at the end.
+
+            _cfgVisible = Config.Bind("Overlay", "Visible", true,
+                "Show the HUD. The toggle key flips this during a match; everything here then gives the game its own panels back.");
+            _cfgToggleKey = Config.Bind("Overlay", "ToggleKey", KeyCode.F10, "Key that shows and hides the whole HUD.");
             _cfgScale = Config.Bind("Overlay", "Scale", 1f,
                 new ConfigDescription("Size of the whole HUD — the economy strip, the commander widget, the orders row, the unit card, " +
                     "the selection row and the build strip — as a multiple of the standard size, on top of the game's own UI Scale.",
                     new AcceptableValueRange<float>(0.6f, 1.5f)));
-            _cfgCommanderZoom = Config.Bind("Commander", "JumpZoomFactor", 0.5f,
-                "How wide the camera sits after jumping to the commander, as a fraction of the current camera height. " +
-                "Higher = further out. 0.5 keeps roughly your current zoom.");
 
-            _cfgReclaim = Config.Bind("Reclaim", "Enabled", true,
-                "Draw the alloy (and energy) value of wrecks and harvestable props over the map. Zoomed out, nearby values are summed into one figure.");
-            _cfgReclaimHoldKey = Config.Bind("Reclaim", "HoldKey", KeyCode.LeftAlt,
+            _cfgHideBuiltIn = Config.Bind("TopBar", "HideGameEconomyBars", false,
+                "Hide the game's own alloy and energy readouts at the top of the screen, so the economy strip is the only one. " +
+                "The menu and pause buttons that share that panel move into the middle of the strip. " +
+                "It all comes back whenever the HUD is hidden or the mod is unloaded.");
+            _cfgCommanderZoom = Config.Bind("TopBar", "CommanderJumpZoom", 0.5f,
+                "Clicking the commander widget (top right) jumps the camera to your commander. This is how far out the camera " +
+                "sits afterwards, as a fraction of its current height: higher is further out, 0.5 keeps roughly your zoom.");
+
+            // The stand-ins for the game's own bottom panels, under one switch:
+            // with it off the game's panels stay as they are and only the
+            // strip, the mini-map, the alerts and the map labels remain.
+            _cfgSanctuaryUi = Config.Bind("BottomPanels", "ReplaceGamePanels", true,
+                "The HUD's own versions of the game's bottom panels — the orders row, the unit card, the selection row and the build " +
+                "strip with its tabs and queue — in place of the game's. Off leaves the game's panels untouched, and the settings below " +
+                "that replace a panel then do nothing.");
+            OrdersBar.Bind(Config);
+            InfoCard.Bind(Config);
+            SelectionRow.Bind(Config);
+            BuildStrip.Bind(Config);
+            TierTabs.Bind(Config);
+
+            MiniMap.Bind(Config);
+
+            _cfgReclaim = Config.Bind("MapLabels", "ReclaimValues", true,
+                "Write the alloy (and energy) left in wrecks and harvestable props over the map. Zoomed out, nearby values are summed into one figure.");
+            _cfgReclaimHoldKey = Config.Bind("MapLabels", "ReclaimHoldKey", KeyCode.LeftAlt,
                 "Only show reclaim values while this key is held. None = always shown.");
-            _cfgReclaimMinValue = Config.Bind("Reclaim", "MinValue", 5f,
-                "Hide figures below this many alloys (energy counts a tenth).");
-            _cfgReclaimCluster = Config.Bind("Reclaim", "ClusterPixels", 110f,
-                "How close two values can sit on screen before they are summed into one figure, in pixels at 1080p. Smaller = more, finer numbers.");
-
-            _cfgBuildEta = Config.Bind("BuildEta", "Enabled", true,
+            _cfgReclaimMinValue = Config.Bind("MapLabels", "ReclaimMinValue", 5f,
+                "Leave out reclaim values below this many alloys (energy counts a tenth).");
+            _cfgReclaimCluster = Config.Bind("MapLabels", "ReclaimClusterPixels", 110f,
+                "How close two reclaim values can sit on screen before they are summed into one figure, in pixels at 1080p. Smaller = more, finer numbers.");
+            _cfgBuildEta = Config.Bind("MapLabels", "BuildCountdowns", true,
                 "Show a time-to-finish under each of your structures under construction (upgrades included): normal while it builds, " +
                 "dark orange while your economy is stalling, red once nothing is building it. A paused upgrade that nothing is building is left out.");
-            _cfgBuildEtaMax = Config.Bind("BuildEta", "MaxLabels", 12,
+            _cfgBuildEtaMax = Config.Bind("MapLabels", "MaxBuildCountdowns", 12,
                 "At most this many countdowns at once, soonest first; ones that would overlap another are skipped.");
 
             _cfgAlertAttacked = Config.Bind("Alerts", "CommanderUnderAttack", true,
-                "Toast and tone when the commander loses health. Click the toast to jump to it.");
+                "Toast when the commander loses health, repeated at most every eight seconds while it goes on. Click the toast to jump to it.");
             _cfgAlertCritical = Config.Bind("Alerts", "CommanderCritical", true,
-                "Toast and tone once when the commander drops below the critical fraction; re-arms after it is repaired.");
-            _cfgAlertCriticalAt = Config.Bind("Alerts", "CriticalFraction", 0.35f,
-                "Health fraction that counts as critical.");
-            _cfgAlertBuildComplete = Config.Bind("Alerts", "StructureComplete", true,
-                "Toast when one of your structures finishes building. Which ones is set under CompleteToasts.");
+                "Toast once when the commander's health drops below CommanderCriticalAt; it re-arms after the commander is repaired.");
+            _cfgAlertCriticalAt = Config.Bind("Alerts", "CommanderCriticalAt", 0.35f,
+                "The share of its health, 0 to 1, below which the commander counts as critical. It also turns the commander widget's bar red.");
             _cfgAlertDisconnect = Config.Bind("Alerts", "PlayerDisconnected", true,
                 "White toast naming a player who drops out of the match (the game's own notice is small text top right), " +
                 "and one when your connection to the host is lost. A player quitting reads the same as a disconnect.");
-
-            // One switch per kind of completion, so the Mod Manager lists
-            // them as rows. Upgrades (a tier-1 factory becoming tier 2, a
-            // radar becoming the next tier) are the ones worth interrupting
-            // for; a fresh extractor or generator is not, by default.
-            _cfgCompleteTier4 = Config.Bind("CompleteToasts", "AnyTier4", true,
-                "Any tier-4 structure finishing, whatever it is.");
-            void Rule(string role, string label, bool newDefault, bool upgradeDefault)
-            {
-                _cfgCompleteRules[role + ".new"] = Config.Bind("CompleteToasts", label + "Built", newDefault, $"A new {label.ToLowerInvariant()} finishes building.");
-                _cfgCompleteRules[role + ".upgrade"] = Config.Bind("CompleteToasts", label + "Upgraded", upgradeDefault, $"A {label.ToLowerInvariant()} finishes upgrading to its next tier.");
-            }
-            Rule("factory", "Factory", false, true);
-            Rule("intel", "Radar", false, true);
-            Rule("extractor", "Extractor", false, false);
-            Rule("energy", "Energy", false, false);
-            Rule("defence", "Defence", false, false);
-            Rule("tech", "TechCentre", true, true);
-            Rule("strategic", "Strategic", true, true);
-            Rule("other", "Other", false, false);
+            _cfgAlertBuildComplete = Config.Bind("Alerts", "StructureComplete", true,
+                "Toast when one of your structures finishes building or upgrading. Which kinds is set under Structure alerts.");
             _cfgAlertSound = Config.Bind("Alerts", "Sound", false,
                 "Play a sound with each alert: a voice line from the mod's sounds folder where one is shipped, else a short tone. Off by default; the toasts show either way. While on (with the commander-attacked alert), the game's own commander damage voice line is muted so the two don't overlap.");
             _cfgAlertVolume = Config.Bind("Alerts", "Volume", 50,
@@ -143,24 +146,27 @@ namespace SanctuaryHud
                     "Which voice speaks the alerts: a subfolder of SanctuaryMods\\SanctuaryHud\\sounds, or the built-in tones.",
                     new AcceptableValueList<string>(packs.ToArray())));
 
-            MiniMap.Bind(Config);
-            // The stand-ins for the game's own bottom panels, under one switch:
-            // with it off the game's panels stay as they are and only the
-            // strip, the mini-map, the alerts and the map labels remain.
-            _cfgSanctuaryUi = Config.Bind("SanctuaryUI", "Enabled", true,
-                "The HUD's own versions of the game's bottom panels — the orders row, the unit card, the selection row and the build " +
-                "strip with its tabs and queue — in place of the game's. Off leaves the game's panels untouched; the settings below then do nothing.");
-            OrdersBar.Bind(Config);
-            InfoCard.Bind(Config);
-            SelectionRow.Bind(Config);
-            TierTabs.Bind(Config);
-            BuildStrip.Bind(Config);
-            QueueReorder.Bind(Config);
-            Waypoints.Bind(Config);
-            GameClock.Bind(Config);
+            // One switch per kind of completion, so the Mod Manager lists
+            // them as rows. Upgrades (a tier-1 factory becoming tier 2, a
+            // radar becoming the next tier) are the ones worth interrupting
+            // for; a fresh extractor or generator is not, by default.
+            _cfgCompleteTier4 = Config.Bind(StructureAlerts, "AnyTier4", true,
+                "Any tier-4 structure finishing, whatever it is.");
+            void Rule(string role, string label, bool newDefault, bool upgradeDefault)
+            {
+                _cfgCompleteRules[role + ".new"] = Config.Bind(StructureAlerts, label + "Built", newDefault, $"A new {label.ToLowerInvariant()} finishes building.");
+                _cfgCompleteRules[role + ".upgrade"] = Config.Bind(StructureAlerts, label + "Upgraded", upgradeDefault, $"A {label.ToLowerInvariant()} finishes upgrading to its next tier.");
+            }
+            foreach (var (role, label, newDefault, upgradeDefault) in CompleteRules) Rule(role, label, newDefault, upgradeDefault);
+
+            // Extras for the game's own controls, all off until switched on.
             CursorHint.Bind(Config);
             SelectSameType.Bind(Config);
-            BottomDock.Bind(Config);
+            Waypoints.Bind(Config);
+            QueueReorder.Bind(Config);
+            GameClock.Bind(Config);
+
+            MigrateRenamedSettings();
 
             _visible = _cfgVisible.Value;
 
@@ -197,6 +203,104 @@ namespace SanctuaryHud
                 PanelConceal.Unavailable = true;
             }
             _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log.");
+        }
+
+        private const string StructureAlerts = "StructureAlerts";
+
+        // The structure-complete toasts, one switch per kind and whether it
+        // was built new or upgraded: (role, label, new, upgraded).
+        private static readonly (string, string, bool, bool)[] CompleteRules =
+        {
+            ("factory", "Factory", false, true),
+            ("intel", "Radar", false, true),
+            ("extractor", "Extractor", false, false),
+            ("energy", "Energy", false, false),
+            ("defence", "Defence", false, false),
+            ("tech", "TechCentre", true, true),
+            ("strategic", "Strategic", true, true),
+            ("other", "Other", false, false),
+        };
+
+        // Settings renamed or moved when the Mods page was reorganised
+        // (0.14.0): (old section, old key, new section, new key).
+        private static IEnumerable<(string, string, string, string)> RenamedSettings()
+        {
+            yield return ("Overlay", "HideGameEconomyBars", "TopBar", "HideGameEconomyBars");
+            yield return ("Commander", "JumpZoomFactor", "TopBar", "CommanderJumpZoom");
+            yield return ("SanctuaryUI", "Enabled", "BottomPanels", "ReplaceGamePanels");
+            yield return ("SanctuaryUI", "OrdersRow", "BottomPanels", "OrdersRow");
+            yield return ("SanctuaryUI", "OrdersHideInert", "BottomPanels", "HideUnwiredOrders");
+            yield return ("SanctuaryUI", "UnitCard", "BottomPanels", "UnitCard");
+            yield return ("SanctuaryUI", "UnitCardTidyGameCard", "BottomPanels", "TidyGameUnitCard");
+            yield return ("SanctuaryUI", "SelectionRow", "BottomPanels", "SelectionRow");
+            yield return ("SanctuaryUI", "BuildStrip", "BottomPanels", "BuildStrip");
+            yield return ("SanctuaryUI", "HideLoneTierTab", "BottomPanels", "HideLoneTierTab");
+            yield return ("SanctuaryUI", "PanelArt", "BottomPanels", "DashedPanelArt");
+            yield return ("Reclaim", "Enabled", "MapLabels", "ReclaimValues");
+            yield return ("Reclaim", "HoldKey", "MapLabels", "ReclaimHoldKey");
+            yield return ("Reclaim", "MinValue", "MapLabels", "ReclaimMinValue");
+            yield return ("Reclaim", "ClusterPixels", "MapLabels", "ReclaimClusterPixels");
+            yield return ("BuildEta", "Enabled", "MapLabels", "BuildCountdowns");
+            yield return ("BuildEta", "MaxLabels", "MapLabels", "MaxBuildCountdowns");
+            yield return ("Alerts", "CriticalFraction", "Alerts", "CommanderCriticalAt");
+            yield return ("CompleteToasts", "AnyTier4", StructureAlerts, "AnyTier4");
+            foreach (var (_, label, _, _) in CompleteRules)
+            {
+                yield return ("CompleteToasts", label + "Built", StructureAlerts, label + "Built");
+                yield return ("CompleteToasts", label + "Upgraded", StructureAlerts, label + "Upgraded");
+            }
+            // The QoL settings as first named, before release.
+            yield return ("QoL", "RightClickHint", "QoL", "RightClickCursors");
+            yield return ("QoL", "CtrlASelectsSameType", "QoL", "SelectAllOfSelectedTypes");
+            yield return ("QoL", "GrabPixels", "QoL", "WaypointGrabPixels");
+            yield return ("QoL", "QueueDragReorder", "QoL", "ReorderQueueByDragging");
+            yield return ("QoL", "ShowClock", "QoL", "ShowMatchClock");
+        }
+
+        /// Carries a renamed setting's saved value over to its new name. A
+        /// line in the .cfg that no Bind claims stays in the file as an
+        /// orphan (ConfigFile.OrphanedEntries, private), so the old value is
+        /// still there to read; it moves to the new entry and the old line
+        /// goes, so it only ever happens once. Called after every Bind.
+        private void MigrateRenamedSettings()
+        {
+            try
+            {
+                var orphans = AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(Config)
+                    as Dictionary<ConfigDefinition, string>;
+                if (orphans == null || orphans.Count == 0) return;
+                var moved = 0;
+                var save = Config.SaveOnConfigSet;
+                Config.SaveOnConfigSet = false;
+                try
+                {
+                    foreach (var (oldSection, oldKey, newSection, newKey) in RenamedSettings())
+                    {
+                        var old = new ConfigDefinition(oldSection, oldKey);
+                        if (!orphans.TryGetValue(old, out var text)) continue;
+                        orphans.Remove(old);
+                        var entry = Config[new ConfigDefinition(newSection, newKey)];
+                        entry.SetSerializedValue(text);
+                        moved++;
+                    }
+                }
+                finally
+                {
+                    Config.SaveOnConfigSet = save;
+                }
+                // Whatever is still unclaimed is a setting no version reads
+                // any more (every Bind has run by now, and the file is this
+                // mod's alone), so it goes rather than sit in the file forever.
+                var dropped = orphans.Count;
+                orphans.Clear();
+                Config.Save();
+                if (moved > 0) _log.LogInfo($"Settings: carried {moved} value(s) over to their renamed settings.");
+                if (dropped > 0) _log.LogInfo($"Settings: dropped {dropped} line(s) left over from settings that no longer exist.");
+            }
+            catch (Exception e)
+            {
+                _log.LogWarning($"Settings: renamed settings could not be carried over, so they are at their defaults ({e.Message}).");
+            }
         }
 
         // Hot reload (or the mod manager) destroys and recreates the plugin;

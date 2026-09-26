@@ -52,7 +52,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("QoL", "RightClickHint", false,
+            Enabled = config.Bind("QoL", "RightClickCursors", false,
                 "The cursor shows what a right-click would do there: a sword for attack-move, a crosshair for " +
                 "attack, a hand for assist, a wrench for repair (which also resumes building), a pickaxe for " +
                 "reclaim, a fist for capture, and a plain arrow for a move and anywhere else over the map. Hold Alt " +

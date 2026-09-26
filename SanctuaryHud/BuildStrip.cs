@@ -26,7 +26,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("SanctuaryUI", "BuildStrip", true,
+            Enabled = config.Bind("BottomPanels", "BuildStrip", true,
                 "Replace the game's build options, tier tabs and build queue with the HUD's own rows: the selection row, then the " +
                 "options the selection actually has (no placeholders, no paging), with the tier tabs — only when there is more than one — " +
                 "and the queue above. Clicks and hovers go to the game's own buttons. It all comes back whenever the overlay is hidden or the mod is unloaded.");
@@ -49,12 +49,6 @@ namespace SanctuaryHud
             if (_concealOptions.Apply(options)) Describe(options, queue, tabs);
             _concealQueue.Apply(queue);
             _concealTabs.Apply(tabs);
-            // The game's dashed panel art, off its build panel, for the plates.
-            if (options != null)
-            {
-                try { HudCanvas.CaptureGamePanelArt(options.transform.Find("Panel Dashed")); }
-                catch { /* the plain plate will do */ }
-            }
             try
             {
                 SyncRows(options, queue, tabs);
@@ -280,7 +274,7 @@ namespace SanctuaryHud
                     _shown.Clear();
                 }
                 _rect.localScale = new Vector3(scale, scale, 1f);
-                HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
+                HudCanvas.PlateStyle(_rect, false);
 
                 var same = tabs.Count == _shown.Count;
                 for (var i = 0; same && i < tabs.Count; i++) same = tabs[i] == _shown[i];

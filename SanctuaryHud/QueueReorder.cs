@@ -29,7 +29,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("QoL", "QueueDragReorder", false,
+            Enabled = config.Bind("QoL", "ReorderQueueByDragging", false,
                 "Drag a tile in the build strip's queue to move that item. Dropping it at the very front cancels " +
                 "what the factory is building and starts the moved item instead; anywhere else waits for the current " +
                 "build. Applies to every selected factory sharing the queue shown.");

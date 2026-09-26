@@ -77,19 +77,19 @@ namespace SanctuaryHud
             _cfgIconSize = config.Bind("MiniMap", "IconSize", 9f,
                 new ConfigDescription("How big each contact's strategic icon is drawn, in 1080p-logical pixels.",
                     new AcceptableValueRange<float>(4f, 20f)));
-            _cfgRefreshHz = config.Bind("MiniMap", "RefreshHz", 8f,
-                new ConfigDescription("How many times a second the contacts are re-read from the game. Lower costs less on a big late game.",
-                    new AcceptableValueRange<float>(2f, 20f)));
-            _cfgAlloySpots = config.Bind("MiniMap", "ShowAlloySpots", true,
-                "Mark alloy deposits that have no extractor on them yet — the same ones the game marks on the ground.");
             _cfgFog = config.Bind("MiniMap", "ShowFog", true,
                 "Shade the ground you cannot currently see, so an empty patch of map reads as nothing there rather than nothing known.");
             _cfgFogDarkness = config.Bind("MiniMap", "FogDarkness", 0.6f,
                 new ConfigDescription("How heavily the unseen ground is shaded.",
                     new AcceptableValueRange<float>(0.1f, 0.95f)));
-            _cfgPosX = config.Bind("MiniMap", "PanelX", 16f, "Panel X in 1080p-logical pixels.");
-            _cfgPosY = config.Bind("MiniMap", "PanelY", 802f, "Panel Y in 1080p-logical pixels.");
+            _cfgAlloySpots = config.Bind("MiniMap", "ShowAlloySpots", true,
+                "Mark alloy deposits that have no extractor on them yet — the same ones the game marks on the ground.");
+            _cfgRefreshHz = config.Bind("MiniMap", "RefreshHz", 8f,
+                new ConfigDescription("How many times a second the contacts are re-read from the game. Lower costs less on a big late game.",
+                    new AcceptableValueRange<float>(2f, 20f)));
             _cfgLocked = config.Bind("MiniMap", "Locked", false, "Keep the panel where it is: no dragging or resizing during a game.");
+            _cfgPosX = config.Bind("MiniMap", "PanelX", 16f, "Where the panel sits, from the left, in 1080p-logical pixels. Dragging the panel sets this.");
+            _cfgPosY = config.Bind("MiniMap", "PanelY", 802f, "Where the panel sits, from the top, in 1080p-logical pixels. Dragging the panel sets this.");
 
             _rect.x = _cfgPosX.Value;
             _rect.y = _cfgPosY.Value;

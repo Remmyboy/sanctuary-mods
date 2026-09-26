@@ -73,7 +73,7 @@ has no release of its own yet; build it from source if you need it.
   the game's own panel, on the same near-black blue with an accent-blue
   hairline as the front menu. The commander widget is built the same way.
   Numbers abbreviate exactly as the game's readouts do (`1.2K` above 999).
-- **Hide the game's own bars** (`Overlay · HideGameEconomyBars`, off by
+- **Hide the game's own bars** (`Top bar · HideGameEconomyBars`, off by
   default, in the Mod Manager's settings): switches off the built-in alloy
   and energy readouts so the strip is the only economy display. The buttons
   that share that panel (menu and pause among them) move into the middle of
@@ -97,7 +97,7 @@ has no release of its own yet; build it from source if you need it.
 ### SanctuaryUI
 
 The HUD's own versions of the game's panels along the bottom of the screen,
-under one switch (`SanctuaryUI · Enabled`, on by default) with everything
+under one switch (`Bottom panels · ReplaceGamePanels`, on by default) with everything
 below it in the same section of the Mod Manager page. Off leaves the game's
 panels exactly as they are and the rest of the settings do nothing. Each
 stand-in keeps the game's own panel running underneath at zero alpha — Lua
@@ -111,9 +111,7 @@ and information panels, the unit card standing on the orders row, and the
 build area against its right edge, the selection row and the options along
 the bottom with the tier tabs and the queue above them, no gaps between.
 One hairline runs along every exposed top edge of the combined shape, with
-thin dividers where pieces meet. `PanelArt` (off by default) dresses the
-plates in the game's own dashed panel sprite instead, so they are framed
-as its panels are.
+thin dividers where pieces meet.
 
 - **Orders row** (`OrdersRow`) in place of the game's orders panel
   bottom-left. The game draws all twenty-one order buttons for any selection
@@ -122,7 +120,7 @@ as its panels are.
   clicked in the current build — the Lua registers no click function for
   move, attack, patrol and the rest, which are hotkeys and right-clicks
   anyway. The row shows only the buttons the game has enabled for the
-  selection, and with `OrdersHideInert` (on by default) only the ones that
+  selection, and with `HideUnwiredOrders` (on by default) only the ones that
   are wired, so a factory gets pause, repeat build and stop and a tank gets
   stop. Each button is a clone of the game's own — its dashed plate in the
   order's colour, its icon, and the frame its glow shader lights while the
@@ -166,7 +164,7 @@ as its panels are.
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
   counts. With the replacement off,
-  `UnitCardTidyGameCard` (on by default) still hides the template id on the
+  `TidyGameUnitCard` (on by default) still hides the template id on the
   game's own card and rounds its income figures.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,
   which stacks the selected unit types upwards in a narrow column on the
@@ -207,7 +205,7 @@ as its panels are.
   game's panels, and a tab press sends the click the game's toggle needs to
   light up.
 
-  **Drag a queue tile to reorder the factory's queue** (`QoL.QueueDragReorder`,
+  **Drag a queue tile to reorder the factory's queue** (`QoL · ReorderQueueByDragging`,
   off by default, like everything in the QoL section). A bar shows where it will land. Dropped at the very front,
   it cancels what the factory is building and starts the moved item instead;
   anywhere else, the current build carries on. The host has no reorder: its
@@ -237,22 +235,22 @@ time per frame every ten seconds in a match, so "is it the mod" is
 answerable from the log alone.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
-  keeping roughly your current zoom.
-- **Reclaim values** over the map while **Left Alt** is held (`Reclaim ·
-  HoldKey`; `None` keeps them up permanently): the alloys left in every
+  keeping roughly your current zoom (`Top bar · CommanderJumpZoom`).
+- **Reclaim values** over the map while **Left Alt** is held (`Map labels ·
+  ReclaimHoldKey`; `None` keeps them up permanently): the alloys left in every
   wreck and harvestable prop the client knows about, drawn at the spot.
-  Values closer together on screen than `ClusterPixels` (110 at 1080p) are
+  Values closer together on screen than `ReclaimClusterPixels` (110 at 1080p) are
   summed into one figure at their value-weighted centre, so zoomed out a
   battlefield reads as one number the way FAF's overlay groups it, rather
   than a smear of digits. Energy shows as a smaller amber `E` line only where
-  it is the point. `MinValue` hides trivia. The prop table
+  it is the point. `ReclaimMinValue` hides trivia. The prop table
   (`__Entities.Props`) holds wrecks and map props alike with their template's
   `economy.harvest`, and the host streams `reclaimProgress` as they are
   eaten, so what is left is `harvest × (1 − progress / harvestTime)`. A
   decayed wreck stays in that table with no render entity behind it, so each
   is checked with `Engine.IsValidLocalID` before it counts. Positions are
   cached Lua-side per prop; only the values are re-read, once a second.
-- **Build countdowns** (`BuildEta · Enabled`): under your structures still
+- **Build countdowns** (`Map labels · BuildCountdowns`): under your structures still
   under construction, upgrades included, a `m:ss` time-to-finish and a thin
   progress bar. The rate is measured from successive progress samples
   (half-second poll, filtered), so it reflects whatever is actually assisting;
@@ -268,13 +266,13 @@ answerable from the log alone.
   builds straight through the pause, and then it shows. A game pause (the
   economy stream going quiet) freezes the clocks instead. Labels are placed
   soonest-first, one that
-  would overlap another is skipped, and `MaxLabels` (12) caps them, so a
+  would overlap another is skipped, and `MaxBuildCountdowns` (12) caps them, so a
   busy base shows the handful nearest completion rather than a wall.
 - **Alerts** (`Alerts · …`): toasts top-centre under the strip, with a short
   sound at `Volume` when `Sound` is on (it is off by default; voice packs
   below). *Commander under attack* on
   any health loss, re-sounding at most every eight seconds while it goes on;
-  *commander critical* once below `CriticalFraction` (35%), re-armed after
+  *commander critical* once below `CommanderCriticalAt` (35%), re-armed after
   repair; *structure complete* when a countdown finishes; *player
   disconnected* (`PlayerDisconnected`), a white toast naming them when the
   game reports a player dropping out, which it otherwise shows as small text
@@ -301,7 +299,7 @@ answerable from the log alone.
   makes the HUD vanish. The mini-map stays up regardless: it is the one
   thing here that reads just as well watching everybody.
 
-  Which completions get a toast is one switch each under `CompleteToasts`,
+  Which completions get a toast is one switch each under `Structure alerts`,
   by role (factory, radar, extractor, energy, defence, tech centre,
   strategic, other) and separately for a fresh build and for an upgrade to
   the next tier, plus `AnyTier4`. Defaults: factory and radar upgrades,
@@ -451,7 +449,7 @@ with a building queued would otherwise plant it wherever the cursor ended up.
 
 **The fog** shades the whole map and lets the units you share intel with lift
 the shade around themselves, so an empty patch reads as nothing there rather
-than nothing known (`Map · ShowFog`, `Map · FogDarkness`).
+than nothing known (`MiniMap · ShowFog`, `MiniMap · FogDarkness`).
 
 The obvious source for it is the game's own fog buffer — `FowPass` renders the
 focused army's intel into a render texture and publishes it as the global
@@ -488,7 +486,7 @@ deliberately not read off the marker's own flag, because CameraUtilities' "hide
 alloy spot markers" switch writes that flag — and running both mods should not
 silently empty this layer.
 
-Contacts are re-read a configurable 8 times a second (`Map · RefreshHz`, 2 to
+Contacts are re-read a configurable 8 times a second (`MiniMap · RefreshHz`, 2 to
 20); army colours and deposits every two seconds, since they barely change.
 The contact sweep is a single Lua chunk that walks each army's units, applies
 the visibility test inside the chunk so invisible units never reach the
@@ -510,15 +508,15 @@ game's own HUD does: IMGUI would otherwise draw on top of them.
 ### QoL
 
 Everything here lives in the **QoL** section of the Mods page and is **off by
-default**; the factory queue drag above (`QueueDragReorder`) is there too.
+default**; the factory queue drag above (`ReorderQueueByDragging`) is there too.
 
-**Match clock** (`ShowClock`): the time since the match started and the sim
+**Match clock** (`ShowMatchClock`): the time since the match started and the sim
 speed (`12:34   1.5×`, or `PAUSED`), under the menu buttons in the middle of
 the economy strip, where the game's version line was. The game has no clock.
 The speed is the one the host last announced (its "Speed changed to …" log
 line), since a client's own engine speed need not follow the host's.
 
-**Right-click cursors** (`RightClickHint`): the cursor shows what a
+**Right-click cursors** (`RightClickCursors`): the cursor shows what a
 right-click there would do — a sword for attack-move (with Alt held), a
 crosshair for attack, an open hand for assist, a wrench for repair (which also
 resumes a half-built structure), a pickaxe for reclaim, a fist for capture —
@@ -530,7 +528,7 @@ from the same inputs, every frame. The cursors are from Kenney's
 [Cursor Pack](https://kenney.nl/assets/cursor-pack) (CC0), embedded in the DLL
 and scaled to the screen: 32 pixels at 1080p, 48 at 1440p, 64 at 4K.
 
-**Ctrl-A selects every unit of the selected types** (`CtrlASelectsSameType`):
+**Ctrl-A selects every unit of the selected types** (`SelectAllOfSelectedTypes`, on Ctrl-A):
 with a T1 tank and a T1 scout selected, Ctrl-A selects every finished T1 tank
 and T1 scout of yours on the map. The game's double-click does this for one
 type and only on screen. With nothing selected, Ctrl-A keeps the game's own
@@ -588,8 +586,8 @@ order commands, so a queue holding an order from before the mod loaded does not
 drag.
 
 Everything it sends is a command an unmodded client sends, and no Lua file
-changes, so it stays lobby-compatible. `QoL.ShowRallyPoints`,
-`QoL.DraggableWaypoints` and `QoL.GrabPixels` (how close a press has to land)
+changes, so it stays lobby-compatible. `QoL · ShowRallyPoints`,
+`QoL · DraggableWaypoints` and `QoL · WaypointGrabPixels` (how close a press has to land)
 are in the QoL section of the Mods page, and the first two are off by default:
 turn them on to use them. They work with the overlay hidden too:
 they are controls, not display.

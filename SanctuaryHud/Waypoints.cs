@@ -42,19 +42,19 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            _cfgRally = config.Bind("QoL", "ShowRallyPoints", false,
-                "Draw a line from each factory to the rally point you gave it, the way move orders are drawn: for " +
-                "the selected factories, and for all of your factories while Shift is held. The game keeps rally " +
-                "points on the host only, so this shows the ones set since the match (or the mod) started.");
             _cfgDrag = config.Bind("QoL", "DraggableWaypoints", false,
                 "Left-drag a move, attack-move or build waypoint, or a rally point, to move it; Ctrl-click one to " +
                 "delete it; double-click one to select the units sharing it (Shift adds them). Works on the " +
                 "waypoints on screen: your selected units', or all of yours while Shift is held. Moving one " +
                 "re-issues the queue of every unit sharing it; engineers with a queued building pause for a " +
                 "moment while the old placement clears.");
-            _cfgGrabPixels = config.Bind("QoL", "GrabPixels", 16f,
+            _cfgGrabPixels = config.Bind("QoL", "WaypointGrabPixels", 16f,
                 new ConfigDescription("How close to a waypoint, in screen pixels, a left press has to land to pick it up.",
                     new AcceptableValueRange<float>(4f, 60f)));
+            _cfgRally = config.Bind("QoL", "ShowRallyPoints", false,
+                "Draw a line from each factory to the rally point you gave it, the way move orders are drawn: for " +
+                "the selected factories, and for all of your factories while Shift is held. The game keeps rally " +
+                "points on the host only, so this shows the ones set since the match (or the mod) started.");
         }
 
         internal static void Shutdown() => Remove();

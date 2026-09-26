@@ -28,10 +28,10 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("SanctuaryUI", "OrdersRow", true,
+            Enabled = config.Bind("BottomPanels", "OrdersRow", true,
                 "Replace the game's orders panel (bottom left) with a compact row showing only the orders the selected units can take, " +
                 "using the game's own icons. The game's panel comes back whenever the overlay is hidden or the mod is unloaded.");
-            HideInert = config.Bind("SanctuaryUI", "OrdersHideInert", true,
+            HideInert = config.Bind("BottomPanels", "HideUnwiredOrders", true,
                 "Leave out the buttons the game has not wired up yet: move, attack, patrol, assist and the rest do nothing when clicked " +
                 "in the current build (they are hotkeys and right-clicks). Stop and the toggles — pause, repeat build, shield, intel, production — stay.");
         }
@@ -298,7 +298,7 @@ namespace SanctuaryHud
                     _shown.Clear();
                 }
                 _rect.localScale = new Vector3(scale, scale, 1f);
-                HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
+                HudCanvas.PlateStyle(_rect, false);
 
                 var same = buttons.Count == _shown.Count;
                 for (var i = 0; same && i < buttons.Count; i++) same = buttons[i].Element == _shown[i];

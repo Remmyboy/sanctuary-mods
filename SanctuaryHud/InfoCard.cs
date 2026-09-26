@@ -33,11 +33,11 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("SanctuaryUI", "UnitCard", true,
+            Enabled = config.Bind("BottomPanels", "UnitCard", true,
                 "Replace the game's unit information card with a plainer one drawn from the same values: name, health, shields, " +
                 "build cost, income and build power in labelled rows, figures rounded, template id left off. " +
                 "The game's card comes back whenever the overlay is hidden or the mod is unloaded.");
-            TidyBuiltIn = config.Bind("SanctuaryUI", "UnitCardTidyGameCard", true,
+            TidyBuiltIn = config.Bind("BottomPanels", "TidyGameUnitCard", true,
                 "With the game's own card kept (UnitCard off): hide the unit's template id and round its income figures.");
         }
 
@@ -580,7 +580,7 @@ namespace SanctuaryHud
             internal void Fill(UIInformationValues v, bool building, float scale)
             {
                 _rect.localScale = new Vector3(scale, scale, 1f);
-                HudCanvas.PlateStyle(_rect, BottomDock.PanelArt != null && BottomDock.PanelArt.Value, false);
+                HudCanvas.PlateStyle(_rect, false);
                 var factory = _queue.Count > 0;
                 if (Mathf.Abs(_rect.sizeDelta.x - Width) > 0.5f) _rect.sizeDelta = new Vector2(Width, _rect.sizeDelta.y);
 

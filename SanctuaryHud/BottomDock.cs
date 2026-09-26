@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using BepInEx.Configuration;
 using SanctuaryUI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,20 +17,8 @@ namespace SanctuaryHud
     // the hairlines are drawn here: one along every exposed top edge of the
     // combined shape, thin dividers where two pieces meet, and the exposed
     // sides of a taller column, so the outline is the outline of the whole.
-    //
-    // With PanelArt on, the pieces wear the game's own dashed panel sprite
-    // instead, each framed as the game frames its panels, and the outline
-    // is left off.
     internal static class BottomDock
     {
-        internal static ConfigEntry<bool> PanelArt;
-
-        internal static void Bind(ConfigFile config)
-        {
-            PanelArt = config.Bind("SanctuaryUI", "PanelArt", false,
-                "Dress the bottom panels in the game's own dashed panel art, as its panels are, instead of the HUD's plain plate with its one outline. Off reads cleaner.");
-        }
-
         /// One row of tiles, plate included: the height every piece on the
         /// baseline shares.
         internal const float Pad = 12f;
@@ -91,7 +78,7 @@ namespace SanctuaryHud
         {
             _linesUsed = 0;
             var root = HudCanvas.Root;
-            if (root != null && (PanelArt == null || !PanelArt.Value)) Outline(root);
+            if (root != null) Outline(root);
             for (var i = _linesUsed; i < _lines.Count; i++)
                 if (_lines[i] != null && _lines[i].gameObject.activeSelf) _lines[i].gameObject.SetActive(false);
         }

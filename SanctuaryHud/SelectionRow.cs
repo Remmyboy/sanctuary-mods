@@ -26,7 +26,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("SanctuaryUI", "SelectionRow", true,
+            Enabled = config.Bind("BottomPanels", "SelectionRow", true,
                 "Draw the selected unit types as a row along the bottom, at the left end of the build options, instead of the game's " +
                 "column up the left edge. Left click keeps just that type, right click drops it. " +
                 "The game's list comes back whenever the overlay is hidden or the mod is unloaded.");

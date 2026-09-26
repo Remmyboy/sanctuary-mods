@@ -24,7 +24,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("QoL", "CtrlASelectsSameType", false,
+            Enabled = config.Bind("QoL", "SelectAllOfSelectedTypes", false,
                 "Ctrl-A selects every finished unit of yours of the types you have selected, across the whole map: " +
                 "a T1 tank and a T1 scout selected, and Ctrl-A takes every T1 tank and T1 scout. With nothing " +
                 "selected Ctrl-A keeps the game's own meaning (hold it to box-select only air units).");

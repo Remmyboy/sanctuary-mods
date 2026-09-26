@@ -29,7 +29,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("QoL", "ShowClock", false,
+            Enabled = config.Bind("QoL", "ShowMatchClock", false,
                 "Show the match clock and sim speed in the middle of the economy strip, under the menu buttons " +
                 "(where the game's version line is). The game has no clock of its own.");
         }
