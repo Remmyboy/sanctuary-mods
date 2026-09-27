@@ -1,9 +1,9 @@
 {
   "id": "sanctuarymods.example.engineersandraiders",
   "name": "Test: Engineers and Raiders only",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Sanctuary Mods",
-  "description": "Factories can only build engineers and T1 raiders; every other mobile unit is off the build menus. Structures are untouched, so you can still build factories and your economy. A test mod for the lobby's gameplay-mod check.",
+  "description": "Factories can only build engineers and T1 raiders; every other mobile unit is off the build menus, and the host refuses them if anything queues one anyway. Structures are untouched, so you can still build factories and your economy. A test mod for the lobby's gameplay-mod check.",
   "kind": "gameplay",
   "luaRoot": "lua",
   "apiVersion": 1

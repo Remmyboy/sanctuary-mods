@@ -44,11 +44,14 @@ second, whether or not the game is running. The template's options:
 To build without touching the game (for example while you're playing), use
 `dotnet build -p:DeployPath=some\other\folder`.
 
-There are two worked examples in [`examples/`](../examples):
+There are three worked examples in [`examples/`](../examples):
 
 - **ExampleGameplayMod** is Lua only. It appends to `common/colors.lua` so the
   first army plays in pink. Copy the folder into `SanctuaryMods`, pick it in a
   lobby, and start a match against the AI.
+- **EngineersAndRaiders** is Lua only. Factories can build only engineers and
+  T1 raiders. It shows how to change what can be built, in the menus and on
+  the host (see [Recipes](#recipes)).
 - **ExampleUiMod** is C#. It shows which gameplay mods are live, binds
   settings that appear on the Mods page, and subscribes to match events.
 
@@ -145,6 +148,80 @@ Things that trip everyone up:
 - `.santp` unit templates are loaded by the game but aren't in the game's own
   Lua hash. The framework's content hash covers them, so the lobby still
   catches a mismatch.
+- **The host is the authority, menus aren't.** Clients send requests
+  ("queue 3 of this unit", "build that here"), and the host doesn't always
+  check them against what the UI would allow. The build queue is one example:
+  the host queues whatever it is asked to. A rule that only changes a menu can
+  be walked around by anything that sends the request directly. Hotkey mods,
+  scripts and future UI all do. So enforce it where the host handles the
+  request too; EngineersAndRaiders does both.
+- **Your append runs once per VM.** The host VM and every client VM each run
+  the file, so anything with side effects (logging, counters) happens once
+  per VM.
+
+## Recipes
+
+Each of these is a folder you could ship as it stands.
+
+**Change what can be built.** Every builder's build list is its template's
+`construction.canBuild` tag expression (e.g.
+`"Tags.EDA * Tags.BUILDABLE_BY_T1_FACTORY"`). `ParseTagsFromString` turns it
+into a set of unit ids; it's defined in `common/systems/tags.lua`, and the menu
+and the host's `buildQueueUtils.CanBuild` both use it. Append to `tags.lua` to
+filter what it returns for `BUILDABLE_BY_` expressions. Then append to
+`common/commands/definitions/buildQueue.lua` to make the host refuse queue
+requests that aren't on the list. The full version is
+[`examples/EngineersAndRaiders`](../examples/EngineersAndRaiders).
+
+**Change a unit's numbers.** Unit stats live in
+`common/units/unitsTemplates/<id>/<id>.santp` (the `ue`/`uc`/`ug` prefixes are
+EDA, Chosen and Guard; `l` land, `a` air, `n` naval, `s` structure). Copy the
+file to the same path under your `lua\` folder and edit it; a replacement wins
+over the game's copy. That's simple, but a game update that changes the unit
+means updating your copy.
+
+**Hook a game function.** Append to the file that defines it, keep the
+original, and replace it:
+
+```lua
+-- lua\append\host\units\unitsClasses\unitsDefault.lua
+local originalComplete = HostFactory.CompleteBuildQueueItem
+function HostFactory:CompleteBuildQueueItem(index)
+    -- your code before
+    return originalComplete(self, index)
+end
+```
+
+Callers inside the file pick up your version too, since they look the
+function up in the same table.
+
+**Add your own module.** Put it at `lua\<yourname>\util.lua` and
+`Import("yourname/util.lua")` from your appends. A folder named after you
+can't collide with the game's files or another mod's.
+
+## Testing and debugging
+
+- **Try a gameplay mod alone:** host a lobby, add an AI in the second slot,
+  pick your mod in the Mods panel and start. The AI doesn't know about your
+  rules, so expect it to struggle with restrictions.
+- **Two players:** give the other player the same zip of your mod. The Mods
+  panel lists each player with "has them all", "missing …", "has a different
+  copy …" or "no mod support".
+- **Logs:**
+  - `engine\BepInEx\LogOutput.log` shows what the framework did: `Sanctuary Mod API` lines for the
+    catalog, the overlay ("Lua overlay: 2 file(s) from …"), the pick and Start
+    refusals, and your mod's syntax errors ("doesn't compile …").
+  - `%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary\Player.log`
+    shows the game's own Lua errors: `HostLua` for the simulation, `ClientLua`
+    for the UI, each with a stack trace naming the file and line. An appended
+    line's number is past the end of the game's own file.
+- **Iterate on Lua** in a lobby: edit a file and the host's pick picks it up
+  within two seconds. The panel shows a new content hash, and every player has
+  to have the same edit again. Lua already running in a match never changes;
+  start a new one.
+- **Iterate on C#:** `dotnet build` while the game runs, and the mod reloads
+  within a second (gameplay DLLs wait for the match to end). If the game is a
+  match you care about, build with `-p:DeployPath=` somewhere else instead.
 
 ## C# mods
 
@@ -218,6 +295,26 @@ in a gameplay mod instead.
 The API's major version is `1`. Mods built against 1.x keep working on every
 1.y.
 
+### Bringing an existing BepInEx mod over
+
+A plugin that already works from `BepInEx\plugins` works from `SanctuaryMods`
+unchanged. Moving it there gets you hot reload, the Mods page switch and
+settings, and your name on it:
+
+1. Give it a folder, `SanctuaryMods\<YourMod>\`, with the DLL and a
+   `mod.json` (`"kind": "ui"` unless it changes the match).
+2. Make sure `OnDestroy` undoes `Awake` (see the rules above), or a reload
+   leaves the old copy's patches in place.
+3. Don't ship Harmony, BepInEx or Newtonsoft.Json beside it; the game has them.
+4. Reference `Sanctuary.ModApi.dll` only if you use it. A mod that references
+   it doesn't load without it. Any install from this framework has it, but a
+   plain BepInEx install doesn't.
+
+A plugin that patches the simulation, so every player must run it, is a
+gameplay mod: set `"kind": "gameplay"` and the lobby takes care of the rest.
+Such a plugin's `Awake` runs when the host picks the mod in a lobby, not at
+game start, and it's destroyed when the match ends.
+
 ## How the lobby decides
 
 1. The host picks gameplay mods in the lobby's **Mods** panel. The **Mods**
@@ -248,6 +345,12 @@ and tell players to extract it into `engine\SanctuaryMods\`. Players need the
 framework: any Standalone release from this repo includes it. Bump `version`
 whenever the files change, so players with an old copy are told which one
 they have.
+
+**Share the zip, not a checkout.** The content hash is byte-exact, and Git on
+Windows rewrites line endings on checkout (`core.autocrlf`). Two players who
+cloned your repository on different machines can end up with "different
+copies" of identical code. The template ships a `.gitattributes` that stops
+Git touching `lua\`; keep it, and have everyone play from the same zip.
 
 Like every BepInEx plugin, a mod's DLL runs as full-trust code on the
 player's PC. Only a mod's author can make it safe, so only publish what you'd

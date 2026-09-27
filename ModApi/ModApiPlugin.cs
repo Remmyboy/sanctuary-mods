@@ -20,7 +20,18 @@ namespace Sanctuary.ModApi
         public const string Guid = "com.sanctuarydb.modapi";
         public const string Version = "1.0.0";
 
-        internal static ManualLogSource Log;
+        private static ManualLogSource _log;
+
+        /// The plugin's logger, or a stand-in when a mod calls the API before
+        /// (or without) the plugin starting: the DLL can be loaded as a mere
+        /// reference, e.g. a newer Mod Manager dropped in beside a game that
+        /// started without the API, and a null logger then turned a harmless
+        /// warning into a NullReferenceException.
+        internal static ManualLogSource Log
+        {
+            get => _log ?? (_log = BepInEx.Logging.Logger.CreateLogSource("Sanctuary Mod API"));
+            private set => _log = value;
+        }
         internal static bool MatchWasUnderway;
 
         private static ConfigEntry<string> _cfgDefaultSelection;
