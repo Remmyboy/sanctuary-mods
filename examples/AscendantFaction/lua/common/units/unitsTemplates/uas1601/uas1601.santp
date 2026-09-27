@@ -1,0 +1,196 @@
+---@type UnitTemplate
+UnitTemplate = {
+    adjacency = "AlloyExtractorAdjacencyBuff",
+    audio = {
+        onDestroyed = {
+            looping = false,
+            name = "aeod2110",
+        },
+    },
+    collisionInfo = {
+        centerOffset = {
+            x = 0,
+            y = 0.25,
+            z = 0,
+        },
+        collisionSize = {
+            x = 1.5,
+            y = 0.5,
+            z = 1.5,
+        },
+    },
+    construction = {
+        buildPower = 5,
+        buildableOnResources = {
+            "alloys",
+        },
+    },
+    defence = {
+        health = {
+            max = 600,
+            value = 600,
+        },
+    },
+    economy = {
+        buildTime = 50,
+        cost = {
+            alloys = 50,
+            energy = 500,
+        },
+        production = {
+            alloys = 1,
+        },
+    },
+    footprint = {
+        x = 1,
+        y = 1,
+    },
+    general = {
+        class = {
+            "unitsDefaultEDA",
+            "EDAAlloyExtractor",
+        },
+        displayName = "Tier 1: Alloy Extractor",
+        icon = {
+            shape = "structure1",
+            symbol = "alloy",
+            tech = "t1",
+        },
+        iconUI = "tech1_structure1_alloy.png",
+        iconUIBuildSortPriority = 370,
+        iconUIType = "amphibious",
+        name = "",
+        orders = {
+            Pause = false,
+            Stop = true,
+        },
+        threatByLayer = {
+            Air = 0,
+            Land = 0,
+            WaterSurface = 0,
+        },
+        toggles = {
+            Pause = false,
+        },
+        modelTpId = "ues1601",
+        tpId = "uas1601",
+        unitTypeName = "AscendantT1AlloyExtractor",
+    },
+    intel = {
+        visionRadius = 15,
+    },
+    skirtSize = {
+        x = 2,
+        y = 2,
+    },
+    tags = {
+        "ALLOYS_EXTRACTION",
+        "BUILDABLE_BY_T1_ENGINEER",
+        "BUILDABLE_BY_T2_ENGINEER",
+        "BUILDABLE_BY_T3_ENGINEER",
+        "CONSTRUCTION",
+        "ECONOMIC",
+        "ASCENDANT",
+        "STRUCTURE",
+        "TECH1",
+    },
+    visuals = {
+        display = {
+            mainBarDisplayScale = {
+                x = 0.4,
+                y = 0.4,
+            },
+            mainBarOffSet = {
+                x = 0,
+                y = 15,
+            },
+            progressBars = {
+                {
+                    colorBackground = {
+                        a = 1,
+                        x = 0,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorEmpty = {
+                        a = 1,
+                        x = 1,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorFull = {
+                        a = 1,
+                        x = 0,
+                        y = 1,
+                        z = 0,
+                    },
+                    mainBar = true,
+                    name = "Health",
+                    property = "Health_Current",
+                    xOffset = 0,
+                    xScale = 1,
+                },
+            },
+            subBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            subBarOffSet = {
+                x = 0,
+                y = 0,
+            },
+        },
+        effectsInstant = {
+            onDeath = {
+                {
+                    audioName = "unit_death_land_eda_small",
+                    boneName = "Root",
+                    particleName = "VFX/Death/ved2101_death_building_small.sanvfx",
+                },
+            },
+        },
+        effectsPersistent = {
+            {
+                boneName = "Root",
+                particleName = "VFX/Unit/veu1201_active_alloy_extractor.sanvfx",
+            },
+        },
+        holes = {
+            {
+                holeSize = {
+                    x = 1.1,
+                    y = 1.1,
+                },
+            },
+            {
+                holeOffset = {
+                    x = -0.145,
+                    y = 0,
+                },
+                holeSize = {
+                    x = 1.37,
+                    y = 0.22,
+                },
+            },
+        },
+        mesh = {
+            lod0distance = 70,
+            lod1distance = 182,
+        },
+        selection = {
+            size = {
+                x = 1.9,
+                y = 1.9,
+            },
+        },
+    },
+    weapons = {
+        {
+            category = "DeathExplosion",
+            damage = 400,
+            damageFriendly = true,
+            damageRadius = 2,
+            damageType = "Normal",
+        },
+    },
+}

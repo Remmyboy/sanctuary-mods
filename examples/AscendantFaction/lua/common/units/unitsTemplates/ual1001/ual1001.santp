@@ -1,0 +1,322 @@
+---@type UnitTemplate
+UnitTemplate = {
+    additions = {
+        rotators = {
+            {
+                boneName = "Wheel01_Left",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = -180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel01_Right",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = 180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel02_Left",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = -180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel02_Right",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = 180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel03_Left",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = -180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel03_Right",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = 180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel04_Left",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = -180,
+                    z = 0,
+                },
+            },
+            {
+                boneName = "Wheel04_Right",
+                isVelocityScalingEnabled = true,
+                speed = {
+                    x = 0,
+                    y = 180,
+                    z = 0,
+                },
+            },
+        },
+    },
+    audio = {
+        engine = {
+            looping = true,
+            name = "aelu1110",
+        },
+        onDestroyed = {
+            looping = false,
+            name = "aeod1110",
+        },
+    },
+    collisionInfo = {
+        centerOffset = {
+            x = 0,
+            y = 0.2,
+            z = 0,
+        },
+        collisionSize = {
+            x = 0.4,
+            y = 0.4,
+            z = 0.8,
+        },
+    },
+    defence = {
+        health = {
+            max = 420,
+            value = 420,
+        },
+    },
+    economy = {
+        buildTime = 120,
+        cost = {
+            alloys = 31,
+            energy = 310,
+        },
+    },
+    footprint = {
+        x = 0.8,
+        y = 1.2,
+    },
+    general = {
+        class = {
+            "unitsDefaultEDA",
+            "EDALandUnit",
+        },
+        displayName = "Tier 1: Tank",
+        icon = {
+            shape = "land1",
+            symbol = "direct",
+            tech = "t1",
+        },
+        iconUI = "tech1_land1_direct.png",
+        iconUIBuildSortPriority = 80,
+        iconUIType = "land",
+        name = "Ascendant Puma",
+        orders = {
+            Assist = true,
+            Attack = true,
+            AttackMove = true,
+            Move = true,
+            Patrol = true,
+            Stop = true,
+        },
+        threatByLayer = {
+            Air = 0,
+            Land = 72.9,
+            WaterSurface = 72.9,
+        },
+        modelTpId = "uel1001",
+        tpId = "ual1001",
+        unitTypeName = "AscendantT1Tank",
+    },
+    intel = {
+        visionRadius = 20,
+    },
+    movement = {
+        acceleration = 3.3,
+        altitudeJitterFactor = 0,
+        bankFactor = 0,
+        collisionMaskDefault = {
+            "LandSmall",
+        },
+        collisionMaskSpawn = {
+            "LandSmall",
+        },
+        orbitRange = 0,
+        orbitSpeed = 0,
+        preferredAltitude = 0,
+        referenceAltitude = "Ground",
+        rotationSpeed = 90,
+        sortOrder = 1,
+        speed = 2.9,
+        terrainAlignmentFactor = 1,
+        type = "TracksLand",
+    },
+    tags = {
+        "ANTI_SURFACE",
+        "BUILDABLE_BY_T1_FACTORY",
+        "BUILDABLE_BY_T2_FACTORY",
+        "BUILDABLE_BY_T3_FACTORY",
+        "DIRECT_FIRE",
+        "ASCENDANT",
+        "LAND",
+        "MOBILE",
+        "TANK",
+        "TECH1",
+    },
+    visuals = {
+        display = {
+            mainBarDisplayScale = {
+                x = 0.7,
+                y = 0.7,
+            },
+            mainBarOffSet = {
+                x = 0,
+                y = 20,
+            },
+            progressBars = {
+                {
+                    colorBackground = {
+                        a = 1,
+                        x = 0,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorEmpty = {
+                        a = 1,
+                        x = 1,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorFull = {
+                        a = 1,
+                        x = 0,
+                        y = 1,
+                        z = 0,
+                    },
+                    mainBar = true,
+                    name = "Health",
+                    property = "Health_Current",
+                    xOffset = 0,
+                    xScale = 1,
+                },
+            },
+            subBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            subBarOffSet = {
+                x = 0,
+                y = 0,
+            },
+        },
+        effectsInstant = {
+            onDeath = {
+                {
+                    boneName = "Root",
+                    particleName = "VFX/Death/ved1101_death_land_small.sanvfx",
+                },
+            },
+        },
+        effectsPersistent = {
+            {
+                boneName = "Wheel01_Left",
+                particleName = "VFX/Trails/TireTrack01.sanvfx",
+            },
+            {
+                boneName = "Wheel01_Right",
+                particleName = "VFX/Trails/TireTrack01.sanvfx",
+            },
+        },
+        mesh = {
+            lod0distance = 65,
+            lod1distance = 171,
+        },
+        selection = {
+            size = {
+                x = 1.14,
+                y = 1.58,
+            },
+        },
+    },
+    weapons = {
+        {
+            aimControllers = {
+                {
+                    aimBone = "Turret01_Muzzle01",
+                    aimTolerance = 0.2,
+                    defaultPitchAdjustment = 0,
+                    defaultYawAdjustment = 0,
+                    leadTarget = true,
+                    pitchBone = "Turret01_Pitch01",
+                    pitchMax = 45,
+                    pitchMin = -25,
+                    pitchSpeed = 100,
+                    poseResetTime = 3,
+                    projectileSpeed = 25,
+                    solverType = "LowArc",
+                    yawBone = "Turret01_Yaw01",
+                    yawMax = 180,
+                    yawMin = -180,
+                    yawSpeed = 100,
+                },
+            },
+            audio = {
+                onFire = {
+                    looping = false,
+                    name = "aeom1110",
+                },
+            },
+            damage = 37.23,
+            damageRadius = 0,
+            damageType = "Normal",
+            effects = {
+                onFire = "VFX/Muzzle/vem1101_cannon_small_muzzle.sanvfx",
+            },
+            firingRandomness = 0,
+            layerTargetLimits = {
+                "Land",
+                "WaterSurface",
+            },
+            layerWeaponLimits = {
+                "Land",
+            },
+            muzzleGroupChargeDelay = 0,
+            muzzleGroupTimeOut = -1,
+            muzzleGroups = {
+                {
+                    muzzles = {
+                        "Turret01_Muzzle01",
+                    },
+                },
+            },
+            muzzleSalvoSize = 1,
+            projectileLifetime = 2,
+            projectileTemplate = "ped111",
+            rangeMax = 20,
+            rangeMin = 0,
+            rangeRingType = "DirectFire",
+            rangeTracking = 1.1,
+            reloadTime = 1.6,
+            targetWaterLimits = "Above",
+        },
+    },
+}

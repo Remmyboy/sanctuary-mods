@@ -1,0 +1,256 @@
+---@type UnitTemplate
+UnitTemplate = {
+    additions = {
+        buildBeamBones = {
+            "BuildArm01",
+        },
+        buildBeamEffectName = "beam1",
+    },
+    audio = {
+        active = {
+            looping = true,
+            name = "aelu2520",
+        },
+        onDestroyed = {
+            looping = false,
+            name = "aeod2120",
+        },
+    },
+    collisionInfo = {
+        centerOffset = {
+            x = 0,
+            y = 1.5,
+            z = 0,
+        },
+        collisionSize = {
+            x = 5,
+            y = 3,
+            z = 6,
+        },
+    },
+    construction = {
+        beam = {
+            offset = {
+                x = 0,
+                y = 1.7,
+                z = 4,
+            },
+            shrink = 0.6,
+        },
+        buildPower = 10,
+        canBuild = "Tags.ASCENDANT * Tags.BUILDABLE_BY_T1_FACTORY * ((Tags.LAND * Tags.MOBILE) + Tags.LAND_FACTORY)",
+        rollOffPoints = {
+            {
+                offset = {
+                    x = 0,
+                    y = 0,
+                    z = 2.5,
+                },
+                platformOffset = {
+                    x = 0,
+                    y = 0,
+                    z = 0.5,
+                },
+                rollOffTime = 2,
+                unitSpin = 0,
+            },
+            {
+                offset = {
+                    x = 0,
+                    y = 0,
+                    z = -7,
+                },
+                platformOffset = {
+                    x = 0,
+                    y = 0,
+                    z = -2,
+                },
+                rollOffTime = 2,
+                unitSpin = 180,
+            },
+        },
+    },
+    defence = {
+        health = {
+            max = 5000,
+            value = 5000,
+        },
+    },
+    economy = {
+        buildTime = 150,
+        cost = {
+            alloys = 150,
+            energy = 1500,
+        },
+        storage = {
+            energy = 1000,
+        },
+    },
+    footprint = {
+        x = 5,
+        y = 9,
+    },
+    general = {
+        class = {
+            "unitsDefaultEDA",
+            "EDALandFactory",
+        },
+        displayName = "Tier 1: Land Factory",
+        icon = {
+            shape = "structure2",
+            symbol = "land",
+            tech = "t1",
+        },
+        iconUI = "tech1_structure2_land.png",
+        iconUIBuildSortPriority = 400,
+        iconUIType = "land",
+        name = "",
+        orders = {
+            Assist = true,
+            Pause = false,
+            Stop = true,
+        },
+        threatByLayer = {
+            Air = 0,
+            Land = 0,
+            WaterSurface = 0,
+        },
+        toggles = {
+            Pause = false,
+            RepeatBuild = true,
+        },
+        modelTpId = "ues1511",
+        tpId = "uas1511",
+        unitTypeName = "AscendantT1LandFactory",
+    },
+    intel = {
+        visionRadius = 15,
+    },
+    skirtSize = {
+        x = 8,
+        y = 12,
+    },
+    tags = {
+        "BUILDABLE_BY_T1_ENGINEER",
+        "BUILDABLE_BY_T2_ENGINEER",
+        "BUILDABLE_BY_T3_ENGINEER",
+        "CONSTRUCTION",
+        "ASCENDANT",
+        "ENERGY_STORAGE",
+        "FACTORY",
+        "LAND",
+        "LAND_FACTORY",
+        "STRUCTURE",
+        "TECH1",
+    },
+    visuals = {
+        display = {
+            mainBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            mainBarOffSet = {
+                x = 0,
+                y = 15,
+            },
+            progressBars = {
+                {
+                    colorBackground = {
+                        a = 1,
+                        x = 0,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorEmpty = {
+                        a = 1,
+                        x = 1,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorFull = {
+                        a = 1,
+                        x = 0,
+                        y = 1,
+                        z = 0,
+                    },
+                    mainBar = true,
+                    name = "Health",
+                    property = "Health_Current",
+                    xOffset = 0,
+                    xScale = 1,
+                },
+            },
+            subBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            subBarOffSet = {
+                x = 0,
+                y = 0,
+            },
+        },
+        effectsInstant = {
+            onConstructionCompleted = {
+                {
+                    boneName = "Root",
+                    particleName = "VFX/Unit/veu1311_factory_finish_t1.sanvfx",
+                },
+            },
+            onDeath = {
+                {
+                    audioName = "unit_death_land_eda_large",
+                    boneName = "Root",
+                    particleName = "VFX/Death/ved2301_death_building_large.sanvfx",
+                },
+            },
+        },
+        effectsPersistent = {
+            {
+                boneName = "Effect01",
+                particleName = "VFX/Unit/veu2301_active_generator_t3.sanvfx",
+            },
+        },
+        effectsWhenActive = {
+            {
+                boneName = "BuildArm01",
+                particleName = "VFX/Unit/veu8202_construction_effect_factory_build.sanvfx",
+            },
+            {
+                boneName = "Root",
+                particleName = "VFX/Unit/veu8201_construction_effect_factory_ambient.sanvfx",
+            },
+        },
+        holes = {
+            {
+                holeOffset = {
+                    x = 0,
+                    y = 2,
+                },
+                holeSize = {
+                    x = 3.4,
+                    y = 4,
+                },
+            },
+            {
+                holeOffset = {
+                    x = 1.5,
+                    y = 2,
+                },
+                holeSize = {
+                    x = 3,
+                    y = 2.8,
+                },
+            },
+        },
+        mesh = {
+            lod0distance = 199,
+            lod1distance = 517,
+        },
+        selection = {
+            size = {
+                x = 6.5,
+                y = 9,
+            },
+        },
+    },
+}

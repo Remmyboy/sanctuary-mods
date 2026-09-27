@@ -44,7 +44,7 @@ second, whether or not the game is running. The template's options:
 To build without touching the game (for example while you're playing), use
 `dotnet build -p:DeployPath=some\other\folder`.
 
-There are three worked examples in [`examples/`](../examples):
+There are four worked examples in [`examples/`](../examples):
 
 - **ExampleGameplayMod** is Lua only. It appends to `common/colors.lua` so the
   first army plays in pink. Copy the folder into `SanctuaryMods`, pick it in a
@@ -52,6 +52,9 @@ There are three worked examples in [`examples/`](../examples):
 - **EngineersAndRaiders** is Lua only. Factories can build only engineers and
   T1 raiders. It shows how to change what can be built, in the menus and on
   the host (see [Recipes](#recipes)).
+- **AscendantFaction** is Lua plus C#. It adds a fourth faction, picked from
+  the lobby's faction dropdown, using EDA's models (see
+  [Add a faction](#add-a-faction)).
 - **ExampleUiMod** is C#. It shows which gameplay mods are live, binds
   settings that appear on the Mods page, and subscribes to match events.
 
@@ -198,6 +201,55 @@ function up in the same table.
 **Add your own module.** Put it at `lua\<yourname>\util.lua` and
 `Import("yourname/util.lua")` from your appends. A folder named after you
 can't collide with the game's files or another mod's.
+
+**Add new units.** Put each one at
+`lua\common\units\unitsTemplates\<id>\<id>.santp`. The game finds unit
+templates by scanning that folder, and the framework makes new folders visible
+to the scan. A new unit has no art of its own, so borrow an existing unit's
+with `general.modelTpId = "<its id>"`: the game builds the unit's model,
+skeleton and material from that id. For a building, you also need the
+placement-ghost and portrait appends from the faction example below. Without
+them a new building has no see-through preview, and every new unit shows the
+"coming soon" portrait, which some UI mods (SanctuaryHud) hide.
+
+### Add a faction
+
+[`examples/AscendantFaction`](../examples/AscendantFaction) is a working
+fourth faction, tested in a match: you pick it in the lobby, spawn its
+commander, build its factory, and the factory builds its tanks and raiders. It
+needs both halves of a mod:
+
+- **Lua.**
+  - Append a fourth entry to `FactionsData` in `common/systems/factions.lua`:
+    name, unit-id prefix, faction tag and starting unit. The lobby hands Lua
+    the faction's dropdown index + 1, and the game looks everything up from
+    that table.
+  - Give the faction its units, each tagged with the new faction tag. Their
+    build lists name it (`"Tags.ASCENDANT * Tags.BUILDABLE_BY_T1_FACTORY"`), so
+    the tech tree stays inside the faction.
+- **C#.** The game's C# knows exactly three factions, and the lobby fills its
+  faction dropdown with them by name. A gameplay DLL adds the fourth option.
+  The loader only runs it while the host has picked the mod, so the option
+  exists exactly when every player can make sense of it. Past the dropdown,
+  nothing needs changing: the choice travels as a number nobody range-checks.
+
+`tools/make-templates.ps1` in the example generates the units from EDA's:
+- new ids
+- the new faction tag
+- EDA's models borrowed
+- EDA upgrade links cut
+- a few stat tweaks
+
+Re-run it after a game update to pick up the devs' changes to those units.
+
+What a faction can't do (yet):
+- **Art:** no new models, textures, sounds or effects; they live in the game's
+  asset packs, not in Lua.
+- **AI:** the AI can't play it; it plans builds with the three factions'
+  unit-id prefixes.
+- **Materials:** shields, build beams and adjacency effects pick their
+  materials by the three factions' tags. A new faction falls back to EDA's, and
+  the game logs a "no faction tag" line for each unit.
 
 ## Testing and debugging
 

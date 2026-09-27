@@ -210,11 +210,11 @@ namespace SanctuaryModLoader
                 {
                     if (plugin.Gameplay)
                     {
-                        if (_activeGameplayFolders.Contains(ModFolderOf(plugin.Path)) && Start(plugin)) started++;
+                        if (_activeGameplayFolders.Contains(ModFolderOf(plugin.Path)) && StartPlugin(plugin)) started++;
                         else waiting.Add(plugin.Name);
                     }
                     else if (vanilla || heldBack.Contains(plugin.Guid)) held.Add(plugin.Name);
-                    else if (Start(plugin)) started++;
+                    else if (StartPlugin(plugin)) started++;
                 }
                 var copies = _loadCounts[path];
                 Logger.LogInfo($"Hot-loaded {started} plugin(s) from {Path.GetFileName(path)} (built {_loadedStamps[path]:HH:mm:ss} UTC)" +
@@ -311,7 +311,9 @@ namespace SanctuaryModLoader
             }
         }
 
-        private bool Start(Managed plugin)
+        // Not "Start": Unity takes a method of that name for its own message and
+        // logs "Start() can not take parameters" at every launch.
+        private bool StartPlugin(Managed plugin)
         {
             if (plugin.Instance != null) return true;
             try
@@ -438,7 +440,7 @@ namespace SanctuaryModLoader
             if (plugin.Gameplay) return plugin.Instance != null ? plugin.Instance : null;
             if (enabled)
             {
-                loader.Start(plugin);
+                loader.StartPlugin(plugin);
             }
             else if (plugin.Instance != null)
             {
@@ -465,7 +467,7 @@ namespace SanctuaryModLoader
                 var want = loader._activeGameplayFolders.Contains(loader.ModFolderOf(plugin.Path));
                 if (want && plugin.Instance == null)
                 {
-                    if (loader.Start(plugin)) loader.Logger.LogInfo($"Gameplay mod plugin '{plugin.Name}' started for this lobby.");
+                    if (loader.StartPlugin(plugin)) loader.Logger.LogInfo($"Gameplay mod plugin '{plugin.Name}' started for this lobby.");
                 }
                 else if (!want && plugin.Instance != null)
                 {

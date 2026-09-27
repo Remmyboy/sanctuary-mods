@@ -18,7 +18,7 @@ and — for gameplay mods that change the match — let the lobby host pick it a
 hold Start until every player has an identical copy. Outside a lobby the game
 always runs vanilla, so players without mods can play with anyone.
 [docs/writing-mods.md](docs/writing-mods.md) is the author's guide, with a
-`dotnet new` [template](templates/sanctuary-mod/) and three
+`dotnet new` [template](templates/sanctuary-mod/) and four
 [examples](examples/).
 
 Lobby-compatible is not the same as safe. Every DLL here, like any BepInEx

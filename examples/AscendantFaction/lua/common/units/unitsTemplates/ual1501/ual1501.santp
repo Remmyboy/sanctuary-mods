@@ -1,0 +1,231 @@
+---@type UnitTemplate
+UnitTemplate = {
+    additions = {
+        buildBeamBones = {
+            "Root",
+        },
+        buildBeamEffectName = "beam1",
+    },
+    audio = {
+        engine = {
+            looping = true,
+            name = "aelu1210",
+        },
+        onDestroyed = {
+            looping = false,
+            name = "aeod1110",
+        },
+    },
+    collisionInfo = {
+        centerOffset = {
+            x = 0,
+            y = 0.25,
+            z = 0,
+        },
+        collisionSize = {
+            x = 0.5,
+            y = 0.5,
+            z = 1,
+        },
+    },
+    construction = {
+        beam = {
+            offset = {
+                x = 0,
+                y = 0.3,
+                z = 0,
+            },
+            shrink = 0.3,
+        },
+        buildPower = 5,
+        canBuild = "Tags.ASCENDANT * Tags.BUILDABLE_BY_T1_ENGINEER",
+        range = 5,
+    },
+    defence = {
+        health = {
+            max = 750,
+            value = 750,
+        },
+    },
+    economy = {
+        buildTime = 300,
+        cost = {
+            alloys = 75,
+            energy = 750,
+        },
+    },
+    footprint = {
+        x = 0.9,
+        y = 1.4,
+    },
+    general = {
+        class = {
+            "unitsDefaultEDA",
+            "EDAEngineer",
+        },
+        displayName = "Tier 1: Engineer",
+        icon = {
+            shape = "land1",
+            symbol = "engineer",
+            tech = "t1",
+        },
+        iconUI = "tech1_land1_engineer.png",
+        iconUIBuildSortPriority = 150,
+        iconUIType = "amphibious",
+        name = "",
+        orders = {
+            Assist = true,
+            AttackMove = true,
+            Capture = true,
+            Harvest = true,
+            Move = true,
+            Patrol = true,
+            Pause = false,
+            Repair = true,
+            Stop = true,
+        },
+        threatByLayer = {
+            Air = 0,
+            Land = 0,
+            WaterSurface = 0,
+        },
+        toggles = {
+            Pause = false,
+        },
+        modelTpId = "uel1501",
+        tpId = "ual1501",
+        unitTypeName = "AscendantT1Engineer",
+    },
+    intel = {
+        visionRadius = 15,
+    },
+    movement = {
+        acceleration = 2.7,
+        altitudeJitterFactor = 0,
+        bankFactor = 0,
+        collisionMaskDefault = {
+            "LandSmall",
+            "SeabedSmall",
+        },
+        collisionMaskSpawn = {
+            "LandSmall",
+            "SeabedSmall",
+        },
+        hullWaterSensor = {
+            offset = {
+                x = 0,
+                y = 0.5,
+                z = 0,
+            },
+            size = {
+                x = 0.5,
+                y = 0.5,
+                z = 1,
+            },
+        },
+        orbitRange = 0,
+        orbitSpeed = 0,
+        preferredAltitude = 0,
+        referenceAltitude = "Ground",
+        rotationSpeed = 90,
+        sortOrder = 6,
+        speed = 2.7,
+        terrainAlignmentFactor = 1,
+        type = "TracksAmphibious",
+    },
+    tags = {
+        "AMPHIBIOUS",
+        "BUILDABLE_BY_T1_FACTORY",
+        "BUILDABLE_BY_T2_FACTORY",
+        "BUILDABLE_BY_T3_FACTORY",
+        "CONSTRUCTION",
+        "ASCENDANT",
+        "ENGINEER",
+        "HARVEST",
+        "LAND",
+        "MOBILE",
+        "TECH1",
+    },
+    visuals = {
+        display = {
+            mainBarDisplayScale = {
+                x = 0.5,
+                y = 0.5,
+            },
+            mainBarOffSet = {
+                x = 0,
+                y = 15,
+            },
+            progressBars = {
+                {
+                    colorBackground = {
+                        a = 1,
+                        x = 0,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorEmpty = {
+                        a = 1,
+                        x = 1,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorFull = {
+                        a = 1,
+                        x = 0,
+                        y = 1,
+                        z = 0,
+                    },
+                    mainBar = true,
+                    name = "Health",
+                    property = "Health_Current",
+                    xOffset = 0,
+                    xScale = 1,
+                },
+            },
+            subBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            subBarOffSet = {
+                x = 0,
+                y = 0,
+            },
+        },
+        effectsInstant = {
+            onDeath = {
+                {
+                    audioName = "Sounds/videvo.net_royalFree_soundEffects/Explosions/mi explosion 03 hpx.ogg",
+                    boneName = "Root",
+                    particleName = "VFX/Death/ved1101_death_land_small.sanvfx",
+                },
+            },
+        },
+        effectsPersistent = {
+            {
+                boneName = "Root",
+                particleName = "VFX/Trails/TireTrack01.sanvfx",
+                positionOffset = {
+                    x = 0.2,
+                },
+            },
+            {
+                boneName = "Root",
+                particleName = "VFX/Trails/TireTrack01.sanvfx",
+                positionOffset = {
+                    x = -0.2,
+                },
+            },
+        },
+        mesh = {
+            lod0distance = 66,
+            lod1distance = 173,
+        },
+        selection = {
+            size = {
+                x = 1.25,
+                y = 1.8,
+            },
+        },
+    },
+}
