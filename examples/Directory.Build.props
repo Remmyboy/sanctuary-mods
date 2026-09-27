@@ -1,0 +1,4 @@
+<Project>
+  <!-- Stops MSBuild picking up the repo's own Directory.Build.props: these
+       projects build exactly as they would in an author's own folder. -->
+</Project>

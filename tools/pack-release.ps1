@@ -94,6 +94,9 @@ function Invoke-Git([string]$What, [string[]]$GitArgs) {
 # The loader lives in BepInEx\plugins and ships in every Standalone zip; a copy
 # under SanctuaryMods would load itself, and that copy would load itself again.
 if ($Mod -eq 'ModLoader') { Fail "no ModLoader mode: its zip would put the loader under SanctuaryMods; it ships inside every Standalone zip" }
+# The mod API is the loader's twin: BepInEx loads it from plugins\ under a
+# fixed identity, and it ships in every Standalone zip and with ModManager.
+if ($Mod -eq 'ModApi') { Fail "no ModApi mode: it ships inside every Standalone zip and the ModManager release; see the release-mod skill" }
 if (-not (Test-Path $Body)) { Fail "body file not found: $Body" }
 $bodyText = (Get-Content $Body -Raw).TrimEnd()
 if ($bodyText -match '\*\*|\[.+\]\(') {
@@ -136,14 +139,14 @@ if ($LASTEXITCODE -ne 0) {
     $buildLog | Select-Object -Last 40 | ForEach-Object { Write-Host "    $_" }
     Fail 'build failed'
 }
-foreach ($need in "$Mod.dll", 'ModLoader.dll') {
+foreach ($need in "$Mod.dll", 'ModLoader.dll', 'Sanctuary.ModApi.dll') {
     if (-not (Test-Path "$stage\$need")) { Fail "build produced no $need" }
 }
 
 # The SDK stamps the commit it built from into every DLL's product version
 # ("1.0.0+<sha>"). Checking it is what ties the zips to the tag: a DLL built
 # from anything else, a dirty tree or a stale output, cannot pass.
-foreach ($dll in @("$Mod.dll", 'ModLoader.dll') | Select-Object -Unique) {
+foreach ($dll in @("$Mod.dll", 'ModLoader.dll', 'Sanctuary.ModApi.dll') | Select-Object -Unique) {
     $pv = [Diagnostics.FileVersionInfo]::GetVersionInfo("$stage\$dll").ProductVersion
     $rev = if ($pv -match '\+([0-9a-f]{40})') { $Matches[1] } else { '(none)' }
     if ($rev -ne $head) { Fail "$dll carries source revision $rev (product version '$pv'), expected $head" }
@@ -165,6 +168,21 @@ Copy-Item "$stage\$Mod.dll" "$mm\SanctuaryMods\$Mod\$Mod.dll"
 # A mod may ship data next to its DLL (SanctuaryHud's alert sounds live in
 # <Mod>\sounds); anything under the project's sounds folder goes along.
 if (Test-Path "$src\$Mod\sounds") { Copy-Item "$src\$Mod\sounds" "$mm\SanctuaryMods\$Mod\sounds" -Recurse }
+# The Mod Manager is built on the mod API and on a loader that knows gameplay
+# mods, both in BepInEx\plugins, so its add-in zip updates those too.
+$framework = $Mod -eq 'ModManager'
+$frameworkNote = ''
+if ($framework) {
+    New-Item -ItemType Directory -Force -Path "$mm\BepInEx\plugins" | Out-Null
+    Copy-Item "$stage\ModLoader.dll" "$mm\BepInEx\plugins\ModLoader.dll"
+    Copy-Item "$stage\Sanctuary.ModApi.dll" "$mm\BepInEx\plugins\Sanctuary.ModApi.dll"
+    $frameworkNote = @"
+
+   This one also updates BepInEx\plugins\ModLoader.dll and adds
+   BepInEx\plugins\Sanctuary.ModApi.dll, the framework it runs on. Restart
+   the game once after extracting: those two never hot-reload.
+"@
+}
 $t = "Sanctuary $display $Version - Mod Manager add-in"
 @"
 $t
@@ -180,7 +198,7 @@ INSTALL
    Sanctuary.exe), so the mod lands in SanctuaryMods\$Mod\.
 2. That's it. If the game is already running the loader picks it up on the
    spot; it shows up under UI Mods on the Mods page, where it can be
-   switched off and on and its settings changed.
+   switched off and on and its settings changed.$frameworkNote
 
 WHAT IT DOES
 $bodyText
@@ -204,6 +222,7 @@ Copy-Item "$GamePath\BepInEx\core\*" "$sa\BepInEx\core\" -Recurse
 Copy-Item "$tools\BepInEx.cfg" "$sa\BepInEx\config\BepInEx.cfg"
 Copy-Item "$tools\SanctuaryMods-README.txt" "$sa\SanctuaryMods\README.txt"
 Copy-Item "$stage\ModLoader.dll" "$sa\BepInEx\plugins\ModLoader.dll"
+Copy-Item "$stage\Sanctuary.ModApi.dll" "$sa\BepInEx\plugins\Sanctuary.ModApi.dll"
 Copy-Item "$stage\$Mod.dll" "$sa\SanctuaryMods\$Mod\$Mod.dll"
 if (Test-Path "$src\$Mod\sounds") { Copy-Item "$src\$Mod\sounds" "$sa\SanctuaryMods\$Mod\sounds" -Recurse }
 $t = "Sanctuary $display $Version - Standalone"
@@ -223,6 +242,9 @@ INSTALL
 
 WHAT GOES WHERE
   BepInEx\plugins\ModLoader.dll        the loader - BepInEx starts it
+  BepInEx\plugins\Sanctuary.ModApi.dll the mod framework: gameplay mods
+                                       picked in the lobby, and the API
+                                       anyone's mods are built on
   SanctuaryMods\$Mod\$Mod.dll  the mod; the loader loads every DLL
                                        under SanctuaryMods and reloads it
                                        when the file changes
@@ -230,8 +252,8 @@ Other mods from the same author install the same way: drop their folder
 into SanctuaryMods.
 
 ALREADY RUNNING BEPINEX?
-Copy BepInEx\plugins\ModLoader.dll and the SanctuaryMods folder from this
-zip into your engine folder - AND make sure BepInEx\config\BepInEx.cfg has
+Copy BepInEx\plugins\ModLoader.dll, BepInEx\plugins\Sanctuary.ModApi.dll
+and the SanctuaryMods folder from this zip into your engine folder - AND make sure BepInEx\config\BepInEx.cfg has
     HideManagerGameObject = true
 under [Chainloader]. Sanctuary destroys BepInEx's manager object after
 start-up otherwise, and every plugin on it stops running right after it
@@ -264,9 +286,11 @@ function Assert-Entries($zip, $expected) {
     $stray = $names | Where-Object { $_ -like 'BepInEx/config/*' -and $_ -ne 'BepInEx/config/BepInEx.cfg' }
     if ($stray) { Fail "$([IO.Path]::GetFileName($zip)) ships stray config: $($stray -join ', ')" }
 }
-Assert-Entries $mmZip @("SanctuaryMods/$Mod/$Mod.dll", 'README.txt')
+$mmExpected = @("SanctuaryMods/$Mod/$Mod.dll", 'README.txt')
+if ($framework) { $mmExpected += 'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll' }
+Assert-Entries $mmZip $mmExpected
 Assert-Entries $saZip @("SanctuaryMods/$Mod/$Mod.dll", 'SanctuaryMods/README.txt', 'README.txt',
-    'BepInEx/plugins/ModLoader.dll', 'BepInEx/config/BepInEx.cfg', 'winhttp.dll',
+    'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll', 'BepInEx/config/BepInEx.cfg', 'winhttp.dll',
     'doorstop_config.ini', '.doorstop_version')
 
 Get-ChildItem $outPath -Filter "$Mod-$Version-*.zip" |

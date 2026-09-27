@@ -1,6 +1,6 @@
 ---
 name: release-mod
-description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
+description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader, and the ModApi framework DLL that ships inside them). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
 ---
 
 # Releasing a mod
@@ -124,6 +124,14 @@ version unless they have already said to go ahead.
   from that Standalone zip minus `SanctuaryMods/<Mod>/`, with the previous
   ModLoader zip's README.txt updated (header, a `NEW IN` section). Publish
   with an annotated tag at that commit and `gh release create --verify-tag`.
+- **ModApi has no release of its own** (the packer refuses `-Mod ModApi`).
+  `BepInEx/plugins/Sanctuary.ModApi.dll` ships in every Standalone zip and in
+  the ModManager add-in zip, which also carries `ModLoader.dll`: the manager
+  can't load without the API. Bump `ModApiPlugin.Version` (and
+  `<FileVersion>`) when it changes, but **never** `<AssemblyVersion>` within
+  1.x — third-party mods bind against 1.0.0.0. A change to ModApi means
+  re-releasing ModManager (so add-in installs get it) and saying "restart the
+  game once" in the notes: plugins\ never hot-reloads.
 - **A stale `[BepInPlugin]` version** has happened before: LadderReporter shipped
   0.2.3 while its attribute still read 0.2.1. Bumping the attribute first is
   what stops that.

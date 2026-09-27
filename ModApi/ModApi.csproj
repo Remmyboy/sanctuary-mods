@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Sanctuary.ModApi</AssemblyName>
+    <RootNamespace>Sanctuary.ModApi</RootNamespace>
+    <!-- The API is the stable half, like the loader: BepInEx loads it from
+         plugins\ under a fixed identity, so third-party mods can reference
+         it. The loader renames every DLL under SanctuaryMods per load, which
+         is why nothing there can be referenced, and why this can't live there.
+         It is also where everything that must outlive a hot reload lives:
+         the Lua overlay a running match reads from, and the lobby protocol. -->
+    <DeployPath>$(GamePath)\BepInEx\plugins</DeployPath>
+    <Deterministic>true</Deterministic>
+    <!-- Mods bind against 1.0.0.0 whatever the release: bump only on a
+         breaking change, and never within 1.x. -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NativeList, SharedStatic (the network data) and Newtonsoft (mod.json)
+         all ship with the game. -->
+    <Reference Include="Unity.Collections">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Collections.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Burst">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Burst.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Michsky.UI.Beam">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Michsky.UI.Beam.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

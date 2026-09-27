@@ -1,0 +1,10 @@
+{
+  "id": "sanctuarymods.example.pinkarmy",
+  "name": "Example: Pink Army",
+  "version": "1.0.0",
+  "author": "Sanctuary Mods",
+  "description": "The first army plays in hot pink. A smoke test for gameplay mods: pick it in a lobby and the first army's units should turn pink for everyone.",
+  "kind": "gameplay",
+  "luaRoot": "lua",
+  "apiVersion": 1
+}

@@ -1,0 +1,332 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using BepInEx;
+using Unity.Collections;
+
+namespace Sanctuary.ModApi
+{
+    /// The Lua overlay: gameplay mods' .lua and .santp files swapped into the
+    /// game's in-memory FilesCache. Every Lua VM and the lobby's hash read
+    /// from that cache, never from disk, and a VM reads it lazily, on every
+    /// Import, for the whole match. So an overlay has to be in place before
+    /// the match's VMs start and stay exactly as it was until the match is
+    /// cleaned up. Nothing on disk is ever touched.
+    ///
+    /// This lives in the API rather than the Mod Manager so that hot-reloading
+    /// the manager mid-match can't pull the files out from under the VMs.
+    public static class Overlay
+    {
+        // Original cache entries we replaced (never our own arrays), added
+        // keys that had no original, and every array we allocated (disposed on
+        // restore, including arrays a later mod's file overwrote in the dict).
+        private static readonly Dictionary<string, NativeArray<byte>> Pristine =
+            new Dictionary<string, NativeArray<byte>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> Added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly List<NativeArray<byte>> Allocated = new List<NativeArray<byte>>();
+        // CreateFileCache reassigns the whole dictionary, so if the game
+        // rebuilds the cache our entries are already gone, and restoring into
+        // the new one would corrupt it.
+        private static Dictionary<string, NativeArray<byte>> _appliedToDict;
+
+        private static List<ModInfo> _applied = new List<ModInfo>();
+        private static string _vanillaHash = "";
+        private static string _currentHash = "";
+
+        // Folder listings come from a separate private index built from disk;
+        // added files in new folders need their folder chain registered there
+        // or Lua directory enumeration won't see them.
+        private static readonly FieldInfo DirIndexField = typeof(EM.Lua.FilesCache)
+            .GetField("directoryToSubFolderNames", BindingFlags.NonPublic | BindingFlags.Static);
+        private static readonly MethodInfo RebuildDirIndexMi = typeof(EM.Lua.FilesCache)
+            .GetMethod("RebuildDirectoryIndex", BindingFlags.NonPublic | BindingFlags.Static);
+
+        private static string LuaRoot => Path.GetFullPath(Path.Combine(Paths.GameRootPath, "LJ", "lua"));
+
+        /// The mods whose files are in the cache right now, in apply order.
+        public static IReadOnlyList<ModInfo> Applied => _applied;
+
+        public static bool IsVanilla => _applied.Count == 0;
+
+        /// The game's Lua hash with no mods applied: what the lobby compares
+        /// at join, and what a player without any mods has.
+        public static string VanillaHash => _vanillaHash;
+
+        /// The game's Lua hash as the cache stands now.
+        public static string CurrentHash => _currentHash;
+
+        /// True once the game has built its file cache.
+        public static bool CacheReady => EM.Lua.FilesCache.pathToFileContents != null;
+
+        internal static void CaptureVanillaHash()
+        {
+            if (!CacheReady || _vanillaHash.Length > 0) return;
+            RestoreAll();
+            _vanillaHash = SafeHash();
+            _currentHash = _vanillaHash;
+        }
+
+        private const string AppendDir = "append";
+
+        /// An overlay file under append\ adds to a game file instead of
+        /// replacing it: append\common\colors.lua goes onto common\colors.lua.
+        internal static bool IsAppend(string rel, out string target)
+        {
+            var norm = rel.Replace('/', '\\');
+            if (norm.StartsWith(AppendDir + "\\", StringComparison.OrdinalIgnoreCase) && norm.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            {
+                target = norm.Substring(AppendDir.Length + 1);
+                return true;
+            }
+            target = norm;
+            return false;
+        }
+
+        /// Files that more than one of the given mods replace. The later mod
+        /// in the list wins. Appends never conflict: they stack.
+        public static IEnumerable<(string file, ModInfo[] mods)> Conflicts(IEnumerable<ModInfo> mods)
+        {
+            return mods
+                .SelectMany(m => m.OverlayFiles.Where(f => !IsAppend(f, out _))
+                    .Select(f => (file: f.Replace('/', '\\').ToLowerInvariant(), mod: m)))
+                .GroupBy(x => x.file)
+                .Where(g => g.Count() > 1)
+                .Select(g => (g.Key, g.Select(x => x.mod).ToArray()));
+        }
+
+        /// Makes the cache hold vanilla plus exactly these mods, in this order.
+        /// Replacements go first, a later mod's winning; then every append,
+        /// in the same order, onto whatever the file has become. Returns false
+        /// when the cache doesn't exist yet.
+        internal static bool Apply(IList<ModInfo> mods)
+        {
+            var cache = EM.Lua.FilesCache.pathToFileContents;
+            if (cache == null) return false;
+
+            // Unchanged: leave the arrays the VMs may already hold alone.
+            if (_appliedToDict != null && ReferenceEquals(_appliedToDict, cache) &&
+                mods.Count == _applied.Count &&
+                mods.Zip(_applied, (a, b) => ReferenceEquals(a, b)).All(x => x))
+            {
+                return true;
+            }
+
+            RestoreAll();
+            _appliedToDict = cache;
+            var files = 0;
+            var applied = new List<ModInfo>();
+            foreach (var appends in new[] { false, true })
+            {
+                foreach (var mod in mods)
+                {
+                    try
+                    {
+                        files += ApplyMod(mod, cache, appends);
+                        if (appends) applied.Add(mod);
+                    }
+                    catch (Exception e)
+                    {
+                        ModApiPlugin.Log.LogError($"Applying gameplay mod '{mod.Name}' failed part-way: {e.Message}");
+                    }
+                }
+            }
+            _applied = applied;
+            _currentHash = SafeHash();
+            ModApiPlugin.Log.LogInfo(applied.Count == 0
+                ? $"Lua overlay: vanilla (hash {Short(_currentHash)})."
+                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.");
+            return true;
+        }
+
+        internal static void Clear()
+        {
+            if (_applied.Count == 0 && _appliedToDict == null) return;
+            Apply(Array.Empty<ModInfo>());
+        }
+
+        /// The game rebuilt its cache (the debug file watcher, or a future
+        /// engine change): our entries went with the old dictionary. Returns
+        /// true when the overlay needs putting back.
+        internal static bool CacheWasRebuilt =>
+            _appliedToDict != null && !ReferenceEquals(_appliedToDict, EM.Lua.FilesCache.pathToFileContents);
+
+        internal static void Reestablish()
+        {
+            var mods = _applied.ToList();
+            ForgetDict();
+            Apply(mods);
+        }
+
+        private static int ApplyMod(ModInfo mod, Dictionary<string, NativeArray<byte>> cache, bool appends)
+        {
+            var count = 0;
+            var root = LuaRoot;
+            foreach (var rel in mod.OverlayFiles)
+            {
+                if (IsAppend(rel, out var targetRel) != appends) continue;
+                var target = Path.GetFullPath(Path.Combine(root, targetRel));
+                // Symlinks or ".." in a mod folder must not reach outside LJ\lua.
+                if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    ModApiPlugin.Log.LogWarning($"Mod '{mod.Name}': skipped '{rel}' (resolves outside LJ\\lua).");
+                    continue;
+                }
+
+                var bytes = File.ReadAllBytes(Path.Combine(mod.LuaRootPath, rel));
+                var exists = cache.TryGetValue(target, out var existing);
+                var name = targetRel.Replace('\\', '/');
+                if (appends)
+                {
+                    if (!exists)
+                    {
+                        ModApiPlugin.Log.LogWarning($"Mod '{mod.Name}': {rel} appends to {targetRel}, which the game doesn't have; skipped.");
+                        continue;
+                    }
+                    var original = existing.ToArray();
+                    var combined = AppendLua(original, bytes, beforeReturn: true);
+                    var error = LuaSyntax.Check(combined, name);
+                    if (error != null)
+                    {
+                        // A file whose closing return the scan misread: try
+                        // the plain end of the file before giving up.
+                        var atEnd = AppendLua(original, bytes, beforeReturn: false);
+                        if (LuaSyntax.Check(atEnd, name) == null) { combined = atEnd; error = null; }
+                    }
+                    if (error != null)
+                        ModApiPlugin.Log.LogError($"Mod '{mod.Name}': {rel} doesn't compile once appended to {name}: {error}. " +
+                                                  "The match will fail when the game loads that file.");
+                    bytes = combined;
+                }
+                else if (target.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                {
+                    var error = LuaSyntax.Check(bytes, name);
+                    if (error != null)
+                        ModApiPlugin.Log.LogError($"Mod '{mod.Name}': {rel} doesn't compile: {error}. The match will fail when the game loads it.");
+                }
+
+                var arr = new NativeArray<byte>(bytes, Allocator.Persistent);
+                Allocated.Add(arr);
+
+                if (exists)
+                {
+                    // Stash only the true original: a key another mod already
+                    // touched has its pristine copy (or none, if added) stashed.
+                    if (!Pristine.ContainsKey(target) && !Added.Contains(target))
+                        Pristine[target] = existing;
+                }
+                else
+                {
+                    Added.Add(target);
+                    RegisterFolders(targetRel);
+                }
+                cache[target] = arr;
+                count++;
+            }
+            return count;
+        }
+
+        /// The game file with a mod's code added in the same chunk, so the
+        /// added code sees the file's locals and can change what it defines.
+        /// Many game files end in a top-level `return { ... }`, after which Lua
+        /// allows nothing, so the code goes in just before that return,
+        /// where changes to the file's functions still reach the returned
+        /// table. Each addition gets its own do-block, so its locals can't
+        /// clash with the file's or another mod's.
+        internal static byte[] AppendLua(byte[] original, byte[] addition, bool beforeReturn = true)
+        {
+            var text = Encoding.UTF8.GetString(original);
+            var add = Encoding.UTF8.GetString(addition);
+            if (add.Length > 0 && add[0] == '﻿') add = add.Substring(1);
+            var block = "\n-- [SanctuaryMods append]\ndo\n" + add + "\nend\n";
+            var at = beforeReturn ? FinalReturn(text) : -1;
+            var combined = at < 0 ? text + block : text.Substring(0, at) + block + text.Substring(at);
+            return Encoding.UTF8.GetBytes(combined);
+        }
+
+        /// Where a file's closing top-level `return` starts, or -1: a line
+        /// starting with `return`, followed by nothing but its own indented
+        /// or closing lines, blank lines and comments.
+        internal static int FinalReturn(string text)
+        {
+            var lines = text.Split('\n');
+            var offset = text.Length;
+            for (var i = lines.Length - 1; i >= 0; i--)
+            {
+                var line = lines[i];
+                offset -= line.Length + (i < lines.Length - 1 ? 1 : 0);
+                var trimmed = line.TrimEnd('\r');
+                if (trimmed.StartsWith("return", StringComparison.Ordinal) &&
+                    (trimmed.Length == 6 || !char.IsLetterOrDigit(trimmed[6]) && trimmed[6] != '_'))
+                    return offset;
+                var t = trimmed.TrimStart();
+                // "return" alone on its line, then "{", fields and "}" below it,
+                // is how a lot of the game's files end.
+                var partOfTail = t.Length == 0 || t.StartsWith("--") || t.StartsWith("{") || t.StartsWith("}") ||
+                                 t.StartsWith(")") || char.IsWhiteSpace(trimmed[0]);
+                if (!partOfTail) return -1;
+            }
+            return -1;
+        }
+
+        private static void RestoreAll()
+        {
+            if (_appliedToDict != null && ReferenceEquals(_appliedToDict, EM.Lua.FilesCache.pathToFileContents))
+            {
+                foreach (var kv in Pristine) _appliedToDict[kv.Key] = kv.Value;
+                foreach (var key in Added) _appliedToDict.Remove(key);
+                // Drop our folder registrations by rebuilding the index from disk.
+                if (Added.Count > 0)
+                {
+                    try { RebuildDirIndexMi?.Invoke(null, null); }
+                    catch (Exception e) { ModApiPlugin.Log.LogWarning($"Directory index rebuild failed: {e.Message}"); }
+                }
+            }
+            ForgetDict();
+            _applied = new List<ModInfo>();
+        }
+
+        private static void ForgetDict()
+        {
+            // If the game reassigned the cache since we applied, our entries
+            // went with the old dictionary — nothing references these arrays.
+            foreach (var arr in Allocated)
+            {
+                try { if (arr.IsCreated) arr.Dispose(); } catch { }
+            }
+            Pristine.Clear();
+            Added.Clear();
+            Allocated.Clear();
+            _appliedToDict = null;
+        }
+
+        private static void RegisterFolders(string rel)
+        {
+            if (!(DirIndexField?.GetValue(null) is Dictionary<string, HashSet<string>> dirIndex)) return;
+            var parts = rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var parent = LuaRoot;
+            for (var i = 0; i < parts.Length - 1; i++)
+            {
+                if (!dirIndex.TryGetValue(parent, out var set))
+                    dirIndex[parent] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                set.Add(parts[i]);
+                parent = Path.Combine(parent, parts[i]);
+            }
+        }
+
+        private static string SafeHash()
+        {
+            try { return EM.Lua.FilesCache.ComputeLuaHashString(); }
+            catch (Exception e)
+            {
+                ModApiPlugin.Log.LogWarning($"Lua hash compute failed: {e.Message}");
+                return "?";
+            }
+        }
+
+        public static string Short(string hash) =>
+            string.IsNullOrEmpty(hash) ? "…" : (hash.Length > 12 ? hash.Substring(0, 12) : hash);
+    }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "templateauthorid.sanctuarymodtemplate",
+  "name": "SanctuaryModTemplate",
+  "version": "1.0.0",
+  "author": "TemplateAuthor",
+  "description": "What this mod does, in a sentence or two. Shown on the Mods page.",
+  "kind": "TEMPLATEKIND",
+  "luaRoot": "lua",
+  "url": "",
+  "requires": [],
+  "apiVersion": 1
+}

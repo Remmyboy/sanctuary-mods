@@ -24,7 +24,7 @@ namespace SanctuaryHud
     // (the pause menu's Settings button opens the same Settings screen
     // there), so the hotkey opens the page full-screen mid-match too, over
     // the menu background, and closing it returns to whatever was showing.
-    internal sealed class ModsPage
+    internal sealed partial class ModsPage
     {
         private const string HarmonyId = "com.sanctuarydb.modmanager.page";
         private static ModsPage _current;
@@ -42,7 +42,7 @@ namespace SanctuaryHud
         private GameObject _page;
         private GameObject _sidebarButton;
         private Transform _templates;
-        private Transform _uiList, _luaList;
+        private Transform _uiList, _gameList;
         private string _pluginSignature = "";
         private bool _sidebarRegistered;
 
@@ -166,6 +166,14 @@ namespace SanctuaryHud
             {
                 if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
                 if (PluginSignature() != _pluginSignature) RebuildUiTab();
+                if (GameplaySignature() != _gameplaySignature) RebuildGameplayTab();
+            }
+
+            try { TickLobby(); }
+            catch (Exception e)
+            {
+                _log.LogError($"Lobby mods panel: {e}");
+                DestroyLobbyPanel();
             }
         }
 
@@ -202,7 +210,7 @@ namespace SanctuaryHud
             if (frontMenu) CurrentWindow(im) = InterfaceManager.Window.Background;
             else im.TransitionTo(InterfaceManager.Window.Background);
             RebuildUiTab();
-            RebuildLuaTab();
+            RebuildGameplayTab();
             pm.OpenPanel(PanelName);
             _open = true;
         }
@@ -222,6 +230,7 @@ namespace SanctuaryHud
             // A hot reload while the page is up would otherwise leave the
             // menu on an empty screen.
             if (IsOpen) Close();
+            DestroyLobbyPanel();
             try { _harmony?.UnpatchSelf(); } catch { }
             _harmony = null;
             Unregister();
@@ -262,7 +271,7 @@ namespace SanctuaryHud
         }
 
         private string PluginSignature() =>
-            string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-")));
+            (_owner.VanillaMode ? "V|" : "") + string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-")));
 
         // ---- construction ---------------------------------------------------
 
@@ -333,22 +342,22 @@ namespace SanctuaryHud
             _templates.SetParent(_page.transform, false);
             _templates.gameObject.SetActive(false);
 
-            // Tabs: Graphics becomes UI Mods, Controls becomes Lua Mods; the rest go.
+            // Tabs: Graphics becomes UI Mods, Controls becomes Gameplay Mods; the rest go.
             var uiTab = categories.Find("Graphics").GetComponent<PanelButton>();
-            var luaTab = categories.Find("Controls").GetComponent<PanelButton>();
+            var gameTab = categories.Find("Controls").GetComponent<PanelButton>();
             Object.DestroyImmediate(categories.Find("General").gameObject);
             Object.DestroyImmediate(categories.Find("Audio").gameObject);
             RenamePanelButton(uiTab, "UI Mods", _icon);
-            RenamePanelButton(luaTab, "Lua Mods", FindSprite("General (64x)"));
+            RenamePanelButton(gameTab, "Gameplay Mods", FindSprite("General (64x)"));
 
             var uiPanel = panels.Find("Graphics");
-            var luaPanel = panels.Find("Controls");
+            var gamePanel = panels.Find("Controls");
             Object.DestroyImmediate(panels.Find("General").gameObject);
             Object.DestroyImmediate(panels.Find("Audio").gameObject);
             uiPanel.name = "UI Mods";
-            luaPanel.name = "Lua Mods";
+            gamePanel.name = "Gameplay Mods";
             _uiList = uiPanel.Find("Content/List/Layout Group");
-            _luaList = luaPanel.Find("Content/List/Layout Group");
+            _gameList = gamePanel.Find("Content/List/Layout Group");
 
             // Lift the row templates out before emptying the lists.
             _tHeading = TakeTemplate(_uiList, "Display Header", "Heading");
@@ -358,7 +367,7 @@ namespace SanctuaryHud
             _tButtonRow = TakeTemplate(_uiList, "ApplyButton", "ButtonRow");
             _tSelectorRow = TakeTemplate(_uiList, "Window Mode", "SelectorRow");
             PrepareSelectorTemplate(_tSelectorRow);
-            _tSwitchRow = TakeTemplate(_luaList, "EdgePanToggle", "SwitchRow");
+            _tSwitchRow = TakeTemplate(_gameList, "EdgePanToggle", "SwitchRow");
             // The slider row is a second copy of UI Scale, taken before the
             // text template strips the slider out of the first.
             _tSliderRow = Object.Instantiate(_tTextRow, _templates);
@@ -368,13 +377,13 @@ namespace SanctuaryHud
             PrepareTextTemplate(_tTextRow);
             PrepareButtonTemplate(_tButtonRow);
             Clear(_uiList);
-            Clear(_luaList);
+            Clear(_gameList);
 
             var pm = screen.GetComponent<PanelManager>();
             pm.panels = new List<PanelManager.PanelItem>
             {
                 new PanelManager.PanelItem { panelName = "UI Mods", panelObject = uiPanel.GetComponent<Animator>(), panelButton = uiTab },
-                new PanelManager.PanelItem { panelName = "Lua Mods", panelObject = luaPanel.GetComponent<Animator>(), panelButton = luaTab },
+                new PanelManager.PanelItem { panelName = "Gameplay Mods", panelObject = gamePanel.GetComponent<Animator>(), panelButton = gameTab },
             };
             pm.currentPanelIndex = 0;
 
@@ -407,7 +416,7 @@ namespace SanctuaryHud
             }
             SetButtonText(rescan, "Rescan");
             SetButtonText(open, "Open Mods Folder");
-            rescan.onClick.AddListener(() => { _owner.Rescan(); RebuildLuaTab(); RebuildUiTab(); });
+            rescan.onClick.AddListener(() => { _owner.Rescan(); RebuildGameplayTab(); RebuildUiTab(); });
             open.onClick.AddListener(_owner.OpenModsFolder);
 
             // -- the sidebar entry: a clone of the Settings button, right after it.
@@ -469,7 +478,8 @@ namespace SanctuaryHud
 
         private const string PageDescription =
             "Switch mods on and off, and change their settings. Click a mod to show its settings. " +
-            "UI mods run on this PC only; Lua mods change the game's own scripts, so everyone in a lobby needs the same ones.";
+            "UI mods run on this PC only. Gameplay mods change the match itself: the lobby host picks them, " +
+            "everyone needs the same copies, and outside a lobby the game stays vanilla.";
 
         /// The description column, with our text as its resting state and
         /// the mod's icon as its picture. Rows fill it on hover (see Place).
@@ -1082,6 +1092,16 @@ namespace SanctuaryHud
             _pluginGroups.Clear();
             _sectionLabels.Clear();
 
+            DescribeNext("Play vanilla",
+                "Every UI mod off at once, as if none were installed; switch it off again and they come back as you had them. " +
+                "Gameplay mods are always the lobby host's choice.");
+            SwitchRow(_uiList, "Play vanilla   <alpha=#80>every UI mod off", _owner.VanillaMode, true, on =>
+            {
+                _owner.SetVanillaMode(on);
+                RebuildUiTab();
+            });
+            Line(_uiList);
+
             if (_owner.Plugins.Count == 0)
             {
                 InfoRow(_uiList, "No UI mods loaded");
@@ -1133,7 +1153,9 @@ namespace SanctuaryHud
             string version = null;
             try { version = p.Type != null ? BepInEx.MetadataHelper.GetMetadata(p.Type)?.Version?.ToString() : null; }
             catch { }
-            return (version != null ? $"Version {version}. " : "") +
+            var m = p.Mod != null && !p.Mod.Manifest.Synthesised ? p.Mod.Manifest : null;
+            return (m != null && m.Description.Length > 0 ? m.Description + "\n\n" : "") +
+                   (version != null ? $"Version {version}" + (m != null && m.Author.Length > 0 ? $" by {m.Author}. " : ". ") : "") +
                    (p.Enabled ? "Running. " : "Switched off. ") +
                    "The switch starts or stops it straight away; click the row to show or hide its settings.";
         }
@@ -1217,40 +1239,5 @@ namespace SanctuaryHud
             });
         }
 
-        private void RebuildLuaTab()
-        {
-            if (_luaList == null) return;
-            Clear(_luaList);
-            var locked = _owner.Locked;
-
-            Heading(_luaList, "Lua mods need everyone in the lobby to run the same set");
-            var vanilla = _owner.HashNow == _owner.HashVanilla;
-            InfoRow(_luaList,
-                locked ? "In a lobby or match — leave it to change mods" : "Applied at the next match launch",
-                (vanilla ? "Vanilla   " : "Modded   ") + ModManagerPlugin.Short(_owner.HashNow));
-            Line(_luaList);
-
-            if (_owner.Mods.Count == 0)
-            {
-                InfoRow(_luaList, "No Lua mods found", "SanctuaryMods\\<Mod>\\<files laid out like LJ\\lua>");
-                ScrollToTop(_luaList);
-                return;
-            }
-
-            foreach (var mod in _owner.Mods)
-            {
-                var m = mod;
-                var files = $"{m.LuaCount} lua" + (m.SantpCount > 0 ? $", {m.SantpCount} santp — not hash-checked" : "");
-                DescribeNext(m.Name,
-                    $"{m.LuaCount} Lua file(s)" + (m.SantpCount > 0 ? $" and {m.SantpCount} unit template(s), which the lobby's check does not cover" : "") +
-                    ". A change applies at the next match launch, and everyone in the lobby needs the same Lua mods switched on.");
-                SwitchRow(_luaList, $"{m.Name}   <alpha=#80>{files}", m.Enabled, !locked, on =>
-                {
-                    _owner.SetModEnabled(m, on);
-                    RebuildLuaTab();
-                });
-            }
-            ScrollToTop(_luaList);
-        }
     }
 }

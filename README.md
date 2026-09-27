@@ -11,6 +11,16 @@ The UI mods are presentation-side only: they never touch the game's Lua tree
 tick between players), so a modded client stays lobby-compatible with unmodded
 players. The exceptions are called out in their own sections below.
 
+It is also a **mod framework** anyone can build on: drop a mod's folder into
+`engine\SanctuaryMods\` and the [Mod Loader](#modloader), [Mod API](#modapi) and
+[Mod Manager](#modmanager) load it, hot-reload it, list it on the Mods page
+and — for gameplay mods that change the match — let the lobby host pick it and
+hold Start until every player has an identical copy. Outside a lobby the game
+always runs vanilla, so players without mods can play with anyone.
+[docs/writing-mods.md](docs/writing-mods.md) is the author's guide, with a
+`dotnet new` [template](templates/sanctuary-mod/) and two
+[examples](examples/).
+
 Lobby-compatible is not the same as safe. Every DLL here, like any BepInEx
 plugin, is a full-trust client plugin: it runs inside the game process with
 the permissions of the Windows account playing, and an unchanged Lua hash is
@@ -33,9 +43,10 @@ source.
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.1) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover, Lua overlays |
+| [ModManager](ModManager/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.1) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover, play-vanilla switch; the lobby's Mods panel where the host picks gameplay mods |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.1) | Loads and hot-reloads every mod above from `SanctuaryMods` |
+| [ModApi](ModApi/) | — | The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1410,7 +1421,7 @@ agent running).
 
 A **Mods** entry in the front menu's sidebar (the cube icon, just below
 Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods
-and Lua Mods. The page is the game's own Settings screen, cloned and refilled:
+and Gameplay Mods, and a **Mods** button in the lobby. The page is the game's own Settings screen, cloned and refilled:
 the tab bar, the switch rows, the sliders (UI Scale's row), the left/right
 selectors (Window Mode's row), the text fields (a slider's input box,
 widened), the headings and the buttons are all the game's Beam UI widgets, so
@@ -1428,28 +1439,32 @@ two to a row, which is what keeps BuildHotkeys' structure and unit lists
 short.
 **F8** also opens the same page full-screen during a match (over the menu
 background, the way the pause menu's Settings does); closing it returns to
-the game. UI mod toggles and settings changes apply immediately; Lua mod
-toggles are locked until you leave the match.
+the game. UI mod toggles and settings changes apply immediately.
 
-It manages two kinds of mods:
+It manages two kinds of mods (see [docs/writing-mods.md](docs/writing-mods.md)):
 
-**Lua mods** are a mod folder's `*.lua`/`*.santp` files, laid out mirroring the
-`LJ\lua` tree (later mods win conflicts, and new files/folders are registered
-so Lua directory listings see them). The manager overlays them into the
-game's in-memory `FilesCache` — the
-single source both the lobby hash and every match's Lua VMs read from — so
-mods toggled in the main menu apply at the next match launch, no restart
-needed, and nothing on disk is modified. Enabled mods persist in config and
-re-apply on startup.
+**Gameplay mods** are a mod folder's `*.lua`/`*.santp` files, laid out mirroring
+`LJ\lua` (and, with `"kind": "gameplay"` in its `mod.json`, its DLL). They are
+the lobby host's pick, not the player's: outside a lobby the game always runs
+vanilla, so nobody is ever kept out of a vanilla lobby by their own mods. In
+the lobby, the **Mods** button beside Settings (it reads `Mods (2)`, with a `!`
+while someone is missing something) opens a panel over the lobby screen: the
+host switches gameplay mods on and off there, and everyone sees the pick and,
+for each player, whether they have identical copies ("has Faster Tanks 1.1
+(host 1.2)", "no mod support"). Every pick also goes into the lobby chat.
+Start stays greyed out until everyone matches; with nothing picked there's no
+check and vanilla players play as usual. The panel is an overlay rather than a
+screen of its own because leaving the game's lobby window drops its chat and
+roster listeners and clears the chat. The [Mod API](#modapi) does the actual
+work; the Gameplay Mods tab here lists what's installed (manifest details and
+problems on hover) and which mods are **picked by default** when this player
+hosts (`[Lobby] DefaultSelection` in `com.sanctuarydb.modapi.cfg`; Lua mods
+switched on under 0.6 migrate to it). Ladder lobbies always start vanilla.
 
-Multiplayer safety falls out of the game's own design: the lobby host compares
-`ComputeLuaHash` of the *cache* (not the disk) against each joiner and refuses
-mismatches, so everyone in a lobby provably runs the same Lua. The Lua Mods
-tab shows the live hash for comparing with friends. Two caveats: `.santp` files
-are loaded but **not** hashed (template mods must be coordinated manually or
-they desync mid-game), and toggling is blocked while in a lobby or match. A
-sample mod, `SanctuaryMods\ExamplePinkArmy`, turns army slot 1 hot pink as a
-smoke test (safe to delete).
+**Play vanilla**, at the top of the UI Mods tab, holds back every UI mod at
+once, as if none were installed, and brings them back as they were when
+switched off again (`[Plugins] VanillaMode`, which the loader also reads, so
+nothing starts at launch either).
 
 **UI mods** — the DLLs, every mod in this repo — each get a section headed
 by the mod's name with its on/off switch inline. Sections start folded, one
@@ -1515,6 +1530,17 @@ loader, which refuses one whose DLL has since been deleted. An older Mod
 Manager can't list a held-back plugin, so the loader only holds plugins back
 when the manager installed says it can.
 
+Since 1.4 it knows the two kinds of mod. A folder whose `mod.json` says
+`"kind": "gameplay"` has its DLLs held back like a switched-off plugin, and
+started only while the lobby host has picked that mod (the [Mod API](#modapi)
+tells it which folders through `SetActiveGameplayFolders`); they stop when the
+lobby or match ends, and a rebuild of one waits until the match is over, so
+the simulation never changes under a running game. The Mods page's **Play
+vanilla** (`[Plugins] VanillaMode`) holds back every UI mod the same way.
+Libraries an author ships by accident beside their DLL (`0Harmony.dll`,
+`Newtonsoft.Json.dll`, `BepInEx*.dll`, `Sanctuary.ModApi.dll`) are skipped with
+a warning: a second, renamed copy would break the real one.
+
 Two things it has to do that a plain BepInEx plugin would not: it rewrites
 each assembly's identity per load, because Mono returns the cached assembly
 for a byte-load with an identical name and a rebuild would silently keep
@@ -1522,6 +1548,62 @@ running the old code; and it attaches the plugins it loads to BepInEx's own
 hidden manager object rather than a GameObject of its own, because Sanctuary
 destroys foreign root GameObjects after start-up (the same reason BepInEx
 needs `HideManagerGameObject = true` here, see Setup).
+
+## ModApi
+
+`BepInEx\plugins\Sanctuary.ModApi.dll`: the stable core of the mod framework,
+and the one assembly third-party mods compile against. Like the loader it is
+loaded by BepInEx under a fixed identity (1.0.0.0 for all of 1.x), so it never
+hot-reloads — which is exactly why it holds the parts that must outlive every
+other mod's reloads, the Mod Manager's included:
+
+- **The catalog.** Every folder under `SanctuaryMods` with its `mod.json`
+  (id, name, version, author, kind, `luaRoot`, url, requires) and a SHA-256
+  **content hash** over its overlaid files and, for gameplay mods, its DLLs.
+  Rescanned every two seconds; only changed folders are hashed again.
+- **The overlay.** Gameplay mods' files go into the game's in-memory
+  `FilesCache`, which every Lua VM and the lobby's Lua hash read, lazily, for
+  the whole match; nothing on disk changes. Files under `append\` are added to
+  the game file of that path in the same chunk — just before a closing
+  top-level `return`, which 123 of the game's 731 Lua files end in — and
+  several mods' appends stack in pick order; other files replace or add.
+  Every overlaid Lua file is compiled with the game's own `lua51.dll` as it
+  goes on, so a syntax error is logged against its mod and file.
+- **Vanilla outside lobbies.** Prefixes on `LobbyManager.CreateLobby` and
+  `JoinLobby` clear the overlay, so the hash the host records for its join
+  check, and every joiner's, is the vanilla one; postfixes on `LeaveLobby`
+  and `EngineLoader.CleanUpGame` clear it again afterwards. A prefix on
+  `SteamManager.AdvertiseServer` advertises the vanilla hash too (and adds
+  " [mods]" to the lobby's name while mods are picked), so the lobby browser
+  never greys a modded lobby out.
+- **The lobby protocol.** The game's lobby runs on its own channel-4 messages,
+  whose handlers switch on a type byte with no default case, so a type they
+  don't know is dropped silently. Four new types ride on that: a joiner says
+  hello, the host sends its pick (id, name, version, content hash and the
+  resulting Lua hash, in apply order), each client applies it when all its
+  copies are identical and reports back, and the host broadcasts everyone's
+  state. Vanilla players neither see nor send any of it.
+- **The Start gate.** The game only compares Lua hashes at join, so the API
+  holds Start itself while any player is missing a mod, has a different copy,
+  or has no mod support: `LobbyInterface.UpdateData` (the button),
+  `InterfaceManager.OnLobbyStartGamePressed` (the reason, in the chat),
+  `LobbyManager.CanStartGame` (anything calling it directly, LadderReporter
+  included), and authoritatively the host's handling of its own `StartGame`,
+  which also freezes the pick for the match. A client whose files don't match
+  the host's when the match loads leaves it rather than desync.
+- **Modded replays.** A replay recorded with gameplay mods gets a
+  `<replay>.mods.json` beside it (moved and deleted with it). The replay list
+  shows it as playable when those mods are installed and identical — or
+  "needs Faster Tanks 1.0" when not — and playing it puts them back on first.
+- **The API** for mod authors: `Modding` (your mod's folder and manifest,
+  lobby and match state, the live gameplay mods), `ModEvents` (lobby entered
+  and left, pick changed, match starting and ended — owner-scoped, so a
+  hot-reloaded mod's old copy never runs), `ModLua` (run and read Lua in the
+  client VM), `Lobby` and `ModCatalog`. See
+  [docs/writing-mods.md](docs/writing-mods.md).
+
+It has no release of its own: it ships in every Standalone zip and with the
+Mod Manager.
 
 ## Development
 
@@ -1535,8 +1617,14 @@ Every mod deploys to its own folder under `engine\SanctuaryMods\` — outside
 the BepInEx tree, alongside the Lua mods, so one folder is the whole of a mod
 whether it ships a DLL, Lua files, or both. The loader is the exception: it
 deploys to `BepInEx\plugins`, because BepInEx is what loads *it* (see
-[ModLoader](#modloader)). So `dotnet build` — of one project or the whole
-`SanctuaryMods.sln` — is the entire iteration loop, no game restart.
+[ModLoader](#modloader)), and so does the [Mod API](#modapi). So
+`dotnet build` — of one project or the whole `SanctuaryMods.sln` — is the
+entire iteration loop, no game restart, except for those two, which need one.
+
+[examples/](examples/) and [templates/](templates/) are deliberately outside
+the solution and outside `Directory.Build.props` (each has a stub that stops
+the import): they build exactly as a third-party mod would, against the
+installed `BepInEx\plugins\Sanctuary.ModApi.dll`.
 
 ### Cutting a release
 
