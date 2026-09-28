@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
+  "title": "Sanctuary mod manifest (mod.json)",
+  "description": "Describes a mod folder under engine\\SanctuaryMods. See docs/writing-mods.md.",
+  "type": "object",
+  "required": ["id"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": {
+      "description": "How the lobby names the mod to other players. Prefix it with your own name so it never collides with someone else's.",
+      "type": "string",
+      "pattern": "^[a-z0-9._-]{1,64}$"
+    },
+    "name": { "description": "Shown on the Mods page and in the lobby.", "type": "string" },
+    "version": { "description": "Shown to players; the lobby compares contents, not this.", "type": "string" },
+    "author": { "type": "string" },
+    "description": { "description": "A sentence or two, shown on the Mods page.", "type": "string" },
+    "kind": {
+      "description": "ui: changes only your own screen, you switch it on and off. gameplay: changes the match; the lobby host picks it and every player needs an identical copy.",
+      "enum": ["ui", "gameplay"]
+    },
+    "luaRoot": {
+      "description": "The folder, inside the mod, that mirrors the game's LJ\\lua. Default \"lua\".",
+      "type": "string",
+      "default": "lua"
+    },
+    "url": { "description": "Where to get the mod. Shown to players who are missing it.", "type": "string" },
+    "requires": {
+      "description": "Ids of gameplay mods that must be picked alongside this one.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9._-]{1,64}$" }
+    },
+    "apiVersion": { "description": "The Mod API major version the mod was written for.", "type": "integer", "default": 1 },
+    "options": {
+      "description": "Settings the lobby host picks for a gameplay mod. Lua reads them with Import(\"modoptions/<id>.lua\").Options.",
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "required": ["key", "type"],
+        "properties": {
+          "key": {
+            "description": "The name Lua and C# read the value by. A Lua name: letters, digits and _, not starting with a digit, not a Lua keyword.",
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,39}$"
+          },
+          "label": { "description": "Shown in the lobby. Default: the key.", "type": "string" },
+          "description": { "description": "Shown on the Mods page.", "type": "string" },
+          "type": {
+            "description": "toggle: on or off. choice: one of a list. number: a number, optionally in a range and on a step.",
+            "enum": ["toggle", "choice", "number", "int"]
+          },
+          "default": {
+            "description": "A toggle's true or false, a choice's value, or a number. Missing: off, the first choice, or the lowest number.",
+            "type": ["boolean", "string", "number"]
+          },
+          "choices": {
+            "description": "For a choice: values, or { value, label } pairs.",
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "anyOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "required": ["value"],
+                  "properties": { "value": { "type": "string" }, "label": { "type": "string" } },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "min": { "description": "For a number: the lowest value.", "type": "number" },
+          "max": { "description": "For a number: the highest value. With min, the lobby shows a slider.", "type": "number" },
+          "step": { "description": "For a number: values snap to min plus a whole number of steps.", "type": "number", "exclusiveMinimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

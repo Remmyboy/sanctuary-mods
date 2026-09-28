@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.example.uimod",
   "name": "Example UI Mod",
   "version": "1.0.0",

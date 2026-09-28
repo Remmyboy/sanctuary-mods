@@ -11,13 +11,17 @@
 -- and everything else that parses tags is left alone. Structures always stay
 -- buildable, so factories, extractors and generators still work.
 
+local Options = Import("modoptions/sanctuarymods.example.engineersandraiders.lua").Options
 local original = _G.ParseTagsFromString
 local filtered = {}
 
 local function allowed(tpId)
     if not Tags.MOBILE[tpId] then return true end    -- structures
     if Tags.ENGINEER[tpId] then return true end      -- every tier of engineer
-    return Tags.RAIDER[tpId] and Tags.TECH1[tpId]   -- T1 raiders
+    if not Tags.RAIDER[tpId] then return false end
+    if Options.raiders == "all" then return true end
+    if Options.raiders == "none" then return false end
+    return Tags.TECH1[tpId] and true or false        -- T1 raiders
 end
 
 function _G.ParseTagsFromString(str)
@@ -35,4 +39,4 @@ function _G.ParseTagsFromString(str)
     return result
 end
 
-if Log then Log("Engineers and Raiders test mod: build lists limited to engineers and T1 raiders.") end
+if Log then Log("Engineers and Raiders test mod: build lists limited to engineers and raiders (" .. tostring(Options.raiders) .. ").") end

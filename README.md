@@ -1451,7 +1451,9 @@ the lobby, the **Mods** button beside Settings (it reads `Mods (2)`, with a `!`
 while someone is missing something) opens a panel over the lobby screen: the
 host switches gameplay mods on and off there, and everyone sees the pick and,
 for each player, whether they have identical copies ("has Faster Tanks 1.1
-(host 1.2)", "no mod support"). Every pick also goes into the lobby chat.
+(host 1.2)", "no mod support"). A picked mod's options appear under it as
+switches, selectors and sliders for the host and as values for everyone else.
+Every pick, options included, also goes into the lobby chat.
 Start stays greyed out until everyone matches; with nothing picked there's no
 check and vanilla players play as usual. The panel is an overlay rather than a
 screen of its own because leaving the game's lobby window drops its chat and
@@ -1558,7 +1560,7 @@ hot-reloads — which is exactly why it holds the parts that must outlive every
 other mod's reloads, the Mod Manager's included:
 
 - **The catalog.** Every folder under `SanctuaryMods` with its `mod.json`
-  (id, name, version, author, kind, `luaRoot`, url, requires) and a SHA-256
+  (id, name, version, author, kind, `luaRoot`, url, requires, options) and a SHA-256
   **content hash** over its overlaid files and, for gameplay mods, its DLLs.
   Rescanned every two seconds; only changed folders are hashed again.
 - **The overlay.** Gameplay mods' files go into the game's in-memory
@@ -1591,8 +1593,18 @@ other mod's reloads, the Mod Manager's included:
   included), and authoritatively the host's handling of its own `StartGame`,
   which also freezes the pick for the match. A client whose files don't match
   the host's when the match loads leaves it rather than desync.
+- **Mod options.** A gameplay mod's `mod.json` can declare `options`
+  (toggle, choice or number, with a default, range and step). The host sets
+  them in the lobby's Mods panel, remembered for next time. The values travel
+  with the pick, and each player's API writes them as
+  `modoptions/<id>.lua` into the overlay, where the mod's Lua imports them.
+  Because that file is part of the Lua hash, the Start gate already covers
+  them, with no second check. The options' keys, types and ranges are part of
+  the content hash; their labels aren't. Changes wait until the host has
+  stopped moving a slider for 0.4 s, then go out as one revision.
 - **Modded replays.** A replay recorded with gameplay mods gets a
-  `<replay>.mods.json` beside it (moved and deleted with it). The replay list
+  `<replay>.mods.json` beside it (moved and deleted with it), option values
+  included. The replay list
   shows it as playable when those mods are installed and identical — or
   "needs Faster Tanks 1.0" when not — and playing it puts them back on first.
 - **The API** for mod authors: `Modding` (your mod's folder and manifest,

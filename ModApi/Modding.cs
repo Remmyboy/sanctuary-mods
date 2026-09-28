@@ -63,6 +63,27 @@ namespace Sanctuary.ModApi
         /// True when the given gameplay mod is live.
         public static bool IsActive(string modId) => Overlay.Applied.Any(m => m.Id == modId);
 
+        /// Your gameplay mod's option values: the ones the lobby host picked
+        /// while the mod is live, else the defaults from mod.json. Null as
+        /// for <see cref="Self"/>. Lua reads the same values with
+        /// Import("modoptions/&lt;id&gt;.lua").Options.
+        public static ModOptionValues Options(BaseUnityPlugin plugin) => Options(Self(plugin));
+
+        /// A gameplay mod's option values, by id. Null when no such mod is
+        /// installed.
+        public static ModOptionValues Options(string modId) => Options(ModCatalog.Find(modId));
+
+        private static ModOptionValues Options(ModInfo mod)
+        {
+            if (mod == null) return null;
+            var live = Overlay.OptionsOf(mod.Id);
+            // The live copy can be an older catalog entry than `mod` (edited
+            // mid-match); its values are what the match runs.
+            return live != null
+                ? new ModOptionValues(mod, live, true)
+                : new ModOptionValues(mod, OptionValues.Defaults(mod), false);
+        }
+
         /// The game's Lua hash with no gameplay mods, and as it is now.
         public static string VanillaLuaHash => Overlay.VanillaHash;
         public static string CurrentLuaHash => Overlay.CurrentHash;

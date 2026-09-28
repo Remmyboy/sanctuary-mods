@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "templateauthorid.sanctuarymodtemplate",
   "name": "SanctuaryModTemplate",
   "version": "1.0.0",
@@ -8,5 +9,6 @@
   "luaRoot": "lua",
   "url": "",
   "requires": [],
-  "apiVersion": 1
+  "apiVersion": 1,
+  "options": []
 }

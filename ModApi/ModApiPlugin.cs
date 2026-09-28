@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
 
         private static ManualLogSource _log;
 
@@ -50,12 +50,44 @@ namespace Sanctuary.ModApi
 
         internal static bool ValidId(string id) => ModManifest.IsValidId(id);
 
+        private static ConfigEntry<string> _cfgOptions;
+
+        /// The option values this player last hosted a mod with, or null.
+        internal static IReadOnlyDictionary<string, string> RememberedOptions(string modId)
+        {
+            try
+            {
+                var all = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(_cfgOptions?.Value ?? "");
+                return all != null && all.TryGetValue(modId, out var v) ? v : null;
+            }
+            catch { return null; }
+        }
+
+        internal static void RememberOptions(string modId, IReadOnlyDictionary<string, string> values)
+        {
+            if (_cfgOptions == null || !ValidId(modId)) return;
+            Dictionary<string, Dictionary<string, string>> all = null;
+            try { all = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(_cfgOptions.Value ?? ""); }
+            catch { }
+            all = all ?? new Dictionary<string, Dictionary<string, string>>();
+            all[modId] = values.ToDictionary(kv => kv.Key, kv => kv.Value);
+            // Sorted, so unchanged values make an unchanged string and the
+            // config file isn't rewritten for nothing.
+            var text = Newtonsoft.Json.JsonConvert.SerializeObject(
+                all.OrderBy(m => m.Key, StringComparer.Ordinal).ToDictionary(
+                    m => m.Key, m => m.Value.OrderBy(v => v.Key, StringComparer.Ordinal).ToDictionary(v => v.Key, v => v.Value)));
+            if (text != _cfgOptions.Value) _cfgOptions.Value = text;
+        }
+
         private void Awake()
         {
             Log = Logger;
             _cfgDefaultSelection = Config.Bind("Lobby", "DefaultSelection", "",
                 "Gameplay mod ids (semicolon-separated, in apply order) picked when you host a lobby. " +
                 "Ladder lobbies always start vanilla.");
+            _cfgOptions = Config.Bind("Lobby", "Options", "",
+                "The gameplay mod options you last hosted with, as JSON ({\"mod.id\": {\"key\": \"value\"}}). " +
+                "Set them in the lobby's Mods panel.");
 
             try { System.IO.Directory.CreateDirectory(ModCatalog.ModsRoot); }
             catch (Exception e) { Log.LogWarning($"Could not create {ModCatalog.ModsRoot}: {e.Message}"); }

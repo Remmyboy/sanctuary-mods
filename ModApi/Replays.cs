@@ -116,6 +116,7 @@ namespace Sanctuary.ModApi
                     mods = Overlay.Applied.Select(m => new WireMod
                     {
                         id = m.Id, name = m.Name, version = m.Version, hash = m.ContentHash, url = m.Manifest.Url,
+                        options = m.Manifest.Options.Count == 0 ? null : Overlay.OptionsOf(m.Id)?.ToDictionary(kv => kv.Key, kv => kv.Value),
                     }).ToList(),
                 };
                 File.WriteAllText(SidecarOf(path), JsonConvert.SerializeObject(s, Formatting.Indented));
@@ -222,7 +223,9 @@ namespace Sanctuary.ModApi
                     __result = false;
                     return false;
                 }
-                Overlay.Apply(mods);
+                var options = s.mods.Where(w => w.options != null && ModManifest.IsValidId(w.id))
+                    .GroupBy(w => w.id).ToDictionary(g => g.Key, g => g.First().options, StringComparer.Ordinal);
+                Overlay.Apply(mods, options);
                 if (!string.IsNullOrEmpty(s.luaHash) && Overlay.CurrentHash != s.luaHash)
                 {
                     Overlay.Clear();

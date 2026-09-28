@@ -79,18 +79,25 @@ uninstall it by deleting the folder. There's no restart either way.
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "alice.fastertanks",
   "name": "Faster Tanks",
   "version": "1.0.0",
   "author": "Alice",
-  "description": "Tanks move 20% faster.",
+  "description": "Tanks move faster.",
   "kind": "gameplay",
   "luaRoot": "lua",
   "url": "https://example.com/fastertanks",
   "requires": ["bob.tankcore"],
-  "apiVersion": 1
+  "apiVersion": 1,
+  "options": [
+    { "key": "bonus", "label": "Speed bonus (%)", "type": "number", "default": 20, "min": 0, "max": 50, "step": 5 }
+  ]
 }
 ```
+
+The `$schema` line is optional. With it, editors such as VS Code check the
+file as you type and suggest the fields.
 
 | Field | Meaning |
 | --- | --- |
@@ -101,16 +108,92 @@ uninstall it by deleting the folder. There's no restart either way.
 | `url` | Where to get the mod. It's shown to players who are missing it. It's never opened or fetched automatically. |
 | `requires` | Ids of other gameplay mods that must be picked alongside this one. If one isn't, the lobby says so and holds Start. |
 | `apiVersion` | The ModApi major version you wrote against (`1`). |
+| `options` | Settings the lobby host picks for a gameplay mod. See [Options](#options-let-the-host-tune-your-mod). |
 
 A folder with no `mod.json` still works the way mods worked before
 manifests: its DLL is a UI mod, its Lua files are a gameplay mod whose id is
 the folder name, and `luaRoot` is the folder itself.
 
 **Same copy** means the same *content hash*. That is a SHA-256 over every
-overlaid file's path and bytes, plus the DLLs of a gameplay mod. `mod.json`
-isn't part of it, so rewording the description doesn't make you incompatible.
-Anything else does, which is the point: two players whose Lua differs by one
-byte would desync.
+overlaid file's path and bytes, the options' keys, types and ranges, and the
+DLLs of a gameplay mod. The rest of `mod.json` isn't part of it, so rewording
+the description or an option's label doesn't make you incompatible. Anything
+else does, which is the point: two players whose Lua differs by one byte
+would desync.
+
+## Options: let the host tune your mod
+
+A gameplay mod can declare settings in `mod.json`. When the host picks the mod
+in a lobby, its options appear under it in the Mods panel. The host sets them,
+everyone else sees the values, and the match runs with them on every machine.
+
+```json
+"options": [
+  { "key": "minutes", "label": "No-rush time", "type": "number", "default": 20, "min": 0, "max": 60, "step": 5,
+    "description": "Minutes before armies may attack each other." },
+  { "key": "noAir", "label": "No air units", "type": "toggle", "default": false },
+  { "key": "color", "label": "Colour", "type": "choice", "default": "pink",
+    "choices": [ { "value": "pink", "label": "Hot pink" }, { "value": "lime", "label": "Lime" }, "gold" ] }
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `key` | **Required.** What your code reads the value by. A Lua name: letters, digits and `_`, not starting with a digit, not a Lua keyword. |
+| `type` | **Required.** `toggle` (on/off), `choice` (one of `choices`), or `number`. `int` is a number with `step` 1. |
+| `label` | Shown in the lobby. Defaults to the key. |
+| `description` | Shown on the Mods page. |
+| `default` | `true`/`false`, a choice's value, or a number. Missing: off, the first choice, or the lowest number. |
+| `choices` | For a choice: values, or `{ "value": ..., "label": ... }` pairs. The code sees the value; the lobby shows the label. |
+| `min`, `max`, `step` | For a number. With both `min` and `max` the lobby shows a slider, otherwise a text box. Values are clamped to the range and snapped to `min` plus whole steps. |
+
+Up to 32 options per mod. Mistakes in them (a bad key, a default outside the
+range) are listed under Problems on the Mods page, and the option falls back
+to something sensible rather than breaking the mod.
+
+**Reading them in Lua.** The framework writes the values to
+`modoptions/<your mod id>.lua` before any of your files run, on every
+player's machine:
+
+```lua
+local Options = Import("modoptions/alice.fastertanks.lua").Options
+
+if Options.noAir then ... end            -- toggle: true or false
+local ticks = Options.minutes * 60 * 10  -- number: a Lua number
+if Options.color == "lime" then ... end  -- choice: the value string
+```
+
+The file always has every option you declared, set to the host's value or
+the default, so you never need to check for nil. It exists whenever your mod
+is picked, including in replays, so import it at the top of any file.
+
+**Reading them in C#.** A gameplay DLL reads the same values:
+
+```csharp
+var options = Modding.Options(this);     // or Modding.Options("alice.fastertanks")
+var minutes = options.GetNumber("minutes");
+var noAir   = options.GetBool("noAir");
+var color   = options.GetString("color");
+```
+
+`options.IsLive` is true while the values are the ones the current match
+runs with; otherwise they're the defaults.
+
+**What players see.**
+
+- While the host drags a slider or flips a switch, Start waits for a moment,
+  then the values go out. Everyone's machine rewrites the options file and
+  reports back, the same check as the mod itself. Start opens again once
+  everyone matches.
+- The new values also go into the lobby chat.
+- A host's values are remembered for the next lobby they host.
+- A player whose Mod API is older than 1.1 can't take options. The lobby says
+  so and names the update they need.
+
+The values are part of the game's Lua hash, so a player who somehow ran with
+different values couldn't start. Keep them to what the match needs. A
+personal preference, like how a panel looks, belongs in a UI mod's
+`Config.Bind` instead.
 
 ## Gameplay Lua
 
@@ -173,7 +256,8 @@ into a set of unit ids; it's defined in `common/systems/tags.lua`, and the menu
 and the host's `buildQueueUtils.CanBuild` both use it. Append to `tags.lua` to
 filter what it returns for `BUILDABLE_BY_` expressions. Then append to
 `common/commands/definitions/buildQueue.lua` to make the host refuse queue
-requests that aren't on the list. The full version is
+requests that aren't on the list. The full version, with an option for which
+raiders are allowed, is
 [`examples/EngineersAndRaiders`](../examples/EngineersAndRaiders).
 
 **Change a unit's numbers.** Unit stats live in
@@ -320,9 +404,10 @@ Modding.FolderOf(this)         // for data files shipped beside the DLL
 Modding.InLobby / IsHost / InMatch / InReplay
 Modding.ActiveGameplayMods     // the gameplay mods live right now (empty = vanilla)
 Modding.IsActive("bob.tankcore")
+Modding.Options(this)          // your gameplay mod's option values: GetBool, GetNumber, GetInt, GetString
 
 ModEvents.OnLobbyEntered(this, isHost => ...);
-ModEvents.OnSelectionChanged(this, () => ...);   // gameplay mods live here changed
+ModEvents.OnSelectionChanged(this, () => ...);   // gameplay mods live here, or their options, changed
 ModEvents.OnMatchStarting(this, () => ...);
 ModEvents.OnMatchEnded(this, () => ...);
 ModEvents.OnLobbyLeft(this, () => ...);
@@ -336,6 +421,7 @@ Lobby.Selection                // the host's pick, as everyone sees it
 Lobby.Players                  // who has what: Ok, Pending, Problem, Vanilla
 Lobby.StartBlockedReason       // null, or why Start is held
 Lobby.SetSelection(ids)        // host only, before Start
+Lobby.SetOption(id, key, value) // host only, before Start; Lobby.ResetOptions(id)
 
 ModCatalog.Mods                // every mod folder, with manifest and content hash
 ```
@@ -373,7 +459,8 @@ game start, and it's destroyed when the match ends.
    button beside Settings shows a count, and a `!` while someone is missing
    something. The pick also goes into the lobby chat. Players with the
    framework get the pick at once, apply the mods if their copies are
-   identical, and report back.
+   identical, and report back. A picked mod's options appear under it; the
+   host sets them and everyone else sees the values.
 2. **Start** stays greyed out while any player is missing a mod, has a
    different copy, or has no mod support at all. The panel and the chat say who
    and what: "Bob has Faster Tanks 1.1 (host 1.2)". The host can switch the mod
@@ -382,9 +469,9 @@ game start, and it's destroyed when the match ends.
    mods play as usual.
 4. When the match starts the pick is frozen. The files stay exactly as they
    were until the match is over, even if you rebuild.
-5. Replays of a modded match remember its mods (a `.mods.json` beside the
-   replay) and put them back on to play, as long as they're installed and
-   identical.
+5. Replays of a modded match remember its mods and their option values (a
+   `.mods.json` beside the replay) and put them back on to play, as long as
+   they're installed and identical.
 
 The lobby messages travel on the game's own lobby connection as message types
 vanilla players silently ignore, so a modded host and vanilla players can

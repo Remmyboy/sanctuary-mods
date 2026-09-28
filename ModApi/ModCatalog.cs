@@ -34,9 +34,10 @@ namespace Sanctuary.ModApi
         public IReadOnlyList<string> Dlls { get; internal set; } = Array.Empty<string>();
 
         /// SHA-256 over what a match runs: every overlay file (path and
-        /// bytes) and, for gameplay DLLs, the DLL bytes. mod.json is left out,
-        /// so a reworded description is still the same mod. Empty for a mod
-        /// with nothing to hash.
+        /// bytes), the options' keys, types and ranges, and, for gameplay
+        /// DLLs, the DLL bytes. The rest of mod.json is left out, so a
+        /// reworded description is still the same mod. Empty for a mod with
+        /// nothing to hash.
         public string ContentHash { get; internal set; } = "";
         public string ShortHash => ContentHash.Length > 8 ? ContentHash.Substring(0, 8) : ContentHash;
 
@@ -198,6 +199,10 @@ namespace Sanctuary.ModApi
                 problems.Add("no kind given: the DLL stays a personal UI mod and only the Lua half is picked in the lobby");
             if (info.Kind == ModKind.Gameplay && overlay.Count == 0 && info.Dlls.Count == 0)
                 problems.Add($"nothing to apply: no .lua or .santp under '{manifest.LuaRoot}' and no DLL");
+            if (info.Kind != ModKind.Gameplay && manifest.Options.Count > 0)
+                problems.Add("options only apply to gameplay mods (the lobby host picks them); a UI mod's settings go in Config.Bind");
+            if (overlay.Any(r => r.Replace('\\', '/').StartsWith("modoptions/", StringComparison.OrdinalIgnoreCase)))
+                problems.Add("lua\\modoptions\\ is where the Mod API writes options files; files of yours there may be replaced");
 
             info.ContentHash = HashContent(info);
             info.Problems = problems;
@@ -220,6 +225,14 @@ namespace Sanctuary.ModApi
                 }
 
                 foreach (var rel in info.OverlayFiles) Add("lua:" + rel, Path.Combine(info.LuaRootPath, rel));
+                // The options decide what the generated options file can
+                // say, so they're part of what the match runs. Only for mods
+                // that have options: other mods' hashes stay as they were.
+                if (info.Manifest.Options.Count > 0)
+                {
+                    var sig = Encoding.UTF8.GetBytes("options\n" + string.Join("\n", info.Manifest.Options.Select(o => o.Signature())));
+                    sha.TransformBlock(sig, 0, sig.Length, null, 0);
+                }
                 if (info.DllsAreGameplay)
                 {
                     foreach (var dll in info.Dlls) Add("dll:" + dll.Substring(info.Folder.Length).TrimStart('\\', '/'), dll);

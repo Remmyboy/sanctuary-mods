@@ -11,3 +11,7 @@
 --
 -- Everything in lua\ is part of the match: the lobby host picks this mod and
 -- every player needs an identical copy. Delete this file, or put real code in.
+--
+-- Settings the host should choose (a timer, which units are allowed) go in
+-- mod.json's "options"; read them here with
+--   local Options = Import("modoptions/templateauthorid.sanctuarymodtemplate.lua").Options

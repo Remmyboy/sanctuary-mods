@@ -42,6 +42,12 @@ namespace Sanctuary.ModApi
         public ModInfo Local { get; internal set; }
         /// The local folder has this id but different contents.
         public ModInfo LocalDifferent { get; internal set; }
+        /// The host's option values, key to canonical value. Empty for a mod
+        /// without options.
+        public IReadOnlyDictionary<string, string> Options { get; internal set; } = new Dictionary<string, string>();
+        /// The mod's options as declared in mod.json, for showing the values.
+        /// Empty when this machine doesn't have the host's copy.
+        public IReadOnlyList<ModOption> OptionDefinitions => Local?.Manifest.Options ?? (IReadOnlyList<ModOption>)Array.Empty<ModOption>();
     }
 
     /// The lobby side of gameplay mods: the host picks, every player's
@@ -63,6 +69,15 @@ namespace Sanctuary.ModApi
         private static string _rosterSig = "";
         private static List<ModInfo> _hostResolved = new List<ModInfo>();
         private static string _hostSelectionProblem;
+        // The host's option values for each picked mod that has options.
+        private static readonly Dictionary<string, Dictionary<string, string>> _options =
+            new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        // An option changed and hasn't gone out yet: a slider being dragged
+        // sends its final value, not every one on the way.
+        private static bool _optionsPending;
+        private static float _optionsChangedAt;
+        private const float OptionsSettle = 0.4f;
+        private static readonly Dictionary<ulong, string> _apiVersions = new Dictionary<ulong, string>();
 
         // ---- client state ---------------------------------------------------
         private static bool _helloSent;
@@ -109,6 +124,7 @@ namespace Sanctuary.ModApi
                         {
                             Id = id, Name = m?.Name ?? id, Version = m?.Version ?? "", ContentHash = m?.ContentHash ?? "",
                             Url = m?.Manifest.Url ?? "", Local = m,
+                            Options = m == null ? new Dictionary<string, string>() : HostValues(m),
                         };
                     }).ToList();
                 }
@@ -121,6 +137,8 @@ namespace Sanctuary.ModApi
                     {
                         Id = w.id, Name = w.name, Version = w.version, ContentHash = w.hash, Url = w.url,
                         Local = same ? local : null, LocalDifferent = same ? null : local,
+                        Options = same ? OptionValues.Complete(local, w.options)
+                            : (IReadOnlyDictionary<string, string>)(w.options ?? new Dictionary<string, string>()),
                     };
                 }).ToList();
             }
@@ -181,6 +199,56 @@ namespace Sanctuary.ModApi
             return SetSelection(next);
         }
 
+        /// Sets one option of a picked mod, as the host. The value is
+        /// normalised the way the option declares (clamped, snapped to its
+        /// step, matched to a choice). Changes go out once the host stops
+        /// changing things for a moment, and are remembered for the next
+        /// lobby this player hosts. False when the selection can't be changed
+        /// right now, or the mod isn't picked or has no such option.
+        public static bool SetOption(string modId, string key, string value)
+        {
+            if (!CanChangeSelection || !_selection.Contains(modId)) return false;
+            var mod = ModCatalog.Find(modId);
+            var opt = mod?.Manifest.Options.FirstOrDefault(o => o.Key == key);
+            if (opt == null) return false;
+            var values = HostValues(mod);
+            var next = opt.Normalize(value);
+            if (values[key] == next) return true;
+            values[key] = next;
+            if (!_optionsPending) _statusDirty = true; // Start waits for it
+            _optionsPending = true;
+            _optionsChangedAt = UnityEngine.Time.unscaledTime;
+            _changeCounter++;
+            return true;
+        }
+
+        /// Puts every option of a picked mod back to its default.
+        public static bool ResetOptions(string modId)
+        {
+            if (!CanChangeSelection || !_selection.Contains(modId)) return false;
+            var mod = ModCatalog.Find(modId);
+            if (mod == null || mod.Manifest.Options.Count == 0) return false;
+            var defaults = OptionValues.Defaults(mod);
+            if (OptionValues.Signature(HostValues(mod)) == OptionValues.Signature(defaults)) return true;
+            _options[modId] = defaults;
+            if (!_optionsPending) _statusDirty = true; // Start waits for it
+            _optionsPending = true;
+            _optionsChangedAt = UnityEngine.Time.unscaledTime;
+            _changeCounter++;
+            return true;
+        }
+
+        /// The host's values for a mod it has (picked or not): this lobby's,
+        /// else the ones it used last time, else the defaults.
+        private static Dictionary<string, string> HostValues(ModInfo mod)
+        {
+            if (!_options.TryGetValue(mod.Id, out var values))
+                _options[mod.Id] = values = OptionValues.Complete(mod, ModApiPlugin.RememberedOptions(mod.Id));
+            else if (values.Count != mod.Manifest.Options.Count || mod.Manifest.Options.Any(o => !values.ContainsKey(o.Key) || o.Normalize(values[o.Key]) != values[o.Key]))
+                _options[mod.Id] = values = OptionValues.Complete(mod, values); // the mod's options were edited
+            return values;
+        }
+
         // ---- lifecycle, driven by ModApiPlugin and the patches ----------------
 
         internal static void OnCreateLobby(string lobbyName)
@@ -213,6 +281,9 @@ namespace Sanctuary.ModApi
             _selection.Clear();
             _hostResolved = new List<ModInfo>();
             _hostSelectionProblem = null;
+            _options.Clear();
+            _optionsPending = false;
+            _apiVersions.Clear();
             _reports.Clear();
             _hellos.Clear();
             _locked = false;
@@ -275,6 +346,12 @@ namespace Sanctuary.ModApi
                 _changeCounter++;
             }
 
+            if (_optionsPending && _hostSession && !_locked && !MatchUnderway &&
+                UnityEngine.Time.unscaledTime - _optionsChangedAt >= OptionsSettle)
+            {
+                HostApply("options changed");
+            }
+
             if (_hostSession)
             {
                 var sig = RosterSignature();
@@ -312,7 +389,11 @@ namespace Sanctuary.ModApi
                 ? null
                 : string.Join("; ", missingReqs.Select(x => $"{x.m.Name} needs {ModCatalog.Find(x.r)?.Name ?? x.r} picked too"));
 
-            Overlay.Apply(_hostResolved);
+            _optionsPending = false;
+            var options = HostOptions();
+            Overlay.Apply(_hostResolved, options);
+            // Next time this player hosts, the mods start as they were left.
+            foreach (var kv in options) ModApiPlugin.RememberOptions(kv.Key, kv.Value);
             LoaderBridge.SetActiveGameplayFolders(_hostResolved.Where(m => m.DllsAreGameplay).Select(m => m.Folder).ToArray());
             _rev++;
             ModApiPlugin.Log.LogInfo($"Lobby gameplay mods ({why}), revision {_rev}: " +
@@ -333,8 +414,13 @@ namespace Sanctuary.ModApi
             mods = _hostResolved.Select(m => new WireMod
             {
                 id = m.Id, name = Cap(m.Name, 80), version = Cap(m.Version, 40), hash = m.ContentHash, url = Cap(m.Manifest.Url, 300),
+                options = m.Manifest.Options.Count == 0 ? null : new Dictionary<string, string>(HostValues(m)),
             }).ToList(),
         };
+
+        /// The picked mods' option values, as the overlay takes them.
+        private static Dictionary<string, Dictionary<string, string>> HostOptions() =>
+            _hostResolved.Where(m => m.Manifest.Options.Count > 0).ToDictionary(m => m.Id, HostValues, StringComparer.Ordinal);
 
         internal static bool HostSelectionActive => _hostSession && _hostResolved.Count > 0;
 
@@ -344,8 +430,9 @@ namespace Sanctuary.ModApi
             if (!Humans().Any(p => p.id == sender)) return;
             if (type == LobbyProtocol.Hello)
             {
-                if (!LobbyProtocol.TryRead<HelloMsg>(payload, out _)) return;
+                if (!LobbyProtocol.TryRead<HelloMsg>(payload, out var hello)) return;
                 _hellos.Add(sender.value);
+                _apiVersions[sender.value] = Cap(hello.version, 20);
                 LobbyProtocol.SendToPlayer(sender, LobbyProtocol.ModSet, HostModSet());
                 _statusDirty = true;
             }
@@ -375,7 +462,9 @@ namespace Sanctuary.ModApi
             var s = new StatusMsg { rev = _rev };
             var reasons = new List<string>();
             if (_hostSelectionProblem != null) reasons.Add(_hostSelectionProblem);
+            if (_optionsPending) reasons.Add("options changing");
             var selectionActive = _hostResolved.Count > 0;
+            var hasOptions = _hostResolved.Any(m => m.Manifest.Options.Count > 0);
             foreach (var p in Humans())
             {
                 var row = new PlayerStatusMsg { id = p.id.value.ToString(), name = Cap(p.name, 64) };
@@ -406,6 +495,12 @@ namespace Sanctuary.ModApi
                     }
                     if (problems.Count == 0 && selectionActive && report.luaHash != Overlay.CurrentHash)
                         problems.Add("Lua files differ from the host's");
+                    // Mod API 1.0 knows nothing of options: its copy of an
+                    // options mod hashes differently and writes no options
+                    // file. Say so rather than leave them hunting for a
+                    // difference in the mod.
+                    if (problems.Count > 0 && hasOptions && _apiVersions.TryGetValue(p.id.value, out var api) && OlderThan(api, 1, 1))
+                        problems.Add($"their Mod API {api} is too old for mod options: update the Mod Manager");
                     if (problems.Count == 0)
                     {
                         row.state = "ok";
@@ -427,6 +522,13 @@ namespace Sanctuary.ModApi
 
         private static string Names(IEnumerable<ModInfo> mods) => string.Join(", ", mods.Select(m => m.Name));
 
+        private static bool OlderThan(string version, int major, int minor)
+        {
+            var parts = (version ?? "").Split('.');
+            if (parts.Length < 2 || !int.TryParse(parts[0], out var ma) || !int.TryParse(parts[1], out var mi)) return false;
+            return ma < major || (ma == major && mi < minor);
+        }
+
         /// For the patches: may the host start the match now?
         internal static bool GateOpen(out string reason)
         {
@@ -442,9 +544,18 @@ namespace Sanctuary.ModApi
         internal static bool HostStartGame(out string reason)
         {
             if (!_hostSession) { reason = null; return true; }
+            if (_optionsPending)
+            {
+                // Everyone has to confirm the new values first.
+                HostApply("options changed");
+                reason = "Gameplay mod options changed a moment ago; press Start again once everyone has them.";
+                return false;
+            }
             if (!GateOpen(out reason)) return false;
             var applied = Overlay.Applied;
-            if (applied.Count != _hostResolved.Count || applied.Where((m, i) => !ReferenceEquals(m, _hostResolved[i])).Any())
+            if (applied.Count != _hostResolved.Count || applied.Where((m, i) => !ReferenceEquals(m, _hostResolved[i])).Any() ||
+                _hostResolved.Any(m => m.Manifest.Options.Count > 0 &&
+                                       OptionValues.Signature(Overlay.OptionsOf(m.Id)) != OptionValues.Signature(HostValues(m))))
             {
                 reason = "Gameplay mods changed on disk a moment ago; press Start again.";
                 HostApply("re-applied at start");
@@ -522,6 +633,7 @@ namespace Sanctuary.ModApi
             if (_received == null) return;
             var report = new ReportMsg { rev = _received.rev };
             var resolved = new List<ModInfo>();
+            var options = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
             foreach (var w in _received.mods)
             {
                 var local = ModApiPlugin.ValidId(w.id) ? ModCatalog.Find(w.id) : null;
@@ -532,14 +644,22 @@ namespace Sanctuary.ModApi
                 }
                 var same = local.ContentHash == w.hash;
                 report.mods.Add(new ReportedMod { id = w.id, state = same ? "ok" : "different", version = local.Version, hash = local.ContentHash });
-                if (same) resolved.Add(local);
+                if (!same) continue;
+                resolved.Add(local);
+                // Checked against this machine's copy, which is the host's:
+                // only declared keys, only values the option can take.
+                if (local.Manifest.Options.Count > 0)
+                {
+                    var given = w.options != null && w.options.Count <= ModOption.MaxOptions * 2 ? w.options : null;
+                    options[local.Id] = OptionValues.Complete(local, given);
+                }
             }
             var complete = resolved.Count == _received.mods.Count;
 
             // The host's own client shares the host's cache: the host applies.
             if (!LobbyManager.isHostRunning && !MatchUnderway)
             {
-                Overlay.Apply(complete ? resolved : new List<ModInfo>());
+                Overlay.Apply(complete ? resolved : new List<ModInfo>(), options);
                 LoaderBridge.SetActiveGameplayFolders(complete
                     ? resolved.Where(m => m.DllsAreGameplay).Select(m => m.Folder).ToArray()
                     : Array.Empty<string>());

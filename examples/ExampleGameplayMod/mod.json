@@ -1,10 +1,35 @@
 {
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.example.pinkarmy",
   "name": "Example: Pink Army",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Sanctuary Mods",
-  "description": "The first army plays in hot pink. A smoke test for gameplay mods: pick it in a lobby and the first army's units should turn pink for everyone.",
+  "description": "One army plays in a loud colour. A smoke test for gameplay mods and their options: pick it in a lobby, set the colour and the army, and that army's units change colour for everyone.",
   "kind": "gameplay",
   "luaRoot": "lua",
-  "apiVersion": 1
+  "apiVersion": 1,
+  "options": [
+    {
+      "key": "color",
+      "label": "Colour",
+      "type": "choice",
+      "default": "pink",
+      "choices": [
+        { "value": "pink", "label": "Hot pink" },
+        { "value": "lime", "label": "Lime" },
+        { "value": "gold", "label": "Gold" }
+      ],
+      "description": "The colour the army plays in."
+    },
+    {
+      "key": "army",
+      "label": "Army",
+      "type": "number",
+      "default": 1,
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "description": "Which army changes colour: 1 is the first seat's."
+    }
+  ]
 }

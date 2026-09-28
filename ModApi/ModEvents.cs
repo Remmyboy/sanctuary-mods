@@ -24,7 +24,8 @@ namespace Sanctuary.ModApi
         public static void OnLobbyLeft(UnityEngine.Object owner, Action handler) => Add("left", owner, handler);
 
         /// The gameplay mods applied on this machine changed (the host picked
-        /// different ones, or a picked mod's files changed).
+        /// different ones or changed their options, or a picked mod's files
+        /// changed).
         public static void OnSelectionChanged(UnityEngine.Object owner, Action handler) => Add("selection", owner, handler);
 
         /// The host pressed Start and the match is loading.

@@ -97,19 +97,42 @@ namespace Sanctuary.ModApi
                 .Select(g => (g.Key, g.Select(x => x.mod).ToArray()));
         }
 
+        /// The option values of each applied mod that has options, by mod id.
+        private static Dictionary<string, Dictionary<string, string>> _appliedOptions =
+            new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+
+        /// The option values an applied mod runs with, or null when the mod
+        /// isn't applied.
+        public static IReadOnlyDictionary<string, string> OptionsOf(string modId)
+        {
+            if (!_applied.Any(m => m.Id == modId)) return null;
+            return _appliedOptions.TryGetValue(modId, out var v) ? v : new Dictionary<string, string>();
+        }
+
         /// Makes the cache hold vanilla plus exactly these mods, in this order.
-        /// Replacements go first, a later mod's winning; then every append,
-        /// in the same order, onto whatever the file has become. Returns false
-        /// when the cache doesn't exist yet.
-        internal static bool Apply(IList<ModInfo> mods)
+        /// Replacements go first, a later mod's winning; then each mod's
+        /// options file; then every append, in the same order, onto whatever
+        /// the file has become. A mod missing from `options` runs with its
+        /// defaults. Returns false when the cache doesn't exist yet.
+        internal static bool Apply(IList<ModInfo> mods, IReadOnlyDictionary<string, Dictionary<string, string>> options = null)
         {
             var cache = EM.Lua.FilesCache.pathToFileContents;
             if (cache == null) return false;
 
+            var values = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+            foreach (var m in mods.Where(m => m.Manifest.Options.Count > 0))
+            {
+                Dictionary<string, string> given = null;
+                options?.TryGetValue(m.Id, out given);
+                values[m.Id] = OptionValues.Complete(m, given);
+            }
+
             // Unchanged: leave the arrays the VMs may already hold alone.
             if (_appliedToDict != null && ReferenceEquals(_appliedToDict, cache) &&
                 mods.Count == _applied.Count &&
-                mods.Zip(_applied, (a, b) => ReferenceEquals(a, b)).All(x => x))
+                mods.Zip(_applied, (a, b) => ReferenceEquals(a, b)).All(x => x) &&
+                values.Count == _appliedOptions.Count &&
+                values.All(kv => _appliedOptions.TryGetValue(kv.Key, out var was) && OptionValues.Signature(was) == OptionValues.Signature(kv.Value)))
             {
                 return true;
             }
@@ -120,6 +143,23 @@ namespace Sanctuary.ModApi
             var applied = new List<ModInfo>();
             foreach (var appends in new[] { false, true })
             {
+                if (appends)
+                {
+                    // Between the two passes, so a mod's own appends can
+                    // already Import its options.
+                    foreach (var mod in mods.Where(m => values.ContainsKey(m.Id)))
+                    {
+                        try
+                        {
+                            PutFile(cache, OptionValues.LuaPath(mod.Id).Replace('/', '\\'), OptionValues.LuaFile(mod, values[mod.Id]));
+                            files++;
+                        }
+                        catch (Exception e)
+                        {
+                            ModApiPlugin.Log.LogError($"Writing the options of '{mod.Name}' failed: {e.Message}");
+                        }
+                    }
+                }
                 foreach (var mod in mods)
                 {
                     try
@@ -134,10 +174,13 @@ namespace Sanctuary.ModApi
                 }
             }
             _applied = applied;
+            _appliedOptions = values;
             _currentHash = SafeHash();
+            var withOptions = values.Count == 0 ? "" :
+                " Options: " + string.Join("; ", values.Select(kv => kv.Key + " " + string.Join(", ", kv.Value.Select(o => o.Key + "=" + o.Value)))) + ".";
             ModApiPlugin.Log.LogInfo(applied.Count == 0
                 ? $"Lua overlay: vanilla (hash {Short(_currentHash)})."
-                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.");
+                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.{withOptions}");
             return true;
         }
 
@@ -156,8 +199,10 @@ namespace Sanctuary.ModApi
         internal static void Reestablish()
         {
             var mods = _applied.ToList();
+            var options = _appliedOptions;
             ForgetDict();
-            Apply(mods);
+            _applied = new List<ModInfo>();
+            Apply(mods, options);
         }
 
         private static int ApplyMod(ModInfo mod, Dictionary<string, NativeArray<byte>> cache, bool appends)
@@ -207,25 +252,34 @@ namespace Sanctuary.ModApi
                         ModApiPlugin.Log.LogError($"Mod '{mod.Name}': {rel} doesn't compile: {error}. The match will fail when the game loads it.");
                 }
 
-                var arr = new NativeArray<byte>(bytes, Allocator.Persistent);
-                Allocated.Add(arr);
-
-                if (exists)
-                {
-                    // Stash only the true original: a key another mod already
-                    // touched has its pristine copy (or none, if added) stashed.
-                    if (!Pristine.ContainsKey(target) && !Added.Contains(target))
-                        Pristine[target] = existing;
-                }
-                else
-                {
-                    Added.Add(target);
-                    RegisterFolders(targetRel);
-                }
-                cache[target] = arr;
+                PutFile(cache, targetRel, bytes);
                 count++;
             }
             return count;
+        }
+
+        /// Sets one cache entry (targetRel is relative to LJ\lua), keeping
+        /// what's needed to put the original back.
+        private static void PutFile(Dictionary<string, NativeArray<byte>> cache, string targetRel, byte[] bytes)
+        {
+            var target = Path.GetFullPath(Path.Combine(LuaRoot, targetRel));
+            var exists = cache.TryGetValue(target, out var existing);
+            var arr = new NativeArray<byte>(bytes, Allocator.Persistent);
+            Allocated.Add(arr);
+
+            if (exists)
+            {
+                // Stash only the true original: a key another mod already
+                // touched has its pristine copy (or none, if added) stashed.
+                if (!Pristine.ContainsKey(target) && !Added.Contains(target))
+                    Pristine[target] = existing;
+            }
+            else
+            {
+                Added.Add(target);
+                RegisterFolders(targetRel);
+            }
+            cache[target] = arr;
         }
 
         /// The game file with a mod's code added in the same chunk, so the
@@ -286,6 +340,7 @@ namespace Sanctuary.ModApi
             }
             ForgetDict();
             _applied = new List<ModInfo>();
+            _appliedOptions = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         }
 
         private static void ForgetDict()

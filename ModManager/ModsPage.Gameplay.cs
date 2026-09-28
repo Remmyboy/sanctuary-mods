@@ -91,6 +91,7 @@ namespace SanctuaryHud
             if (m.LuaCount > 0) parts.Add($"{m.LuaCount} lua");
             if (m.SantpCount > 0) parts.Add($"{m.SantpCount} santp");
             if (m.DllsAreGameplay && m.Dlls.Count > 0) parts.Add($"{m.Dlls.Count} dll");
+            if (m.Manifest.Options.Count > 0) parts.Add(m.Manifest.Options.Count == 1 ? "1 option" : $"{m.Manifest.Options.Count} options");
             if (m.Manifest.Author.Length > 0) parts.Add("by " + m.Manifest.Author);
             return string.Join(", ", parts);
         }
@@ -103,6 +104,11 @@ namespace SanctuaryHud
             if (m.Manifest.Requires.Count > 0) text += $"Needs {string.Join(", ", m.Manifest.Requires)} picked too. ";
             if (m.Manifest.Url.Length > 0) text += $"Get it from {m.Manifest.Url}. ";
             text += "Switched on here, it is picked straight away when you host a lobby; you can still change the pick there.";
+            if (m.Manifest.Options.Count > 0)
+            {
+                text += "\n\nOptions, set by the host in the lobby's Mods panel:";
+                foreach (var o in m.Manifest.Options) text += $"\n{o.Label}: {OptionDescription(o)}";
+            }
             if (m.Problems.Count > 0) text += "\n\n" + string.Join("\n", m.Problems);
             return text;
         }
@@ -145,7 +151,7 @@ namespace SanctuaryHud
             if (_lobbyPanel != null && _lobbyPanel.activeSelf)
             {
                 var sig = LobbySignature();
-                if (sig != _lobbySignature) RebuildLobbyPanel();
+                if (sig != _lobbySignature && !LobbyPanelBusy()) RebuildLobbyPanel();
             }
         }
 
@@ -166,14 +172,18 @@ namespace SanctuaryHud
         {
             if (!Lobby.HostHasModSupport) return;
             var sel = Lobby.Selection;
-            var sig = string.Join(",", sel.Select(s => s.Id + "@" + s.ContentHash));
+            // The host's own values change the moment it touches a control;
+            // everyone else's arrive settled. Wait for the host's to settle
+            // too, so a dragged slider isn't a line of chat per step.
+            if (Lobby.IsHost && Lobby.StartBlockedReason?.Contains("options changing") == true) return;
+            var sig = string.Join(",", sel.Select(s => s.Id + "@" + s.ContentHash + OptionSummary(s)));
             if (sig == _announcedSelection) return;
             var first = _announcedSelection == null;
             _announcedSelection = sig;
             if (first && sel.Count == 0) return;
             ui.AddChatMessage(sel.Count == 0
                 ? "Gameplay mods: none, vanilla match."
-                : "Gameplay mods: " + string.Join(", ", sel.Select(s => $"{s.Name} {s.Version}".TrimEnd())) + ". Mods button for details.");
+                : "Gameplay mods: " + string.Join(", ", sel.Select(s => $"{s.Name} {s.Version}".TrimEnd() + OptionSummary(s))) + ". Mods button for details.");
         }
 
         private void BuildLobbyButton(LobbyInterface ui)
@@ -324,12 +334,14 @@ namespace SanctuaryHud
             {
                 var mods = ModCatalog.GameplayMods.ToList();
                 if (mods.Count == 0) InfoRow(_lobbyList, "No gameplay mods installed", "SanctuaryMods\\<mod>\\mod.json");
-                var picked = Lobby.Selection.Select(s => s.Id).ToList();
+                var selection = Lobby.Selection;
                 foreach (var mod in mods)
                 {
                     var m = mod;
-                    SwitchRow(_lobbyList, $"{m.Name} {m.Version}   <alpha=#80>{GameplayFiles(m)}", picked.Contains(m.Id),
+                    var picked = selection.FirstOrDefault(s => s.Id == m.Id);
+                    SwitchRow(_lobbyList, $"{m.Name} {m.Version}   <alpha=#80>{GameplayFiles(m)}", picked != null,
                         Lobby.CanChangeSelection, on => Lobby.SetSelected(m.Id, on));
+                    if (picked != null) HostOptionRows(m, picked.Options);
                 }
                 foreach (var (file, owners) in Overlay.Conflicts(Lobby.Selection.Where(s => s.Local != null).Select(s => s.Local)))
                     InfoRow(_lobbyList, $"Both change {file}", $"{owners.Last().Name} wins");
@@ -342,6 +354,11 @@ namespace SanctuaryHud
                         : s.LocalDifferent != null ? $"yours differs ({s.LocalDifferent.Version})"
                         : "missing" + (string.IsNullOrEmpty(s.Url) ? "" : ": " + s.Url);
                     InfoRow(_lobbyList, $"{s.Name} {s.Version}", state);
+                    foreach (var o in s.OptionDefinitions)
+                    {
+                        s.Options.TryGetValue(o.Key, out var v);
+                        InfoRow(_lobbyList, OptionIndent + o.Label, o.Display(v));
+                    }
                 }
             }
 
@@ -355,6 +372,103 @@ namespace SanctuaryHud
                     : p.Detail;
                 InfoRow(_lobbyList, p.Name, text);
             }
+        }
+
+        private const string OptionIndent = "      ";
+
+        /// A picked mod's options, under its switch: the host sets them
+        /// here. Values go out once the host stops changing them for a
+        /// moment, so a dragged slider sends one change, not fifty.
+        private void HostOptionRows(ModInfo m, IReadOnlyDictionary<string, string> values)
+        {
+            var options = m.Manifest.Options;
+            if (options.Count == 0) return;
+            var editable = Lobby.CanChangeSelection;
+            foreach (var option in options)
+            {
+                var o = option;
+                values.TryGetValue(o.Key, out var raw);
+                var v = o.Normalize(raw);
+                var label = OptionIndent + o.Label;
+                if (!editable)
+                {
+                    InfoRow(_lobbyList, label, o.Display(v));
+                    continue;
+                }
+                switch (o.Type)
+                {
+                    case ModOptionType.Toggle:
+                        SwitchRow(_lobbyList, label, v == "true", true, on => Lobby.SetOption(m.Id, o.Key, on ? "true" : "false"));
+                        break;
+                    case ModOptionType.Choice:
+                        var index = o.Choices.Select((c, i) => (c, i)).FirstOrDefault(x => x.c.Value == v).i;
+                        SelectorRow(_lobbyList, label, o.Choices.Select(c => c.Label).ToList(), index,
+                            i => { if (i >= 0 && i < o.Choices.Count) Lobby.SetOption(m.Id, o.Key, o.Choices[i].Value); });
+                        break;
+                    default:
+                        var number = double.Parse(v, System.Globalization.CultureInfo.InvariantCulture);
+                        if (o.Min.HasValue && o.Max.HasValue)
+                        {
+                            SliderRow(_lobbyList, label, (float)o.Min.Value, (float)o.Max.Value, (float)number, o.IsWhole,
+                                f => Lobby.SetOption(m.Id, o.Key, f.ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+                        }
+                        else
+                        {
+                            var typed = v;
+                            TextRow(_lobbyList, label, v, s => typed = s, () =>
+                            {
+                                Lobby.SetOption(m.Id, o.Key, typed);
+                                return o.Normalize(typed);
+                            });
+                        }
+                        break;
+                }
+            }
+            if (options.Any(o => o.Normalize(values.TryGetValue(o.Key, out var x) ? x : null) != o.Default))
+                ButtonRow(_lobbyList, $"Reset {m.Name} options", () => Lobby.ResetOptions(m.Id));
+        }
+
+        /// The option values in a line of chat: "Minutes 20, No air On".
+        private static string OptionSummary(SelectedMod s)
+        {
+            if (s.Options.Count == 0) return "";
+            var defs = s.OptionDefinitions;
+            var parts = defs.Count > 0
+                ? defs.Select(o => $"{o.Label} {o.Display(s.Options.TryGetValue(o.Key, out var v) ? v : null)}")
+                : s.Options.Select(kv => $"{kv.Key} {kv.Value}");
+            var list = parts.ToList();
+            var text = string.Join(", ", list.Take(6));
+            if (list.Count > 6) text += ", …";
+            return " (" + text + ")";
+        }
+
+        private static string OptionDescription(ModOption o)
+        {
+            var text = o.Description.Length > 0 ? o.Description + " " : "";
+            switch (o.Type)
+            {
+                case ModOptionType.Choice:
+                    text += "One of: " + string.Join(", ", o.Choices.Select(c => c.Label)) + ".";
+                    break;
+                case ModOptionType.Number:
+                    if (o.Min.HasValue || o.Max.HasValue)
+                        text += $"From {(o.Min.HasValue ? ModOption.FormatNumber(o.Min.Value) : "any")} to {(o.Max.HasValue ? ModOption.FormatNumber(o.Max.Value) : "any")}";
+                    if (o.Step.HasValue) text += $", in steps of {ModOption.FormatNumber(o.Step.Value)}";
+                    text += ".";
+                    break;
+            }
+            return text + $" Default: {o.Display(o.Default)}.";
+        }
+
+        /// A text box or a dragged slider in the lobby panel: rebuilding
+        /// the panel now would tear it out from under the pointer.
+        private bool LobbyPanelBusy()
+        {
+            if (Input.GetMouseButton(0)) return true;
+            var selected = UnityEngine.EventSystems.EventSystem.current?.currentSelectedGameObject;
+            if (selected == null || _lobbyPanel == null || !selected.transform.IsChildOf(_lobbyPanel.transform)) return false;
+            var field = selected.GetComponent<TMP_InputField>();
+            return field != null && field.isFocused;
         }
 
         private void DestroyLobbyPanel()

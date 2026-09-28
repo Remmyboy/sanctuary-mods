@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.example.ascendant",
   "name": "Ascendant faction (proof of concept)",
   "version": "0.1.0",

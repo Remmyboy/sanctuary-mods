@@ -32,7 +32,10 @@ namespace Sanctuary.ModApi
     ///   "luaRoot": "lua",
     ///   "url": "https://example.com/fastertanks",
     ///   "requires": ["bob.tankcore"],
-    ///   "apiVersion": 1
+    ///   "apiVersion": 1,
+    ///   "options": [
+    ///     { "key": "speedBonus", "label": "Speed bonus (%)", "type": "number", "default": 20, "min": 0, "max": 50, "step": 5 }
+    ///   ]
     /// }
     /// </code>
     public sealed class ModManifest
@@ -58,6 +61,9 @@ namespace Sanctuary.ModApi
         public IReadOnlyList<string> Requires { get; internal set; } = Array.Empty<string>();
         /// The ModApi major version the mod was written for.
         public int ApiVersion { get; internal set; } = 1;
+        /// Settings the lobby host picks for a gameplay mod. See
+        /// <see cref="ModOption"/>.
+        public IReadOnlyList<ModOption> Options { get; internal set; } = Array.Empty<ModOption>();
         /// True when the folder has no mod.json and these values were made up
         /// from its contents, the way mods were laid out before manifests.
         public bool Synthesised { get; internal set; }
@@ -122,6 +128,7 @@ namespace Sanctuary.ModApi
                 }
             }
             m.Requires = requires;
+            m.Options = ModOption.ParseAll(o["options"], problems);
             return m;
         }
 
