@@ -150,7 +150,6 @@ namespace SanctuaryHud
         private Transform _lobbyList;
         private string _lobbySignature = "";
         private string _lobbyButtonText = "";
-        private string _announcedSelection;
 
         private void TickLobby()
         {
@@ -159,7 +158,7 @@ namespace SanctuaryHud
             if (!inLobby)
             {
                 if (_lobbyPanel != null) _lobbyPanel.SetActive(false);
-                if (!LobbyManager.IsInLobby) _announcedSelection = null;
+                if (!LobbyManager.IsInLobby) _announced = null;
                 return;
             }
             if (_tSwitchRow == null) return; // the page (and its templates) isn't built yet
@@ -177,40 +176,96 @@ namespace SanctuaryHud
             if (_lobbyPanel != null && _lobbyPanel.activeSelf)
             {
                 var sig = LobbySignature();
-                if (sig != _lobbySignature && !LobbyPanelBusy()) RebuildLobbyPanel();
+                if (sig != _lobbySignature && !LobbyPanelBusy() && !SettlingBriefly()) RebuildLobbyPanel();
             }
         }
+
+        // A change reaching everyone takes a moment (the host's option
+        // settles, then each player confirms it). For that moment the panel
+        // holds still rather than flashing "Start waits..." and back; only a
+        // change that takes longer than this says it's updating.
+        private const float SettleGrace = 1f;
+        private float _settlingSince = -1f;
+
+        /// Settling, and not for long yet: leave the panel as it was.
+        private bool SettlingBriefly()
+        {
+            if (!Lobby.Settling) { _settlingSince = -1f; return false; }
+            if (_settlingSince < 0f) _settlingSince = Time.unscaledTime;
+            return Time.unscaledTime - _settlingSince < SettleGrace;
+        }
+
+        /// Settling long enough to say so.
+        private bool SettlingShown() => Lobby.Settling && _settlingSince >= 0f && Time.unscaledTime - _settlingSince >= SettleGrace;
 
         private static string LobbyButtonLabel()
         {
             var n = Lobby.Selection.Count;
             if (n == 0) return "Mods";
-            return Lobby.StartBlockedReason != null ? $"Mods ({n}) !" : $"Mods ({n})";
+            // The "!" is for someone missing something, not for a change on
+            // its way.
+            return Lobby.StartBlockedReason != null && !Lobby.Settling ? $"Mods ({n}) !" : $"Mods ({n})";
         }
 
-        private static string LobbySignature() =>
-            $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|" +
+        private string LobbySignature() =>
+            $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|{SettlingShown()}|" +
             string.Join(",", Lobby.Players.Select(p => p.Name + p.State + p.Detail));
 
+        // What the chat was last told: each mod's id and contents, and its
+        // option values as shown.
+        private List<(string id, string hash, string name, Dictionary<string, string> options)> _announced;
+
         /// A line in the lobby chat whenever the pick changes, so nobody
-        /// misses it: players see what they're about to play.
+        /// misses it: players see what they're about to play. A change of
+        /// options alone says just what changed.
         private void AnnounceSelection(LobbyInterface ui)
         {
             if (!Lobby.HostHasModSupport) return;
+            // Mid-change the host's values move with its controls; say it
+            // once it has settled, so a dragged slider isn't a line per step.
+            if (Lobby.Settling) return;
             var sel = Lobby.Selection;
-            // The host's own values change the moment it touches a control;
-            // everyone else's arrive settled. Wait for the host's to settle
-            // too, so a dragged slider isn't a line of chat per step.
-            if (Lobby.IsHost && Lobby.StartBlockedReason?.Contains("options changing") == true) return;
-            var sig = string.Join(",", sel.Select(s => s.Id + "@" + s.ContentHash + OptionSummary(s)));
-            if (sig == _announcedSelection) return;
-            var first = _announcedSelection == null;
-            _announcedSelection = sig;
-            if (first && sel.Count == 0) return;
+            var now = sel.Select(s => (s.Id, s.ContentHash, $"{s.Name} {s.Version}".TrimEnd(), OptionDisplay(s))).ToList();
+            var was = _announced;
+            if (was != null && was.Count == now.Count &&
+                was.Zip(now, (a, b) => a.id == b.Item1 && a.hash == b.Item2 && SameOptions(a.options, b.Item4)).All(x => x))
+                return;
+            _announced = now;
+            if (was == null && sel.Count == 0) return;
+
+            // Same mods, same copies: only options moved.
+            if (was != null && was.Count == now.Count && was.Zip(now, (a, b) => a.id == b.Item1 && a.hash == b.Item2).All(x => x))
+            {
+                var changes = new List<string>();
+                for (var i = 0; i < now.Count; i++)
+                {
+                    var diff = now[i].Item4.Where(kv => !was[i].options.TryGetValue(kv.Key, out var old) || old != kv.Value)
+                        .Select(kv => $"{kv.Key} {kv.Value}").ToList();
+                    if (diff.Count > 0) changes.Add($"{now[i].Item3}: {string.Join(", ", diff)}");
+                }
+                if (changes.Count > 0) ui.AddChatMessage("Gameplay mods: " + string.Join("; ", changes) + ".");
+                return;
+            }
+
             ui.AddChatMessage(sel.Count == 0
                 ? "Gameplay mods: none, vanilla match."
                 : "Gameplay mods: " + string.Join(", ", sel.Select(s => $"{s.Name} {s.Version}".TrimEnd() + OptionSummary(s))) + ". Mods button for details.");
         }
+
+        /// A mod's option values as the chat shows them: label to shown value.
+        private static Dictionary<string, string> OptionDisplay(SelectedMod s)
+        {
+            var result = new Dictionary<string, string>();
+            var defs = s.OptionDefinitions;
+            if (defs.Count > 0)
+                foreach (var o in defs) result[o.Label] = o.Display(s.Options.TryGetValue(o.Key, out var v) ? v : null);
+            else
+                foreach (var kv in s.Options) result[kv.Key] = kv.Value;
+            return result;
+        }
+
+        private static bool SameOptions(Dictionary<string, string> a, Dictionary<string, string> b) =>
+            a.Count == b.Count && a.All(kv => b.TryGetValue(kv.Key, out var v) && v == kv.Value);
 
         private void BuildLobbyButton(LobbyInterface ui)
         {
@@ -351,10 +406,13 @@ namespace SanctuaryHud
             }
 
             Heading(_lobbyList, host ? "Gameplay mods: your pick for this match" : "Gameplay mods: the host's pick");
+            var settling = blocked != null && Lobby.Settling;
             InfoRow(_lobbyList,
                 Lobby.Selection.Count == 0 ? "None picked: a vanilla match, anyone can play"
-                    : blocked == null ? "Everyone has them: ready to start" : "Start waits until everyone has them",
-                blocked == null ? "" : "see players below");
+                    : blocked == null ? "Everyone has them: ready to start"
+                    : settling ? "Updating everyone's copy…"
+                    : "Start waits until everyone has them",
+                blocked == null ? "" : settling ? (host ? "Start still works" : "a moment") : "see players below");
 
             if (host)
             {

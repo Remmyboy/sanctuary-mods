@@ -177,6 +177,19 @@ namespace Sanctuary.ModApi
             }
         }
 
+        /// Start is held only while a change reaches everyone (an option
+        /// settling, players confirming it); nobody is missing anything, and
+        /// it clears by itself within a moment.
+        public static bool Settling
+        {
+            get
+            {
+                if (!InLobby) return false;
+                var s = IsHost ? BuildStatus() : _status;
+                return s != null && !s.ready && s.settling;
+            }
+        }
+
         /// Sets the host's selection, in apply order (a later mod's file
         /// wins). Ignores ids not in the local catalog. False when the
         /// selection can't be changed right now.
@@ -294,6 +307,7 @@ namespace Sanctuary.ModApi
             _status = null;
             _rosterSig = "";
             _abortPending = false;
+            _startQueuedAt = -1f;
             _changeCounter++;
         }
 
@@ -372,6 +386,7 @@ namespace Sanctuary.ModApi
                     RefreshStartButton();
                     _changeCounter++;
                 }
+                TickQueuedStart();
             }
         }
 
@@ -463,6 +478,10 @@ namespace Sanctuary.ModApi
             var reasons = new List<string>();
             if (_hostSelectionProblem != null) reasons.Add(_hostSelectionProblem);
             if (_optionsPending) reasons.Add("options changing");
+            // A reason that won't clear by itself: someone is missing
+            // something, or the pick itself is incomplete. The rest is a
+            // change still on its way to everyone.
+            var hard = _hostSelectionProblem != null;
             var selectionActive = _hostResolved.Count > 0;
             foreach (var p in Humans())
             {
@@ -472,7 +491,7 @@ namespace Sanctuary.ModApi
                 {
                     row.state = "vanilla";
                     row.detail = "no mod support installed";
-                    if (selectionActive) reasons.Add($"{row.name} has no mod support (needs {Names(_hostResolved)})");
+                    if (selectionActive) { reasons.Add($"{row.name} has no mod support (needs {Names(_hostResolved)})"); hard = true; }
                 }
                 else if (report == null || report.rev != _rev)
                 {
@@ -510,11 +529,13 @@ namespace Sanctuary.ModApi
                         row.state = "problem";
                         row.detail = Cap(string.Join(", ", problems), 300);
                         reasons.Add($"{row.name} {row.detail}");
+                        hard = true;
                     }
                 }
                 s.players.Add(row);
             }
             s.ready = reasons.Count == 0;
+            s.settling = !s.ready && !hard;
             s.reason = s.ready ? null : Cap("Gameplay mods: " + string.Join("; ", reasons), 600);
             return s;
         }
@@ -559,6 +580,50 @@ namespace Sanctuary.ModApi
             return true;
         }
 
+        // Start pressed while a change was settling: the press goes through
+        // once everyone has confirmed it.
+        private static float _startQueuedAt = -1f;
+        private const float StartQueueTimeout = 5f;
+
+        /// The host pressed Start while the gate was only settling. True when
+        /// the press was queued (and a line said so).
+        internal static bool QueueStart()
+        {
+            if (!IsHost || !Settling) return false;
+            if (_startQueuedAt < 0f)
+            {
+                try { EM.UI.LobbyInterface.Instance?.AddChatMessage("Gameplay mods: starting as soon as everyone has the latest change…"); }
+                catch { }
+            }
+            _startQueuedAt = UnityEngine.Time.unscaledTime;
+            return true;
+        }
+
+        private static readonly System.Reflection.MethodInfo StartPressedMi =
+            HarmonyLib.AccessTools.Method(typeof(EM.UI.InterfaceManager), "OnLobbyStartGamePressed");
+
+        /// Every frame: a queued Start goes through once the gate opens, and
+        /// gives up with the reason if a real problem appears or it takes
+        /// too long.
+        private static void TickQueuedStart()
+        {
+            if (_startQueuedAt < 0f) return;
+            if (!IsHost || !_hostSession || MatchUnderway) { _startQueuedAt = -1f; return; }
+            if (_optionsPending || _statusDirty) return; // let the change go out first
+            if (GateOpen(out var reason))
+            {
+                _startQueuedAt = -1f;
+                try { StartPressedMi?.Invoke(EM.UI.InterfaceManager.Instance, null); }
+                catch (Exception e) { ModApiPlugin.Log.LogError($"Queued Start failed: {e}"); }
+                return;
+            }
+            if (!Settling || UnityEngine.Time.unscaledTime - _startQueuedAt > StartQueueTimeout)
+            {
+                _startQueuedAt = -1f;
+                GamePatches.ShowError(reason ?? "Gameplay mods: players didn't confirm the change in time; press Start again.");
+            }
+        }
+
         private static readonly HarmonyLib.AccessTools.FieldRef<EM.UI.LobbyInterface, Michsky.UI.Beam.ButtonManager> StartButtonRef =
             HarmonyLib.AccessTools.FieldRefAccess<EM.UI.LobbyInterface, Michsky.UI.Beam.ButtonManager>("hostStartButton");
 
@@ -576,7 +641,10 @@ namespace Sanctuary.ModApi
                 var button = StartButtonRef(ui);
                 if (button == null || !button.gameObject.activeInHierarchy) return;
                 var allReady = state.players.Take(state.maxPlayers).All(p => p.isReady || p.type == PlayerType.Empty);
-                button.Interactable(allReady && GateOpen(out _));
+                // While a change is only settling the button stays live: a
+                // press then waits for it (QueueStart) rather than the
+                // button flickering grey for half a second.
+                button.Interactable(allReady && (GateOpen(out _) || Settling));
             }
             catch { }
         }

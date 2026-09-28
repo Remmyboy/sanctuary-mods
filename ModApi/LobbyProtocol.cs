@@ -167,6 +167,10 @@ namespace Sanctuary.ModApi
     {
         public int rev;
         public bool ready;
+        /// Not ready only because a change is still reaching everyone
+        /// (options settling, players re-checking): no one is missing
+        /// anything.
+        public bool settling;
         public string reason;
         public List<PlayerStatusMsg> players = new List<PlayerStatusMsg>();
     }

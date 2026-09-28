@@ -180,6 +180,8 @@ namespace Sanctuary.ModApi
             try
             {
                 if (Lobby.GateOpen(out var reason)) return true;
+                // Only a change still reaching everyone: start once it has.
+                if (Lobby.QueueStart()) return false;
                 ShowError(reason);
                 return false;
             }
