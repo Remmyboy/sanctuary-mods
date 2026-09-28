@@ -117,13 +117,15 @@ version unless they have already said to go ahead.
   got in.
 - **`MapLocalFiles` has no release** and is built from source; leave its
   Download cell as `—`.
-- **ModLoader has no packer mode** (the packer refuses `-Mod ModLoader`: it
-  would put the loader under SanctuaryMods, where it loads itself). Bump both
-  `[BepInPlugin]` and `<AssemblyVersion>` in `ModLoader.csproj`, pack any
-  other mod from the same commit, and hand-build one `ModLoader-<ver>.zip`
-  from that Standalone zip minus `SanctuaryMods/<Mod>/`, with the previous
-  ModLoader zip's README.txt updated (header, a `NEW IN` section). Publish
-  with an annotated tag at that commit and `gh release create --verify-tag`.
+- **ModLoader has no release of its own any more** (the user's call,
+  2026-09-28: the loader and the Mod Manager are one thing to players). It
+  ships inside the ModManager release: the add-in zip carries
+  `BepInEx/plugins/ModLoader.dll` beside the API, and every Standalone zip
+  has it too. Bump both `[BepInPlugin]` and `<AssemblyVersion>` in
+  `ModLoader.csproj` when it changes, then release **ModManager** and say
+  what the loader gained in its notes. The packer still refuses
+  `-Mod ModLoader` (it would put the loader under SanctuaryMods, where it
+  loads itself). Point the README's ModLoader row at the ModManager release.
 - **ModApi has no release of its own** (the packer refuses `-Mod ModApi`).
   `BepInEx/plugins/Sanctuary.ModApi.dll` ships in every Standalone zip and in
   the ModManager add-in zip, which also carries `ModLoader.dll`: the manager
