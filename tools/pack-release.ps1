@@ -1,14 +1,22 @@
 <#
 .SYNOPSIS
-Builds a mod's two release zips, and optionally publishes the GitHub release.
+Builds a mod's release zips, and optionally publishes the GitHub release.
 
 .DESCRIPTION
-Every release ships two zips:
+The Mod Manager is the one base install; every other mod is an add-in for it.
 
-  <Mod>-<version>-Standalone.zip   BepInEx + the mod loader + the mod, for a
-                                   clean install; extracted into `engine`.
-  <Mod>-<version>-ModManager.zip   just the mod, for an install that already
-                                   has the Mod Manager.
+  <Mod>-<version>-ModManager.zip   just the mod, for an install that has the
+                                   Mod Manager. Every mod ships this. The Mod
+                                   Manager's own also updates the loader and
+                                   the mod API in BepInEx\plugins.
+  ModManager-<version>-Standalone.zip
+                                   the Mod Manager release only: BepInEx +
+                                   the loader + the mod API + the Mod Manager,
+                                   the clean install everything else goes on.
+
+Other mods have had no Standalone zip since September 2026: each carried its
+own copy of the loader, and an older one extracted later would downgrade the
+loader under everything else.
 
 The version and display name are read from the mod's [BepInPlugin] attribute,
 so that attribute is the single source of truth and a release cannot disagree
@@ -91,12 +99,12 @@ function Invoke-Git([string]$What, [string[]]$GitArgs) {
     return (($out | Out-String).Trim())
 }
 
-# The loader lives in BepInEx\plugins and ships in every Standalone zip; a copy
+# The loader lives in BepInEx\plugins and ships with the Mod Manager; a copy
 # under SanctuaryMods would load itself, and that copy would load itself again.
-if ($Mod -eq 'ModLoader') { Fail "no ModLoader mode: its zip would put the loader under SanctuaryMods; it ships inside every Standalone zip" }
+if ($Mod -eq 'ModLoader') { Fail "no ModLoader mode: the loader ships inside the ModManager release; release ModManager" }
 # The mod API is the loader's twin: BepInEx loads it from plugins\ under a
-# fixed identity, and it ships in every Standalone zip and with ModManager.
-if ($Mod -eq 'ModApi') { Fail "no ModApi mode: it ships inside every Standalone zip and the ModManager release; see the release-mod skill" }
+# fixed identity, and it ships with the Mod Manager too.
+if ($Mod -eq 'ModApi') { Fail "no ModApi mode: the mod API ships inside the ModManager release; release ModManager" }
 if (-not (Test-Path $Body)) { Fail "body file not found: $Body" }
 $bodyText = (Get-Content $Body -Raw).TrimEnd()
 if ($bodyText -match '\*\*|\[.+\]\(') {
@@ -184,14 +192,20 @@ if ($framework) {
 "@
 }
 $t = "Sanctuary $display $Version - Mod Manager add-in"
+$needsManager = if ($framework) { @"
+This updates an install that already has BepInEx. For a first install use
+the Standalone zip of this release instead, which includes everything.
+"@ } else { @"
+This mod needs the Sanctuary Mod Manager, which brings BepInEx, the mod
+loader and the mod framework. If you don't have it yet, install that first:
+the Standalone zip of the latest ModManager release at
+https://github.com/Remmyboy/sanctuary-mods/releases
+"@ }
 @"
 $t
 $('=' * $t.Length)
 
-This is the add-in version: just the mod, for an install that already has
-the Sanctuary Mod Manager (which brings the mod loader). If you don't have
-that yet, either install the Mod Manager first or use the Standalone zip of
-this mod instead, which includes everything.
+$needsManager
 
 INSTALL
 1. Extract this zip into your Sanctuary 'engine' folder (the one with
@@ -209,9 +223,12 @@ Delete SanctuaryMods\$Mod, or switch it off on the Mods page.
 $mmZip = "$outPath\$Mod-$Version-ModManager.zip"
 New-Zip $mm $mmZip
 
-# ---- Standalone -----------------------------------------------------------
-# An allowlist, not a copy of the install: BepInEx\config there holds the
-# developer's own per-mod settings, and none of that belongs in a release.
+# ---- Standalone (the Mod Manager only) -------------------------------------
+# The base install. An allowlist, not a copy of the install: BepInEx\config
+# there holds the developer's own per-mod settings, and none of that belongs
+# in a release.
+$saZip = $null
+if ($framework) {
 $sa = "$stage\sa"
 New-Item -ItemType Directory -Force -Path "$sa\BepInEx\core", "$sa\BepInEx\config", "$sa\BepInEx\plugins", "$sa\SanctuaryMods\$Mod" | Out-Null
 foreach ($f in '.doorstop_version', 'doorstop_config.ini', 'winhttp.dll') {
@@ -261,17 +278,20 @@ loads. This zip ships that setting; a BepInEx you installed yourself
 defaults it to false.
 
 MULTIPLAYER AND TRUST
-This mod runs client-side: it never changes the game's Lua files or the
-simulation, so a modded client stays lobby-compatible with unmodded
-players. That is compatibility, not a safety check. Like every BepInEx
-plugin, the DLL runs as full-trust code inside the game with your Windows
-account's permissions, so only install mods from a source you trust.
+Outside a lobby the game always runs vanilla, and every lobby starts with no
+gameplay mods picked, so you can play with anyone, modded or not. Gameplay
+mods only change a match when the lobby host switches them on, and then
+every player needs identical copies before Start works. That is
+compatibility, not a safety check. Like every BepInEx plugin, a mod's DLL
+runs as full-trust code inside the game with your Windows account's
+permissions, so only install mods from a source you trust.
 
 UNINSTALL
 Delete SanctuaryMods\$Mod, or switch it off on the Mods page.
 "@ | Set-Content "$sa\README.txt" -NoNewline
 $saZip = "$outPath\$Mod-$Version-Standalone.zip"
 New-Zip $sa $saZip
+}
 
 # ---- verify, so a broken zip cannot reach a release -----------------------
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -289,9 +309,12 @@ function Assert-Entries($zip, $expected) {
 $mmExpected = @("SanctuaryMods/$Mod/$Mod.dll", 'README.txt')
 if ($framework) { $mmExpected += 'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll' }
 Assert-Entries $mmZip $mmExpected
-Assert-Entries $saZip @("SanctuaryMods/$Mod/$Mod.dll", 'SanctuaryMods/README.txt', 'README.txt',
-    'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll', 'BepInEx/config/BepInEx.cfg', 'winhttp.dll',
-    'doorstop_config.ini', '.doorstop_version')
+if ($saZip) {
+    Assert-Entries $saZip @("SanctuaryMods/$Mod/$Mod.dll", 'SanctuaryMods/README.txt', 'README.txt',
+        'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll', 'BepInEx/config/BepInEx.cfg', 'winhttp.dll',
+        'doorstop_config.ini', '.doorstop_version')
+}
+$zips = @($saZip, $mmZip) | Where-Object { $_ }
 
 Get-ChildItem $outPath -Filter "$Mod-$Version-*.zip" |
     ForEach-Object { "  {0,-42} {1,9:N0} bytes" -f $_.Name, $_.Length }
@@ -318,8 +341,7 @@ $notesText = if ($Notes) { (Get-Content $Notes -Raw).TrimEnd() } else {
     @"
 $bodyText
 
-- **Standalone** - everything: BepInEx, the Mod Loader and the mod. Extract into the game's ``engine`` folder.
-- **ModManager** - just the mod, for an install that already has the Mod Manager. Extract into ``engine``; it appears under UI Mods.
+- **ModManager** - the mod, for an install that has the [Sanctuary Mod Manager](https://github.com/Remmyboy/sanctuary-mods/releases?q=ModManager) (install that first if you haven't). Extract into the game's ``engine`` folder; it appears under UI Mods.
 
 Client-side only: never changes the Lua files or the simulation, so a modded client stays lobby-compatible with unmodded players. Like any BepInEx plugin it runs as full-trust code inside the game, so only install it from a source you trust. Built for the game update of $BuiltFor.
 "@
@@ -338,12 +360,12 @@ if ($LASTEXITCODE -ne 0) {
 $tagged = Invoke-Git "resolving $tag" @('rev-parse', "refs/tags/$tag^{commit}")
 if ($tagged -ne $head) { Fail "$tag resolves to $tagged, not the built commit $head" }
 
-& gh release create $tag --verify-tag --title "$display $Version" --notes-file $notesFile $saZip $mmZip
+& gh release create $tag --verify-tag --title "$display $Version" --notes-file $notesFile @zips
 if ($LASTEXITCODE -ne 0) {
     Fail ("gh release create failed (exit $LASTEXITCODE). Tag $tag is already pushed at $head; once the cause is " +
-          "fixed, create the release from that tag with gh release create $tag --verify-tag, attaching $saZip and $mmZip.")
+          "fixed, create the release from that tag with gh release create $tag --verify-tag, attaching $($zips -join ' and ').")
 }
 $assets = & gh release view $tag --json assets --jq '.assets | length'
-if ($LASTEXITCODE -ne 0 -or "$assets".Trim() -ne '2') { Fail "release $tag was created but lists '$assets' assets instead of 2; check it on GitHub" }
+if ($LASTEXITCODE -ne 0 -or "$assets".Trim() -ne "$($zips.Count)") { Fail "release $tag was created but lists '$assets' assets instead of $($zips.Count); check it on GitHub" }
 Remove-Temp
-Write-Host "Published $tag from $short with both zips." -ForegroundColor Green
+Write-Host "Published $tag from $short with $($zips.Count) zip(s)." -ForegroundColor Green

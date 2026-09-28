@@ -594,7 +594,8 @@ always see each other's lobbies.
 
 Zip the mod's folder (`FasterTanks\` with `mod.json`, the DLL and `lua\`)
 and tell players to extract it into `engine\SanctuaryMods\`. Players need the
-framework: any Standalone release from this repo includes it. Bump `version`
+framework, which comes with the Mod Manager (its Standalone zip is the full
+install). Bump `version`
 whenever the files change, so players with an old copy are told which one
 they have.
 

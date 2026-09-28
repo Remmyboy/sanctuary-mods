@@ -27,12 +27,14 @@ the permissions of the Windows account playing, and an unchanged Lua hash is
 no check against cheating or harmful code. Nothing in the game or the loader
 enforces good behaviour, so install DLL mods only from a source you trust.
 
-Every release ships two zips. **Standalone** is everything — BepInEx, the mod
-loader and the mod — for a clean install; extract it into the game's `engine`
-folder. **ModManager** is just the mod, for an install that already has the
-[Mod Manager](#modmanager); it appears under UI Mods and can be switched on and
-off from there. Each mod builds to `<name>.dll`, and the project link is its
-source.
+**Install the [Mod Manager](#modmanager) first.** Its **Standalone** zip is
+the one base install: BepInEx, the mod loader, the mod framework and the Mod
+Manager. Extract it into the game's `engine` folder. Every other mod ships one
+**ModManager** zip, which is just the mod; extract it into `engine` too. It
+appears under UI Mods and can be switched on and off from there. (Before
+September 2026 every mod also had a Standalone zip. Those carried their own
+copy of the loader, and an old one extracted later would downgrade it.) Each
+mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
@@ -1649,8 +1651,8 @@ other mod's reloads, the Mod Manager's included:
   client VM), `Lobby` and `ModCatalog`. See
   [docs/writing-mods.md](docs/writing-mods.md).
 
-It has no release of its own: it ships in every Standalone zip and with the
-Mod Manager.
+It has no release of its own. It ships with the Mod Manager, in both of its
+zips.
 
 ## Development
 
