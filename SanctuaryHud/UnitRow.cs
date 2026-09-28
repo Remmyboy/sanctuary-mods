@@ -43,8 +43,11 @@ namespace SanctuaryHud
                     if (button != null && !button.interactable) continue;
                     // A "coming soon" placeholder: the Lua adds it with click
                     // and hover events off (constructionPanel.lua's demo units).
+                    // Not the '?' label, which marks a real option with no
+                    // hotkey: SetText never writes '?' (it hides the label
+                    // instead), so the text is whatever the pooled button last
+                    // held, and the fresh ones' prefab text would drop them.
                     if (!element.emitClickEvents) continue;
-                    if (element.textOverlayText != null && element.textOverlayText.text == "?") continue;
                     // ...and one with no art of its own wears the prefab's
                     // default portrait, which is the "coming soon" picture.
                     if (element.portraitImage != null && element.defaultPortrait != null &&
