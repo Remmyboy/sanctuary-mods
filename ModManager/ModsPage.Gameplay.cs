@@ -172,8 +172,25 @@ namespace SanctuaryHud
 
             if (_lobbyPanel != null && _lobbyPanel.activeSelf)
             {
-                var sig = LobbySignature();
-                if (sig != _lobbySignature && !LobbyPanelBusy() && !SettlingBriefly()) RebuildLobbyPanel();
+                SettlingBriefly(); // keeps the settling clock running
+                // Rows are rebuilt only when the rows themselves change (a mod
+                // picked or dropped, a player joining); otherwise the rows
+                // there update in place. Neither happens under the pointer
+                // while it's dragging a slider or typing.
+                if (!LobbyPanelBusy())
+                {
+                    var structure = LobbyStructure();
+                    if (structure != _lobbyStructure) RebuildLobbyPanel();
+                    else
+                    {
+                        var values = LobbySignature();
+                        if (values != _lobbySignature)
+                        {
+                            _lobbySignature = values;
+                            RefreshLobbyValues();
+                        }
+                    }
+                }
             }
         }
 
@@ -335,15 +352,17 @@ namespace SanctuaryHud
             brt.offsetMin = brt.offsetMax = Vector2.zero;
             box.GetComponent<Image>().color = new Color(0.05f, 0.07f, 0.11f, 0.97f);
 
-            // A scroll view: mask, content with a vertical layout like the
-            // settings lists, and a close button pinned below it.
-            var view = new GameObject("View", typeof(RectTransform), typeof(RectMask2D), typeof(ScrollRect));
+            // The scroll view. Its own (invisible) image makes the whole view
+            // take the mouse wheel and drags, not just the rows: without it
+            // the gaps between rows let the wheel through to nothing.
+            var view = new GameObject("View", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
             var vrt = (RectTransform)view.transform;
             vrt.SetParent(brt, false);
             vrt.anchorMin = Vector2.zero;
             vrt.anchorMax = Vector2.one;
             vrt.offsetMin = new Vector2(40f, 140f);
-            vrt.offsetMax = new Vector2(-40f, -40f);
+            vrt.offsetMax = new Vector2(-70f, -40f);
+            view.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
 
             var content = new GameObject("Layout Group", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
             var crt = (RectTransform)content.transform;
@@ -359,12 +378,43 @@ namespace SanctuaryHud
             vl.childForceExpandWidth = true;
             vl.childForceExpandHeight = false;
             content.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
             var scroll = view.GetComponent<ScrollRect>();
             scroll.content = crt;
             scroll.viewport = vrt;
             scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 40f;
+            // Scrolls like the game's own settings list, with its scrollbar.
+            var gameScroll = _gameList != null ? _gameList.GetComponentInParent<ScrollRect>(true) : null;
+            if (gameScroll != null)
+            {
+                scroll.movementType = gameScroll.movementType;
+                scroll.elasticity = gameScroll.elasticity;
+                scroll.inertia = gameScroll.inertia;
+                scroll.decelerationRate = gameScroll.decelerationRate;
+                scroll.scrollSensitivity = Mathf.Max(gameScroll.scrollSensitivity, 60f);
+            }
+            else
+            {
+                scroll.movementType = ScrollRect.MovementType.Clamped;
+                scroll.scrollSensitivity = 120f;
+            }
+            var gameBar = gameScroll != null ? gameScroll.verticalScrollbar : null;
+            if (gameBar != null)
+            {
+                var bar = Object.Instantiate(gameBar.gameObject, brt, false);
+                bar.name = "Scrollbar";
+                var bart = (RectTransform)bar.transform;
+                var width = Mathf.Max(((RectTransform)gameBar.transform).rect.width, 8f);
+                bart.anchorMin = new Vector2(1f, 0f);
+                bart.anchorMax = new Vector2(1f, 1f);
+                bart.pivot = new Vector2(1f, 0.5f);
+                bart.offsetMin = new Vector2(-40f - width, 140f);
+                bart.offsetMax = new Vector2(-40f, -40f);
+                bar.SetActive(true);
+                scroll.verticalScrollbar = bar.GetComponent<Scrollbar>();
+                scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            }
+            _lobbyScroll = scroll;
             _lobbyList = crt;
 
             var footer = new GameObject("Footer", typeof(RectTransform), typeof(VerticalLayoutGroup));
@@ -386,14 +436,78 @@ namespace SanctuaryHud
             root.SetActive(false);
         }
 
+        private ScrollRect _lobbyScroll;
+        private string _lobbyStructure = "";
+        // One per row that shows something which changes without the rows
+        // changing (option values, the status line, each player's state).
+        private readonly List<Action> _lobbyUpdaters = new List<Action>();
+
+        /// What decides which rows the panel has. Values shown in them (option
+        /// values, statuses) are left out: those update in place.
+        private string LobbyStructure()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append(Lobby.IsHost).Append('|').Append(Lobby.HostHasModSupport).Append('|')
+              .Append(Lobby.IsLadderLobby).Append('|').Append(Lobby.CanChangeSelection).Append('|')
+              .Append(ModCatalog.Version).Append('|');
+            foreach (var s in Lobby.Selection)
+            {
+                sb.Append(s.Id).Append('@').Append(s.ContentHash)
+                  .Append(s.Local != null ? "+" : s.LocalDifferent != null ? "~" : "-").Append(':');
+                foreach (var o in s.OptionDefinitions) sb.Append(o.Key).Append(',');
+                sb.Append(';');
+            }
+            sb.Append('|');
+            foreach (var p in Lobby.Players) sb.Append(p.PlayerId).Append('=').Append(p.Name).Append(';');
+            return sb.ToString();
+        }
+
         private void RebuildLobbyPanel()
         {
             if (_lobbyList == null) return;
+            _lobbyStructure = LobbyStructure();
             _lobbySignature = LobbySignature();
-            Clear(_lobbyList);
 
+            // Where the list was scrolled to, kept across the rebuild.
+            var content = (RectTransform)_lobbyList;
+            var scrolledTo = content.anchoredPosition.y;
+
+            Clear(_lobbyList);
+            _lobbyUpdaters.Clear();
+            _keepEmptyValues = true;
+            try { FillLobbyPanel(); }
+            finally { _keepEmptyValues = false; }
+            RefreshLobbyValues();
+
+            // Lay the new rows out now rather than next frame, so the list is
+            // never drawn half-built, then put the scroll position back.
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            if (_lobbyScroll != null && _lobbyScroll.viewport != null)
+            {
+                var max = Mathf.Max(0f, content.rect.height - _lobbyScroll.viewport.rect.height);
+                content.anchoredPosition = new Vector2(content.anchoredPosition.x, Mathf.Clamp(scrolledTo, 0f, max));
+                _lobbyScroll.velocity = Vector2.zero;
+            }
+        }
+
+        /// Every row that updates in place, from the lobby as it is now.
+        private void RefreshLobbyValues()
+        {
+            foreach (var update in _lobbyUpdaters)
+            {
+                try { update(); }
+                catch (Exception e) { _log.LogWarning($"Lobby mods panel: {e.Message}"); }
+            }
+        }
+
+        private static void SetText(TMP_Text t, string s)
+        {
+            if (t != null && t.text != s) t.text = s ?? "";
+        }
+
+        private void FillLobbyPanel()
+        {
             var host = Lobby.IsHost;
-            var blocked = Lobby.StartBlockedReason;
 
             if (!Lobby.HostHasModSupport && !host)
             {
@@ -408,13 +522,14 @@ namespace SanctuaryHud
                 InfoRow(_lobbyList, "Ladder lobby: always vanilla", "no gameplay mods");
                 return;
             }
-            var settling = blocked != null && Lobby.Settling;
-            InfoRow(_lobbyList,
-                Lobby.Selection.Count == 0 ? "None picked: a vanilla match, anyone can play"
-                    : blocked == null ? "Everyone has them: ready to start"
-                    : settling ? "Updating everyone's copy…"
-                    : "Start waits until everyone has them",
-                blocked == null ? "" : settling ? (host ? "Start still works" : "a moment") : "see players below");
+
+            var status = InfoRow(_lobbyList, "", "");
+            _lobbyUpdaters.Add(() =>
+            {
+                var (label, value) = StatusLine(host);
+                SetText(status.label, label);
+                SetText(status.value, value);
+            });
 
             if (host)
             {
@@ -427,45 +542,80 @@ namespace SanctuaryHud
                     var picked = selection.FirstOrDefault(s => s.Id == m.Id);
                     SwitchRow(_lobbyList, $"{m.Name} {m.Version}   <alpha=#80>{GameplayFiles(m)}", picked != null,
                         Lobby.CanChangeSelection, on => Lobby.SetSelected(m.Id, on));
-                    if (picked != null) HostOptionRows(m, picked.Options);
+                    if (picked != null) HostOptionRows(m);
                 }
-                foreach (var (file, owners) in Overlay.Conflicts(Lobby.Selection.Where(s => s.Local != null).Select(s => s.Local)))
+                foreach (var (file, owners) in Overlay.Conflicts(selection.Where(s => s.Local != null).Select(s => s.Local)))
                     InfoRow(_lobbyList, $"Both change {file}", $"{owners.Last().Name} wins");
             }
             else
             {
-                foreach (var s in Lobby.Selection)
+                foreach (var sel in Lobby.Selection)
                 {
+                    var s = sel;
                     var state = s.Local != null ? "you have it"
                         : s.LocalDifferent != null ? $"yours differs ({s.LocalDifferent.Version})"
                         : "missing" + (string.IsNullOrEmpty(s.Url) ? "" : ": " + s.Url);
                     InfoRow(_lobbyList, $"{s.Name} {s.Version}", state);
-                    foreach (var o in s.OptionDefinitions)
+                    foreach (var option in s.OptionDefinitions)
                     {
-                        s.Options.TryGetValue(o.Key, out var v);
-                        InfoRow(_lobbyList, OptionIndent + o.Label, o.Display(v));
+                        var o = option;
+                        var row = InfoRow(_lobbyList, OptionIndent + o.Label, "");
+                        _lobbyUpdaters.Add(() => SetText(row.value, o.Display(CurrentOption(s.Id, o.Key))));
                     }
                 }
             }
 
             Line(_lobbyList);
             Heading(_lobbyList, "Players");
-            foreach (var p in Lobby.Players)
+            foreach (var player in Lobby.Players)
             {
-                var text = p.State == PlayerModState.Ok ? (Lobby.Selection.Count == 0 ? "" : "has them all")
-                    : p.State == PlayerModState.Vanilla ? (Lobby.Selection.Count == 0 ? "vanilla" : "no mod support")
-                    : p.State == PlayerModState.Pending ? "checking…"
-                    : p.Detail;
-                InfoRow(_lobbyList, p.Name, text);
+                var id = player.PlayerId;
+                var row = InfoRow(_lobbyList, player.Name, "");
+                _lobbyUpdaters.Add(() =>
+                {
+                    var p = Lobby.Players.FirstOrDefault(x => x.PlayerId == id);
+                    if (p == null) return;
+                    // A player re-checking a change that's still on its way
+                    // keeps what they showed, rather than blinking "checking…".
+                    if (p.State == PlayerModState.Pending && Lobby.Settling && !SettlingShown()) return;
+                    SetText(row.value, PlayerText(p));
+                });
             }
+        }
+
+        /// The line at the top of the panel: whether Start can go.
+        private (string label, string value) StatusLine(bool host)
+        {
+            var blocked = Lobby.StartBlockedReason;
+            if (Lobby.Selection.Count == 0) return ("None picked: a vanilla match, anyone can play", "");
+            // A change on its way reads as ready for its first moment, and
+            // as "updating" only if it takes longer.
+            if (blocked == null || (Lobby.Settling && !SettlingShown())) return ("Everyone has them: ready to start", "");
+            if (Lobby.Settling) return ("Updating everyone's copy…", host ? "Start still works" : "a moment");
+            return ("Start waits until everyone has them", "see players below");
+        }
+
+        private static string PlayerText(PlayerModStatus p) =>
+            p.State == PlayerModState.Ok ? (Lobby.Selection.Count == 0 ? "" : "has them all")
+            : p.State == PlayerModState.Vanilla ? (Lobby.Selection.Count == 0 ? "vanilla" : "no mod support")
+            : p.State == PlayerModState.Pending ? "checking…"
+            : p.Detail;
+
+        /// A picked mod's current value for one option, as everyone sees it.
+        private static string CurrentOption(string modId, string key)
+        {
+            var s = Lobby.Selection.FirstOrDefault(x => x.Id == modId);
+            return s != null && s.Options.TryGetValue(key, out var v) ? v : null;
         }
 
         private const string OptionIndent = "      ";
 
         /// A picked mod's options, under its switch: the host sets them
         /// here. Values go out once the host stops changing them for a
-        /// moment, so a dragged slider sends one change, not fifty.
-        private void HostOptionRows(ModInfo m, IReadOnlyDictionary<string, string> values)
+        /// moment, so a dragged slider sends one change, not fifty. Each
+        /// control also follows the value if it changes some other way (a
+        /// reset, a mod file edited), without a rebuild.
+        private void HostOptionRows(ModInfo m)
         {
             var options = m.Manifest.Options;
             if (options.Count == 0) return;
@@ -473,45 +623,79 @@ namespace SanctuaryHud
             foreach (var option in options)
             {
                 var o = option;
-                values.TryGetValue(o.Key, out var raw);
-                var v = o.Normalize(raw);
+                string Value() => o.Normalize(CurrentOption(m.Id, o.Key));
+                var v = Value();
                 var label = OptionIndent + o.Label;
                 if (!editable)
                 {
-                    InfoRow(_lobbyList, label, o.Display(v));
+                    var row = InfoRow(_lobbyList, label, "");
+                    _lobbyUpdaters.Add(() => SetText(row.value, o.Display(Value())));
                     continue;
                 }
                 switch (o.Type)
                 {
                     case ModOptionType.Toggle:
-                        SwitchRow(_lobbyList, label, v == "true", true, on => Lobby.SetOption(m.Id, o.Key, on ? "true" : "false"));
+                    {
+                        var sw = SwitchRow(_lobbyList, label, v == "true", true, on => Lobby.SetOption(m.Id, o.Key, on ? "true" : "false"));
+                        _lobbyUpdaters.Add(() =>
+                        {
+                            var on = Value() == "true";
+                            if (sw.isOn == on) return;
+                            sw.isOn = on;
+                            sw.UpdateUI();
+                        });
                         break;
+                    }
                     case ModOptionType.Choice:
-                        var index = o.Choices.Select((c, i) => (c, i)).FirstOrDefault(x => x.c.Value == v).i;
-                        SelectorRow(_lobbyList, label, o.Choices.Select(c => c.Label).ToList(), index,
+                    {
+                        int IndexOf(string value) => Math.Max(0, o.Choices.Select((c, i) => (c, i)).FirstOrDefault(x => x.c.Value == value).i);
+                        var selector = SelectorRow(_lobbyList, label, o.Choices.Select(c => c.Label).ToList(), IndexOf(v),
                             i => { if (i >= 0 && i < o.Choices.Count) Lobby.SetOption(m.Id, o.Key, o.Choices[i].Value); });
+                        _lobbyUpdaters.Add(() =>
+                        {
+                            var i = IndexOf(Value());
+                            if (selector.index == i) return;
+                            selector.index = i;
+                            selector.UpdateUI();
+                        });
                         break;
+                    }
                     default:
+                    {
                         var number = double.Parse(v, System.Globalization.CultureInfo.InvariantCulture);
                         if (o.Min.HasValue && o.Max.HasValue)
                         {
-                            SliderRow(_lobbyList, label, (float)o.Min.Value, (float)o.Max.Value, (float)number, o.IsWhole,
+                            var (slider, box) = SliderRow(_lobbyList, label, (float)o.Min.Value, (float)o.Max.Value, (float)number, o.IsWhole,
                                 f => Lobby.SetOption(m.Id, o.Key, f.ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+                            _lobbyUpdaters.Add(() =>
+                            {
+                                var now = (float)double.Parse(Value(), System.Globalization.CultureInfo.InvariantCulture);
+                                if (Mathf.Approximately(slider.value, now)) return;
+                                slider.SetValueWithoutNotify(now);
+                                if (box != null && !box.isFocused) box.SetTextWithoutNotify(Value());
+                            });
                         }
                         else
                         {
                             var typed = v;
-                            TextRow(_lobbyList, label, v, s => typed = s, () =>
+                            TMP_InputField field = null;
+                            field = TextRow(_lobbyList, label, v, s => typed = s, () =>
                             {
                                 Lobby.SetOption(m.Id, o.Key, typed);
                                 return o.Normalize(typed);
                             });
+                            _lobbyUpdaters.Add(() =>
+                            {
+                                if (field == null || field.isFocused) return;
+                                var now = Value();
+                                if (field.text != now) { field.SetTextWithoutNotify(now); typed = now; }
+                            });
                         }
                         break;
+                    }
                 }
             }
-            if (options.Any(o => o.Normalize(values.TryGetValue(o.Key, out var x) ? x : null) != o.Default))
-                ButtonRow(_lobbyList, $"Reset {m.Name} options", () => Lobby.ResetOptions(m.Id));
+            ButtonRow(_lobbyList, $"Reset {m.Name} options", () => Lobby.ResetOptions(m.Id));
         }
 
         /// The option values in a line of chat: "Minutes 20, No air On".
@@ -564,8 +748,11 @@ namespace SanctuaryHud
             _lobbyPanel = null;
             _lobbyButton = null;
             _lobbyList = null;
+            _lobbyScroll = null;
             _lobbyFor = null;
             _lobbySignature = "";
+            _lobbyStructure = "";
+            _lobbyUpdaters.Clear();
         }
     }
 }

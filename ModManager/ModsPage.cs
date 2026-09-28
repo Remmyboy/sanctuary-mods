@@ -634,7 +634,7 @@ namespace SanctuaryHud
 
         /// A fixed choice: the game's own left/right selector. Options are
         /// shown as given; `selected` is the index shown first.
-        private void SelectorRow(Transform list, string label, IList<string> options, int selected, Action<int> onChanged)
+        private HorizontalSelector SelectorRow(Transform list, string label, IList<string> options, int selected, Action<int> onChanged)
         {
             var go = Spawn(_tSelectorRow);
             go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
@@ -649,6 +649,7 @@ namespace SanctuaryHud
             // and covers a template that was already awake.
             Place(go, list);
             selector.InitializeSelector();
+            return selector;
         }
 
         private static void PrepareButtonTemplate(GameObject row)
@@ -797,7 +798,7 @@ namespace SanctuaryHud
             Place(Spawn(_tSpacer), list);
         }
 
-        private void SwitchRow(Transform list, string label, bool isOn, bool interactable, Action<bool> onChanged)
+        private SwitchManager SwitchRow(Transform list, string label, bool isOn, bool interactable, Action<bool> onChanged)
         {
             var go = Spawn(_tSwitchRow);
             go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
@@ -806,6 +807,7 @@ namespace SanctuaryHud
             sw.isInteractable = interactable;
             sw.onValueChanged.AddListener(v => onChanged(v));
             Place(go, list);
+            return sw;
         }
 
         /// A mod's section header: the switch row restyled as a heading,
@@ -851,14 +853,17 @@ namespace SanctuaryHud
             (expanded ? "-  " : "+  ") + name; // TMP has no closing alpha tag, so no dimming here
 
         /// A switch row without the switch: a label with an optional value
-        /// on the right.
-        private void InfoRow(Transform list, string label, string value = null)
+        /// on the right. Returns both texts (the value's is null when no
+        /// value was given), for a row whose text changes in place.
+        private (TMP_Text label, TMP_Text value) InfoRow(Transform list, string label, string value = null)
         {
             var go = Spawn(_tSwitchRow);
             var text = go.transform.Find("Text");
-            text.GetComponent<TMP_Text>().text = label;
+            var labelText = text.GetComponent<TMP_Text>();
+            labelText.text = label;
             Object.DestroyImmediate(go.transform.Find("Switch").gameObject);
-            if (!string.IsNullOrEmpty(value))
+            TMP_Text valueText = null;
+            if (value != null && (value.Length > 0 || _keepEmptyValues))
             {
                 var v = Object.Instantiate(text.gameObject, go.transform);
                 v.name = "Value";
@@ -875,11 +880,17 @@ namespace SanctuaryHud
                 tmp.characterSpacing = 0f;
                 var um = v.GetComponent<UIManagerText>();
                 if (um != null) um.colorType = UIManagerText.ColorType.Accent;
+                valueText = tmp;
             }
             Place(go, list);
+            return (labelText, valueText);
         }
 
-        private void TextRow(Transform list, string label, string value, Action<string> onEdited, Func<string> onEndEdit)
+        // Set while building rows that update in place: their value text
+        // exists even while it's empty, so it can be filled in later.
+        private bool _keepEmptyValues;
+
+        private TMP_InputField TextRow(Transform list, string label, string value, Action<string> onEdited, Func<string> onEndEdit)
         {
             var go = Spawn(_tTextRow);
             go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
@@ -894,11 +905,12 @@ namespace SanctuaryHud
                 if (canonical != null && field.text != canonical) field.SetTextWithoutNotify(canonical);
             });
             Place(go, list);
+            return field;
         }
 
         /// A slider with a value box, for a setting that declares a range.
         /// Whole numbers when the setting is integral; otherwise a tenth.
-        private void SliderRow(Transform list, string label, float min, float max, float value, bool whole, Action<float> onChanged)
+        private (Slider slider, TMP_InputField box) SliderRow(Transform list, string label, float min, float max, float value, bool whole, Action<float> onChanged)
         {
             var go = Spawn(_tSliderRow);
             go.transform.Find("Text").GetComponent<TMP_Text>().text = label;
@@ -928,6 +940,7 @@ namespace SanctuaryHud
             }
             Place(go, list);
             sm.UpdateUI();
+            return (slider, field);
         }
 
         /// The row for one setting, by its type and declared constraints:
