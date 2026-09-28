@@ -44,14 +44,21 @@ second, whether or not the game is running. The template's options:
 To build without touching the game (for example while you're playing), use
 `dotnet build -p:DeployPath=some\other\folder`.
 
-There are four worked examples in [`examples/`](../examples):
+A gameplay mod from the template comes with `lua\<name>\host.lua`, a
+[host script](#host-scripts-and-match-events) already named in `mod.json`:
+put the match's rules there.
 
-- **ExampleGameplayMod** is Lua only. It appends to `common/colors.lua` so the
-  first army plays in pink. Copy the folder into `SanctuaryMods`, pick it in a
-  lobby, and start a match against the AI.
+There are five worked examples in [`examples/`](../examples):
+
+- **ExampleGameplayMod** is Lua only. It appends to `common/colors.lua` so one
+  army plays in a loud colour, with the colour and army as
+  [options](#options-let-the-host-tune-your-mod). Copy the folder into
+  `SanctuaryMods`, pick it in a lobby, and start a match against the AI.
+- **SupplyDrop** is Lua only. Every few minutes every army gets alloys and
+  energy. It shows a host script, timers and options working together.
 - **EngineersAndRaiders** is Lua only. Factories can build only engineers and
-  T1 raiders. It shows how to change what can be built, in the menus and on
-  the host (see [Recipes](#recipes)).
+  raiders, with an option for which raiders. It shows how to change what can
+  be built, in the menus and on the host (see [Recipes](#recipes)).
 - **AscendantFaction** is Lua plus C#. It adds a fourth faction, picked from
   the lobby's faction dropdown, using EDA's models (see
   [Add a faction](#add-a-faction)).
@@ -109,6 +116,8 @@ file as you type and suggest the fields.
 | `requires` | Ids of other gameplay mods that must be picked alongside this one. If one isn't, the lobby says so and holds Start. |
 | `apiVersion` | The ModApi major version you wrote against (`1`). |
 | `options` | Settings the lobby host picks for a gameplay mod. See [Options](#options-let-the-host-tune-your-mod). |
+| `hostScript`, `clientScript` | Lua files of yours, relative to `luaRoot`, that the framework imports in the host's simulation and in every player's client when the mod is picked. See [Host scripts and match events](#host-scripts-and-match-events). |
+| `gameVersion` | The game version you made and tested the mod for, such as `"0.0.1.20"`, or a prefix such as `"0.0.1"`. On any other version the Mods page shows "made for game 0.0.1.20", so after a game update players can see which mods might need one too. The mod still loads either way. |
 
 A folder with no `mod.json` still works the way mods worked before
 manifests: its DLL is a UI mod, its Lua files are a gameplay mod whose id is
@@ -187,13 +196,77 @@ runs with; otherwise they're the defaults.
   everyone matches.
 - The new values also go into the lobby chat.
 - A host's values are remembered for the next lobby they host.
-- A player whose Mod API is older than 1.1 can't take options. The lobby says
-  so and names the update they need.
+- Players need the same Mod API release as the host, because the options
+  file and the match events come from it. If they don't have it, the lobby
+  names both versions.
 
 The values are part of the game's Lua hash, so a player who somehow ran with
 different values couldn't start. Keep them to what the match needs. A
 personal preference, like how a panel looks, belongs in a UI mod's
 `Config.Bind` instead.
+
+## Host scripts and match events
+
+Most rules come down to "when the match starts, do this", "after 20 minutes,
+do that" or "when an army is out, check this". The framework gives you both
+the place and the timing.
+
+**The place.** Name a Lua file in `mod.json`, and the framework imports it
+when your mod is picked:
+
+```json
+"hostScript": "norush/host.lua",
+"clientScript": "norush/client.lua"
+```
+
+- The host script runs in the host's simulation. That's where the match's
+  rules belong: what can be built, who can attack, who wins.
+- The client script runs on every player's client and in replays. It's for
+  what a player sees.
+
+Both are imported once, while the game loads, before the first tick. Paths
+are relative to your `lua` folder. You don't need to find a game file to
+append to.
+
+**The timing.** `modapi/events.lua` is always there when any gameplay mod is
+picked:
+
+```lua
+local Events = Import("modapi/events.lua").Events
+local Options = Import("modoptions/alice.norush.lua").Options
+
+Events.OnMatchStart(function()
+    -- The armies and the map are set up.
+end)
+
+Events.After(Options.minutes * 60, function()
+    -- Once, this far into the match, in game time.
+end)
+
+local drop = Events.Every(60, function() ... end)   -- every minute
+-- drop:Cancel() stops it.
+
+Events.OnTick(function(tick) ... end)               -- 10 times a second
+Events.OnArmyDefeated(function(army) ... end)       -- host only
+
+Events.IsHost()     -- true in the simulation, false in a client
+Events.GameTime()   -- seconds since the start
+```
+
+- Times are game time: they pause and speed up with the game.
+- A timer set before the match starts counts from the start.
+- Armies are in the global `Armies` table. Skip `army.civilian`; each army
+  has `army:IsAlive()`, `army:GiveResources("alloys" or "energy", n)`,
+  `army:SetAlly(other)`, `army:SetEnemy(other)` and `army:SetNeutral(other)`.
+- A handler that errors is logged with its traceback (in the game's log) and
+  skipped; the other handlers, and other mods', keep running. A host script
+  that fails to load is logged the same way.
+- `Events.IsHost()` is only settled inside a handler or in your
+  host/client script. A file the game imports early, such as an append to
+  `tags.lua`, runs before the framework knows which side it's on.
+
+The [`SupplyDrop`](../examples/SupplyDrop) example is a complete mod built
+this way.
 
 ## Gameplay Lua
 
@@ -484,6 +557,20 @@ and tell players to extract it into `engine\SanctuaryMods\`. Players need the
 framework: any Standalone release from this repo includes it. Bump `version`
 whenever the files change, so players with an old copy are told which one
 they have.
+
+The framework forgives the usual install slips:
+
+- **A folder around the mod.** Some zip tools extract to
+  `SanctuaryMods\FasterTanks-1.0\FasterTanks\mod.json`. The framework finds
+  the mod inside, up to three folders down, and the Mods page suggests
+  moving it up.
+- **Several mods in one zip.** A pack of mods in one folder works the same
+  way: each folder with a `mod.json` is its own mod.
+- **An archive nobody extracted,** or a DLL dropped loose in `SanctuaryMods`.
+  These show at the top of the Mods page, saying what to do.
+
+A DLL belongs to the nearest folder above it that has a `mod.json`, so
+`FasterTanks\bin\FasterTanks.dll` is still FasterTanks's.
 
 **Share the zip, not a checkout.** The content hash is byte-exact, and Git on
 Windows rewrites line endings on checkout (`core.autocrlf`). Two players who

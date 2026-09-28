@@ -6,6 +6,7 @@
   "author": "Sanctuary Mods",
   "description": "A fourth faction, picked from the lobby's faction dropdown. It borrows EDA's models: commander, T1 engineer, land factory, alloy extractor, energy generator, a T1 raider and a heavier, slower T1 tank. Proves a new faction can be added by a mod; not balanced.",
   "kind": "gameplay",
+  "gameVersion": "0.0.1.20",
   "luaRoot": "lua",
   "apiVersion": 1
 }

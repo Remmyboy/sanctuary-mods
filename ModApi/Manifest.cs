@@ -64,6 +64,22 @@ namespace Sanctuary.ModApi
         /// Settings the lobby host picks for a gameplay mod. See
         /// <see cref="ModOption"/>.
         public IReadOnlyList<ModOption> Options { get; internal set; } = Array.Empty<ModOption>();
+        /// The game version the mod was made and tested for ("0.0.1.20"), or
+        /// a prefix of it ("0.0.1" for any 0.0.1.x). Empty when not stated.
+        /// Only informs: a mod for another version still loads.
+        public string GameVersion { get; internal set; } = "";
+        /// A Lua file of the mod's, as a path under LJ\lua ("alice/norush/host.lua"),
+        /// that the framework imports in the host's simulation when the mod
+        /// is picked. Empty for none.
+        public string HostScript { get; internal set; } = "";
+        /// The same, imported in every player's client (and in replays).
+        public string ClientScript { get; internal set; } = "";
+
+        /// True when <see cref="GameVersion"/> is stated and the running
+        /// game isn't that version.
+        public bool IsForOtherGameVersion(string running) =>
+            GameVersion.Length > 0 && running != null &&
+            !(running == GameVersion || running.StartsWith(GameVersion + ".", StringComparison.Ordinal));
         /// True when the folder has no mod.json and these values were made up
         /// from its contents, the way mods were laid out before manifests.
         public bool Synthesised { get; internal set; }
@@ -129,7 +145,33 @@ namespace Sanctuary.ModApi
             }
             m.Requires = requires;
             m.Options = ModOption.ParseAll(o["options"], problems);
+            m.GameVersion = (Str(o, "gameVersion") ?? "").Trim();
+            if (m.GameVersion.Length > 40) m.GameVersion = m.GameVersion.Substring(0, 40);
+            m.HostScript = ScriptPath(Str(o, "hostScript"), "hostScript", problems);
+            m.ClientScript = ScriptPath(Str(o, "clientScript"), "clientScript", problems);
             return m;
+        }
+
+        /// A script path as Import takes it: forward slashes, relative,
+        /// inside LJ\lua, ending in .lua.
+        private static string ScriptPath(string raw, string field, List<string> problems)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            var p = raw.Trim().Replace('\\', '/').TrimStart('/');
+            if (p.StartsWith("lua/", StringComparison.OrdinalIgnoreCase) && p.Length > 4)
+            {
+                // "lua/alice/x.lua" is the path in the mod folder; Import
+                // wants the path under the mod's luaRoot.
+                problems.Add($"mod.json: {field} '{raw}' starts with the lua folder; paths are relative to it, so using '{p.Substring(4)}'");
+                p = p.Substring(4);
+            }
+            if (p.Contains("..") || Path.IsPathRooted(p) || p.Contains(":") || !p.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) ||
+                p.IndexOfAny(new[] { '"', '\n', '\r' }) >= 0)
+            {
+                problems.Add($"mod.json: {field} '{raw}' must be a .lua file of the mod's, relative to its lua folder; ignored");
+                return "";
+            }
+            return p;
         }
 
         /// kind was missing or unknown: the catalog decides from the files.

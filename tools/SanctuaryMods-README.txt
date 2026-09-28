@@ -1,7 +1,10 @@
 SanctuaryMods - every mod lives here, one folder each.
 
-Install a mod by copying its folder in; remove it by deleting the folder.
-No restart either way: mods are picked up within a couple of seconds.
+Install a mod by extracting its zip here, so its folder sits beside the
+others; remove it by deleting the folder. No restart either way: mods are
+picked up within a couple of seconds. The Mods page's "Open Mods Folder"
+button opens this folder. If a zip ended up in a folder of its own, or was
+never extracted, the Mods page says so at the top.
 
   SanctuaryMods\
     MyUiMod\

@@ -32,6 +32,20 @@
       "items": { "type": "string", "pattern": "^[a-z0-9._-]{1,64}$" }
     },
     "apiVersion": { "description": "The Mod API major version the mod was written for.", "type": "integer", "default": 1 },
+    "gameVersion": {
+      "description": "The game version the mod was made and tested for (\"0.0.1.20\"), or a prefix of it (\"0.0.1\"). On any other version the Mods page says so; the mod still loads.",
+      "type": "string"
+    },
+    "hostScript": {
+      "description": "A Lua file of the mod's, relative to its lua folder (\"alice/norush/host.lua\"), imported in the host's simulation when the mod is picked. The place for match rules; see Import(\"modapi/events.lua\").Events.",
+      "type": "string",
+      "pattern": "\\.lua$"
+    },
+    "clientScript": {
+      "description": "A Lua file of the mod's, relative to its lua folder, imported in every player's client (and replays) when the mod is picked. For what players see.",
+      "type": "string",
+      "pattern": "\\.lua$"
+    },
     "options": {
       "description": "Settings the lobby host picks for a gameplay mod. Lua reads them with Import(\"modoptions/<id>.lua\").Options.",
       "type": "array",

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
+  "id": "sanctuarymods.example.supplydrop",
+  "name": "Example: Supply Drop",
+  "version": "1.0.0",
+  "author": "Sanctuary Mods",
+  "description": "Every few minutes, every army still in the game gets a drop of alloys and energy. An example of a host script, match events and options working together.",
+  "kind": "gameplay",
+  "luaRoot": "lua",
+  "gameVersion": "0.0.1.20",
+  "hostScript": "supplydrop/host.lua",
+  "apiVersion": 1,
+  "options": [
+    { "key": "interval", "label": "Minutes between drops", "type": "number", "default": 3, "min": 1, "max": 10, "step": 1 },
+    { "key": "alloys", "label": "Alloys per drop", "type": "number", "default": 100, "min": 0, "max": 1000, "step": 50 },
+    { "key": "energy", "label": "Energy per drop", "type": "number", "default": 1000, "min": 0, "max": 10000, "step": 500 }
+  ]
+}

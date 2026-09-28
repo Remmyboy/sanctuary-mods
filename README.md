@@ -1602,6 +1602,22 @@ other mod's reloads, the Mod Manager's included:
   them, with no second check. The options' keys, types and ranges are part of
   the content hash; their labels aren't. Changes wait until the host has
   stopped moving a slider for 0.4 s, then go out as one revision.
+- **Match events and mod scripts.** Whenever any gameplay mod is picked, the
+  overlay also carries `modapi/events.lua` (embedded in the DLL) and a short
+  append to `host/hostMain.lua` and `client/clientMain.lua`. The append wraps
+  the game's `_G.OnSimulationTickUpdate` so the helper can run
+  `OnMatchStart`, `After`, `Every` and `OnTick` handlers after each tick (10
+  a second). It replaces `host/winCondition.lua`'s `CheckWinCondition` on
+  the module to fire `OnArmyDefeated`. It also imports each picked mod's
+  `hostScript`/`clientScript`. Handler errors are logged with a traceback
+  and never stop the others.
+- **Install slips.** A top-level folder with no `mod.json` is searched up to
+  three levels down for folders that have one: a zip extracted into its own
+  folder, or a pack of mods. The loader gives each DLL to the nearest folder
+  above it with a `mod.json`, so both agree on which mod a DLL belongs to.
+  Unextracted archives and loose DLLs in `SanctuaryMods` are listed at the
+  top of the Mods page. A `gameVersion` in `mod.json` that isn't the running
+  game's shows as "made for game 0.0.1.20".
 - **Modded replays.** A replay recorded with gameplay mods gets a
   `<replay>.mods.json` beside it (moved and deleted with it), option values
   included. The replay list

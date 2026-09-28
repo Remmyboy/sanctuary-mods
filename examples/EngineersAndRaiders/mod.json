@@ -6,6 +6,7 @@
   "author": "Sanctuary Mods",
   "description": "Factories can only build engineers and raiders; every other mobile unit is off the build menus, and the host refuses them if anything queues one anyway. Structures are untouched, so you can still build factories and your economy. A test mod for the lobby's gameplay-mod check, and an example of a unit restriction with an option.",
   "kind": "gameplay",
+  "gameVersion": "0.0.1.20",
   "luaRoot": "lua",
   "apiVersion": 1,
   "options": [

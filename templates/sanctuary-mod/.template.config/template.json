@@ -39,6 +39,13 @@
       "valueTransform": "modId",
       "replaces": "templateauthorid"
     },
+    "scriptFolder": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "modId",
+      "replaces": "templatescriptfolder",
+      "fileRename": "templatescriptfolder"
+    },
     "gamePath": {
       "type": "parameter",
       "datatype": "text",

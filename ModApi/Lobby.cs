@@ -464,7 +464,6 @@ namespace Sanctuary.ModApi
             if (_hostSelectionProblem != null) reasons.Add(_hostSelectionProblem);
             if (_optionsPending) reasons.Add("options changing");
             var selectionActive = _hostResolved.Count > 0;
-            var hasOptions = _hostResolved.Any(m => m.Manifest.Options.Count > 0);
             foreach (var p in Humans())
             {
                 var row = new PlayerStatusMsg { id = p.id.value.ToString(), name = Cap(p.name, 64) };
@@ -495,12 +494,12 @@ namespace Sanctuary.ModApi
                     }
                     if (problems.Count == 0 && selectionActive && report.luaHash != Overlay.CurrentHash)
                         problems.Add("Lua files differ from the host's");
-                    // Mod API 1.0 knows nothing of options: its copy of an
-                    // options mod hashes differently and writes no options
-                    // file. Say so rather than leave them hunting for a
-                    // difference in the mod.
-                    if (problems.Count > 0 && hasOptions && _apiVersions.TryGetValue(p.id.value, out var api) && OlderThan(api, 1, 1))
-                        problems.Add($"their Mod API {api} is too old for mod options: update the Mod Manager");
+                    // The framework's own Lua (match events, options files)
+                    // comes with the API, so two API versions give different
+                    // Lua for the same mods. Say so rather than leave them
+                    // hunting for a difference in the mod.
+                    if (problems.Count > 0 && _apiVersions.TryGetValue(p.id.value, out var api) && api != ModApiPlugin.Version)
+                        problems.Add($"their Mod API is {api}, the host's {ModApiPlugin.Version}: both need the same Mod Manager release");
                     if (problems.Count == 0)
                     {
                         row.state = "ok";
@@ -521,13 +520,6 @@ namespace Sanctuary.ModApi
         }
 
         private static string Names(IEnumerable<ModInfo> mods) => string.Join(", ", mods.Select(m => m.Name));
-
-        private static bool OlderThan(string version, int major, int minor)
-        {
-            var parts = (version ?? "").Split('.');
-            if (parts.Length < 2 || !int.TryParse(parts[0], out var ma) || !int.TryParse(parts[1], out var mi)) return false;
-            return ma < major || (ma == major && mi < minor);
-        }
 
         /// For the patches: may the host start the match now?
         internal static bool GateOpen(out string reason)

@@ -37,6 +37,7 @@ namespace SanctuaryHud
             _gameplaySignature = GameplaySignature();
             Clear(_gameList);
 
+            InstallNotices(_gameList);
             Heading(_gameList, "Gameplay mods: the lobby host picks them");
             var live = Modding.ActiveGameplayMods;
             DescribeNext("Right now",
@@ -85,6 +86,29 @@ namespace SanctuaryHud
             ScrollToTop(_gameList);
         }
 
+        /// Mistakes in how mods were installed (an archive left zipped, a DLL
+        /// with no folder), at the top of both tabs where they can't be
+        /// missed. Nothing when all is well.
+        private void InstallNotices(Transform list)
+        {
+            var notices = ModCatalog.Notices;
+            if (notices.Count == 0) return;
+            Heading(list, "Check your SanctuaryMods folder");
+            foreach (var n in notices)
+            {
+                var first = n.IndexOf(' ');
+                DescribeNext("SanctuaryMods", n + "\n\nOpen Mods Folder, at the bottom of this page, opens it.");
+                InfoRow(list, first > 0 ? n.Substring(0, first) : n, first > 0 ? ShortNotice(n.Substring(first + 1)) : "");
+            }
+            Line(list);
+        }
+
+        private static string ShortNotice(string rest)
+        {
+            var stop = rest.IndexOf('.');
+            return stop > 0 ? rest.Substring(0, stop) : rest;
+        }
+
         private static string GameplayFiles(ModInfo m)
         {
             var parts = new List<string>();
@@ -93,6 +117,7 @@ namespace SanctuaryHud
             if (m.DllsAreGameplay && m.Dlls.Count > 0) parts.Add($"{m.Dlls.Count} dll");
             if (m.Manifest.Options.Count > 0) parts.Add(m.Manifest.Options.Count == 1 ? "1 option" : $"{m.Manifest.Options.Count} options");
             if (m.Manifest.Author.Length > 0) parts.Add("by " + m.Manifest.Author);
+            if (m.Manifest.IsForOtherGameVersion(Application.version)) parts.Add("made for game " + m.Manifest.GameVersion);
             return string.Join(", ", parts);
         }
 
@@ -100,6 +125,7 @@ namespace SanctuaryHud
         {
             var text = m.Manifest.Description.Length > 0 ? m.Manifest.Description + "\n\n" : "";
             text += $"Id {m.Id}, contents {m.ShortHash}. ";
+            if (m.Manifest.GameVersion.Length > 0) text += $"Made for game version {m.Manifest.GameVersion}. ";
             if (m.Manifest.Synthesised) text += "This folder has no mod.json, so its name stands in for one. ";
             if (m.Manifest.Requires.Count > 0) text += $"Needs {string.Join(", ", m.Manifest.Requires)} picked too. ";
             if (m.Manifest.Url.Length > 0) text += $"Get it from {m.Manifest.Url}. ";

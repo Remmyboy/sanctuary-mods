@@ -131,10 +131,21 @@ namespace SanctuaryModLoader
                    LibraryDlls.Any(l => string.Equals(l, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// The mod folder a DLL belongs to: the top-level folder under
-        /// SanctuaryMods it sits in (or the root, for a loose DLL).
+        /// The mod folder a DLL belongs to: the nearest folder above it with
+        /// a mod.json (a DLL in bin\, a mod extracted inside a folder of its
+        /// own, one of a pack), else the top-level folder under SanctuaryMods
+        /// it sits in, or the root for a loose DLL. The Mod API's catalog
+        /// finds mods the same way.
         private string ModFolderOf(string dllPath)
         {
+            var root = Path.GetFullPath(_modsDir).TrimEnd('\\', '/');
+            var dir = Path.GetDirectoryName(Path.GetFullPath(dllPath));
+            try
+            {
+                for (var d = dir; d != null && d.Length > root.Length; d = Path.GetDirectoryName(d))
+                    if (File.Exists(Path.Combine(d, "mod.json"))) return d.TrimEnd('\\', '/');
+            }
+            catch { }
             var rel = dllPath.Substring(_modsDir.Length).TrimStart('\\', '/');
             var slash = rel.IndexOfAny(new[] { '\\', '/' });
             return Path.GetFullPath(slash < 0 ? _modsDir : Path.Combine(_modsDir, rel.Substring(0, slash))).TrimEnd('\\', '/');

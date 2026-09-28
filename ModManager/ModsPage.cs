@@ -271,7 +271,8 @@ namespace SanctuaryHud
         }
 
         private string PluginSignature() =>
-            (_owner.VanillaMode ? "V|" : "") + string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-")));
+            (_owner.VanillaMode ? "V|" : "") + string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-"))) +
+            "|" + string.Join("|", Sanctuary.ModApi.ModCatalog.Notices);
 
         // ---- construction ---------------------------------------------------
 
@@ -1101,6 +1102,7 @@ namespace SanctuaryHud
                 RebuildUiTab();
             });
             Line(_uiList);
+            InstallNotices(_uiList);
 
             if (_owner.Plugins.Count == 0)
             {

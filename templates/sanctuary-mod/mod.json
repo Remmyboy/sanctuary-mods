@@ -9,6 +9,10 @@
   "luaRoot": "lua",
   "url": "",
   "requires": [],
+  "gameVersion": "",
+//#if (gameplay)
+  "hostScript": "templatescriptfolder/host.lua",
+//#endif
   "apiVersion": 1,
   "options": []
 }

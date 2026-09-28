@@ -20,6 +20,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The framework's own Lua, put in place alongside gameplay mods. -->
+    <EmbeddedResource Include="lua\modapi\events.lua" LogicalName="modapi.events.lua" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- NativeList, SharedStatic (the network data) and Newtonsoft (mod.json)
          all ship with the game. -->
     <Reference Include="Unity.Collections">

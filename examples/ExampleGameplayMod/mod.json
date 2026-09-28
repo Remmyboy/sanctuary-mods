@@ -6,6 +6,7 @@
   "author": "Sanctuary Mods",
   "description": "One army plays in a loud colour. A smoke test for gameplay mods and their options: pick it in a lobby, set the colour and the army, and that army's units change colour for everyone.",
   "kind": "gameplay",
+  "gameVersion": "0.0.1.20",
   "luaRoot": "lua",
   "apiVersion": 1,
   "options": [

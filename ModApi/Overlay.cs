@@ -146,7 +146,8 @@ namespace Sanctuary.ModApi
                 if (appends)
                 {
                     // Between the two passes, so a mod's own appends can
-                    // already Import its options.
+                    // already Import its options and the match events.
+                    if (mods.Count > 0) files += ApplyFramework(mods, cache);
                     foreach (var mod in mods.Where(m => values.ContainsKey(m.Id)))
                     {
                         try
@@ -221,31 +222,13 @@ namespace Sanctuary.ModApi
                 }
 
                 var bytes = File.ReadAllBytes(Path.Combine(mod.LuaRootPath, rel));
-                var exists = cache.TryGetValue(target, out var existing);
                 var name = targetRel.Replace('\\', '/');
                 if (appends)
                 {
-                    if (!exists)
-                    {
-                        ModApiPlugin.Log.LogWarning($"Mod '{mod.Name}': {rel} appends to {targetRel}, which the game doesn't have; skipped.");
-                        continue;
-                    }
-                    var original = existing.ToArray();
-                    var combined = AppendLua(original, bytes, beforeReturn: true);
-                    var error = LuaSyntax.Check(combined, name);
-                    if (error != null)
-                    {
-                        // A file whose closing return the scan misread: try
-                        // the plain end of the file before giving up.
-                        var atEnd = AppendLua(original, bytes, beforeReturn: false);
-                        if (LuaSyntax.Check(atEnd, name) == null) { combined = atEnd; error = null; }
-                    }
-                    if (error != null)
-                        ModApiPlugin.Log.LogError($"Mod '{mod.Name}': {rel} doesn't compile once appended to {name}: {error}. " +
-                                                  "The match will fail when the game loads that file.");
-                    bytes = combined;
+                    if (AppendTo(cache, targetRel, bytes, $"Mod '{mod.Name}': {rel}")) count++;
+                    continue;
                 }
-                else if (target.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                if (target.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                 {
                     var error = LuaSyntax.Check(bytes, name);
                     if (error != null)
@@ -254,6 +237,94 @@ namespace Sanctuary.ModApi
 
                 PutFile(cache, targetRel, bytes);
                 count++;
+            }
+            return count;
+        }
+
+        /// Adds code to the end of a file already in the cache (see
+        /// AppendLua), checking the result compiles. `who` names the source
+        /// in the log. False when the file isn't there.
+        private static bool AppendTo(Dictionary<string, NativeArray<byte>> cache, string targetRel, byte[] addition, string who)
+        {
+            var target = Path.GetFullPath(Path.Combine(LuaRoot, targetRel));
+            var name = targetRel.Replace('\\', '/');
+            if (!cache.TryGetValue(target, out var existing))
+            {
+                ModApiPlugin.Log.LogWarning($"{who} appends to {name}, which the game doesn't have; skipped.");
+                return false;
+            }
+            var original = existing.ToArray();
+            var combined = AppendLua(original, addition, beforeReturn: true);
+            var error = LuaSyntax.Check(combined, name);
+            if (error != null)
+            {
+                // A file whose closing return the scan misread: try the
+                // plain end of the file before giving up.
+                var atEnd = AppendLua(original, addition, beforeReturn: false);
+                if (LuaSyntax.Check(atEnd, name) == null) { combined = atEnd; error = null; }
+            }
+            if (error != null)
+                ModApiPlugin.Log.LogError($"{who} doesn't compile once appended to {name}: {error}. " +
+                                          "The match will fail when the game loads that file.");
+            PutFile(cache, targetRel, combined);
+            return true;
+        }
+
+        // ---- the framework's own Lua ----------------------------------------
+
+        internal const string EventsPath = "modapi/events.lua";
+
+        private static byte[] _eventsLua;
+
+        /// modapi/events.lua, shipped inside this DLL so every player with
+        /// the same API has the same bytes.
+        private static byte[] EventsLua()
+        {
+            if (_eventsLua != null) return _eventsLua;
+            using (var s = typeof(Overlay).Assembly.GetManifestResourceStream("modapi.events.lua"))
+            using (var ms = new MemoryStream())
+            {
+                if (s == null) throw new InvalidOperationException("modapi/events.lua is missing from Sanctuary.ModApi.dll");
+                s.CopyTo(ms);
+                // LF whatever Git did on the machine that built it: players'
+                // copies of the API must give the same bytes, or the same
+                // mods would hash differently.
+                var text = Encoding.UTF8.GetString(ms.ToArray()).Replace("\r\n", "\n").TrimStart('﻿');
+                return _eventsLua = Encoding.UTF8.GetBytes(text);
+            }
+        }
+
+        /// The end of host/hostMain.lua or client/clientMain.lua: hook the
+        /// match events in, then import each picked mod's script for that
+        /// side, in pick order. A script that fails to load is logged and
+        /// the rest still load.
+        internal static byte[] MainAppend(string side, IEnumerable<string> scripts)
+        {
+            var sb = new StringBuilder();
+            sb.Append("-- Sanctuary Mod API: match events, and the picked gameplay mods' ").Append(side).Append(" scripts.\n");
+            sb.Append("Import(\"").Append(EventsPath).Append("\").Events._Install(\"").Append(side).Append("\")\n");
+            sb.Append("local function runModScript(path)\n");
+            sb.Append("    local ok, err = xpcall(Import, debug.traceback, path)\n");
+            sb.Append("    if not ok then Warn(\"[Mod API] \" .. path .. \" failed to load: \" .. tostring(err)) end\n");
+            sb.Append("end\n");
+            foreach (var s in scripts) sb.Append("runModScript(").Append(OptionValues.LuaString(s)).Append(")\n");
+            return Encoding.UTF8.GetBytes(sb.ToString());
+        }
+
+        /// The framework's files, whenever any gameplay mod is applied.
+        private static int ApplyFramework(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache)
+        {
+            var count = 0;
+            try
+            {
+                PutFile(cache, EventsPath.Replace('/', '\\'), EventsLua());
+                count++;
+                if (AppendTo(cache, @"host\hostMain.lua", MainAppend("host", mods.Select(m => m.Manifest.HostScript).Where(s => s.Length > 0)), "Mod API host hooks")) count++;
+                if (AppendTo(cache, @"client\clientMain.lua", MainAppend("client", mods.Select(m => m.Manifest.ClientScript).Where(s => s.Length > 0)), "Mod API client hooks")) count++;
+            }
+            catch (Exception e)
+            {
+                ModApiPlugin.Log.LogError($"Mod API match events couldn't be put in place: {e.Message}");
             }
             return count;
         }

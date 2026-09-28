@@ -124,8 +124,7 @@ namespace Sanctuary.ModApi
         public string hash;
         public string url;
         /// The host's option values, key to canonical value; null for a mod
-        /// without options. Players on Mod API 1.0 ignore it, write no
-        /// options file, and so show up as having different Lua files.
+        /// without options.
         public Dictionary<string, string> options;
     }
 

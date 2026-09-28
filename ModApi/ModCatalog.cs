@@ -97,11 +97,39 @@ namespace Sanctuary.ModApi
             return _mods.FirstOrDefault(m => string.Equals(m.Folder, full, StringComparison.OrdinalIgnoreCase));
         }
 
+        private static IReadOnlyList<string> _notices = Array.Empty<string>();
+
+        /// Things wrong with how mods were installed rather than with any one
+        /// mod: an archive nobody extracted, say. For the Mods page to show.
+        public static IReadOnlyList<string> Notices => _notices;
+
+        private static readonly string[] ArchiveExtensions = { ".zip", ".7z", ".rar" };
+
+        /// The folders holding a mod.json up to three levels inside a
+        /// top-level folder that has none of its own: a zip extracted with
+        /// its own folder around the mod, or a pack of several mods.
+        internal static List<string> NestedModFolders(string dir)
+        {
+            var found = new List<string>();
+            void Walk(string d, int depth)
+            {
+                foreach (var sub in Directory.EnumerateDirectories(d))
+                {
+                    if (Path.GetFileName(sub).StartsWith(".")) continue;
+                    if (File.Exists(Path.Combine(sub, ModManifest.FileName))) found.Add(Path.GetFullPath(sub).TrimEnd('\\', '/'));
+                    else if (depth < 3) Walk(sub, depth + 1);
+                }
+            }
+            Walk(dir, 1);
+            return found;
+        }
+
         /// Looks at every folder again. Returns true when anything changed.
         public static bool Rescan()
         {
             var old = _mods.ToDictionary(m => m.Folder, StringComparer.OrdinalIgnoreCase);
             var next = new List<ModInfo>();
+            var notices = new List<string>();
             if (Directory.Exists(ModsRoot))
             {
                 foreach (var dir in Directory.EnumerateDirectories(ModsRoot))
@@ -110,15 +138,55 @@ namespace Sanctuary.ModApi
                     if (name.StartsWith(".")) continue;
                     try
                     {
-                        var info = Scan(Path.GetFullPath(dir).TrimEnd('\\', '/'), old);
-                        if (info != null) next.Add(info);
+                        var full = Path.GetFullPath(dir).TrimEnd('\\', '/');
+                        // A folder around the mod(s) rather than the mod
+                        // itself: take the mods from inside it, as the loader
+                        // does for their DLLs.
+                        var nested = File.Exists(Path.Combine(full, ModManifest.FileName)) ? null : NestedModFolders(full);
+                        if (nested == null || nested.Count == 0)
+                        {
+                            var info = Scan(full, old);
+                            if (info != null) next.Add(info);
+                            continue;
+                        }
+                        foreach (var inner in nested)
+                        {
+                            var info = Scan(inner, old);
+                            if (info == null) continue;
+                            if (nested.Count == 1)
+                            {
+                                var rel = inner.Substring(ModsRoot.Length).TrimStart('\\', '/');
+                                var note = $"installed one folder too deep ({rel}). It works, but moving '{Path.GetFileName(inner)}' straight into SanctuaryMods keeps things tidy";
+                                if (!info.Problems.Contains(note)) info.Problems = info.Problems.Concat(new[] { note }).ToList();
+                            }
+                            next.Add(info);
+                        }
                     }
                     catch (Exception e)
                     {
                         ModApiPlugin.Log?.LogWarning($"Mod folder '{name}' unreadable: {e.Message}");
                     }
                 }
+
+                try
+                {
+                    foreach (var file in Directory.EnumerateFiles(ModsRoot))
+                    {
+                        var ext = Path.GetExtension(file).ToLowerInvariant();
+                        if (!ArchiveExtensions.Contains(ext)) continue;
+                        var stem = Path.GetFileNameWithoutExtension(file);
+                        // Extracted already, the archive left beside it: fine.
+                        if (Directory.Exists(Path.Combine(ModsRoot, stem))) continue;
+                        notices.Add($"{Path.GetFileName(file)} hasn't been extracted. Extract it here, so its folder sits in SanctuaryMods beside the others; the archive itself does nothing.");
+                    }
+                    foreach (var file in Directory.EnumerateFiles(ModsRoot, "*.dll"))
+                        if (!IsLibraryDll(file))
+                            notices.Add($"{Path.GetFileName(file)} sits loose in SanctuaryMods. It loads, but give it a folder of its own (with its mod.json, if it came with one) so it can be told apart from other mods.");
+                }
+                catch (Exception e) { ModApiPlugin.Log?.LogWarning($"SanctuaryMods listing failed: {e.Message}"); }
             }
+            var noticesChanged = !notices.SequenceEqual(_notices);
+            _notices = notices;
 
             // Two folders claiming one id would make the lobby ambiguous;
             // the second keeps its folder name.
@@ -133,7 +201,7 @@ namespace Sanctuary.ModApi
             }
 
             next.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-            var changed = next.Count != _mods.Count ||
+            var changed = noticesChanged || next.Count != _mods.Count ||
                           next.Any(m => !old.TryGetValue(m.Folder, out var was) || !ReferenceEquals(was, m));
             _mods = next;
             if (changed) _version++;
@@ -199,6 +267,16 @@ namespace Sanctuary.ModApi
                 problems.Add("no kind given: the DLL stays a personal UI mod and only the Lua half is picked in the lobby");
             if (info.Kind == ModKind.Gameplay && overlay.Count == 0 && info.Dlls.Count == 0)
                 problems.Add($"nothing to apply: no .lua or .santp under '{manifest.LuaRoot}' and no DLL");
+            foreach (var (field, script) in new[] { ("hostScript", manifest.HostScript), ("clientScript", manifest.ClientScript) })
+            {
+                if (script.Length == 0) continue;
+                if (!overlay.Any(r => string.Equals(r.Replace('\\', '/'), script, StringComparison.OrdinalIgnoreCase)))
+                    problems.Add($"{field} '{script}' isn't in the mod's {manifest.LuaRoot} folder, so nothing runs");
+                else if (IsAppendPath(script))
+                    problems.Add($"{field} '{script}' is an append; a script is a file of its own, outside append\\");
+            }
+            if (manifest.IsForOtherGameVersion(UnityEngine.Application.version))
+                problems.Add($"made for game version {manifest.GameVersion}; this is {UnityEngine.Application.version}. If it misbehaves, look for an update");
             if (info.Kind != ModKind.Gameplay && manifest.Options.Count > 0)
                 problems.Add("options only apply to gameplay mods (the lobby host picks them); a UI mod's settings go in Config.Bind");
             if (overlay.Any(r => r.Replace('\\', '/').StartsWith("modoptions/", StringComparison.OrdinalIgnoreCase)))
@@ -208,6 +286,8 @@ namespace Sanctuary.ModApi
             info.Problems = problems;
             return info;
         }
+
+        private static bool IsAppendPath(string rel) => Overlay.IsAppend(rel, out _);
 
         private static string HashContent(ModInfo info)
         {
@@ -231,6 +311,12 @@ namespace Sanctuary.ModApi
                 if (info.Manifest.Options.Count > 0)
                 {
                     var sig = Encoding.UTF8.GetBytes("options\n" + string.Join("\n", info.Manifest.Options.Select(o => o.Signature())));
+                    sha.TransformBlock(sig, 0, sig.Length, null, 0);
+                }
+                // So are the scripts the framework imports for it.
+                if (info.Manifest.HostScript.Length > 0 || info.Manifest.ClientScript.Length > 0)
+                {
+                    var sig = Encoding.UTF8.GetBytes("scripts\n" + info.Manifest.HostScript + "\n" + info.Manifest.ClientScript);
                     sha.TransformBlock(sig, 0, sig.Length, null, 0);
                 }
                 if (info.DllsAreGameplay)
