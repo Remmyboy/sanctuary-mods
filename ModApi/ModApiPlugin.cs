@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.2.0";
+        public const string Version = "1.2.1";
 
         private static ManualLogSource _log;
 

@@ -265,7 +265,8 @@ Events.GameTime()   -- seconds since the start
   keeps being called but its errors aren't logged again, so a broken
   `OnTick` can't flood the log.
 - `Events.IsHost()` is only settled inside a handler or in your
-  host/client script.
+  host/client script. A file the game imports early, such as an append to
+  `tags.lua`, runs before the framework knows which side it's on.
 
 **Kills and damage (host only).** The game doesn't record who damaged or
 killed a unit, so the framework works it out:
@@ -297,9 +298,10 @@ Events.Kills(army)   -- enemy units that army has killed
   nothing to leave it). The result never goes below 0. Modifiers apply to
   projectiles, splash, beams and dashes alike.
 - **Only when used.** These hooks only go into the game when some picked
-  mod uses one of the calls. Register from the top of your host script, so
-  kills from units that exist at the start are credited to them. A file the game imports early, such as an append to
-  `tags.lua`, runs before the framework knows which side it's on.
+  mod uses one of the calls. They go in once the first tick has set the
+  match up, so register from your host script or from an `OnMatchStart`
+  handler: either way, kills by units that exist from the start are credited
+  to them.
 
 The [`SupplyDrop`](../examples/SupplyDrop) example is a complete mod built
 this way.

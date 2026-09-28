@@ -1624,8 +1624,11 @@ other mod's reloads, the Mod Manager's included:
 
   The hit itself is `HostUnit.TakeDamage`/`ProcessDamage`/`Destroy`,
   assigned on the class so every subclass gets them; `HostCommander:Destroy`
-  calls `HostUnit.Destroy`. The hooks go in at the start of the first
-  simulation tick, when every module is loaded and nothing has spawned yet.
+  calls `HostUnit.Destroy`. The hooks go in right after the first
+  simulation tick's own update, which is where the game sets the match up;
+  importing the unit and weapon code any earlier caches the targeting set-up
+  before it exists, and units get built without muzzles. Units spawned by
+  that set-up are credited through a muzzle backfill.
   `Delete` (captures, upgrades) never reports a kill.
 - **Install slips.** A top-level folder with no `mod.json` is searched up to
   three levels down for folders that have one: a zip extracted into its own

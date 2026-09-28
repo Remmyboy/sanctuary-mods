@@ -21,8 +21,8 @@
 -- info = { army, unit, cause, destroyType }: who dealt the damage (either
 -- may be nil) and how: "projectile", "area", "beam", "dash",
 -- "deathExplosion", or "none" when nothing did (an army's defeat, a script).
--- The kill and damage hooks only go in when a mod uses one of these, so
--- register from the top of your host script.
+-- The kill and damage hooks only go in when a mod uses one of these, once
+-- the first tick has set the match up.
 --   Events.GameTime()   -- seconds since the match started
 --
 -- Times are game time: they pause with the game and speed up with it. A
@@ -190,9 +190,9 @@ local muzzleUnits = setmetatable({}, { __mode = "v" })
 
 local hookDamage -- below
 
--- A mod has asked for kills or damage. The hooks go in on the host's first
--- tick, or straight away if the match is already running; a match where no
--- mod asks never has them.
+-- A mod has asked for kills or damage. The hooks go in once the first tick
+-- has set the match up, or straight away if the match is already running; a
+-- match where no mod asks never has them.
 local function wantDamage()
     damageWanted = true
     if started and side == "host" then hookDamage() end
@@ -437,12 +437,23 @@ function Events._Install(where)
         report("install", "the game has no OnSimulationTickUpdate here; match events won't fire")
         return
     end
+    local hooked = false
     _G.OnSimulationTickUpdate = function(...)
-        -- Before the first tick's own update, which spawns the starting
-        -- units: every module is loaded by now, and nothing has fired yet.
-        if not started and where == "host" and damageWanted then hookDamage() end
         original(...)
+        -- The game's hooks go in after the first tick's own update, not
+        -- before it: that update is where the game sets the match up
+        -- (InitLobby, the map, the armies), and importing the unit and
+        -- weapon code ahead of it caches the targeting set-up before it
+        -- exists, so every unit with a weapon is built without muzzles.
+        -- Nothing has fired yet, and units spawned by the set-up are found
+        -- by the muzzle backfill. OnMatchStart handlers run after this.
+        if not hooked then
+            hooked = true
+            if where == "host" then
+                hookDefeats()
+                if damageWanted then hookDamage() end
+            end
+        end
         afterTick()
     end
-    if where == "host" then hookDefeats() end
 end
