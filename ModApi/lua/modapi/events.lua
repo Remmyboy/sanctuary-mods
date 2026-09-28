@@ -12,7 +12,17 @@
 --   Events.Every(1, function() ... end)            -- every second
 --   Events.OnTick(function(tick) ... end)          -- every tick (10 a second)
 --   Events.OnArmyDefeated(function(army) ... end)  -- host only
+--   Events.OnUnitKilled(function(victim, info) ... end)       -- host only
+--   Events.ModifyDamage(function(victim, amount, info) return amount end)
+--   Events.OnUnitDamaged(function(victim, amount, info) ... end)
+--   Events.Kills(army)  -- enemy units the army has killed
 --   Events.IsHost()     -- true in the simulation, false in a client
+--
+-- info = { army, unit, cause, destroyType }: who dealt the damage (either
+-- may be nil) and how: "projectile", "area", "beam", "dash",
+-- "deathExplosion", or "none" when nothing did (an army's defeat, a script).
+-- The kill and damage hooks only go in when a mod uses one of these, so
+-- register from the top of your host script.
 --   Events.GameTime()   -- seconds since the match started
 --
 -- Times are game time: they pause with the game and speed up with it. A
@@ -44,9 +54,20 @@ local function report(what, err)
     if Warn then Warn(text) elseif Log then Log(text) end
 end
 
+-- Handlers that have already failed once: a broken OnTick or ModifyDamage
+-- would otherwise fill the log many times a second. The first failure is
+-- logged in full, later ones are not; the handler keeps being called.
+local failed = setmetatable({}, { __mode = "k" })
+
+local function handlerFailed(what, fn, err)
+    if failed[fn] then return end
+    failed[fn] = true
+    report(what, tostring(err) .. "\n(further errors from this handler are not logged)")
+end
+
 local function call(what, fn, ...)
     local ok, err = xpcall(fn, debug.traceback, ...)
-    if not ok then report(what, err) end
+    if not ok then handlerFailed(what, fn, err) end
 end
 
 local function currentTick()
@@ -148,6 +169,245 @@ local function afterTick()
     for _, fn in ipairs(tickHandlers) do call("OnTick", fn, tick) end
 end
 
+-- ---- kills and damage (host) ------------------------------------------------
+--
+-- The game never records who hit a unit: HostUnit:TakeDamage(amount,
+-- destroyType) has no source. So the framework notes the source around each
+-- place damage comes from (a projectile hit, area damage, a beam, a dash, a
+-- death explosion). It's all synchronous, so "whatever is dealing damage right
+-- now" is exact. The unit a projectile came from is found through its muzzle,
+-- remembered as weapons are set up.
+
+local killHandlers = {}
+local damageModifiers = {}
+local damagedHandlers = {}
+local killsByArmy = {}
+local damageWanted = false     -- any mod listening; until then the hooks just pass through
+local damageHooked = false
+local sourceStack = {}         -- what is dealing damage right now, innermost last
+local hitStack = {}            -- units taking damage right now: { victim, info, final }
+local muzzleUnits = setmetatable({}, { __mode = "v" })
+
+local hookDamage -- below
+
+-- A mod has asked for kills or damage. The hooks go in on the host's first
+-- tick, or straight away if the match is already running; a match where no
+-- mod asks never has them.
+local function wantDamage()
+    damageWanted = true
+    if started and side == "host" then hookDamage() end
+end
+
+--- Host only: runs fn(victim, info) once for each unit killed, the tick it
+--- dies, after it's marked dead. info = { army, unit, cause, destroyType }:
+--- the army and unit that dealt the killing damage (either can be nil),
+--- and cause "projectile", "area", "beam", "dash", "deathExplosion" or
+--- "none" (nothing damaged it: an army's defeat, a script). Not called for
+--- units removed rather than killed (captures, upgrades, Delete). Friendly
+--- and self kills are reported as they are.
+function Events.OnUnitKilled(fn)
+    assert(type(fn) == "function", "Events.OnUnitKilled takes a function")
+    killHandlers[#killHandlers + 1] = fn
+    wantDamage()
+end
+
+--- Host only: fn(victim, amount, info) runs for every hit on a unit before
+--- its health changes, and may return a new amount (a number); anything
+--- else leaves it as it was. Several mods' modifiers apply in turn, in the
+--- order they were registered. info is as for OnUnitKilled. The result
+--- never goes below 0.
+function Events.ModifyDamage(fn)
+    assert(type(fn) == "function", "Events.ModifyDamage takes a function")
+    damageModifiers[#damageModifiers + 1] = fn
+    wantDamage()
+end
+
+--- Host only: runs fn(victim, amount, info) after a unit has taken a hit,
+--- with the amount it took (after every ModifyDamage). The victim may have
+--- died of it.
+function Events.OnUnitDamaged(fn)
+    assert(type(fn) == "function", "Events.OnUnitDamaged takes a function")
+    damagedHandlers[#damagedHandlers + 1] = fn
+    wantDamage()
+end
+
+--- Host only: enemy units an army (or army id) has killed. Counts from the
+--- first time any mod calls this or listens for kills or damage, so call it
+--- once from your host script to count from the start.
+function Events.Kills(army)
+    wantDamage()
+    local id = type(army) == "table" and army.id or army
+    return killsByArmy[id] or 0
+end
+
+-- Pops a stack back to depth n-1 whatever happened, then returns or rethrows.
+local function unwind(stack, n, ok, ...)
+    for i = #stack, n, -1 do stack[i] = nil end
+    if not ok then error((...), 0) end
+    return ...
+end
+
+local function withSource(source, fn, ...)
+    local n = #sourceStack + 1
+    sourceStack[n] = source
+    return unwind(sourceStack, n, pcall(fn, ...))
+end
+
+local function currentInfo(destroyType)
+    local src = sourceStack[#sourceStack]
+    return {
+        army = src and src.army or nil,
+        unit = src and src.unit or nil,
+        cause = src and src.cause or "none",
+        destroyType = destroyType,
+    }
+end
+
+local function wrap(tbl, name, make)
+    local original = tbl and tbl[name]
+    if type(original) ~= "function" then
+        report("install", "the game has no " .. name .. " to hook; kill credit may be missing for it")
+        return
+    end
+    tbl[name] = make(original)
+end
+
+function hookDamage()
+    if damageHooked then return end
+    damageHooked = true
+
+    local ok, err = pcall(function()
+        local HostUnit = Import("host/units/unitsClasses/unitsBaseClass.lua").HostUnit
+        local collision = Import("host/collisionUpdate.lua")
+        local HostMuzzle = Import("host/units/weaponsClasses/muzzleClass.lua").HostMuzzle
+        local HostBeam = Import("host/units/weaponsClasses/beam.lua").HostBeam
+        local Projectiles = __Entities and __Entities.Projectiles
+
+        -- Which unit each muzzle belongs to, for projectile credit: units
+        -- already on the map, then every muzzle made from now on.
+        for _, unit in pairs((__Entities and __Entities.Units) or {}) do
+            for _, weapon in pairs(unit.weapons or {}) do
+                for _, muzzle in ipairs(weapon.muzzles or {}) do
+                    if muzzle.id then muzzleUnits[muzzle.id.index] = unit end
+                end
+            end
+        end
+        wrap(HostMuzzle, "__init", function(original)
+            return function(self, muzzleBoneID, boneName, unit, ...)
+                if muzzleBoneID and unit then muzzleUnits[muzzleBoneID.index] = unit end
+                return original(self, muzzleBoneID, boneName, unit, ...)
+            end
+        end)
+
+        -- Sources.
+        wrap(collision, "ProcessRayCollisionEvent", function(original)
+            return function(event, ...)
+                local projectile = damageWanted and Projectiles and event and event.rayGlobalID and Projectiles[event.rayGlobalID.index]
+                if not projectile then return original(event, ...) end
+                local army = Armies[projectile.armyId]
+                local unit = projectile.muzzleId and muzzleUnits[projectile.muzzleId.index]
+                if unit and unit.army ~= army then unit = nil end -- a muzzle id reused since
+                return withSource({ army = army, unit = unit, cause = "projectile" }, original, event, ...)
+            end
+        end)
+        wrap(collision, "ProcessAreaDamage", function(original)
+            return function(position, radius, damage, army, damageFriendly, ...)
+                if not damageWanted then return original(position, radius, damage, army, damageFriendly, ...) end
+                local outer = sourceStack[#sourceStack]
+                local source
+                if outer and outer.cause == "deathExplosion" then
+                    source = outer
+                elseif outer and (army == nil or outer.army == army) then
+                    -- Splash from a projectile hit keeps the unit that fired.
+                    source = { army = outer.army, unit = outer.unit, cause = "area" }
+                else
+                    source = { army = army, unit = nil, cause = "area" }
+                end
+                return withSource(source, original, position, radius, damage, army, damageFriendly, ...)
+            end
+        end)
+        wrap(HostBeam, "Fire", function(original)
+            return function(self, ...)
+                if not damageWanted or not self.unit then return original(self, ...) end
+                return withSource({ army = self.unit.army, unit = self.unit, cause = "beam" }, original, self, ...)
+            end
+        end)
+        wrap(HostUnit, "CheckDashCollisionsWithUnits", function(original)
+            return function(self, ...)
+                if not damageWanted then return original(self, ...) end
+                return withSource({ army = self.army, unit = self, cause = "dash" }, original, self, ...)
+            end
+        end)
+        wrap(HostUnit, "CreateDeathExplosions", function(original)
+            return function(self, ...)
+                if not damageWanted then return original(self, ...) end
+                return withSource({ army = self.army, unit = self, cause = "deathExplosion" }, original, self, ...)
+            end
+        end)
+
+        -- The hit itself.
+        wrap(HostUnit, "TakeDamage", function(original)
+            return function(self, amount, destroyType, ...)
+                if not damageWanted or self.dead or not self.canTakeDamage then
+                    return original(self, amount, destroyType, ...)
+                end
+                local hit = { victim = self, info = currentInfo(destroyType) }
+                local n = #hitStack + 1
+                hitStack[n] = hit
+                unwind(hitStack, n, pcall(original, self, amount, destroyType, ...))
+                if hit.final and #damagedHandlers > 0 then
+                    for _, fn in ipairs(damagedHandlers) do call("OnUnitDamaged", fn, self, hit.final, hit.info) end
+                end
+            end
+        end)
+        wrap(HostUnit, "ProcessDamage", function(original)
+            return function(self, damage, ...)
+                local amount = original(self, damage, ...)
+                if not damageWanted then return amount end
+                local hit = hitStack[#hitStack]
+                if not (hit and hit.victim == self) then hit = nil end
+                if #damageModifiers > 0 then
+                    local info = hit and hit.info or currentInfo(nil)
+                    for _, fn in ipairs(damageModifiers) do
+                        local okFn, result = xpcall(fn, debug.traceback, self, amount, info)
+                        if not okFn then
+                            handlerFailed("ModifyDamage", fn, result)
+                        elseif type(result) == "number" and result == result then
+                            amount = result
+                        end
+                    end
+                    if amount < 0 then amount = 0 end
+                end
+                if hit then hit.final = amount end
+                return amount
+            end
+        end)
+
+        -- The kill. HostCommander:Destroy calls HostUnit.Destroy, so this
+        -- reaches commanders too.
+        wrap(HostUnit, "Destroy", function(original)
+            return function(self, overkillRatio, destroyType, ...)
+                local wasAlive = not self.dead
+                original(self, overkillRatio, destroyType, ...)
+                if not (damageWanted and wasAlive and self.dead) then return end
+                local hit = hitStack[#hitStack]
+                local info
+                if hit and hit.victim == self then
+                    info = hit.info
+                    info.destroyType = destroyType or info.destroyType
+                else
+                    info = { cause = "none", destroyType = destroyType }
+                end
+                if info.army and self.army and info.army ~= self.army and not self.army:IsAlly(info.army) then
+                    killsByArmy[info.army.id] = (killsByArmy[info.army.id] or 0) + 1
+                end
+                for _, fn in ipairs(killHandlers) do call("OnUnitKilled", fn, self, info) end
+            end
+        end)
+    end)
+    if not ok then report("install", "kill and damage hooks: " .. tostring(err)) end
+end
+
 local function hookDefeats()
     local ok, winCondition = pcall(Import, "host/winCondition.lua")
     if not ok or type(winCondition) ~= "table" or type(winCondition.CheckWinCondition) ~= "function" then
@@ -178,6 +438,9 @@ function Events._Install(where)
         return
     end
     _G.OnSimulationTickUpdate = function(...)
+        -- Before the first tick's own update, which spawns the starting
+        -- units: every module is loaded by now, and nothing has fired yet.
+        if not started and where == "host" and damageWanted then hookDamage() end
         original(...)
         afterTick()
     end

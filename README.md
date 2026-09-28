@@ -1611,8 +1611,22 @@ other mod's reloads, the Mod Manager's included:
   `OnMatchStart`, `After`, `Every` and `OnTick` handlers after each tick (10
   a second). It replaces `host/winCondition.lua`'s `CheckWinCondition` on
   the module to fire `OnArmyDefeated`. It also imports each picked mod's
-  `hostScript`/`clientScript`. Handler errors are logged with a traceback
-  and never stop the others.
+  `hostScript`/`clientScript`. Handler errors are logged with a traceback,
+  once per handler, and never stop the others.
+- **Kill credit and damage.** The game's `HostUnit:TakeDamage` has no
+  source, so when a mod asks (`OnUnitKilled`, `ModifyDamage`,
+  `OnUnitDamaged`, `Kills`), the helper wraps the places damage comes from
+  and notes the source around each:
+  - `ProcessRayCollisionEvent` and `ProcessAreaDamage` in `collisionUpdate`;
+  - `HostBeam:Fire`, `CheckDashCollisionsWithUnits` and
+    `CreateDeathExplosions`;
+  - a muzzle→unit map from `HostMuzzle.__init`, for projectiles.
+
+  The hit itself is `HostUnit.TakeDamage`/`ProcessDamage`/`Destroy`,
+  assigned on the class so every subclass gets them; `HostCommander:Destroy`
+  calls `HostUnit.Destroy`. The hooks go in at the start of the first
+  simulation tick, when every module is loaded and nothing has spawned yet.
+  `Delete` (captures, upgrades) never reports a kill.
 - **Install slips.** A top-level folder with no `mod.json` is searched up to
   three levels down for folders that have one: a zip extracted into its own
   folder, or a pack of mods. The loader gives each DLL to the nearest folder

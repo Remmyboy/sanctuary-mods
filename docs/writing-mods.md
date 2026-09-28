@@ -261,8 +261,44 @@ Events.GameTime()   -- seconds since the start
 - A handler that errors is logged with its traceback (in the game's log) and
   skipped; the other handlers, and other mods', keep running. A host script
   that fails to load is logged the same way.
+- A handler that errors is logged in full the first time; after that it
+  keeps being called but its errors aren't logged again, so a broken
+  `OnTick` can't flood the log.
 - `Events.IsHost()` is only settled inside a handler or in your
-  host/client script. A file the game imports early, such as an append to
+  host/client script.
+
+**Kills and damage (host only).** The game doesn't record who damaged or
+killed a unit, so the framework works it out:
+
+```lua
+Events.OnUnitKilled(function(victim, info)
+    -- info.army, info.unit: who dealt the killing damage (either may be nil)
+    -- info.cause: "projectile", "area", "beam", "dash", "deathExplosion",
+    --             or "none" (an army's defeat, a script's Destroy)
+end)
+
+Events.ModifyDamage(function(victim, amount, info)
+    if info.army == Armies[1] then return amount * 1.25 end   -- army 1 deals +25%
+end)
+
+Events.OnUnitDamaged(function(victim, amount, info) ... end)  -- after the hit
+
+Events.Kills(army)   -- enemy units that army has killed
+```
+
+- **Credit.** Splash damage from a shell is credited to the unit that fired
+  it. A death explosion is credited to the unit that exploded, and its
+  army.
+- **What counts as a kill.** Every kill fires once. Units removed rather
+  than killed (captures, upgrades, `Delete`) don't fire at all. Friendly
+  kills are reported as they are, but `Kills` only counts enemies.
+- **Modifiers.** Each `ModifyDamage` handler gets the amount the previous
+  one returned, in the order they were registered, and returns a number (or
+  nothing to leave it). The result never goes below 0. Modifiers apply to
+  projectiles, splash, beams and dashes alike.
+- **Only when used.** These hooks only go into the game when some picked
+  mod uses one of the calls. Register from the top of your host script, so
+  kills from units that exist at the start are credited to them. A file the game imports early, such as an append to
   `tags.lua`, runs before the framework knows which side it's on.
 
 The [`SupplyDrop`](../examples/SupplyDrop) example is a complete mod built
