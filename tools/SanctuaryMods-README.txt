@@ -28,9 +28,10 @@ exactly the same ones:
   - Start stays greyed out until every player has identical copies. The
     Mods panel and the chat say who is missing what; players without any
     mods can join, but only play vanilla matches.
-  - Nothing picked means a normal vanilla match.
-  - The Gameplay Mods tab on the Mods page chooses which ones are picked
-    by default when you host.
+  - Every lobby starts with none picked: a normal vanilla match. The host
+    switches mods on for that lobby only.
+  - Only use UI mods? Nothing changes for you: just never switch a
+    gameplay mod on.
 Nothing on disk is ever changed: the mods are applied in memory, for that
 match only.
 

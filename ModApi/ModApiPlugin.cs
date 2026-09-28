@@ -34,19 +34,8 @@ namespace Sanctuary.ModApi
         }
         internal static bool MatchWasUnderway;
 
-        private static ConfigEntry<string> _cfgDefaultSelection;
         private Harmony _harmony;
         private float _scanAccum;
-
-        /// Gameplay mods selected when you host a lobby, in apply order.
-        internal static IReadOnlyList<string> DefaultSelection =>
-            (_cfgDefaultSelection?.Value ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim()).Where(ValidId).Distinct().ToList();
-
-        internal static void SetDefaultSelection(IEnumerable<string> ids)
-        {
-            if (_cfgDefaultSelection != null) _cfgDefaultSelection.Value = string.Join(";", ids.Where(ValidId).Distinct());
-        }
 
         internal static bool ValidId(string id) => ModManifest.IsValidId(id);
 
@@ -82,12 +71,15 @@ namespace Sanctuary.ModApi
         private void Awake()
         {
             Log = Logger;
-            _cfgDefaultSelection = Config.Bind("Lobby", "DefaultSelection", "",
-                "Gameplay mod ids (semicolon-separated, in apply order) picked when you host a lobby. " +
-                "Ladder lobbies always start vanilla.");
+            // Every lobby starts with no gameplay mods; the host switches
+            // them on. An earlier test build picked some by default: drop
+            // that setting.
+            var oldDefaults = Config.Bind("Lobby", "DefaultSelection", "", "");
+            Config.Remove(oldDefaults.Definition);
             _cfgOptions = Config.Bind("Lobby", "Options", "",
                 "The gameplay mod options you last hosted with, as JSON ({\"mod.id\": {\"key\": \"value\"}}). " +
-                "Set them in the lobby's Mods panel.");
+                "Set them in the lobby's Mods panel; they come back when you switch the mod on again.");
+            Config.Save();
 
             try { System.IO.Directory.CreateDirectory(ModCatalog.ModsRoot); }
             catch (Exception e) { Log.LogWarning($"Could not create {ModCatalog.ModsRoot}: {e.Message}"); }

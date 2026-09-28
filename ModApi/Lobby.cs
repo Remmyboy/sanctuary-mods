@@ -101,8 +101,11 @@ namespace Sanctuary.ModApi
         public static bool MatchUnderway => LobbyManager.IsInLobby && LobbyManager.lobbyGameStatus != LobbyManager.LobbyGameStatus.lobby;
 
         /// The host may change the selection: hosting, in the lobby screen,
-        /// before Start.
-        public static bool CanChangeSelection => IsHost && _hostSession && !_locked && !MatchUnderway;
+        /// before Start. Never in a ladder lobby: ranked matches are vanilla.
+        public static bool CanChangeSelection => IsHost && _hostSession && !_hostSessionIsLadder && !_locked && !MatchUnderway;
+
+        /// This is a ladder lobby, where gameplay mods can't be picked.
+        public static bool IsLadderLobby => _hostSession ? _hostSessionIsLadder : _received?.ladder == true;
 
         /// The host has this API: a selection exists and can be shown. False
         /// in a lobby hosted by a vanilla player (no gameplay mods possible).
@@ -308,6 +311,7 @@ namespace Sanctuary.ModApi
             _rosterSig = "";
             _abortPending = false;
             _startQueuedAt = -1f;
+            _startButtonTouched = false;
             _changeCounter++;
         }
 
@@ -342,12 +346,8 @@ namespace Sanctuary.ModApi
                 _hostSessionIsLadder = _pendingLadderFlag;
                 _pendingLadderFlag = false;
                 _rev = 0;
-                if (!_hostSessionIsLadder)
-                {
-                    foreach (var id in ModApiPlugin.DefaultSelection)
-                        if (ModCatalog.Find(id)?.Kind == ModKind.Gameplay && !_selection.Contains(id)) _selection.Add(id);
-                }
-                HostApply(_selection.Count > 0 ? "hosting with the default selection" : "hosting");
+                // Every lobby starts vanilla; the host switches mods on.
+                HostApply("hosting");
                 ModEvents.RaiseLobbyEntered(true);
             }
 
@@ -425,6 +425,7 @@ namespace Sanctuary.ModApi
         {
             rev = _rev,
             locked = _locked,
+            ladder = _hostSessionIsLadder,
             luaHash = Overlay.CurrentHash,
             mods = _hostResolved.Select(m => new WireMod
             {
@@ -624,6 +625,9 @@ namespace Sanctuary.ModApi
             }
         }
 
+        // The Start button has been set by us rather than the game.
+        private static bool _startButtonTouched;
+
         private static readonly HarmonyLib.AccessTools.FieldRef<EM.UI.LobbyInterface, Michsky.UI.Beam.ButtonManager> StartButtonRef =
             HarmonyLib.AccessTools.FieldRefAccess<EM.UI.LobbyInterface, Michsky.UI.Beam.ButtonManager>("hostStartButton");
 
@@ -641,6 +645,16 @@ namespace Sanctuary.ModApi
                 var button = StartButtonRef(ui);
                 if (button == null || !button.gameObject.activeInHierarchy) return;
                 var allReady = state.players.Take(state.maxPlayers).All(p => p.isReady || p.type == PlayerType.Empty);
+                // No gameplay mods in play: the button is the game's alone.
+                // Put back what we changed, once, if mods were just
+                // switched off.
+                if (_hostResolved.Count == 0 && _hostSelectionProblem == null)
+                {
+                    if (_startButtonTouched) button.Interactable(allReady);
+                    _startButtonTouched = false;
+                    return;
+                }
+                _startButtonTouched = true;
                 // While a change is only settling the button stays live: a
                 // press then waits for it (QueueStart) rather than the
                 // button flickering grey for half a second.

@@ -1459,9 +1459,11 @@ check and vanilla players play as usual. The panel is an overlay rather than a
 screen of its own because leaving the game's lobby window drops its chat and
 roster listeners and clears the chat. The [Mod API](#modapi) does the actual
 work; the Gameplay Mods tab here lists what's installed (manifest details and
-problems on hover) and which mods are **picked by default** when this player
-hosts (`[Lobby] DefaultSelection` in `com.sanctuarydb.modapi.cfg`; Lua mods
-switched on under 0.6 migrate to it). Ladder lobbies always start vanilla.
+problems on hover). **Every lobby starts with no gameplay mods**: the host
+switches them on, and nothing can pick one by default. The option values a
+host last used come back when they switch a mod on again. Ladder lobbies
+(named `Ladder:`) are always vanilla: their Mods panel says so and nothing
+can be picked. Lua mods switched on under 0.6 are simply dropped.
 
 **Play vanilla**, at the top of the UI Mods tab, holds back every UI mod at
 once, as if none were installed, and brings them back as they were when

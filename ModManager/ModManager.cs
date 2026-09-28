@@ -49,17 +49,6 @@ namespace SanctuaryHud
 
         internal void OpenModsFolder() => Application.OpenURL("file:///" + ModCatalog.ModsRoot.Replace('\\', '/'));
 
-        /// Whether a gameplay mod is picked by default when this player hosts.
-        internal bool IsDefault(ModInfo mod) => Modding.DefaultSelection.Contains(mod.Id);
-
-        internal void SetDefault(ModInfo mod, bool on)
-        {
-            var list = Modding.DefaultSelection.ToList();
-            if (on && !list.Contains(mod.Id)) list.Add(mod.Id);
-            if (!on) list.Remove(mod.Id);
-            Modding.SetDefaultSelection(list);
-        }
-
         // ---- C# plugin toggles --------------------------------------------
         // Every UI plugin on this same hidden manager GameObject: the ones the
         // hot-reload loader manages, read from its registry, and any BepInEx
@@ -126,22 +115,13 @@ namespace SanctuaryHud
 
         /// Before 0.7 Lua mods were switched on globally from this page
         /// ([Mods] Enabled = folder;folder), which kept a player out of every
-        /// vanilla lobby. They are the lobby host's pick now; the old list
-        /// becomes the selection this player starts with when hosting.
+        /// vanilla lobby. Gameplay mods are the lobby host's pick now, and
+        /// every lobby starts with none, so the old list just goes.
         private void MigrateLuaMods()
         {
-            var old = Config.Bind("Mods", "Enabled", "", "Replaced by the mod API's [Lobby] DefaultSelection.");
-            var folders = (old.Value ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
-            if (folders.Count > 0 && Modding.DefaultSelection.Count == 0)
-            {
-                var ids = folders
-                    .Select(f => ModCatalog.FindByFolder(Path.Combine(ModCatalog.ModsRoot, f)))
-                    .Where(m => m != null && m.Kind == ModKind.Gameplay)
-                    .Select(m => m.Id)
-                    .ToList();
-                Modding.SetDefaultSelection(ids);
-                _log.LogInfo($"Lua mods switched on before 0.7 ({string.Join(", ", folders)}) are now picked by default when you host a lobby.");
-            }
+            var old = Config.Bind("Mods", "Enabled", "", "");
+            if (!string.IsNullOrWhiteSpace(old.Value))
+                _log.LogInfo($"Lua mods switched on before 0.7 ({old.Value}) are now picked per lobby by the host, in the lobby's Mods panel.");
             Config.Remove(old.Definition);
             Config.Save();
         }

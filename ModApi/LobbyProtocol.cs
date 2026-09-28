@@ -132,6 +132,8 @@ namespace Sanctuary.ModApi
     {
         public int rev;
         public bool locked;
+        /// A ladder lobby: always vanilla, nothing can be picked.
+        public bool ladder;
         public List<WireMod> mods = new List<WireMod>();
         /// The host's Lua hash with these mods applied.
         public string luaHash;

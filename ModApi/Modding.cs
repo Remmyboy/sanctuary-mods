@@ -88,9 +88,5 @@ namespace Sanctuary.ModApi
         public static string VanillaLuaHash => Overlay.VanillaHash;
         public static string CurrentLuaHash => Overlay.CurrentHash;
 
-        /// Gameplay mods pre-picked when this player hosts.
-        public static IReadOnlyList<string> DefaultSelection => ModApiPlugin.DefaultSelection;
-
-        public static void SetDefaultSelection(IEnumerable<string> ids) => ModApiPlugin.SetDefaultSelection(ids);
     }
 }

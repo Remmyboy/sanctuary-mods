@@ -29,7 +29,7 @@ namespace SanctuaryHud
         private string _gameplaySignature = "";
 
         private string GameplaySignature() =>
-            $"{ModCatalog.Version}|{Lobby.ChangeCounter}|{string.Join(";", Modding.DefaultSelection)}|{Overlay.CurrentHash}";
+            $"{ModCatalog.Version}|{Lobby.ChangeCounter}|{Overlay.CurrentHash}";
 
         private void RebuildGameplayTab()
         {
@@ -41,7 +41,8 @@ namespace SanctuaryHud
             Heading(_gameList, "Gameplay mods: the lobby host picks them");
             var live = Modding.ActiveGameplayMods;
             DescribeNext("Right now",
-                "Outside a lobby the game always runs vanilla, so you can join anyone. In a lobby the host's pick is applied " +
+                "Outside a lobby the game always runs vanilla, so you can join anyone, and every lobby starts with none picked. " +
+                "The host switches them on in the lobby's Mods panel; the pick is applied " +
                 "on every player's machine before the match starts, and Start waits until everyone has identical copies. " +
                 "The code is the game's Lua hash: two players with the same code run the same scripts.");
             InfoRow(_gameList,
@@ -60,16 +61,12 @@ namespace SanctuaryHud
                 return;
             }
 
-            Heading(_gameList, "Picked when you host");
+            Heading(_gameList, "Installed");
             foreach (var mod in mods)
             {
                 var m = mod;
                 DescribeNext(m.Name, GameplayDescription(m));
-                SwitchRow(_gameList, $"{m.Name} {m.Version}   <alpha=#80>{GameplayFiles(m)}", _owner.IsDefault(m), true, on =>
-                {
-                    _owner.SetDefault(m, on);
-                    _gameplaySignature = GameplaySignature();
-                });
+                InfoRow(_gameList, $"{m.Name} {m.Version}", GameplayFiles(m));
             }
 
             var troubled = ModCatalog.Mods.Where(m => m.Problems.Count > 0).ToList();
@@ -129,7 +126,7 @@ namespace SanctuaryHud
             if (m.Manifest.Synthesised) text += "This folder has no mod.json, so its name stands in for one. ";
             if (m.Manifest.Requires.Count > 0) text += $"Needs {string.Join(", ", m.Manifest.Requires)} picked too. ";
             if (m.Manifest.Url.Length > 0) text += $"Get it from {m.Manifest.Url}. ";
-            text += "Switched on here, it is picked straight away when you host a lobby; you can still change the pick there.";
+            text += "To play it, host a lobby and switch it on in the lobby's Mods panel; everyone in the match needs an identical copy.";
             if (m.Manifest.Options.Count > 0)
             {
                 text += "\n\nOptions, set by the host in the lobby's Mods panel:";
@@ -406,6 +403,11 @@ namespace SanctuaryHud
             }
 
             Heading(_lobbyList, host ? "Gameplay mods: your pick for this match" : "Gameplay mods: the host's pick");
+            if (Lobby.IsLadderLobby)
+            {
+                InfoRow(_lobbyList, "Ladder lobby: always vanilla", "no gameplay mods");
+                return;
+            }
             var settling = blocked != null && Lobby.Settling;
             InfoRow(_lobbyList,
                 Lobby.Selection.Count == 0 ? "None picked: a vanilla match, anyone can play"

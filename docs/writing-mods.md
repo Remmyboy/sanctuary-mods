@@ -528,7 +528,9 @@ game start, and it's destroyed when the match ends.
 
 ## How the lobby decides
 
-1. The host picks gameplay mods in the lobby's **Mods** panel. The **Mods**
+1. Every lobby starts with no gameplay mods. The host switches them on in
+   the lobby's **Mods** panel; nothing is ever on by default, and ladder
+   lobbies can't have any. The **Mods**
    button beside Settings shows a count, and a `!` while someone is missing
    something. The pick also goes into the lobby chat. Players with the
    framework get the pick at once, apply the mods if their copies are
