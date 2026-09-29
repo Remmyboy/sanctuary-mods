@@ -1,0 +1,17 @@
+-- Gameplay Lua. Files under lua\ mirror the game's LJ\lua tree:
+--
+--   lua\common\colors.lua          replaces the game's common\colors.lua
+--   lua\append\common\colors.lua   is added to the end of it (this file)
+--   lua\mymod\helpers.lua          is a new file, for Import("mymod/helpers.lua")
+--
+-- Prefer append: it survives game updates, and several mods can append to
+-- the same file. Appended code runs in the file's own chunk, just before its
+-- closing `return` if it has one, so the file's locals and globals are in
+-- scope. Don't `return` from here.
+--
+-- Everything in lua\ is part of the match: the lobby host picks this mod and
+-- every player needs an identical copy. Delete this file, or put real code in.
+--
+-- Settings the host should choose (a timer, which units are allowed) go in
+-- mod.json's "options"; read them here with
+--   local Options = Import("modoptions/templateauthorid.sanctuarymodtemplate.lua").Options

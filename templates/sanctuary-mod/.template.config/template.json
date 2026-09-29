@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sanctuary Mods",
+  "classifications": [ "Game", "Mod", "Sanctuary" ],
+  "identity": "SanctuaryMods.Mod",
+  "name": "Sanctuary: Shattered Sun mod",
+  "description": "A mod for Sanctuary: Shattered Sun that the Sanctuary mod loader hot-reloads from engine\\SanctuaryMods.",
+  "shortName": "sanctuary-mod",
+  "sourceName": "SanctuaryModTemplate",
+  "preferNameDirectory": true,
+  "tags": { "language": "C#", "type": "project" },
+  "forms": {
+    "lowerCase": { "identifier": "lowerCase" },
+    "idChars": { "identifier": "replace", "pattern": "[^a-z0-9._-]+", "replacement": "-" },
+    "modId": { "identifier": "chain", "steps": [ "lowerCase", "idChars" ] }
+  },
+  "symbols": {
+    "kind": {
+      "type": "parameter",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "ui", "description": "Changes only your own screen; you switch it on and off yourself." },
+        { "choice": "gameplay", "description": "Changes the match (Lua, .santp, maybe C#); the lobby host picks it and every player needs it." }
+      ],
+      "defaultValue": "ui",
+      "replaces": "TEMPLATEKIND",
+      "description": "What kind of mod."
+    },
+    "modAuthor": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "me",
+      "replaces": "TemplateAuthor",
+      "description": "Your name, shown on the Mods page and used to make the mod's id unique."
+    },
+    "authorId": {
+      "type": "derived",
+      "valueSource": "modAuthor",
+      "valueTransform": "modId",
+      "replaces": "templateauthorid"
+    },
+    "scriptFolder": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "modId",
+      "replaces": "templatescriptfolder",
+      "fileRename": "templatescriptfolder"
+    },
+    "gamePath": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Sanctuary Shattered Sun Playtest\\engine",
+      "replaces": "TEMPLATEGAMEPATH",
+      "description": "The game's engine folder (the one holding Sanctuary.exe)."
+    },
+    "gameplay": {
+      "type": "computed",
+      "value": "(kind == \"gameplay\")"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        { "condition": "(!gameplay)", "exclude": [ "lua/**" ] }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# The lobby compares mods byte for byte: never let Git rewrite line endings
+# in the files a match runs.
+**/lua/** -text
+*.santp -text

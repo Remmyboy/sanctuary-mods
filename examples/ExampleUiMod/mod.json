@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
+  "id": "sanctuarymods.example.uimod",
+  "name": "Example UI Mod",
+  "version": "1.0.0",
+  "author": "Sanctuary Mods",
+  "description": "Shows which gameplay mods are live, in a corner of the screen. A starting point for your own UI mod.",
+  "kind": "ui",
+  "apiVersion": 1
+}

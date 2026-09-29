@@ -22,4 +22,10 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The mod API, loaded by BepInEx from plugins\ under a fixed identity:
+         referenced, never copied beside this DLL. -->
+    <ProjectReference Include="..\ModApi\ModApi.csproj" Private="false" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,248 @@
+---@type UnitTemplate
+UnitTemplate = {
+    audio = {
+        engine = {
+            looping = true,
+            name = "aelu1315",
+        },
+        onDestroyed = {
+            looping = false,
+            name = "aeod1110",
+        },
+    },
+    collisionInfo = {
+        centerOffset = {
+            x = 0,
+            y = 0.25,
+            z = 0,
+        },
+        collisionSize = {
+            x = 0.5,
+            y = 0.5,
+            z = 0.5,
+        },
+    },
+    defence = {
+        health = {
+            max = 145,
+            value = 145,
+        },
+    },
+    economy = {
+        buildTime = 80,
+        cost = {
+            alloys = 21,
+            energy = 210,
+        },
+    },
+    footprint = {
+        x = 0.9,
+        y = 0.9,
+    },
+    general = {
+        class = {
+            "unitsDefaultEDA",
+            "EDALandUnit",
+        },
+        displayName = "Tier 1: Raider",
+        icon = {
+            shape = "bot1",
+            symbol = "direct",
+            tech = "t1",
+        },
+        iconUI = "tech1_bot1_direct.png",
+        iconUIBuildSortPriority = 90,
+        iconUIType = "land",
+        name = "Ascendant Dingo",
+        orders = {
+            Assist = true,
+            Attack = true,
+            AttackMove = true,
+            Move = true,
+            Patrol = true,
+            Stop = true,
+        },
+        threatByLayer = {
+            Air = 0,
+            Land = 36.8,
+            WaterSurface = 49.8,
+        },
+        modelTpId = "uel1002",
+        tpId = "ual1002",
+        unitTypeName = "AscendantT1Bot",
+    },
+    intel = {
+        visionRadius = 15,
+    },
+    movement = {
+        acceleration = 100,
+        altitudeJitterFactor = 0,
+        bankFactor = 0,
+        collisionMaskDefault = {
+            "LandSmall",
+        },
+        collisionMaskSpawn = {
+            "LandSmall",
+        },
+        orbitRange = 0,
+        orbitSpeed = 0,
+        preferredAltitude = 0,
+        referenceAltitude = "Ground",
+        rotationSpeed = 300,
+        sortOrder = 1,
+        speed = 4,
+        terrainAlignmentFactor = 1,
+        type = "LegsLand",
+        walkAnimation = {
+            authoredSpeed = 0.5,
+        },
+    },
+    tags = {
+        "ANTI_SURFACE",
+        "BOT",
+        "BUILDABLE_BY_T1_FACTORY",
+        "BUILDABLE_BY_T2_FACTORY",
+        "BUILDABLE_BY_T3_FACTORY",
+        "DIRECT_FIRE",
+        "ASCENDANT",
+        "LAND",
+        "MOBILE",
+        "RAIDER",
+        "TECH1",
+    },
+    visuals = {
+        animations = {
+            walk = {
+                authoredSpeed = 0.5,
+                clipName = "WalkAnim01",
+                sanAnimationPath = "Units/uel1002/LOD0/uel1002.sananimation",
+            },
+        },
+        display = {
+            mainBarDisplayScale = {
+                x = 0.5,
+                y = 0.5,
+            },
+            mainBarOffSet = {
+                x = 0,
+                y = 15,
+            },
+            progressBars = {
+                {
+                    colorBackground = {
+                        a = 1,
+                        x = 0,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorEmpty = {
+                        a = 1,
+                        x = 1,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorFull = {
+                        a = 1,
+                        x = 0,
+                        y = 1,
+                        z = 0,
+                    },
+                    mainBar = true,
+                    name = "Health",
+                    property = "Health_Current",
+                    xOffset = 0,
+                    xScale = 1,
+                },
+            },
+            subBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            subBarOffSet = {
+                x = 0,
+                y = 0,
+            },
+        },
+        effectsInstant = {
+            onDeath = {
+                {
+                    audioName = "EDA_UnitExplosions_Random",
+                    boneName = "Root",
+                    particleName = "VFX/Death/ved1101_death_land_small.sanvfx",
+                },
+            },
+        },
+        mesh = {
+            lod0distance = 65,
+            lod1distance = 169,
+        },
+        selection = {
+            size = {
+                x = 1.25,
+                y = 1.25,
+            },
+        },
+    },
+    weapons = {
+        {
+            aimControllers = {
+                {
+                    aimBone = "Turret01_Muzzle01",
+                    aimTolerance = 0.2,
+                    defaultPitchAdjustment = 0,
+                    defaultYawAdjustment = 0,
+                    leadTarget = true,
+                    pitchBone = "Turret01_Pitch01",
+                    pitchMax = 45,
+                    pitchMin = -25,
+                    pitchSpeed = 20,
+                    poseResetTime = 3,
+                    projectileSpeed = 25,
+                    solverType = "LowArc",
+                    yawBone = "Turret01_Yaw01",
+                    yawMax = 180,
+                    yawMin = -180,
+                    yawSpeed = 100,
+                },
+            },
+            audio = {
+                onFire = {
+                    looping = true,
+                    name = "aelm1110",
+                },
+            },
+            damage = 6.25,
+            damageRadius = 0,
+            damageType = "Normal",
+            effects = {
+                onFire = "VFX/Muzzle/vem1121_autocannon_small_muzzle.sanvfx",
+            },
+            firingRandomness = 0,
+            layerTargetLimits = {
+                "Land",
+                "WaterSurface",
+            },
+            layerWeaponLimits = {
+                "Land",
+            },
+            muzzleGroupChargeDelay = 0,
+            muzzleGroupTimeOut = -1,
+            muzzleGroups = {
+                {
+                    muzzles = {
+                        "Turret01_Muzzle01",
+                    },
+                },
+            },
+            muzzleSalvoSize = 1,
+            projectileLifetime = 2,
+            projectileTemplate = "ped131",
+            rangeMax = 15,
+            rangeMin = 0,
+            rangeRingType = "DirectFire",
+            rangeTracking = 1.1,
+            reloadTime = 0.25,
+            targetWaterLimits = "Above",
+        },
+    },
+}

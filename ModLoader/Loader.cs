@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using BepInEx;
 using UnityEngine;
 
@@ -15,9 +16,10 @@ namespace SanctuaryModLoader
     // BepInEx's protected, hidden manager — instead of creating a new one.
     //
     // Mods live outside the BepInEx tree, one folder each, next to the Lua
-    // mods the mod manager overlays — so a single folder is the whole of a
-    // mod, whether it ships a DLL, Lua files, or both. This loader is the one
-    // piece that has to sit in BepInEx\plugins, because BepInEx loads it.
+    // mods the mod API overlays — so a single folder is the whole of a mod,
+    // whether it ships a DLL, Lua files, or both. This loader is the one piece
+    // that has to sit in BepInEx\plugins, because BepInEx loads it (with the
+    // mod API beside it, which mods compile against).
     //
     // Each DLL is watched and reloaded independently about a second after every
     // rebuild; F6 forces a reload of everything. A DLL deleted from the folder
@@ -30,15 +32,23 @@ namespace SanctuaryModLoader
     // its OnDestroy failed to undo (static event handlers, threads), stay in
     // the process until the game exits.
     //
+    // Two kinds of plugin. A UI mod's DLL is the player's own: it runs unless
+    // switched off on the Mods page. A gameplay mod's DLL (mod.json says
+    // "kind": "gameplay") belongs to the lobby: it runs only while the lobby
+    // host has picked that mod, which the mod API tells the loader through
+    // SetActiveGameplayFolders, and it is never reloaded under a running match.
+    //
     // The loader is also the registry the Mod Manager reads. A plugin switched
     // off on the Mods page is held back before it is ever created, so none of
     // its code runs, and the manager lists, starts and stops plugins through
     // the static methods at the bottom rather than adding components itself.
-    [BepInPlugin("com.sanctuarydb.modloader", "Sanctuary Mod Loader", "1.3.1")]
+    [BepInPlugin(LoaderGuid, "Sanctuary Mod Loader", "1.4.0")]
+    [BepInDependency(ModApiGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class LoaderPlugin : BaseUnityPlugin
     {
         private const string LoaderGuid = "com.sanctuarydb.modloader";
         private const string ManagerGuid = "com.sanctuarydb.modmanager";
+        private const string ModApiGuid = "com.sanctuarydb.modapi";
 
         /// One plugin type from a DLL on disk: running, or held back.
         private sealed class Managed
@@ -46,8 +56,21 @@ namespace SanctuaryModLoader
             public Type Type;
             public string Guid;
             public string Name;
+            public string Path;
+            public bool Gameplay;
             public BaseUnityPlugin Instance;
         }
+
+        // Libraries the game or BepInEx already has. An author who ships one
+        // beside their DLL would otherwise get a second, renamed copy loaded,
+        // which breaks both.
+        private static readonly string[] LibraryDlls =
+        {
+            "Sanctuary.ModApi.dll", "0Harmony.dll", "0Harmony20.dll", "HarmonyXInterop.dll",
+            "Mono.Cecil.dll", "MonoMod.Utils.dll", "MonoMod.RuntimeDetour.dll", "Newtonsoft.Json.dll",
+        };
+
+        private static readonly Regex GameplayKind = new Regex("\"kind\"\\s*:\\s*\"\\s*gameplay\\s*\"", RegexOptions.IgnoreCase);
 
         private static LoaderPlugin _instance;
 
@@ -55,12 +78,15 @@ namespace SanctuaryModLoader
         private readonly Dictionary<string, DateTime> _loadedStamps = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<Managed>> _live = new Dictionary<string, List<Managed>>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _loadCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _activeGameplayFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _skippedLibraries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _deferredLogged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private float _pollAccum;
 
         private void Awake()
         {
             _instance = this;
-            _modsDir = Path.Combine(Paths.GameRootPath, "SanctuaryMods");
+            _modsDir = Path.GetFullPath(Path.Combine(Paths.GameRootPath, "SanctuaryMods")).TrimEnd('\\', '/');
             Logger.LogInfo($"Mods loader ready; watching {_modsDir} for mod DLLs (auto-reload on change, F6 forces).");
             LoadChanged(force: true);
         }
@@ -84,17 +110,87 @@ namespace SanctuaryModLoader
             LoadChanged(force: false);
         }
 
+        /// A match or replay is running: gameplay DLLs stay exactly as they
+        /// started, since swapping one would change the simulation mid-game.
+        private static bool GameplayFrozen()
+        {
+            try
+            {
+                return EM.Network.LobbyManager.IsInLobby &&
+                       EM.Network.LobbyManager.lobbyGameStatus != EM.Network.LobbyManager.LobbyGameStatus.lobby ||
+                       EM.Network.NetworkManager.IsReplayPlayback;
+            }
+            catch { return false; }
+        }
+
+        private static bool IsLibrary(string path)
+        {
+            var name = Path.GetFileName(path);
+            return name.StartsWith("BepInEx", StringComparison.OrdinalIgnoreCase) ||
+                   name.StartsWith("UnityEngine", StringComparison.OrdinalIgnoreCase) ||
+                   LibraryDlls.Any(l => string.Equals(l, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// The mod folder a DLL belongs to, found exactly as the Mod API's
+        /// catalog finds mods, or the two would disagree about which folder
+        /// the lobby picked: the top-level folder under SanctuaryMods when it
+        /// has a mod.json; else the outermost folder with a mod.json up to
+        /// three levels inside it, on the way down to the DLL (a mod extracted
+        /// inside a folder of its own, one of a pack); else the top-level
+        /// folder. The root itself for a loose DLL.
+        private string ModFolderOf(string dllPath)
+        {
+            var full = Path.GetFullPath(dllPath);
+            var parts = full.Substring(_modsDir.Length).TrimStart('\\', '/').Split('\\', '/');
+            if (parts.Length < 2) return _modsDir;
+            var top = Path.Combine(_modsDir, parts[0]);
+            try
+            {
+                if (File.Exists(Path.Combine(top, "mod.json"))) return top;
+                var d = top;
+                for (var depth = 1; depth <= 3 && depth < parts.Length - 1; depth++)
+                {
+                    if (parts[depth].StartsWith(".")) break;
+                    d = Path.Combine(d, parts[depth]);
+                    if (File.Exists(Path.Combine(d, "mod.json"))) return d;
+                }
+            }
+            catch { }
+            return top;
+        }
+
+        private bool IsGameplayDll(string dllPath)
+        {
+            var folder = ModFolderOf(dllPath);
+            if (string.Equals(folder, _modsDir, StringComparison.OrdinalIgnoreCase)) return false;
+            try
+            {
+                var manifest = Path.Combine(folder, "mod.json");
+                return File.Exists(manifest) && GameplayKind.IsMatch(File.ReadAllText(manifest));
+            }
+            catch { return false; }
+        }
+
         private void LoadChanged(bool force)
         {
             if (!Directory.Exists(_modsDir)) return;
 
             // One folder per mod is the convention, but a DLL dropped anywhere
             // under SanctuaryMods is picked up — no silent no-shows.
-            var onDisk = Directory.GetFiles(_modsDir, "*.dll", SearchOption.AllDirectories);
+            var onDisk = new List<string>();
+            foreach (var path in Directory.GetFiles(_modsDir, "*.dll", SearchOption.AllDirectories))
+            {
+                if (!IsLibrary(path)) { onDisk.Add(path); continue; }
+                if (_skippedLibraries.Add(path))
+                    Logger.LogWarning($"{path.Substring(_modsDir.Length).TrimStart('\\')}: a library the game already has; not loaded. Mods reference it, they don't ship it.");
+            }
+
+            var frozen = GameplayFrozen();
 
             // A DLL removed from the folder takes its plugins with it.
             foreach (var gone in _loadedStamps.Keys.Except(onDisk, StringComparer.OrdinalIgnoreCase).ToList())
             {
+                if (frozen && _live.TryGetValue(gone, out var was) && was.Any(p => p.Gameplay && p.Instance != null)) continue;
                 TearDown(gone);
                 _loadedStamps.Remove(gone);
                 Logger.LogInfo($"{Path.GetFileName(gone)} removed; its plugin(s) destroyed.");
@@ -108,6 +204,14 @@ namespace SanctuaryModLoader
             {
                 var stamp = File.GetLastWriteTimeUtc(path);
                 if (!force && _loadedStamps.TryGetValue(path, out var was) && was == stamp) continue;
+                // Gameplay DLLs wait for the match to end before a reload.
+                if (frozen && _live.TryGetValue(path, out var running) && running.Any(p => p.Gameplay))
+                {
+                    if (_deferredLogged.Add(path))
+                        Logger.LogInfo($"{Path.GetFileName(path)} changed; it's a gameplay mod, so it reloads when the match ends.");
+                    continue;
+                }
+                _deferredLogged.Remove(path);
                 if (TryLoadAssembly(path, stamp)) loaded.Add(path);
             }
             if (loaded.Count == 0) return;
@@ -119,14 +223,21 @@ namespace SanctuaryModLoader
             {
                 var started = 0;
                 var held = new List<string>();
+                var waiting = new List<string>();
                 foreach (var plugin in _live[path])
                 {
-                    if (heldBack.Contains(plugin.Guid)) held.Add(plugin.Name);
-                    else if (Start(plugin)) started++;
+                    if (plugin.Gameplay)
+                    {
+                        if (_activeGameplayFolders.Contains(ModFolderOf(plugin.Path)) && StartPlugin(plugin)) started++;
+                        else waiting.Add(plugin.Name);
+                    }
+                    else if (heldBack.Contains(plugin.Guid)) held.Add(plugin.Name);
+                    else if (StartPlugin(plugin)) started++;
                 }
                 var copies = _loadCounts[path];
                 Logger.LogInfo($"Hot-loaded {started} plugin(s) from {Path.GetFileName(path)} (built {_loadedStamps[path]:HH:mm:ss} UTC)" +
                                (held.Count > 0 ? $"; held back {string.Join(", ", held)}, switched off on the Mods page" : "") +
+                               (waiting.Count > 0 ? $"; {string.Join(", ", waiting)} is a gameplay mod and starts when a lobby host picks it" : "") +
                                (copies > 1
                                    ? $". Copy {copies} of this assembly this session: earlier copies can't be unloaded and stay in memory until the game exits."
                                    : "."));
@@ -186,6 +297,7 @@ namespace SanctuaryModLoader
                 var assembly = Assembly.Load(bytes);
                 _loadCounts[path] = _loadCounts.TryGetValue(path, out var count) ? count + 1 : 1;
 
+                var gameplay = IsGameplayDll(path);
                 var plugins = new List<Managed>();
                 foreach (var type in GetTypesSafe(assembly)
                              .Where(t => typeof(BaseUnityPlugin).IsAssignableFrom(t) && !t.IsAbstract))
@@ -194,13 +306,18 @@ namespace SanctuaryModLoader
                     try { meta = type.GetCustomAttributes(typeof(BepInPlugin), false).OfType<BepInPlugin>().FirstOrDefault(); }
                     catch (Exception e) { Logger.LogWarning($"{type.FullName}: unreadable [BepInPlugin] ({e.Message})."); }
                     // A copy of the loader under SanctuaryMods would load
-                    // itself from its own Awake, without end.
-                    if (meta?.GUID == LoaderGuid)
+                    // itself from its own Awake, without end; the API is
+                    // loaded by BepInEx and must stay a single copy.
+                    if (meta?.GUID == LoaderGuid || meta?.GUID == ModApiGuid)
                     {
-                        Logger.LogWarning($"{Path.GetFileName(path)}: the mod loader belongs in BepInEx\\plugins, not SanctuaryMods; skipped.");
+                        Logger.LogWarning($"{Path.GetFileName(path)}: {meta.Name} belongs in BepInEx\\plugins, not SanctuaryMods; skipped.");
                         continue;
                     }
-                    plugins.Add(new Managed { Type = type, Guid = meta?.GUID ?? type.FullName, Name = meta?.Name ?? type.Name });
+                    plugins.Add(new Managed
+                    {
+                        Type = type, Guid = meta?.GUID ?? type.FullName, Name = meta?.Name ?? type.Name,
+                        Path = path, Gameplay = gameplay && meta?.GUID != ManagerGuid,
+                    });
                 }
                 _live[path] = plugins;
                 return true;
@@ -212,7 +329,9 @@ namespace SanctuaryModLoader
             }
         }
 
-        private bool Start(Managed plugin)
+        // Not "Start": Unity takes a method of that name for its own message and
+        // logs "Start() can not take parameters" at every launch.
+        private bool StartPlugin(Managed plugin)
         {
             if (plugin.Instance != null) return true;
             try
@@ -287,7 +406,7 @@ namespace SanctuaryModLoader
             }
         }
 
-        // ---- registry, for the Mod Manager -----------------------------------
+        // ---- registry, for the Mod Manager and the mod API --------------------
         // Reached by reflection, never a compile-time reference: the manager is
         // hot-loaded under a per-load assembly name and has to keep running
         // against an older loader without these. Only framework, Unity and
@@ -309,18 +428,26 @@ namespace SanctuaryModLoader
             return plugin != null && plugin.Instance != null ? plugin.Instance : null;
         }
 
+        /// The DLL a type from PluginTypes was loaded from, or null.
+        public static string PathOf(Type type) => _instance?.Find(type)?.Path;
+
+        /// True for a type from a gameplay mod's DLL: the lobby starts and
+        /// stops it, not the player.
+        public static bool IsGameplay(Type type) => _instance?.Find(type)?.Gameplay ?? false;
+
         /// Starts or destroys a type from PluginTypes and returns its running
         /// instance (null when off). A type the loader no longer manages is
         /// refused and nothing is created, so a deleted DLL can't come back
-        /// from memory.
+        /// from memory. Gameplay plugins are refused too: the lobby owns them.
         public static BaseUnityPlugin SetPluginEnabled(Type type, bool enabled)
         {
             var loader = _instance;
             var plugin = loader == null ? null : loader.Find(type);
             if (plugin == null) return null;
+            if (plugin.Gameplay) return plugin.Instance != null ? plugin.Instance : null;
             if (enabled)
             {
-                loader.Start(plugin);
+                loader.StartPlugin(plugin);
             }
             else if (plugin.Instance != null)
             {
@@ -328,6 +455,34 @@ namespace SanctuaryModLoader
                 plugin.Instance = null;
             }
             return plugin.Instance != null ? plugin.Instance : null;
+        }
+
+        /// The mod folders (full paths) whose gameplay DLLs should run: the
+        /// lobby host's pick. Called by the mod API whenever it changes, and
+        /// with nothing when the lobby or match ends. Plugins from other
+        /// gameplay folders are stopped.
+        public static void SetActiveGameplayFolders(string[] folders)
+        {
+            var loader = _instance;
+            if (loader == null) return;
+            loader._activeGameplayFolders.Clear();
+            foreach (var f in folders ?? new string[0])
+                loader._activeGameplayFolders.Add(Path.GetFullPath(f).TrimEnd('\\', '/'));
+
+            foreach (var plugin in loader._live.Values.SelectMany(l => l).Where(p => p.Gameplay))
+            {
+                var want = loader._activeGameplayFolders.Contains(loader.ModFolderOf(plugin.Path));
+                if (want && plugin.Instance == null)
+                {
+                    if (loader.StartPlugin(plugin)) loader.Logger.LogInfo($"Gameplay mod plugin '{plugin.Name}' started for this lobby.");
+                }
+                else if (!want && plugin.Instance != null)
+                {
+                    Destroy(plugin.Instance);
+                    plugin.Instance = null;
+                    loader.Logger.LogInfo($"Gameplay mod plugin '{plugin.Name}' stopped.");
+                }
+            }
         }
 
         private Managed Find(Type type) =>

@@ -1,12 +1,18 @@
 ---
 name: release-mod
-description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
+description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader, and the ModApi framework DLL that ships inside them). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
 ---
 
 # Releasing a mod
 
-Each release is a GitHub release carrying **two zips**, tagged `<Mod>-<version>`
-and titled `<Display Name> <version>`. `tools/pack-release.ps1` does everything
+Each release is a GitHub release tagged `<Mod>-<version>`
+and titled `<Display Name> <version>`. Every mod ships one
+`<Mod>-<ver>-ModManager.zip` (just the mod, an add-in for the Mod Manager);
+the ModManager release also ships `ModManager-<ver>-Standalone.zip`, the one
+base install (BepInEx, the loader, the mod API and the Mod Manager). No other
+mod has had a Standalone zip since September 2026: each carried its own
+loader, and an older one extracted later downgraded it.
+`tools/pack-release.ps1` does everything
 mechanical; this file is the order to do it in and the decisions it cannot make
 for you.
 
@@ -59,7 +65,7 @@ reverting someone else's work.
 ## 4. Write the body
 
 One plain-text file describing the mod and what is new. It goes into the
-`README.txt` of both zips **verbatim**, so:
+`README.txt` of each zip **verbatim**, so:
 
 - no markdown — no `**bold**`, no links
 - ASCII hyphens, not en dashes
@@ -78,8 +84,8 @@ always of the committed `HEAD`, checked out clean into a temporary git worktree,
 so uncommitted edits are not in it (the script says so when there are any), and
 each DLL's embedded source revision must equal `HEAD`. It fails loudly if the
 DLL is missing, if a zip lacks an expected path, if a revision doesn't match, or
-if any file from your own `BepInEx/config` leaked in. Look at the reported sizes: a Standalone that is
-not several hundred KB means the BepInEx tree did not come through.
+if any file from your own `BepInEx/config` leaked in. Look at the reported sizes: the ModManager Standalone, if
+not several hundred KB, means the BepInEx tree did not come through.
 
 ## 6. Publish
 
@@ -91,7 +97,7 @@ Refuses if the tag exists locally, on origin or as a release — bump the versio
 rather than deleting a tag someone may have downloaded. Otherwise it creates an
 annotated tag at the built commit, pushes it, and creates the release from that
 existing tag (`--verify-tag`), failing if `gh` fails or the release doesn't list
-both zips. If `gh release create` fails after the tag is pushed, the message says
+its zips. If `gh release create` fails after the tag is pushed, the message says
 how to finish from the same tag. Pass `-Notes notes.md` for a richer markdown release body;
 otherwise it uses the plain body plus the standard zip bullets and the
 client-side-only footer.
@@ -101,7 +107,7 @@ version unless they have already said to go ahead.
 
 ## 7. Afterwards
 
-- `gh release view <tag>` — two assets present
+- `gh release view <tag>` — its zips present (one; two for ModManager)
 - every README download link still resolves
 - if the game is running, the packer built to a temp folder and did not disturb
   it; a normal `dotnet build` will redeploy the Debug DLLs
@@ -117,13 +123,23 @@ version unless they have already said to go ahead.
   got in.
 - **`MapLocalFiles` has no release** and is built from source; leave its
   Download cell as `—`.
-- **ModLoader has no packer mode** (the packer refuses `-Mod ModLoader`: it
-  would put the loader under SanctuaryMods, where it loads itself). Bump both
-  `[BepInPlugin]` and `<AssemblyVersion>` in `ModLoader.csproj`, pack any
-  other mod from the same commit, and hand-build one `ModLoader-<ver>.zip`
-  from that Standalone zip minus `SanctuaryMods/<Mod>/`, with the previous
-  ModLoader zip's README.txt updated (header, a `NEW IN` section). Publish
-  with an annotated tag at that commit and `gh release create --verify-tag`.
+- **ModLoader has no release of its own any more** (the user's call,
+  2026-09-28: the loader and the Mod Manager are one thing to players). It
+  ships inside the ModManager release: the add-in zip carries
+  `BepInEx/plugins/ModLoader.dll` beside the API, and so does its
+  Standalone zip. Bump both `[BepInPlugin]` and `<AssemblyVersion>` in
+  `ModLoader.csproj` when it changes, then release **ModManager** and say
+  what the loader gained in its notes. The packer still refuses
+  `-Mod ModLoader` (it would put the loader under SanctuaryMods, where it
+  loads itself). Point the README's ModLoader row at the ModManager release.
+- **ModApi has no release of its own** (the packer refuses `-Mod ModApi`).
+  `BepInEx/plugins/Sanctuary.ModApi.dll` ships in both ModManager zips (the
+  Standalone and the add-in), beside `ModLoader.dll`: the manager
+  can't load without the API. Bump `ModApiPlugin.Version` (and
+  `<FileVersion>`) when it changes, but **never** `<AssemblyVersion>` within
+  1.x — third-party mods bind against 1.0.0.0. A change to ModApi means
+  re-releasing ModManager (so add-in installs get it) and saying "restart the
+  game once" in the notes: plugins\ never hot-reloads.
 - **A stale `[BepInPlugin]` version** has happened before: LadderReporter shipped
   0.2.3 while its attribute still read 0.2.1. Bumping the attribute first is
   what stops that.
