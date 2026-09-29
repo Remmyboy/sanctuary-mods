@@ -38,10 +38,12 @@ Replays of modded matches remember their mods and put them back on to
 play, as long as you still have the same copies.
 
 MAKING MODS
-See docs/writing-mods.md in the source repository: a mod.json, a folder of
-Lua laid out like the game's LJ\lua, and optionally C# built against
-BepInEx\plugins\Sanctuary.ModApi.dll. There is a project template, so a
-new mod builds and loads in a minute.
+A mod is a mod.json, a folder of Lua laid out like the game's LJ\lua, and
+optionally C# built against BepInEx\plugins\Sanctuary.ModApi.dll. In the
+source repository (github.com/Remmyboy/sanctuary-mods), docs/your-first-mod.md
+walks you through a first mod with only a text editor, and
+docs/writing-mods.md is the full guide. There is a project template for C#,
+so a new mod builds and loads in a minute.
 
 TRUST
 A mod's DLL runs as full-trust code inside the game with your Windows

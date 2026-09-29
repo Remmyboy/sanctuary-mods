@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.example.engineersandraiders",
   "name": "Test: Engineers and Raiders only",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Sanctuary Mods",
   "description": "Factories can only build engineers and raiders; every other mobile unit is off the build menus, and the host refuses them if anything queues one anyway. Structures are untouched, so you can still build factories and your economy. A test mod for the lobby's gameplay-mod check, and an example of a unit restriction with an option.",
   "kind": "gameplay",

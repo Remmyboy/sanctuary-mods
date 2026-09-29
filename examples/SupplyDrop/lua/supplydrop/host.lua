@@ -16,10 +16,10 @@ Events.Every(Options.interval * 60, function()
             count = count + 1
         end
     end
-    Log("Supply drop at " .. Events.GameTime() .. "s: " .. count .. " armies got " ..
+    Warn("Supply drop at " .. Events.GameTime() .. "s: " .. count .. " armies got " ..
         Options.alloys .. " alloys and " .. Options.energy .. " energy.")
 end)
 
 Events.OnArmyDefeated(function(army)
-    Log("Supply drop: army " .. tostring(army.id) .. " is out, so no more drops for it.")
+    Warn("Supply drop: army " .. tostring(army.id) .. " is out, so no more drops for it.")
 end)

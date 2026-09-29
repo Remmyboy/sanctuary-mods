@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.example.supplydrop",
   "name": "Example: Supply Drop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Sanctuary Mods",
   "description": "Every few minutes, every army still in the game gets a drop of alloys and energy. An example of a host script, match events and options working together.",
   "kind": "gameplay",

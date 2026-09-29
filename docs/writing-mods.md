@@ -10,6 +10,9 @@ A player with no mods at all can still play with anyone: outside a lobby the
 game always runs vanilla, and a lobby with no gameplay mods picked is a vanilla
 lobby.
 
+New to this? [Your first mod](your-first-mod.md) is a step-by-step walkthrough
+that needs only a text editor. This page is the full reference.
+
 ## Two kinds of mod
 
 | | **UI mod** | **Gameplay mod** |
@@ -601,7 +604,7 @@ ModEvents.OnLobbyLeft(this, () => ...);
 // Handlers are dropped when `this` is destroyed: a reload never calls an old copy.
 
 ModLua.Ready                   // the client Lua VM exists (in a match or replay)
-ModLua.Run("Log('hello')")     // run a chunk in your own client's VM
+ModLua.Run("Warn('hello')")    // run a chunk in your own client's VM
 ModLua.GetGlobal("MyValue")    // read a _G global back as a string
 
 Lobby.Selection                // the host's pick, as everyone sees it
@@ -691,8 +694,9 @@ The framework forgives the usual install slips:
 - **An archive nobody extracted,** or a DLL dropped loose in `SanctuaryMods`.
   These show at the top of the Mods page, saying what to do.
 
-A DLL belongs to the nearest folder above it that has a `mod.json`, so
-`FasterTanks\bin\FasterTanks.dll` is still FasterTanks's.
+A DLL belongs to the mod whose folder it's in, however deep, so
+`FasterTanks\bin\FasterTanks.dll` is still FasterTanks's. A `mod.json` further
+down inside a mod's folder doesn't make a second mod.
 
 **Share the zip, not a checkout.** The content hash is byte-exact, and Git on
 Windows rewrites line endings on checkout (`core.autocrlf`). Two players who
