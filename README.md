@@ -47,6 +47,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
+| [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, and the API mods are built on |
@@ -1503,6 +1504,33 @@ file), so floats, enums and `KeyCode`s all work and a half-typed value just
 doesn't take until it parses (it snaps back to the last good value when the
 field loses focus). Each mod has a "Reset to defaults". Changes save to
 `BepInEx\config\<guid>.cfg` immediately.
+
+## ZoneControl
+
+A **gameplay mod**: the lobby host picks it, and every player needs the same
+copy. It ports johnie102's Zone Control for Forged Alliance (8P V2) to the
+converted [Zone Control for FAF 8P V2](https://github.com/Remmyboy/sanctuary-map-converter/releases/tag/map-zone-control-for-faf-8p-v2)
+map. It is Lua only, so its zip is just the `SanctuaryMods\ZoneControl` folder.
+It needs Mod Manager 0.7.0 or later, whose Mod API has kill credit.
+
+- **No commanders, no building.** 53 zones on the diamond, each with a T2
+  point defence. Every zone you hold sends you a unit every few seconds.
+- **Capture:** destroy a zone's turret, then hold it with 5 or more units, more
+  than anyone else. The owner retakes it with 10 and no enemies there. Lose
+  every zone and you're out; the last team standing wins.
+- **Kills earn money and levels.** Levels bring better units, T4 heroes at 4-6
+  and invulnerable base artillery at 7-9. Each base has an upgrader: move it
+  onto a shop, or have it assist one, to buy attack or defence upgrades or a
+  kamikaze. The gun sells attack, the radar sells defence and the generator
+  sells kamikazes; the banner lists the prices.
+- **Lobby options:** seconds between spawns, unit cap per player, insanity
+  mode (levels after a handful of kills), and the zone count banner.
+- **It only runs on the Zone Control map.** On any other map it says so, and
+  the match is a normal one.
+
+Every number is in `lua\zonecontrol\balance.lua`, each with the original's
+value beside it. Problems show in the match's message log as
+`Zone Control problem: ...`, because the game's Lua warnings reach no log.
 
 ## MapLocalFiles
 
