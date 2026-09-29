@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
+  "id": "sanctuarymods.zonecontrol",
+  "name": "Zone Control",
+  "version": "0.5.0",
+  "author": "Sanctuary Mods",
+  "description": "Supreme Commander's Zone Control, for the converted Zone Control for FAF 8P V2 map. No commanders and no building: every zone you hold sends you units. Destroy a zone's turret, then hold the zone to take it; lose every zone and you're out. Kills earn money and levels: better units, heroes and base artillery, and a shop for attack and defence upgrades and kamikazes. Money and levels need a Mod API with kill credit.",
+  "kind": "gameplay",
+  "luaRoot": "lua",
+  "gameVersion": "0.0.1.20",
+  "hostScript": "zonecontrol/host.lua",
+  "clientScript": "zonecontrol/client.lua",
+  "apiVersion": 1,
+  "options": [
+    { "key": "spawnSeconds", "label": "Seconds between spawns", "type": "number", "default": 5, "min": 2, "max": 15, "step": 1,
+      "description": "Every zone you hold sends you a unit this often (less often at level 2 and up)." },
+    { "key": "unitCap", "label": "Unit cap per player", "type": "number", "default": 150, "min": 50, "max": 500, "step": 25,
+      "description": "Zones stop sending you units while you have this many." },
+    { "key": "insanity", "label": "Insanity mode", "type": "toggle", "default": false,
+      "description": "Levels come after a handful of kills instead of hundreds." },
+    { "key": "statusPanel", "label": "Zone count banner", "type": "toggle", "default": true,
+      "description": "Show how many zones each player holds, and your own money and level." }
+  ]
+}
