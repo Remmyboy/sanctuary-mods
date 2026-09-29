@@ -242,6 +242,7 @@ namespace Sanctuary.ModApi
                     return false;
                 }
                 LoaderBridge.SetActiveGameplayFolders(mods.Where(m => m.DllsAreGameplay).Select(m => m.Folder).ToArray());
+                Packs.Sync(Overlay.Applied);
                 ModApiPlugin.Log.LogInfo($"Replay plays with gameplay mods: {string.Join(", ", mods)}.");
             }
             catch (Exception e) { ModApiPlugin.Log.LogError($"Replay mods: {e}"); }

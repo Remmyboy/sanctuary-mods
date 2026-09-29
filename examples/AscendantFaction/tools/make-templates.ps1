@@ -19,6 +19,7 @@ $out = Join-Path $PSScriptRoot '..\lua\common\units\unitsTemplates'
 # New id -> the EDA unit it is made from.
 $Units = [ordered]@{
     ual0000 = 'uel0000'   # commander
+    ual0001 = 'uel0000'   # the Warden, a second commander to pick
     ual1501 = 'uel1501'   # T1 engineer
     ual1001 = 'uel1001'   # T1 tank
     ual1002 = 'uel1002'   # T1 raider
@@ -29,6 +30,14 @@ $Units = [ordered]@{
 
 # Per-unit edits after the conversion: [regex, replacement] pairs.
 $Tweaks = @{
+    # The Warden: a slower, tougher commander that builds faster, so the
+    # lobby's commander choice matters.
+    ual0001 = @(
+        @('(?m)^(\s*)max = 16000,', '${1}max = 22000,'),
+        @('(?m)^(\s*)value = 16000,', '${1}value = 22000,'),
+        @('(?m)^(\s*)speed = 1\.8,', '${1}speed = 1.4,'),
+        @('(?m)^(\s*)buildPower = 5,', '${1}buildPower = 8,')
+    )
     # The Ascendant tank trades a little speed for a lot more armour, so the
     # faction is visibly its own thing in a match.
     ual1001 = @(

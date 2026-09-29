@@ -45,10 +45,10 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.7.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
+| [ModManager](ModManager/) | [**0.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.7.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.7.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1626,6 +1626,32 @@ other mod's reloads, the Mod Manager's included:
   before it exists, and units get built without muzzles. Units spawned by
   that set-up are credited through a muzzle backfill.
   `Delete` (captures, upgrades) never reports a kill.
+- **Art packs.** A gameplay mod's `packs\*.sanpack` files go into the game's
+  asset table (`EM.Gamedata.Data.SanPackLoadedFiles`, keyed by path) at the
+  host's Start, as each client loads, and for a replay. They come out once
+  the match is cleaned up. Anything the game had already built from an entry
+  a pack replaces is dropped from its caches, both on the way in and on the
+  way out. The host reads meshes and skeletons too, so packs are part of the
+  content hash. Sounds can't come from packs: the game loads its sound banks
+  as separate files.
+- **Factions.** `mod.json` `factions` declares a faction: its name, tag, unit
+  prefix, icon, commanders, AI folder and the stock faction it looks like.
+  - The API numbers the factions after the game's three, in pick order, one
+    lobby value per commander.
+  - It fills every lobby row's faction dropdown, with icons. The game's C#
+    only ever has three, and past the dropdown the value is a byte nobody
+    checks.
+  - It moves seats when the pick changes.
+  - It writes `modapi/factions.lua` and `FactionsData` into the overlay.
+  - It appends hooks that send an AI army to its faction's AI, including on
+    takeover.
+  - It points the stock AI's hardcoded three-faction tables at the full list.
+  - It lends the looked-like faction's tag while a unit's prefab is built, so
+    its shields, build beams, factory spawn bones and shield impacts follow.
+  - It adds mods' units to `AvailableUnits`, the list the AI builds from.
+- **Borrowed models.** A unit template with `general.modelTpId` gets that
+  model's placement ghost (under its own prefab name), portrait (unless its
+  pack has one), wreck and hierarchy maps.
 - **Install slips.** A top-level folder with no `mod.json` is searched up to
   three levels down for folders that have one: a zip extracted into its own
   folder, or a pack of mods. The loader gives each DLL to the nearest folder

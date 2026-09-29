@@ -91,6 +91,63 @@
         },
         "additionalProperties": false
       }
+    },
+    "factions": {
+      "description": "Factions the mod adds to the lobby's faction dropdown while the host has it picked. The Mod API numbers them after the game's three, in pick order, and writes them into FactionsData; no C# needed.",
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["tag", "unitPrefix"],
+        "properties": {
+          "key": { "description": "The mod's own name for the faction. Default: the tag in small letters.", "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" },
+          "name": { "description": "Shown in the lobby, and FactionsData's name.", "type": "string", "maxLength": 32 },
+          "tag": { "description": "The faction tag every unit of the faction carries in its tags list (Tags.DYCOM). Not EDA, CHOSEN or GUARD.", "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,31}$" },
+          "unitPrefix": { "description": "The two letters the faction's unit ids start with (\"ud\"). Not ue, uc or ug.", "type": "string", "pattern": "^[a-z]{2}$" },
+          "icon": { "description": "A PNG in the mod folder shown beside the name in the lobby (\"icons/dycom.png\"), 64x64 or so.", "type": "string", "pattern": "\\.[pP][nN][gG]$" },
+          "looksLike": { "description": "Whose shields, build beams, factory platforms and adjacency effects the faction's units borrow.", "enum": ["EDA", "CHOSEN", "GUARD", "eda", "chosen", "guard"] },
+          "commander": { "description": "The starting unit's template id, when the faction has one commander.", "type": "string" },
+          "commanders": {
+            "description": "Commanders to pick from, each its own entry in the dropdown (\"Dycom\", \"Dycom (Mech)\"). The first is the default.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "anyOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "required": ["unit"],
+                  "properties": {
+                    "name": { "description": "Shown in the dropdown after the faction's name.", "type": "string", "maxLength": 24 },
+                    "unit": { "description": "The starting unit's template id.", "type": "string" }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "ai": {
+            "description": "The AI the faction's AI armies play: a folder under the mod's lua folder laid out like AI/mods/AI-Sanctuary-Rush, or false/absent for the stock AI.",
+            "anyOf": [
+              { "type": "string" },
+              { "type": "boolean", "const": false },
+              {
+                "type": "object",
+                "required": ["folder"],
+                "properties": {
+                  "folder": { "description": "Under the lua folder: \"AI/mods/AI-Dycom\".", "type": "string" },
+                  "land": { "description": "Let the AI use land units. Default true.", "type": "boolean" },
+                  "air": { "description": "Let the AI use air units. Default true.", "type": "boolean" },
+                  "naval": { "description": "Let the AI use naval units. Default false.", "type": "boolean" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

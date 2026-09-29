@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.2.1";
+        public const string Version = "1.3.0";
 
         private static ManualLogSource _log;
 
@@ -88,6 +88,7 @@ namespace Sanctuary.ModApi
             _harmony = new Harmony(Guid);
             GamePatches.Apply(_harmony);
             Replays.Apply(_harmony);
+            FactionLobby.Apply(_harmony);
             LobbyManager.OnLobbyStatusChanged += OnLobbyStatusChanged;
 
             Log.LogInfo($"Mod API {Version} ready: {ModCatalog.Mods.Count} mod folder(s), " +
@@ -108,6 +109,9 @@ namespace Sanctuary.ModApi
                 if (status != LobbyManager.LobbyGameStatus.loading) return;
                 MatchWasUnderway = true;
                 Lobby.ClientMatchLoading();
+                // Before the client's world builds its unit prefabs. On the
+                // host this was done at Start and changes nothing.
+                Packs.Sync(Overlay.Applied);
                 ModEvents.RaiseMatchStarting();
             }
             catch (Exception e) { Log.LogError($"Match start: {e}"); }

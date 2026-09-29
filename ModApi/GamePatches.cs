@@ -139,6 +139,8 @@ namespace Sanctuary.ModApi
                         ShowError(reason);
                         return false;
                     }
+                    // The host's world loads next, and reads unit meshes.
+                    Packs.Sync(Overlay.Applied);
                 }
             }
             catch (Exception e) { ModApiPlugin.Log.LogError($"Mod message on host: {e}"); }
