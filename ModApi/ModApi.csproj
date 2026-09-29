@@ -14,7 +14,7 @@
     <!-- Mods bind against 1.0.0.0 whatever the release: bump only on a
          breaking change, and never within 1.x. -->
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.1</FileVersion>
+    <FileVersion>1.3.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
@@ -22,6 +22,9 @@
   <ItemGroup>
     <!-- The framework's own Lua, put in place alongside gameplay mods. -->
     <EmbeddedResource Include="lua\modapi\events.lua" LogicalName="modapi.events.lua" />
+    <EmbeddedResource Include="lua\modapi\factions_lib.lua" LogicalName="modapi.factions_lib.lua" />
+    <!-- Appends to game files: hooks\<group>\<path under LJ\lua>. -->
+    <EmbeddedResource Include="lua\modapi\hooks\**\*.lua" LogicalName="modapi.hooks.$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\','/'))" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,6 +40,11 @@
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Gameplay mods' art packs are zips, read the way the game reads its own. -->
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\ICSharpCode.SharpZipLib.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Michsky.UI.Beam">

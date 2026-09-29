@@ -156,6 +156,7 @@ namespace Sanctuary.ModApi
             }
             _failed = failed;
             _applied = applied;
+            Factions.OnApplied(applied);
             _appliedOptions = values.Where(kv => applied.Any(m => m.Id == kv.Key))
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
             _currentHash = SafeHash();
@@ -181,7 +182,7 @@ namespace Sanctuary.ModApi
                 {
                     // Between the two passes, so a mod's own appends can
                     // already Import its options and the match events.
-                    if (mods.Count > 0) files += ApplyFramework(mods, cache);
+                    if (mods.Count > 0) files += ApplyFramework(mods, cache, failed);
                     foreach (var mod in mods.Where(m => values.ContainsKey(m.Id)))
                     {
                         try
@@ -222,6 +223,8 @@ namespace Sanctuary.ModApi
 
         internal static void Clear()
         {
+            // Only ever called outside a match, so the art can go too.
+            Packs.Unmount();
             if (_applied.Count == 0 && _appliedToDict == null) return;
             Apply(Array.Empty<ModInfo>());
         }
@@ -309,24 +312,108 @@ namespace Sanctuary.ModApi
 
         internal const string EventsPath = "modapi/events.lua";
 
-        private static byte[] _eventsLua;
+        private static readonly Dictionary<string, byte[]> Resources = new Dictionary<string, byte[]>(StringComparer.Ordinal);
 
-        /// modapi/events.lua, shipped inside this DLL so every player with
-        /// the same API has the same bytes.
-        private static byte[] EventsLua()
+        /// One of the framework's Lua files, shipped inside this DLL so every
+        /// player with the same API has the same bytes.
+        internal static byte[] Resource(string name)
         {
-            if (_eventsLua != null) return _eventsLua;
-            using (var s = typeof(Overlay).Assembly.GetManifestResourceStream("modapi.events.lua"))
+            if (Resources.TryGetValue(name, out var cached)) return cached;
+            using (var s = typeof(Overlay).Assembly.GetManifestResourceStream(name))
             using (var ms = new MemoryStream())
             {
-                if (s == null) throw new InvalidOperationException("modapi/events.lua is missing from Sanctuary.ModApi.dll");
+                if (s == null) throw new InvalidOperationException($"{name} is missing from Sanctuary.ModApi.dll");
                 s.CopyTo(ms);
                 // LF whatever Git did on the machine that built it: players'
                 // copies of the API must give the same bytes, or the same
                 // mods would hash differently.
                 var text = Encoding.UTF8.GetString(ms.ToArray()).Replace("\r\n", "\n").TrimStart('﻿');
-                return _eventsLua = Encoding.UTF8.GetBytes(text);
+                return Resources[name] = Encoding.UTF8.GetBytes(text);
             }
+        }
+
+        private static byte[] EventsLua() => Resource("modapi.events.lua");
+
+        private const string HookPrefix = "modapi.hooks.";
+
+        /// The framework's appends to game files, by group ("factions",
+        /// "units"): (game file under LJ\lua, resource name).
+        private static List<(string target, string resource)> Hooks(string group)
+        {
+            var prefix = HookPrefix + group + "/";
+            return typeof(Overlay).Assembly.GetManifestResourceNames()
+                .Where(n => n.StartsWith(prefix, StringComparison.Ordinal))
+                .OrderBy(n => n, StringComparer.Ordinal)
+                .Select(n => (n.Substring(prefix.Length).Replace('/', '\\'), n))
+                .ToList();
+        }
+
+        /// Faction support, whenever a picked mod adds a faction: the
+        /// factions file, the hooks that read it, and the stock AI's faction
+        /// tables (in the game's AI and in any AI a mod ships) pointed at it.
+        private static int ApplyFactions(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache)
+        {
+            var layout = Factions.Layout(mods);
+            if (layout.Count == 0) return 0;
+            var count = 0;
+            var lua = Factions.Lua(layout);
+            var error = LuaSyntax.Check(lua, Factions.LuaPath);
+            if (error != null) throw new InvalidOperationException($"{Factions.LuaPath} doesn't compile: {error}");
+            PutFile(cache, Factions.LuaPath.Replace('/', '\\'), lua);
+            count++;
+            foreach (var (target, resource) in Hooks("factions"))
+                if (AppendTo(cache, target, Resource(resource), "Mod API faction hooks")) count++;
+
+            var aiRoot = Path.Combine(LuaRoot, "AI") + Path.DirectorySeparatorChar;
+            var patched = new List<string>();
+            foreach (var key in cache.Keys.Where(k => k.StartsWith(aiRoot, StringComparison.OrdinalIgnoreCase) &&
+                                                      k.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                var text = Factions.PatchAiTables(Encoding.UTF8.GetString(cache[key].ToArray()));
+                if (text == null) continue;
+                var rel = key.Substring(LuaRoot.Length + 1);
+                PutFile(cache, rel, Encoding.UTF8.GetBytes(text));
+                patched.Add(rel.Replace('\\', '/'));
+                count++;
+            }
+            ModApiPlugin.Log.LogInfo($"Factions: {string.Join(", ", layout.Select(f => $"{f.Label} = {f.Value}"))}. " +
+                                     $"AI faction tables patched in {patched.Count} file(s).");
+            return count;
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex UnitTemplatePath = new System.Text.RegularExpressions.Regex(
+            @"^common[\\/]units[\\/]unitsTemplates[\\/]([A-Za-z0-9_-]+)[\\/]\1\.santp$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// The unit ids a mod ships templates for.
+        private static IEnumerable<string> UnitIds(ModInfo mod) =>
+            mod.OverlayFiles.Select(f => UnitTemplatePath.Match(f)).Where(m => m.Success).Select(m => m.Groups[1].Value);
+
+        /// Support for mods' own units: modelTpId honoured by placement
+        /// ghosts, portraits, wrecks and hierarchy maps.
+        private static int ApplyUnits(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache)
+        {
+            if (!mods.Any(m => m.SantpCount > 0 || m.Manifest.Factions.Count > 0)) return 0;
+            var count = 0;
+            PutFile(cache, Factions.UnitsLuaPath.Replace('/', '\\'), Factions.UnitsLua(mods));
+            count++;
+            foreach (var (target, resource) in Hooks("units"))
+                if (AppendTo(cache, target, Resource(resource), "Mod API unit hooks")) count++;
+
+            // The AI builds only what AvailableUnits lists ("if the unit isn't
+            // on this list, it's handled as restricted"). Mods' own units go
+            // on it; a mod's own append runs after this one, so it can still
+            // take a unit off.
+            var ids = mods.SelectMany(UnitIds).Distinct(StringComparer.Ordinal).OrderBy(s => s, StringComparer.Ordinal).ToList();
+            if (ids.Count > 0)
+            {
+                var sb = new StringBuilder("-- Sanctuary Mod API: the picked gameplay mods' units, which the AI may build.\n");
+                foreach (var id in ids)
+                    sb.Append("if AvailableUnits[").Append(OptionValues.LuaString(id)).Append("] == nil then AvailableUnits[")
+                        .Append(OptionValues.LuaString(id)).Append("] = true end\n");
+                if (AppendTo(cache, @"common\units\availableUnits.lua", Encoding.UTF8.GetBytes(sb.ToString()), "Mod API unit list")) count++;
+            }
+            return count;
         }
 
         /// The end of host/hostMain.lua or client/clientMain.lua: hook the
@@ -347,7 +434,7 @@ namespace Sanctuary.ModApi
         }
 
         /// The framework's files, whenever any gameplay mod is applied.
-        private static int ApplyFramework(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache)
+        private static int ApplyFramework(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache, List<ModInfo> failed)
         {
             var count = 0;
             try
@@ -360,6 +447,16 @@ namespace Sanctuary.ModApi
             catch (Exception e)
             {
                 ModApiPlugin.Log.LogError($"Mod API match events couldn't be put in place: {e.Message}");
+            }
+            try { count += ApplyUnits(mods, cache); }
+            catch (Exception e) { ModApiPlugin.Log.LogError($"Mod API unit support couldn't be put in place: {e.Message}"); }
+            try { count += ApplyFactions(mods, cache); }
+            catch (Exception e)
+            {
+                // Without it their factions don't exist in the match: leave
+                // those mods out rather than start one that can't spawn them.
+                ModApiPlugin.Log.LogError($"Mod API faction support couldn't be put in place, so the mods adding factions are left out: {e.Message}");
+                foreach (var m in mods.Where(m => m.Manifest.Factions.Count > 0 && !failed.Contains(m))) failed.Add(m);
             }
             return count;
         }

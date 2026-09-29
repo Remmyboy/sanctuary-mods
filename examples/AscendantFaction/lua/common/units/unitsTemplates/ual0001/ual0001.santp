@@ -1,0 +1,418 @@
+---@type UnitTemplate
+UnitTemplate = {
+    additions = {
+        buildBeamBones = {
+            "HeadLight01_Left",
+            "HeadLight01_Right",
+        },
+        buildBeamEffectName = "beam1",
+        displayWreckOnDeath = false,
+    },
+    audio = {
+        onDamagedAlert = {
+            looping = false,
+            name = "dx_uni_evaf_Pxx_Sc",
+        },
+        engine = {
+            looping = true,
+            name = "aelu1400",
+        },
+        onDestroyed = {
+            looping = false,
+            name = "aeod0000",
+        },
+    },
+    collisionInfo = {
+        centerOffset = {
+            x = 0,
+            y = 1,
+            z = 0,
+        },
+        collisionSize = {
+            x = 1.5,
+            y = 1,
+            z = 3.8,
+        },
+    },
+    construction = {
+        beam = {
+            offset = {
+                x = 0,
+                y = 1,
+                z = 1.5,
+            },
+            shrink = 1,
+        },
+        buildPower = 8,
+        canBuild = "Tags.ASCENDANT * Tags.BUILDABLE_BY_T1_ENGINEER",
+        range = 10,
+    },
+    defence = {
+        health = {
+            max = 22000,
+            regen = 15,
+            value = 22000,
+        },
+    },
+    economy = {
+        buildTime = 400000,
+        cost = {
+            alloys = 100000,
+            energy = 1000000,
+        },
+        initial = {
+            alloys = 250,
+            energy = 2500,
+        },
+        production = {
+            alloys = 5,
+            energy = 50,
+        },
+        storage = {
+            alloys = 500,
+            energy = 5000,
+        },
+    },
+    footprint = {
+        x = 1.5,
+        y = 3.8,
+    },
+    general = {
+        class = {
+            "unitsDefaultEDA",
+            "EDACommander",
+        },
+        displayName = "Commander",
+        icon = {
+            shape = "bot2",
+            symbol = "direct",
+            tech = "t1",
+        },
+        iconUI = "tech1_bot2_direct.png",
+        iconUIBuildSortPriority = 1000,
+        iconUIType = "amphibious",
+        name = "",
+        orders = {
+            Assist = true,
+            Attack = true,
+            AttackMove = true,
+            Capture = true,
+            Harvest = true,
+            Move = true,
+            Patrol = true,
+            Pause = false,
+            Repair = true,
+            Stop = true,
+        },
+        threatByLayer = {
+            Air = 0,
+            Land = 271,
+            WaterSurface = 271,
+        },
+        toggles = {
+            Pause = false,
+        },
+        modelTpId = "uel0000",
+        tpId = "ual0001",
+        unitTypeName = "AscendantCommander",
+    },
+    intel = {
+        visionRadius = 20,
+    },
+    movement = {
+        acceleration = 1.8,
+        altitudeJitterFactor = 0,
+        bankFactor = 0,
+        collisionMaskDefault = {
+            "LandSmall",
+            "Sea",
+        },
+        collisionMaskSpawn = {
+            "LandSmall",
+            "Sea",
+        },
+        orbitRange = 0,
+        orbitSpeed = 0,
+        preferredAltitude = 0.35,
+        referenceAltitude = "GroundOrWater",
+        rotationSpeed = 90,
+        sortOrder = 1,
+        speed = 1.4,
+        terrainAlignmentFactor = 0,
+        type = "Hover",
+    },
+    tags = {
+        "ALLOYS_PRODUCTION",
+        "ALLOYS_STORAGE",
+        "ANTI_SURFACE",
+        "CAPTURE",
+        "COMMAND",
+        "CONSTRUCTION",
+        "DIRECT_FIRE",
+        "ECONOMIC",
+        "ASCENDANT",
+        "ENERGY_PRODUCTION",
+        "ENERGY_STORAGE",
+        "HARVEST",
+        "HOVER",
+        "LAND",
+        "MOBILE",
+        "TECH1",
+    },
+    visuals = {
+        display = {
+            mainBarDisplayScale = {
+                x = 0.5,
+                y = 0.5,
+            },
+            mainBarOffSet = {
+                x = 0,
+                y = 15,
+            },
+            progressBars = {
+                {
+                    colorBackground = {
+                        a = 1,
+                        x = 0,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorEmpty = {
+                        a = 1,
+                        x = 1,
+                        y = 0,
+                        z = 0,
+                    },
+                    colorFull = {
+                        a = 1,
+                        x = 0,
+                        y = 1,
+                        z = 0,
+                    },
+                    mainBar = true,
+                    name = "Health",
+                    property = "Health_Current",
+                    xOffset = 0,
+                    xScale = 1,
+                },
+            },
+            subBarDisplayScale = {
+                x = 1,
+                y = 1,
+            },
+            subBarOffSet = {
+                x = 0,
+                y = 0,
+            },
+        },
+        effectsInstant = {
+            onDeath = {
+                {
+                    audioName = "eda_unit_death_rdu",
+                    boneName = "Root",
+                    particleName = "VFX/Death/ved0301_death_rdu.sanvfx",
+                },
+            },
+        },
+        effectsPersistent = {
+            {
+                boneName = "Engine01_Left",
+                particleName = "VFX/Unit/veu4401_exhaust_aircraft_huge.sanvfx",
+            },
+            {
+                boneName = "Engine02_Left",
+                particleName = "VFX/Unit/veu4401_exhaust_aircraft_huge.sanvfx",
+            },
+            {
+                boneName = "Engine03_Left",
+                particleName = "VFX/Unit/veu4401_exhaust_aircraft_huge.sanvfx",
+            },
+            {
+                boneName = "Engine01_Right",
+                particleName = "VFX/Unit/veu4401_exhaust_aircraft_huge.sanvfx",
+            },
+            {
+                boneName = "Engine02_Right",
+                particleName = "VFX/Unit/veu4401_exhaust_aircraft_huge.sanvfx",
+            },
+            {
+                boneName = "Engine03_Right",
+                particleName = "VFX/Unit/veu4401_exhaust_aircraft_huge.sanvfx",
+            },
+        },
+        mesh = {
+            lod0distance = 88,
+            lod1distance = 230,
+        },
+        selection = {
+            size = {
+                x = 2.35,
+                y = 4.88,
+            },
+        },
+    },
+    weapons = {
+        {
+            aimControllers = {
+                {
+                    aimBone = "Turret01_Muzzle01",
+                    aimTolerance = 180,
+                    defaultPitchAdjustment = 0,
+                    leadTarget = false,
+                    pitchAxis = {
+                        x = 0,
+                        y = 0,
+                        z = -1,
+                    },
+                    pitchBone = "Turret01_Pitch01",
+                    pitchMax = 60,
+                    pitchMin = 30,
+                    pitchSpeed = 45,
+                    poseResetTime = 3,
+                    projectileSpeed = 25,
+                    solverType = "NoArc",
+                },
+                {
+                    aimBone = "Turret02_Muzzle01",
+                    aimTolerance = 180,
+                    defaultPitchAdjustment = 0,
+                    leadTarget = false,
+                    pitchAxis = {
+                        x = 0,
+                        y = 0,
+                        z = 1,
+                    },
+                    pitchBone = "Turret02_Pitch01",
+                    pitchMax = 60,
+                    pitchMin = 30,
+                    pitchSpeed = 45,
+                    poseResetTime = 3,
+                    projectileSpeed = 25,
+                    solverType = "NoArc",
+                },
+            },
+            audio = {
+                onFire = {
+                    looping = false,
+                    name = "aeom3120",
+                },
+            },
+            damage = 100,
+            damageRadius = 0,
+            damageType = "Normal",
+            effects = {
+                onFire = "VFX/Muzzle/vem2101_rocket_antitank_small_muzzle.sanvfx",
+            },
+            firingRandomness = 15,
+            layerTargetLimits = {
+                "Land",
+                "WaterSurface",
+            },
+            layerWeaponLimits = {
+                "Land",
+                "WaterSurface",
+            },
+            muzzleGroupChargeDelay = 0,
+            muzzleGroupTimeOut = -1,
+            muzzleGroups = {
+                {
+                    muzzles = {
+                        "Turret01_Muzzle01",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle02",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle01",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle02",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle03",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle04",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle03",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle04",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle05",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle06",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle05",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle06",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle07",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret01_Muzzle08",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle07",
+                    },
+                },
+                {
+                    muzzles = {
+                        "Turret02_Muzzle08",
+                    },
+                },
+            },
+            muzzleSalvoDelay = 0.2,
+            muzzleSalvoSize = 2,
+            projectileLifetime = 10,
+            projectileTemplate = "pei141",
+            rangeMax = 22,
+            rangeMin = 0,
+            rangeRingType = "DirectFire",
+            rangeTracking = 1.1,
+            reloadTime = 2,
+            targetWaterLimits = "Above",
+        },
+        {
+            category = "DeathExplosion",
+            damage = 5000,
+            damageFriendly = true,
+            damageRadius = 15,
+            damageType = "Normal",
+        },
+    },
+}

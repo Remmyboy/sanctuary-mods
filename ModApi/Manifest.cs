@@ -74,6 +74,9 @@ namespace Sanctuary.ModApi
         public string HostScript { get; internal set; } = "";
         /// The same, imported in every player's client (and in replays).
         public string ClientScript { get; internal set; } = "";
+        /// Factions the mod adds to the lobby's faction dropdown. See
+        /// <see cref="FactionDef"/>.
+        public IReadOnlyList<FactionDef> Factions { get; internal set; } = Array.Empty<FactionDef>();
 
         /// True when <see cref="GameVersion"/> is stated and the running
         /// game isn't that version.
@@ -149,6 +152,7 @@ namespace Sanctuary.ModApi
             if (m.GameVersion.Length > 40) m.GameVersion = m.GameVersion.Substring(0, 40);
             m.HostScript = ScriptPath(Str(o, "hostScript"), "hostScript", problems);
             m.ClientScript = ScriptPath(Str(o, "clientScript"), "clientScript", problems);
+            m.Factions = FactionDef.ParseAll(o["factions"], problems);
             return m;
         }
 

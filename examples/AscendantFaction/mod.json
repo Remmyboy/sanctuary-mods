@@ -2,11 +2,25 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.example.ascendant",
   "name": "Ascendant faction (proof of concept)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Sanctuary Mods",
-  "description": "A fourth faction, picked from the lobby's faction dropdown. It borrows EDA's models: commander, T1 engineer, land factory, alloy extractor, energy generator, a T1 raider and a heavier, slower T1 tank. Proves a new faction can be added by a mod; not balanced.",
+  "description": "A fourth faction, picked from the lobby's faction dropdown, with two commanders to choose from. It borrows EDA's models: commander, T1 engineer, land factory, alloy extractor, energy generator, a T1 raider and a heavier, slower T1 tank. Proves a new faction can be added by a mod with no C#; not balanced.",
   "kind": "gameplay",
   "gameVersion": "0.0.1.20",
   "luaRoot": "lua",
-  "apiVersion": 1
+  "apiVersion": 1,
+  "factions": [
+    {
+      "key": "ascendant",
+      "name": "Ascendant",
+      "tag": "ASCENDANT",
+      "unitPrefix": "ua",
+      "icon": "icons/ascendant.png",
+      "looksLike": "EDA",
+      "commanders": [
+        { "name": "Commander", "unit": "ual0000" },
+        { "name": "Warden", "unit": "ual0001" }
+      ]
+    }
+  ]
 }

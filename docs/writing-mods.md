@@ -17,8 +17,8 @@ that needs only a text editor. This page is the full reference.
 
 | | **UI mod** | **Gameplay mod** |
 | --- | --- | --- |
-| What it changes | Your own screen: HUD, hotkeys, camera, info | The match itself: units, rules, AI, maps' Lua |
-| Made of | A C# DLL | Lua and `.santp` files laid out like `LJ\lua`, optionally a DLL |
+| What it changes | Your own screen: HUD, hotkeys, camera, info | The match itself: units, factions, rules, AI, art |
+| Made of | A C# DLL | Lua and `.santp` files laid out like `LJ\lua`, `.sanpack` art packs, optionally a DLL |
 | Who switches it on | Each player, on the Mods page, any time (even mid-match) | The lobby host, in the lobby's **Mods** panel, before Start |
 | Other players need it? | No | Yes, byte-identical, or Start stays greyed out |
 | Hot reload | Rebuild and it reloads within a second, even mid-match | Lua: next match. DLL: reloads once the match ends |
@@ -62,8 +62,8 @@ There are five worked examples in [`examples/`](../examples):
 - **EngineersAndRaiders** is Lua only. Factories can build only engineers and
   raiders, with an option for which raiders. It shows how to change what can
   be built, in the menus and on the host (see [Recipes](#recipes)).
-- **AscendantFaction** is Lua plus C#. It adds a fourth faction, picked from
-  the lobby's faction dropdown, using EDA's models (see
+- **AscendantFaction** is Lua and a `mod.json`, no C#. It adds a fourth
+  faction with two commanders to pick from, using EDA's models (see
   [Add a faction](#add-a-faction)).
 - **ExampleUiMod** is C#. It shows which gameplay mods are live, binds
   settings that appear on the Mods page, and subscribes to match events.
@@ -80,6 +80,7 @@ SanctuaryMods\
         common\colors.lua   added to the end of common\colors.lua
       units\...\x.santp     replaces the game's file of that name
       fastertanks\util.lua  a new file: Import("fastertanks/util.lua")
+    packs\              gameplay mods: art, as .sanpack files (see Art packs)
 ```
 
 One folder is the whole mod. Players install it by copying the folder in and
@@ -121,14 +122,15 @@ file as you type and suggest the fields.
 | `options` | Settings the lobby host picks for a gameplay mod. See [Options](#options-let-the-host-tune-your-mod). |
 | `hostScript`, `clientScript` | Lua files of yours, relative to `luaRoot`, that the framework imports in the host's simulation and in every player's client when the mod is picked. See [Host scripts and match events](#host-scripts-and-match-events). |
 | `gameVersion` | The game version you made and tested the mod for, such as `"0.0.1.20"`, or a prefix such as `"0.0.1"`. On any other version the Mods page shows "made for game 0.0.1.20", so after a game update players can see which mods might need one too. The mod still loads either way. |
+| `factions` | Factions the mod adds to the lobby's faction dropdown. See [Add a faction](#add-a-faction). |
 
 A folder with no `mod.json` still works the way mods worked before
 manifests: its DLL is a UI mod, its Lua files are a gameplay mod whose id is
 the folder name, and `luaRoot` is the folder itself.
 
 **Same copy** means the same *content hash*. That is a SHA-256 over every
-overlaid file's path and bytes, the options' keys, types and ranges, and the
-DLLs of a gameplay mod. The rest of `mod.json` isn't part of it, so rewording
+overlaid file's path and bytes, every art pack, the options' keys, types and
+ranges, the factions, and the DLLs of a gameplay mod. The rest of `mod.json` isn't part of it, so rewording
 the description or an option's label doesn't make you incompatible. Anything
 else does, which is the point: two players whose Lua differs by one byte
 would desync.
@@ -403,51 +405,120 @@ can't collide with the game's files or another mod's.
 **Add new units.** Put each one at
 `lua\common\units\unitsTemplates\<id>\<id>.santp`. The game finds unit
 templates by scanning that folder, and the framework makes new folders visible
-to the scan. A new unit has no art of its own, so borrow an existing unit's
-with `general.modelTpId = "<its id>"`: the game builds the unit's model,
-skeleton and material from that id. For a building, you also need the
-placement-ghost and portrait appends from the faction example below. Without
-them a new building has no see-through preview, and every new unit shows the
-"coming soon" portrait, which some UI mods (SanctuaryHud) hide.
+to the scan. A new unit needs art: ship your own in an [art pack](#art-packs), or
+borrow an existing unit's with `general.modelTpId = "<its id>"`. With
+`modelTpId` the game builds the unit's model, skeleton and material from that
+id, and the framework makes the rest follow: the placement ghost, the
+portrait (unless your pack has one for the unit), the wreck, and the
+hierarchy maps capture needs.
 
 ### Add a faction
 
-[`examples/AscendantFaction`](../examples/AscendantFaction) is a working
-fourth faction, tested in a match: you pick it in the lobby, spawn its
-commander, build its factory, and the factory builds its tanks and raiders. It
-needs both halves of a mod:
+A faction is a `factions` entry in `mod.json` plus its units. No C# is
+needed. While the host has the mod picked, the faction is in every lobby
+row's faction dropdown, the AI can play it, and the match knows it.
 
-- **Lua.**
-  - Append a fourth entry to `FactionsData` in `common/systems/factions.lua`:
-    name, unit-id prefix, faction tag and starting unit. The lobby hands Lua
-    the faction's dropdown index + 1, and the game looks everything up from
-    that table.
-  - Give the faction its units, each tagged with the new faction tag. Their
-    build lists name it (`"Tags.ASCENDANT * Tags.BUILDABLE_BY_T1_FACTORY"`), so
-    the tech tree stays inside the faction.
-- **C#.** The game's C# knows exactly three factions, and the lobby fills its
-  faction dropdown with them by name. A gameplay DLL adds the fourth option.
-  The loader only runs it while the host has picked the mod, so the option
-  exists exactly when every player can make sense of it. Past the dropdown,
-  nothing needs changing: the choice travels as a number nobody range-checks.
+```json
+"factions": [
+  {
+    "key": "dycom",
+    "name": "Dycom",
+    "tag": "DYCOM",
+    "unitPrefix": "ud",
+    "icon": "icons/dycom.png",
+    "looksLike": "CHOSEN",
+    "commanders": [
+      { "name": "Spider", "unit": "udl0000" },
+      { "name": "Mech", "unit": "udl0001" }
+    ],
+    "ai": { "folder": "AI/mods/AI-Dycom", "air": false, "naval": false }
+  }
+]
+```
 
-`tools/make-templates.ps1` in the example generates the units from EDA's:
-- new ids
-- the new faction tag
-- EDA's models borrowed
-- EDA upgrade links cut
-- a few stat tweaks
+| Field | Meaning |
+| --- | --- |
+| `tag` | **Required.** The faction tag in every one of its units' `tags` list, like `"DYCOM"`. Build lists name it (`"Tags.DYCOM * Tags.BUILDABLE_BY_T1_FACTORY"`), so the tech tree stays inside the faction. |
+| `unitPrefix` | **Required.** The two letters its unit ids start with (`ud` for `udl0000`). |
+| `name` | Shown in the lobby. |
+| `key` | Your own name for it, for Lua and C# to find it by. Default: the tag in small letters. |
+| `commander` or `commanders` | The starting unit. With several, each is its own dropdown entry ("Dycom", "Dycom (Mech)"). The first is the faction's own entry. |
+| `icon` | A PNG in the mod folder, shown beside the name. |
+| `looksLike` | `EDA`, `CHOSEN` or `GUARD`. The game picks shield, build-beam, factory-platform and adjacency materials by those three factions' tags. Your units borrow this one's. Without it they get EDA's, and the game logs a line for each unit. |
+| `ai` | The AI your faction's AI armies play: a folder under your `lua\` laid out like the game's `AI\mods\AI-Sanctuary-Rush`, usually a copy of it. `air` and `naval` say which layers it may use (land is on unless you say `"land": false`). Leave `ai` out and the stock AI plays your faction. It picks units by role tags and your faction tag, so it works if your units carry the stock role tags. |
 
-Re-run it after a game update to pick up the devs' changes to those units.
+What the framework does with it:
 
-What a faction can't do (yet):
-- **Art:** no new models, textures, sounds or effects; they live in the game's
-  asset packs, not in Lua.
-- **AI:** the AI can't play it; it plans builds with the three factions'
-  unit-id prefixes.
-- **Materials:** shields, build beams and adjacency effects pick their
-  materials by the three factions' tags. A new faction falls back to EDA's, and
-  the game logs a "no faction tag" line for each unit.
+- **Numbering.** The game's three factions are lobby values 0 to 2. The
+  picked mods' factions come next, in the host's pick order, one value per
+  commander. Every player works out the same numbers from the same pick, so
+  two faction mods can be picked together. Lua sees the value + 1, as
+  always.
+- **FactionsData.** The framework adds an entry per commander to
+  `FactionsData` in `common/systems/factions.lua`. Each entry has `name`,
+  `tpLetter`, `tag` and `initialUnit`; a further commander's entry also has
+  `variantOf`. Don't add your own. Your Lua can look a faction up with
+  `Import("modapi/factions.lua").Find("<mod id>", "<key>").index`, or map
+  faction numbers to tags with `.TagsByIndex()`.
+- **The stock AI.** Its faction tables (`{[1] = "EDA", [2] = "CHOSEN",
+  [3] = "GUARD"}` in `AI\AIFunctions.lua` and each AI's
+  `AIPlatoonFunctions.lua`) are pointed at the full list. That includes a
+  copy of the AI in your own `lua\`.
+- **Seats.** When the host drops the mod, or a change of pick renumbers the
+  factions, players and AI on a modded faction move to its new number, or
+  back to EDA if it's gone.
+
+[`examples/AscendantFaction`](../examples/AscendantFaction) is a complete
+faction with two commanders, all in `mod.json` and Lua.
+`tools/make-templates.ps1` in the example generates its units from EDA's. It
+gives them new ids and the new faction tag, borrows EDA's models, cuts EDA's
+upgrade links and makes a few stat tweaks. Re-run it after a game update to
+pick up the devs' changes to those units.
+
+A faction mod written before `factions` existed, with its own DLL adding the
+dropdown entry and its own `FactionsData[4] = ...`, clashes with this: drop
+both and declare the faction instead.
+
+What a faction can't do (yet): **sounds**. The game loads its sound banks
+from their own files on disk, not from packs, so new units use the game's
+sounds.
+
+## Art packs
+
+Models, skeletons, animations, materials, textures, UI sprites and effects
+live in the game's `.sanpack` files: zips whose entries are paths such as
+`Units/udl0000/LOD0/udl0000_lod0.sanmodel` or
+`UI/Sprites/Icons/Units/udl0000.sansprite`. A gameplay mod can ship its own.
+Put them in a `packs\` folder beside `mod.json`:
+
+```
+SanctuaryMods\
+  Dycom\
+    mod.json
+    lua\...
+    packs\
+      Dycom.sanpack
+```
+
+- **When.** The packs go in while a match with the mod loads: at the host's
+  Start, as each client loads, and when a replay of such a match plays. They
+  come out when the match is over, before any other match loads. Nothing on
+  disk is touched, and the game's own packs are never edited.
+- **New and replaced files.** An entry with a new path adds art: a new unit
+  finds `Units/<its id>/...` and `UI/Sprites/Icons/Units/<its id>.sansprite`
+  there. An entry with the same path as one of the game's replaces the
+  game's for that match. If two picked mods have the same path, the one
+  picked later wins.
+- **Everyone needs the same packs.** The host's simulation reads unit meshes
+  and skeletons too. Packs are part of the content hash, so a player with a
+  different pack can't start.
+- **Making them.** A `.sanpack` is a zip (stored or deflated) with the game's
+  layout inside, which Blender exporters for the game can write. Keep a
+  unit's files under `Units/<id>/` exactly as the game's are.
+- **Iterating.** A pack is held open while its match runs. Rebuild it
+  between matches; the next match picks up the new one.
+- **Not from packs:** sounds (see above) and the game's startup files. A
+  pack can't change the main menu.
 
 ## Testing and debugging
 
@@ -459,8 +530,13 @@ What a faction can't do (yet):
   copy …" or "no mod support".
 - **Logs:**
   - `engine\BepInEx\LogOutput.log` shows what the framework did: `Sanctuary Mod API` lines for the
-    catalog, the overlay ("Lua overlay: 2 file(s) from …"), the pick and Start
-    refusals, and your mod's syntax errors ("doesn't compile …").
+    catalog, the overlay ("Lua overlay: 2 file(s) from …"), the factions and
+    their numbers ("Factions: Dycom = 3, …"), the art packs ("Art packs: 1
+    mounted …"), the pick and Start refusals, and your mod's syntax errors
+    ("doesn't compile …").
+  - The Mods page lists each mod's problems. That includes game Lua files it
+    replaces whole: each is one more file to update after a game patch, and
+    one more that another mod can't touch. An append usually does the job.
   - `%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary\Player.log`
     shows the game's own Lua errors: `HostLua` for the simulation, `ClientLua`
     for the UI, each with a stack trace naming the file and line. An appended
@@ -538,6 +614,11 @@ Lobby.SetSelection(ids)        // host only, before Start
 Lobby.SetOption(id, key, value) // host only, before Start; Lobby.ResetOptions(id)
 
 ModCatalog.Mods                // every mod folder, with manifest and content hash
+
+Factions.Current               // the picked mods' factions: Value, Label, Mod, Faction, Commander
+Factions.NameOf(value)         // "EDA", "Dycom (Mech)", ... for a lobby faction value
+Factions.ValueOf("bob.dycom", "dycom")  // a faction's lobby value, or -1
+Packs.Mounted                  // the art packs in the game's asset table right now
 ```
 
 `ModLua` is presentation-side: it runs in *your* client's VM only and never

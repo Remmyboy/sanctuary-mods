@@ -32,6 +32,11 @@ namespace Sanctuary.ModApi
         public int LuaCount { get; internal set; }
         public int SantpCount { get; internal set; }
         public IReadOnlyList<string> Dlls { get; internal set; } = Array.Empty<string>();
+        /// The mods art: .sanpack files under its packs\ folder, full paths.
+        public IReadOnlyList<string> Packs { get; internal set; } = Array.Empty<string>();
+        /// Unit ids whose portrait (UI/Sprites/Icons/Units/&lt;id&gt;.sansprite)
+        /// the mod's art packs bring.
+        public IReadOnlyList<string> PortraitIds { get; internal set; } = Array.Empty<string>();
 
         /// SHA-256 over what a match runs: every overlay file (path and
         /// bytes), the options' keys, types and ranges, and, for gameplay
@@ -302,14 +307,22 @@ namespace Sanctuary.ModApi
             foreach (var lib in dlls.Where(IsLibraryDll)) problems.Add($"{Path.GetFileName(lib)} is a library the game already has; ignored");
             info.Dlls = dlls.Where(d => !IsLibraryDll(d)).OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList();
 
+            // Art the host's simulation reads too (meshes, skeletons), so a
+            // pack makes the mod one the lobby picks and everyone must match.
+            info.Packs = ModApi.Packs.Find(dir, files);
+
             info.DllsAreGameplay = !manifest.KindUnset && manifest.Kind == ModKind.Gameplay;
-            info.Kind = info.DllsAreGameplay || overlay.Count > 0 ? ModKind.Gameplay : ModKind.Ui;
-            if (!manifest.KindUnset && manifest.Kind == ModKind.Ui && overlay.Count > 0)
-                problems.Add("kind is \"ui\" but the folder has Lua/.santp files: those can only be picked in a lobby, so the mod is listed as gameplay");
-            if (manifest.KindUnset && !manifest.Synthesised && overlay.Count > 0 && info.Dlls.Count > 0)
-                problems.Add("no kind given: the DLL stays a personal UI mod and only the Lua half is picked in the lobby");
-            if (info.Kind == ModKind.Gameplay && overlay.Count == 0 && info.Dlls.Count == 0)
-                problems.Add($"nothing to apply: no .lua or .santp under '{manifest.LuaRoot}' and no DLL");
+            var matchContent = overlay.Count > 0 || info.Packs.Count > 0 || manifest.Factions.Count > 0;
+            info.Kind = info.DllsAreGameplay || matchContent ? ModKind.Gameplay : ModKind.Ui;
+            if (!manifest.KindUnset && manifest.Kind == ModKind.Ui && matchContent)
+                problems.Add("kind is \"ui\" but the folder has Lua, .santp or .sanpack files: those can only be picked in a lobby, so the mod is listed as gameplay");
+            if (manifest.KindUnset && !manifest.Synthesised && matchContent && info.Dlls.Count > 0)
+                problems.Add("no kind given: the DLL stays a personal UI mod and only the Lua and art are picked in the lobby");
+            if (info.Kind == ModKind.Gameplay && !matchContent && info.Dlls.Count == 0)
+                problems.Add($"nothing to apply: no .lua or .santp under '{manifest.LuaRoot}', no .sanpack under '{ModApi.Packs.Folder}' and no DLL");
+            var strayPacks = files.Count(f => f.EndsWith(".sanpack", StringComparison.OrdinalIgnoreCase)) - info.Packs.Count;
+            if (strayPacks > 0)
+                problems.Add($"{strayPacks} .sanpack file(s) outside the '{ModApi.Packs.Folder}' folder are ignored; art packs go in {ModApi.Packs.Folder}\\");
             foreach (var (field, script) in new[] { ("hostScript", manifest.HostScript), ("clientScript", manifest.ClientScript) })
             {
                 if (script.Length == 0) continue;
@@ -324,6 +337,11 @@ namespace Sanctuary.ModApi
                 problems.Add("options only apply to gameplay mods (the lobby host picks them); a UI mod's settings go in Config.Bind");
             if (overlay.Any(r => r.Replace('\\', '/').StartsWith("modoptions/", StringComparison.OrdinalIgnoreCase)))
                 problems.Add("lua\\modoptions\\ is where the Mod API writes options files; files of yours there may be replaced");
+            if (overlay.Any(r => r.Replace('\\', '/').StartsWith("modapi/", StringComparison.OrdinalIgnoreCase)))
+                problems.Add("lua\\modapi\\ is where the Mod API writes its own files; files of yours there may be replaced");
+            CheckFactions(info, overlay, problems);
+            CheckReplacements(overlay, problems);
+            info.PortraitIds = ModApi.Packs.PortraitIds(info.Packs);
 
             info.ContentHash = HashContent(info);
             info.DeclaredId = manifest.Id;
@@ -334,28 +352,83 @@ namespace Sanctuary.ModApi
 
         private static bool IsAppendPath(string rel) => Overlay.IsAppend(rel, out _);
 
+        private static string GameLuaRoot => Path.Combine(Paths.GameRootPath, "LJ", "lua");
+
+        /// What a faction names has to exist: its commanders' templates, its
+        /// AI folder and its icon, in the mod or the game.
+        private static void CheckFactions(ModInfo info, List<string> overlay, List<string> problems)
+        {
+            if (info.Manifest.Factions.Count == 0) return;
+            var files = new HashSet<string>(overlay.Select(r => r.Replace('\\', '/').ToLowerInvariant()), StringComparer.Ordinal);
+            foreach (var f in info.Manifest.Factions)
+            {
+                foreach (var c in f.Commanders)
+                {
+                    var rel = $"common/units/unitsTemplates/{c.Unit}/{c.Unit}.santp";
+                    if (!files.Contains(rel.ToLowerInvariant()) && !File.Exists(Path.Combine(GameLuaRoot, rel)))
+                        problems.Add($"faction {f.Name}: commander {c.Unit} has no template (lua\\{rel.Replace('/', '\\')}); players picking it would start with nothing");
+                }
+                if (f.Ai != null)
+                {
+                    var prefix = f.Ai.Folder.ToLowerInvariant() + "/";
+                    if (!files.Any(r => r.StartsWith(prefix, StringComparison.Ordinal)) && !Directory.Exists(Path.Combine(GameLuaRoot, f.Ai.Folder)))
+                        problems.Add($"faction {f.Name}: ai folder '{f.Ai.Folder}' isn't in the mod's lua folder or the game's; its AI armies would do nothing");
+                }
+                if (f.Icon.Length > 0 && !File.Exists(Path.Combine(info.Folder, f.Icon)))
+                    problems.Add($"faction {f.Name}: icon '{f.Icon}' isn't in the mod folder; the lobby shows the name alone");
+            }
+        }
+
+        /// A mod that replaces the game's Lua files breaks on every game
+        /// update that touches them, and clashes with any other mod that
+        /// replaces them too. Worth saying, gently.
+        private static void CheckReplacements(List<string> overlay, List<string> problems)
+        {
+            var replaced = overlay
+                .Where(r => r.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) && !IsAppendPath(r))
+                .Where(r => File.Exists(Path.Combine(GameLuaRoot, r)))
+                .ToList();
+            if (replaced.Count == 0) return;
+            var names = string.Join(", ", replaced.Take(3).Select(r => r.Replace('\\', '/'))) + (replaced.Count > 3 ? $" and {replaced.Count - 3} more" : "");
+            problems.Add($"replaces {replaced.Count} of the game's Lua file(s) whole ({names}). An append (lua\\append\\<same path>) " +
+                         "keeps working after game updates and alongside other mods");
+        }
+
         private static string HashContent(ModInfo info)
         {
             if (info.Kind != ModKind.Gameplay) return "";
             using (var sha = SHA256.Create())
             {
+                var buffer = new byte[1 << 16];
                 void Add(string label, string path)
                 {
                     var head = Encoding.UTF8.GetBytes(label.Replace('\\', '/').ToLowerInvariant() + "\n");
                     sha.TransformBlock(head, 0, head.Length, null, 0);
-                    var bytes = File.ReadAllBytes(path);
-                    var len = BitConverter.GetBytes((long)bytes.Length);
-                    sha.TransformBlock(len, 0, len.Length, null, 0);
-                    sha.TransformBlock(bytes, 0, bytes.Length, null, 0);
+                    // Streamed: an art pack can run to hundreds of megabytes.
+                    using (var f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, buffer.Length))
+                    {
+                        var len = BitConverter.GetBytes(f.Length);
+                        sha.TransformBlock(len, 0, len.Length, null, 0);
+                        int n;
+                        while ((n = f.Read(buffer, 0, buffer.Length)) > 0) sha.TransformBlock(buffer, 0, n, null, 0);
+                    }
                 }
 
                 foreach (var rel in info.OverlayFiles) Add("lua:" + rel, Path.Combine(info.LuaRootPath, rel));
+                foreach (var pack in info.Packs) Add("pack:" + pack.Substring(info.Folder.Length).TrimStart('\\', '/'), pack);
                 // The options decide what the generated options file can
                 // say, so they're part of what the match runs. Only for mods
                 // that have options: other mods' hashes stay as they were.
                 if (info.Manifest.Options.Count > 0)
                 {
                     var sig = Encoding.UTF8.GetBytes("options\n" + string.Join("\n", info.Manifest.Options.Select(o => o.Signature())));
+                    sha.TransformBlock(sig, 0, sig.Length, null, 0);
+                }
+                // And the factions, which the framework writes into the
+                // match's Lua. Only for mods that have some.
+                if (info.Manifest.Factions.Count > 0)
+                {
+                    var sig = Encoding.UTF8.GetBytes("factions\n" + string.Join("\n", info.Manifest.Factions.Select(f => f.Signature())));
                     sha.TransformBlock(sig, 0, sig.Length, null, 0);
                 }
                 // So are the scripts the framework imports for it.
