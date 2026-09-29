@@ -18,7 +18,6 @@ never extracted, the Mods page says so at the top.
 UI MODS change only your own screen. Switch them on and off, and change
 their settings, on the Mods page (the cube icon in the menu's sidebar, or
 F8, also mid-match). Other players never see them and don't need them.
-"Play vanilla" at the top of the page switches them all off at once.
 
 GAMEPLAY MODS change the match itself, so everyone in the match must run
 exactly the same ones:

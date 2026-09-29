@@ -226,6 +226,14 @@ namespace Sanctuary.ModApi
                 var options = s.mods.Where(w => w.options != null && ModManifest.IsValidId(w.id))
                     .GroupBy(w => w.id).ToDictionary(g => g.Key, g => g.First().options, StringComparer.Ordinal);
                 Overlay.Apply(mods, options);
+                if (Overlay.Failed.Count > 0)
+                {
+                    var failed = string.Join(", ", Overlay.Failed.Select(m => m.Name));
+                    Overlay.Clear();
+                    error = "This replay's gameplay mods couldn't be applied: " + failed + " (see the log).";
+                    __result = false;
+                    return false;
+                }
                 if (!string.IsNullOrEmpty(s.luaHash) && Overlay.CurrentHash != s.luaHash)
                 {
                     Overlay.Clear();

@@ -137,10 +137,44 @@ namespace Sanctuary.ModApi
                 return true;
             }
 
-            RestoreAll();
-            _appliedToDict = cache;
+            // A mod that fails part-way (a file unreadable, say) would leave
+            // the files it had already written in the cache while not being
+            // counted as applied, and nothing would ever take them out again.
+            // So the cache is rebuilt without it: it holds exactly the mods
+            // that went on whole, and the ones that didn't are in Failed.
+            var failed = new List<ModInfo>();
             var files = 0;
             var applied = new List<ModInfo>();
+            while (true)
+            {
+                RestoreAll();
+                _appliedToDict = cache;
+                var attempt = mods.Where(m => !failed.Contains(m)).ToList();
+                var failedNow = TryApply(attempt, values, cache, out files);
+                if (failedNow.Count == 0) { applied = attempt; break; }
+                failed.AddRange(failedNow);
+            }
+            _failed = failed;
+            _applied = applied;
+            _appliedOptions = values.Where(kv => applied.Any(m => m.Id == kv.Key))
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            _currentHash = SafeHash();
+            var withOptions = values.Count == 0 ? "" :
+                " Options: " + string.Join("; ", values.Select(kv => kv.Key + " " + string.Join(", ", kv.Value.Select(o => o.Key + "=" + o.Value)))) + ".";
+            ModApiPlugin.Log.LogInfo(applied.Count == 0
+                ? $"Lua overlay: vanilla (hash {Short(_currentHash)})."
+                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.{withOptions}");
+            return true;
+        }
+
+        /// One pass of Apply over a restored cache: replacements, then the
+        /// framework and options files, then appends. Returns the mods that
+        /// threw part-way (their files are already in the cache).
+        private static List<ModInfo> TryApply(IList<ModInfo> mods, Dictionary<string, Dictionary<string, string>> values,
+            Dictionary<string, NativeArray<byte>> cache, out int files)
+        {
+            files = 0;
+            var failed = new List<ModInfo>();
             foreach (var appends in new[] { false, true })
             {
                 if (appends)
@@ -158,32 +192,33 @@ namespace Sanctuary.ModApi
                         catch (Exception e)
                         {
                             ModApiPlugin.Log.LogError($"Writing the options of '{mod.Name}' failed: {e.Message}");
+                            if (!failed.Contains(mod)) failed.Add(mod);
                         }
                     }
                 }
                 foreach (var mod in mods)
                 {
+                    if (failed.Contains(mod)) continue;
                     try
                     {
                         files += ApplyMod(mod, cache, appends);
-                        if (appends) applied.Add(mod);
                     }
                     catch (Exception e)
                     {
-                        ModApiPlugin.Log.LogError($"Applying gameplay mod '{mod.Name}' failed part-way: {e.Message}");
+                        ModApiPlugin.Log.LogError($"Applying gameplay mod '{mod.Name}' failed part-way, so it is left out: {e.Message}");
+                        failed.Add(mod);
                     }
                 }
             }
-            _applied = applied;
-            _appliedOptions = values;
-            _currentHash = SafeHash();
-            var withOptions = values.Count == 0 ? "" :
-                " Options: " + string.Join("; ", values.Select(kv => kv.Key + " " + string.Join(", ", kv.Value.Select(o => o.Key + "=" + o.Value)))) + ".";
-            ModApiPlugin.Log.LogInfo(applied.Count == 0
-                ? $"Lua overlay: vanilla (hash {Short(_currentHash)})."
-                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.{withOptions}");
-            return true;
+            return failed;
         }
+
+        private static List<ModInfo> _failed = new List<ModInfo>();
+
+        /// The mods the last Apply was asked for but couldn't put on whole
+        /// (an unreadable file, say; the log says which). They are left out
+        /// entirely, and are not in <see cref="Applied"/>.
+        public static IReadOnlyList<ModInfo> Failed => _failed;
 
         internal static void Clear()
         {

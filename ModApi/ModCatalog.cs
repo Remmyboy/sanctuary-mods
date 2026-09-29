@@ -47,6 +47,12 @@ namespace Sanctuary.ModApi
         public string LuaRootPath => Manifest.LuaRoot == "." ? Folder : Path.Combine(Folder, Manifest.LuaRoot);
 
         internal string Signature;
+        /// The id mod.json gave (or the folder's), before the catalog settles
+        /// a clash with another folder, and the problems found in the
+        /// folder's own files. The catalog works Id and Problems out from
+        /// these on every rescan.
+        internal string DeclaredId;
+        internal IReadOnlyList<string> ScanProblems = Array.Empty<string>();
 
         public override string ToString() => $"{Name} {Version} ({Id}, {ShortHash})";
     }
@@ -130,6 +136,10 @@ namespace Sanctuary.ModApi
             var old = _mods.ToDictionary(m => m.Folder, StringComparer.OrdinalIgnoreCase);
             var next = new List<ModInfo>();
             var notices = new List<string>();
+            // Notes that depend on the other folders, not on the mod's own
+            // files. Worked out afresh every pass, never added to the ModInfo
+            // Scan kept, so one goes away when its reason does.
+            var extra = new Dictionary<ModInfo, List<string>>();
             if (Directory.Exists(ModsRoot))
             {
                 foreach (var dir in Directory.EnumerateDirectories(ModsRoot))
@@ -156,8 +166,7 @@ namespace Sanctuary.ModApi
                             if (nested.Count == 1)
                             {
                                 var rel = inner.Substring(ModsRoot.Length).TrimStart('\\', '/');
-                                var note = $"installed one folder too deep ({rel}). It works, but moving '{Path.GetFileName(inner)}' straight into SanctuaryMods keeps things tidy";
-                                if (!info.Problems.Contains(note)) info.Problems = info.Problems.Concat(new[] { note }).ToList();
+                                AddNote(extra, info, $"installed one folder too deep ({rel}). It works, but moving '{Path.GetFileName(inner)}' straight into SanctuaryMods keeps things tidy");
                             }
                             next.Add(info);
                         }
@@ -188,24 +197,58 @@ namespace Sanctuary.ModApi
             var noticesChanged = !notices.SequenceEqual(_notices);
             _notices = notices;
 
-            // Two folders claiming one id would make the lobby ambiguous;
-            // the second keeps its folder name.
-            var seen = new HashSet<string>(StringComparer.Ordinal);
+            // Two folders claiming one id would make the lobby ambiguous: the
+            // first by folder name keeps it, the next takes its folder name
+            // (or the id plus a code made from the folder name). Only names
+            // go into it, never the install path, so two players whose
+            // folders are named alike end up with the same ids.
+            var ids = new Dictionary<ModInfo, string>();
+            var seen = new HashSet<string>(next.Select(m => m.DeclaredId), StringComparer.Ordinal);
+            var claimed = new HashSet<string>(StringComparer.Ordinal);
             foreach (var m in next.OrderBy(m => m.FolderName, StringComparer.OrdinalIgnoreCase))
             {
-                if (seen.Add(m.Id)) continue;
-                var clash = $"id '{m.Id}' is already used by another folder";
-                if (!m.Problems.Contains(clash)) m.Problems = m.Problems.Concat(new[] { clash }).ToList();
+                if (claimed.Add(m.DeclaredId)) { ids[m] = m.DeclaredId; continue; }
+                AddNote(extra, m, $"id '{m.DeclaredId}' is already used by another folder");
                 var alt = m.FolderName.ToLowerInvariant();
-                m.Manifest.Id = ModManifest.IsValidId(alt) && seen.Add(alt) ? alt : m.Id + "-" + Math.Abs(m.Folder.GetHashCode());
+                if (!ModManifest.IsValidId(alt) || seen.Contains(alt) || !claimed.Add(alt))
+                {
+                    var stem = m.DeclaredId.Length > 55 ? m.DeclaredId.Substring(0, 55) : m.DeclaredId;
+                    alt = stem + "-" + ShortCode(m.FolderName.ToLowerInvariant());
+                    claimed.Add(alt);
+                }
+                ids[m] = alt;
+            }
+
+            // Kept entries take this pass's id and notes; a change to either
+            // counts as a change, so screens showing them redraw.
+            var relabelled = false;
+            foreach (var m in next)
+            {
+                var id = ids[m];
+                var problems = extra.TryGetValue(m, out var more) ? m.ScanProblems.Concat(more).ToList() : m.ScanProblems;
+                if (m.Manifest.Id != id) { m.Manifest.Id = id; relabelled = true; }
+                if (!m.Problems.SequenceEqual(problems)) { m.Problems = problems; relabelled = true; }
             }
 
             next.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-            var changed = noticesChanged || next.Count != _mods.Count ||
+            var changed = noticesChanged || relabelled || next.Count != _mods.Count ||
                           next.Any(m => !old.TryGetValue(m.Folder, out var was) || !ReferenceEquals(was, m));
             _mods = next;
             if (changed) _version++;
             return changed;
+        }
+
+        private static void AddNote(Dictionary<ModInfo, List<string>> extra, ModInfo m, string note)
+        {
+            if (!extra.TryGetValue(m, out var list)) extra[m] = list = new List<string>();
+            if (!list.Contains(note)) list.Add(note);
+        }
+
+        /// Eight hex digits that stand for a name the same way on every machine.
+        private static string ShortCode(string s)
+        {
+            using (var sha = SHA256.Create())
+                return string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(s)).Take(4).Select(b => b.ToString("x2")));
         }
 
         private static ModInfo Scan(string dir, Dictionary<string, ModInfo> old)
@@ -283,6 +326,8 @@ namespace Sanctuary.ModApi
                 problems.Add("lua\\modoptions\\ is where the Mod API writes options files; files of yours there may be replaced");
 
             info.ContentHash = HashContent(info);
+            info.DeclaredId = manifest.Id;
+            info.ScanProblems = problems;
             info.Problems = problems;
             return info;
         }

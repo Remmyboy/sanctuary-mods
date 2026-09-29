@@ -102,8 +102,8 @@ namespace Sanctuary.ModApi
                 Description = Str(o, "description") ?? "",
                 LuaRoot = Str(o, "luaRoot") ?? "lua",
                 Url = Str(o, "url") ?? "",
-                ApiVersion = (int?)o["apiVersion"] ?? 1,
             };
+            m.ApiVersion = ApiMajor(o["apiVersion"], problems);
 
             if (!IsValidId(m.Id))
             {
@@ -172,6 +172,20 @@ namespace Sanctuary.ModApi
                 return "";
             }
             return p;
+        }
+
+        /// The API major version from "apiVersion": 1, 1.2, "1" or "1.2.0"
+        /// all mean 1. Anything else is noted and taken as 1, rather than
+        /// throwing and losing the whole mod.json over one field.
+        private static int ApiMajor(JToken t, List<string> problems)
+        {
+            if (t == null || t.Type == JTokenType.Null) return 1;
+            var text = (t.Type == JTokenType.String ? (string)t : t.ToString(Formatting.None)).Trim().TrimStart('v', 'V');
+            var major = text.Split('.')[0];
+            if (int.TryParse(major, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var v) && v >= 1)
+                return v;
+            problems.Add($"mod.json: apiVersion '{t}' isn't a version number; taken as 1");
+            return 1;
         }
 
         /// kind was missing or unknown: the catalog decides from the files.

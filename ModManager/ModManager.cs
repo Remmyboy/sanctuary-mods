@@ -39,7 +39,6 @@ namespace SanctuaryHud
 
         // ---- what the menu page reads and drives ---------------------------
         internal IReadOnlyList<PluginEntry> Plugins => _plugins;
-        internal bool VanillaMode => _cfgVanillaMode.Value;
 
         internal void Rescan()
         {
@@ -85,7 +84,6 @@ namespace SanctuaryHud
         private readonly List<PluginEntry> _plugins = new List<PluginEntry>();
 
         private ConfigEntry<string> _cfgDisabledPlugins;
-        private ConfigEntry<bool> _cfgVanillaMode;
         private float _pluginScanAccum = 999f; // scan on the first Update
 
         private ConfigEntry<KeyCode> _cfgToggleKey;
@@ -102,27 +100,25 @@ namespace SanctuaryHud
             _cfgDisabledPlugins = Config.Bind("Plugins", "Disabled", "",
                 "Semicolon-separated GUIDs of C# plugins switched off on the Mods page. ModLoader 1.3+ never starts " +
                 "these; an older loader starts them and the manager stops them straight away.");
-            _cfgVanillaMode = Config.Bind("Plugins", "VanillaMode", false,
-                "Play vanilla: every UI mod is held back, as if none were installed. Gameplay mods are always " +
-                "the lobby host's choice. Your per-mod switches are kept for when this goes off.");
             MigrateLuaMods();
 
             _page = new ModsPage(this, _log);
             _log.LogInfo($"Mod manager ready: {ModCatalog.Mods.Count} mod folder(s) in {ModCatalog.ModsRoot}. " +
-                         $"Mods is in the front menu's sidebar ({_cfgToggleKey.Value} also opens it) and in the lobby." +
-                         (VanillaMode ? " Playing vanilla: UI mods are held back." : ""));
+                         $"Mods is in the front menu's sidebar ({_cfgToggleKey.Value} also opens it) and in the lobby.");
         }
 
         /// Before 0.7 Lua mods were switched on globally from this page
         /// ([Mods] Enabled = folder;folder), which kept a player out of every
         /// vanilla lobby. Gameplay mods are the lobby host's pick now, and
-        /// every lobby starts with none, so the old list just goes.
+        /// every lobby starts with none, so the old list just goes. So does
+        /// [Plugins] VanillaMode, a switch the 0.7 test builds had.
         private void MigrateLuaMods()
         {
             var old = Config.Bind("Mods", "Enabled", "", "");
             if (!string.IsNullOrWhiteSpace(old.Value))
                 _log.LogInfo($"Lua mods switched on before 0.7 ({old.Value}) are now picked per lobby by the host, in the lobby's Mods panel.");
             Config.Remove(old.Definition);
+            Config.Remove(Config.Bind("Plugins", "VanillaMode", false, "").Definition);
             Config.Save();
         }
 
@@ -137,21 +133,6 @@ namespace SanctuaryHud
         internal void ToggleUi()
         {
             if (_page != null && _page.CanOpen) _page.Toggle();
-        }
-
-        // ---- vanilla mode -------------------------------------------------
-
-        internal void SetVanillaMode(bool on)
-        {
-            if (_cfgVanillaMode.Value == on) return;
-            _cfgVanillaMode.Value = on;
-            var disabled = DisabledGuids();
-            foreach (var p in _plugins.ToList())
-            {
-                if (on) SetPluginEnabled(p, false, persist: false);
-                else if (!disabled.Contains(p.Guid)) SetPluginEnabled(p, true, persist: false);
-            }
-            _log.LogInfo(on ? "Playing vanilla: every UI mod stopped." : "Vanilla off: UI mods back as they were.");
         }
 
         // ---- C# plugin load/unload ----------------------------------------
@@ -196,7 +177,7 @@ namespace SanctuaryHud
                 entry.Instance = comp;
                 entry.SwitchedOff = false;
                 if (comp.Config != null) entry.Config = comp.Config;
-                if (applyDisabled && (VanillaMode || disabled.Contains(entry.Guid))) SetPluginEnabled(entry, false, persist: false);
+                if (applyDisabled && disabled.Contains(entry.Guid)) SetPluginEnabled(entry, false, persist: false);
             }
 
             // An entry nothing vouched for this pass is gone. The registry is
@@ -285,8 +266,6 @@ namespace SanctuaryHud
                     .Concat(_plugins.Where(p => !p.Enabled).Select(p => p.Guid))
                     .Distinct(StringComparer.OrdinalIgnoreCase);
                 _cfgDisabledPlugins.Value = string.Join(";", off);
-                // Switching a mod on by hand ends vanilla mode.
-                if (enable && VanillaMode) _cfgVanillaMode.Value = false;
             }
         }
 

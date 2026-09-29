@@ -271,7 +271,7 @@ namespace SanctuaryHud
         }
 
         private string PluginSignature() =>
-            (_owner.VanillaMode ? "V|" : "") + string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-"))) +
+            string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-"))) +
             "|" + string.Join("|", Sanctuary.ModApi.ModCatalog.Notices);
 
         // ---- construction ---------------------------------------------------
@@ -1106,15 +1106,6 @@ namespace SanctuaryHud
             _pluginGroups.Clear();
             _sectionLabels.Clear();
 
-            DescribeNext("Play vanilla",
-                "Every UI mod off at once, as if none were installed; switch it off again and they come back as you had them. " +
-                "Gameplay mods are always the lobby host's choice.");
-            SwitchRow(_uiList, "Play vanilla   <alpha=#80>every UI mod off", _owner.VanillaMode, true, on =>
-            {
-                _owner.SetVanillaMode(on);
-                RebuildUiTab();
-            });
-            Line(_uiList);
             InstallNotices(_uiList);
 
             if (_owner.Plugins.Count == 0)

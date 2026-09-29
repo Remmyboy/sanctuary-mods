@@ -70,7 +70,7 @@ namespace SanctuaryModLoader
             "Mono.Cecil.dll", "MonoMod.Utils.dll", "MonoMod.RuntimeDetour.dll", "Newtonsoft.Json.dll",
         };
 
-        private static readonly Regex GameplayKind = new Regex("\"kind\"\\s*:\\s*\"gameplay\"", RegexOptions.IgnoreCase);
+        private static readonly Regex GameplayKind = new Regex("\"kind\"\\s*:\\s*\"\\s*gameplay\\s*\"", RegexOptions.IgnoreCase);
 
         private static LoaderPlugin _instance;
 
@@ -131,24 +131,32 @@ namespace SanctuaryModLoader
                    LibraryDlls.Any(l => string.Equals(l, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// The mod folder a DLL belongs to: the nearest folder above it with
-        /// a mod.json (a DLL in bin\, a mod extracted inside a folder of its
-        /// own, one of a pack), else the top-level folder under SanctuaryMods
-        /// it sits in, or the root for a loose DLL. The Mod API's catalog
-        /// finds mods the same way.
+        /// The mod folder a DLL belongs to, found exactly as the Mod API's
+        /// catalog finds mods, or the two would disagree about which folder
+        /// the lobby picked: the top-level folder under SanctuaryMods when it
+        /// has a mod.json; else the outermost folder with a mod.json up to
+        /// three levels inside it, on the way down to the DLL (a mod extracted
+        /// inside a folder of its own, one of a pack); else the top-level
+        /// folder. The root itself for a loose DLL.
         private string ModFolderOf(string dllPath)
         {
-            var root = Path.GetFullPath(_modsDir).TrimEnd('\\', '/');
-            var dir = Path.GetDirectoryName(Path.GetFullPath(dllPath));
+            var full = Path.GetFullPath(dllPath);
+            var parts = full.Substring(_modsDir.Length).TrimStart('\\', '/').Split('\\', '/');
+            if (parts.Length < 2) return _modsDir;
+            var top = Path.Combine(_modsDir, parts[0]);
             try
             {
-                for (var d = dir; d != null && d.Length > root.Length; d = Path.GetDirectoryName(d))
-                    if (File.Exists(Path.Combine(d, "mod.json"))) return d.TrimEnd('\\', '/');
+                if (File.Exists(Path.Combine(top, "mod.json"))) return top;
+                var d = top;
+                for (var depth = 1; depth <= 3 && depth < parts.Length - 1; depth++)
+                {
+                    if (parts[depth].StartsWith(".")) break;
+                    d = Path.Combine(d, parts[depth]);
+                    if (File.Exists(Path.Combine(d, "mod.json"))) return d;
+                }
             }
             catch { }
-            var rel = dllPath.Substring(_modsDir.Length).TrimStart('\\', '/');
-            var slash = rel.IndexOfAny(new[] { '\\', '/' });
-            return Path.GetFullPath(slash < 0 ? _modsDir : Path.Combine(_modsDir, rel.Substring(0, slash))).TrimEnd('\\', '/');
+            return top;
         }
 
         private bool IsGameplayDll(string dllPath)
@@ -208,9 +216,8 @@ namespace SanctuaryModLoader
             }
             if (loaded.Count == 0) return;
 
-            var vanilla = false;
             var heldBack = ManagerListsHeldBackPlugins()
-                ? ReadDisabledGuids(out vanilla)
+                ? ReadDisabledGuids()
                 : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var path in loaded)
             {
@@ -224,12 +231,12 @@ namespace SanctuaryModLoader
                         if (_activeGameplayFolders.Contains(ModFolderOf(plugin.Path)) && StartPlugin(plugin)) started++;
                         else waiting.Add(plugin.Name);
                     }
-                    else if (vanilla || heldBack.Contains(plugin.Guid)) held.Add(plugin.Name);
+                    else if (heldBack.Contains(plugin.Guid)) held.Add(plugin.Name);
                     else if (StartPlugin(plugin)) started++;
                 }
                 var copies = _loadCounts[path];
                 Logger.LogInfo($"Hot-loaded {started} plugin(s) from {Path.GetFileName(path)} (built {_loadedStamps[path]:HH:mm:ss} UTC)" +
-                               (held.Count > 0 ? $"; held back {string.Join(", ", held)}, " + (vanilla ? "playing vanilla" : "switched off on the Mods page") : "") +
+                               (held.Count > 0 ? $"; held back {string.Join(", ", held)}, switched off on the Mods page" : "") +
                                (waiting.Count > 0 ? $"; {string.Join(", ", waiting)} is a gameplay mod and starts when a lobby host picks it" : "") +
                                (copies > 1
                                    ? $". Copy {copies} of this assembly this session: earlier copies can't be unloaded and stay in memory until the game exits."
@@ -349,13 +356,11 @@ namespace SanctuaryModLoader
                 p.Type.GetField("ListsLoaderRegistry", BindingFlags.Public | BindingFlags.Static) != null);
 
         // The Mods page's switched-off list, straight from the manager's config
-        // file ([Plugins] Disabled = guid;guid, and VanillaMode = true to hold
-        // back every UI mod). Read on every pass, so a change made on the page
-        // applies to the next load. The loader and the manager are never held
-        // back, or nothing could undo it.
-        private HashSet<string> ReadDisabledGuids(out bool vanilla)
+        // file ([Plugins] Disabled = guid;guid). Read on every pass, so a change
+        // made on the page applies to the next load. The loader and the manager
+        // are never held back, or nothing could undo it.
+        private HashSet<string> ReadDisabledGuids()
         {
-            vanilla = false;
             var guids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var path = Path.Combine(Paths.ConfigPath, ManagerGuid + ".cfg");
             try
@@ -372,16 +377,8 @@ namespace SanctuaryModLoader
                     }
                     if (line.StartsWith("#") || !string.Equals(section, "Plugins", StringComparison.OrdinalIgnoreCase)) continue;
                     var eq = line.IndexOf('=');
-                    if (eq <= 0) continue;
-                    var key = line.Substring(0, eq).Trim();
-                    var value = line.Substring(eq + 1).Trim();
-                    if (string.Equals(key, "VanillaMode", StringComparison.OrdinalIgnoreCase))
-                    {
-                        vanilla = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
-                        continue;
-                    }
-                    if (!string.Equals(key, "Disabled", StringComparison.OrdinalIgnoreCase)) continue;
-                    foreach (var guid in value.Split(';'))
+                    if (eq <= 0 || !string.Equals(line.Substring(0, eq).Trim(), "Disabled", StringComparison.OrdinalIgnoreCase)) continue;
+                    foreach (var guid in line.Substring(eq + 1).Split(';'))
                     {
                         if (guid.Trim().Length > 0) guids.Add(guid.Trim());
                     }
@@ -391,7 +388,6 @@ namespace SanctuaryModLoader
             {
                 Logger.LogWarning($"Couldn't read the Mods page's disabled list ({e.Message}); starting every plugin.");
                 guids.Clear();
-                vanilla = false;
             }
             guids.Remove(LoaderGuid);
             guids.Remove(ManagerGuid);

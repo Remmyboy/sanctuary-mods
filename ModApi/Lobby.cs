@@ -113,39 +113,68 @@ namespace Sanctuary.ModApi
 
         /// The selection, as sent by the host (or held by it). Empty outside
         /// a lobby.
+        // Screens read Selection and the status every frame; both are worked
+        // out again only when something they come from has changed.
+        private static IReadOnlyList<SelectedMod> _selectionCache;
+        private static string _selectionKey;
+        private static StatusMsg _statusCache;
+        private static IReadOnlyList<PlayerModStatus> _playersCache;
+        private static StatusMsg _playersFrom;
+
         public static IReadOnlyList<SelectedMod> Selection
         {
             get
             {
                 if (!InLobby) return Array.Empty<SelectedMod>();
-                if (IsHost)
+                // Everything the list is made from bumps the change counter
+                // (the pick, option values, the host's message) or the
+                // catalog's version.
+                var key = $"{IsHost}|{_changeCounter}|{ModCatalog.Version}";
+                if (_selectionCache != null && key == _selectionKey) return _selectionCache;
+                _selectionKey = key;
+                return _selectionCache = BuildSelection();
+            }
+        }
+
+        private static IReadOnlyList<SelectedMod> BuildSelection()
+        {
+            if (IsHost)
+            {
+                return _selection.Select(id =>
                 {
-                    return _selection.Select(id =>
-                    {
-                        var m = ModCatalog.Find(id);
-                        return new SelectedMod
-                        {
-                            Id = id, Name = m?.Name ?? id, Version = m?.Version ?? "", ContentHash = m?.ContentHash ?? "",
-                            Url = m?.Manifest.Url ?? "", Local = m,
-                            Options = m == null ? new Dictionary<string, string>() : HostValues(m),
-                        };
-                    }).ToList();
-                }
-                if (_received == null) return Array.Empty<SelectedMod>();
-                return _received.mods.Select(w =>
-                {
-                    var local = ModCatalog.Find(w.id);
-                    var same = local != null && local.ContentHash == w.hash;
+                    var m = ModCatalog.Find(id);
                     return new SelectedMod
                     {
-                        Id = w.id, Name = w.name, Version = w.version, ContentHash = w.hash, Url = w.url,
-                        Local = same ? local : null, LocalDifferent = same ? null : local,
-                        Options = same ? OptionValues.Complete(local, w.options)
-                            : (IReadOnlyDictionary<string, string>)(w.options ?? new Dictionary<string, string>()),
+                        Id = id, Name = m?.Name ?? id, Version = m?.Version ?? "", ContentHash = m?.ContentHash ?? "",
+                        Url = m?.Manifest.Url ?? "", Local = m,
+                        Options = m == null ? new Dictionary<string, string>() : new Dictionary<string, string>(HostValues(m)),
                     };
                 }).ToList();
             }
+            if (_received == null) return Array.Empty<SelectedMod>();
+            return _received.mods.Select(w =>
+            {
+                var local = ModCatalog.Find(w.id);
+                var same = local != null && local.ContentHash == w.hash;
+                return new SelectedMod
+                {
+                    Id = w.id, Name = w.name, Version = w.version, ContentHash = w.hash, Url = w.url,
+                    Local = same ? local : null, LocalDifferent = same ? null : local,
+                    Options = same ? OptionValues.Complete(local, w.options)
+                        : (IReadOnlyDictionary<string, string>)(w.options ?? new Dictionary<string, string>()),
+                };
+            }).ToList();
         }
+
+        /// The host's status as it stands: the last one worked out, unless
+        /// something has changed since (which always sets _statusDirty).
+        private static StatusMsg HostStatus()
+        {
+            if (_statusDirty || _statusCache == null) _statusCache = BuildStatus();
+            return _statusCache;
+        }
+
+        private static StatusMsg CurrentStatus() => IsHost ? HostStatus() : _status;
 
         /// Everyone's state against the selection, as the host last worked
         /// it out.
@@ -153,9 +182,11 @@ namespace Sanctuary.ModApi
         {
             get
             {
-                var s = IsHost ? BuildStatus() : _status;
+                var s = CurrentStatus();
                 if (s == null) return Array.Empty<PlayerModStatus>();
-                return s.players.Select(p => new PlayerModStatus
+                if (ReferenceEquals(s, _playersFrom) && _playersCache != null) return _playersCache;
+                _playersFrom = s;
+                return _playersCache = s.players.Select(p => new PlayerModStatus
                 {
                     PlayerId = ulong.TryParse(p.id, out var v) ? v : 0,
                     Name = p.name,
@@ -175,7 +206,7 @@ namespace Sanctuary.ModApi
             get
             {
                 if (!InLobby) return null;
-                var s = IsHost ? BuildStatus() : _status;
+                var s = CurrentStatus();
                 return s == null || s.ready ? null : s.reason;
             }
         }
@@ -188,7 +219,7 @@ namespace Sanctuary.ModApi
             get
             {
                 if (!InLobby) return false;
-                var s = IsHost ? BuildStatus() : _status;
+                var s = CurrentStatus();
                 return s != null && !s.ready && s.settling;
             }
         }
@@ -312,6 +343,12 @@ namespace Sanctuary.ModApi
             _abortPending = false;
             _startQueuedAt = -1f;
             _startButtonTouched = false;
+            _joinedAt.Clear();
+            _graceCheckAt = -1f;
+            _statusCache = null;
+            _selectionCache = null;
+            _playersCache = null;
+            _playersFrom = null;
             _changeCounter++;
         }
 
@@ -376,12 +413,29 @@ namespace Sanctuary.ModApi
                     var present = new HashSet<ulong>(Humans().Select(p => p.id.value));
                     foreach (var gone in _reports.Keys.Where(k => !present.Contains(k)).ToList()) _reports.Remove(gone);
                     _hellos.RemoveWhere(h => !present.Contains(h));
+                    foreach (var gone in _joinedAt.Keys.Where(k => !present.Contains(k)).ToList()) _joinedAt.Remove(gone);
+                    var now = UnityEngine.Time.unscaledTime;
+                    foreach (var id in present)
+                    {
+                        if (_joinedAt.ContainsKey(id)) continue;
+                        _joinedAt[id] = now;
+                        if (_graceCheckAt < 0f || now + HelloGrace < _graceCheckAt) _graceCheckAt = now + HelloGrace;
+                    }
+                    _statusDirty = true;
+                }
+                // A joiner's time to say hello ran out: they now read as
+                // having no mod support, if they still haven't.
+                if (_graceCheckAt >= 0f && UnityEngine.Time.unscaledTime >= _graceCheckAt)
+                {
+                    var now = UnityEngine.Time.unscaledTime;
+                    var later = _joinedAt.Values.Select(t => t + HelloGrace).Where(t => t > now).ToList();
+                    _graceCheckAt = later.Count > 0 ? later.Min() : -1f;
                     _statusDirty = true;
                 }
                 if (_statusDirty)
                 {
                     _statusDirty = false;
-                    var status = BuildStatus();
+                    var status = _statusCache = BuildStatus();
                     LobbyProtocol.Broadcast(LobbyProtocol.Status, status);
                     RefreshStartButton();
                     _changeCounter++;
@@ -407,6 +461,13 @@ namespace Sanctuary.ModApi
             _optionsPending = false;
             var options = HostOptions();
             Overlay.Apply(_hostResolved, options);
+            // A picked mod the host couldn't put on whole: the match would run
+            // without it here and with it everywhere else.
+            if (Overlay.Failed.Count > 0)
+            {
+                var failed = $"{Names(Overlay.Failed)} couldn't be applied on the host (see its log)";
+                _hostSelectionProblem = _hostSelectionProblem == null ? failed : _hostSelectionProblem + "; " + failed;
+            }
             // Next time this player hosts, the mods start as they were left.
             foreach (var kv in options) ModApiPlugin.RememberOptions(kv.Key, kv.Value);
             LoaderBridge.SetActiveGameplayFolders(_hostResolved.Where(m => m.DllsAreGameplay).Select(m => m.Folder).ToArray());
@@ -470,8 +531,21 @@ namespace Sanctuary.ModApi
             return state.players.Where(p => p.type == PlayerType.Player || p.type == PlayerType.Observer);
         }
 
+        // Names and seat types too: the status shows both, and is only
+        // worked out again when something in it has changed.
         private static string RosterSignature() =>
-            string.Join(",", Humans().Select(p => p.id.value.ToString()));
+            string.Join(",", Humans().Select(p => p.id.value + ":" + (int)p.type + ":" + p.name));
+
+        // A player who has just joined gets this long to say hello (their
+        // client does on its first lobby state) before they count as having
+        // no mod support. Until then they are only "checking", so a Start
+        // pressed that moment waits for them rather than failing.
+        private const float HelloGrace = 3f;
+        private static readonly Dictionary<ulong, float> _joinedAt = new Dictionary<ulong, float>();
+        private static float _graceCheckAt = -1f;
+
+        private static bool JustJoined(ulong id) =>
+            _joinedAt.TryGetValue(id, out var t) && UnityEngine.Time.unscaledTime - t < HelloGrace;
 
         private static StatusMsg BuildStatus()
         {
@@ -488,7 +562,13 @@ namespace Sanctuary.ModApi
             {
                 var row = new PlayerStatusMsg { id = p.id.value.ToString(), name = Cap(p.name, 64) };
                 _reports.TryGetValue(p.id.value, out var report);
-                if (!_hellos.Contains(p.id.value) && report == null)
+                if (!_hellos.Contains(p.id.value) && report == null && selectionActive && JustJoined(p.id.value))
+                {
+                    row.state = "pending";
+                    row.detail = "checking…";
+                    reasons.Add($"{row.name}: still checking mods");
+                }
+                else if (!_hellos.Contains(p.id.value) && report == null)
                 {
                     row.state = "vanilla";
                     row.detail = "no mod support installed";
@@ -507,6 +587,7 @@ namespace Sanctuary.ModApi
                     {
                         var r = report.mods.FirstOrDefault(x => x.id == m.Id);
                         if (r == null || r.state == "missing") problems.Add($"missing {m.Name} {m.Version}".TrimEnd());
+                        else if (r.state == "failed") problems.Add($"couldn't apply {m.Name} (see their log)");
                         else if (r.state != "ok" || r.hash != m.ContentHash)
                             problems.Add(string.IsNullOrEmpty(r.version) || r.version == m.Version
                                 ? $"has a different copy of {m.Name}"
@@ -544,11 +625,11 @@ namespace Sanctuary.ModApi
         private static string Names(IEnumerable<ModInfo> mods) => string.Join(", ", mods.Select(m => m.Name));
 
         /// For the patches: may the host start the match now?
-        internal static bool GateOpen(out string reason)
+        internal static bool GateOpen(out string reason, bool fresh = false)
         {
             reason = null;
             if (!_hostSession) return true;
-            var s = BuildStatus();
+            var s = fresh ? BuildStatus() : HostStatus();
             reason = s.reason;
             return s.ready;
         }
@@ -565,7 +646,7 @@ namespace Sanctuary.ModApi
                 reason = "Gameplay mod options changed a moment ago; press Start again once everyone has them.";
                 return false;
             }
-            if (!GateOpen(out reason)) return false;
+            if (!GateOpen(out reason, fresh: true)) return false;
             var applied = Overlay.Applied;
             if (applied.Count != _hostResolved.Count || applied.Where((m, i) => !ReferenceEquals(m, _hostResolved[i])).Any() ||
                 _hostResolved.Any(m => m.Manifest.Options.Count > 0 &&
@@ -734,6 +815,18 @@ namespace Sanctuary.ModApi
             if (!LobbyManager.isHostRunning && !MatchUnderway)
             {
                 Overlay.Apply(complete ? resolved : new List<ModInfo>(), options);
+                if (Overlay.Failed.Count > 0)
+                {
+                    // Part of the pick is no better than none: back to vanilla,
+                    // and the host is told which mod wouldn't go on.
+                    foreach (var f in Overlay.Failed)
+                    {
+                        var r = report.mods.FirstOrDefault(x => x.id == f.Id);
+                        if (r != null) r.state = "failed";
+                    }
+                    complete = false;
+                    Overlay.Apply(new List<ModInfo>());
+                }
                 LoaderBridge.SetActiveGameplayFolders(complete
                     ? resolved.Where(m => m.DllsAreGameplay).Select(m => m.Folder).ToArray()
                     : Array.Empty<string>());

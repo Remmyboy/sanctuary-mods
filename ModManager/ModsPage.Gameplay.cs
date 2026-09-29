@@ -155,7 +155,7 @@ namespace SanctuaryHud
             if (!inLobby)
             {
                 if (_lobbyPanel != null) _lobbyPanel.SetActive(false);
-                if (!LobbyManager.IsInLobby) _announced = null;
+                if (!LobbyManager.IsInLobby) { _announced = null; _announceKey = null; }
                 return;
             }
             if (_tSwitchRow == null) return; // the page (and its templates) isn't built yet
@@ -176,9 +176,13 @@ namespace SanctuaryHud
                 // Rows are rebuilt only when the rows themselves change (a mod
                 // picked or dropped, a player joining); otherwise the rows
                 // there update in place. Neither happens under the pointer
-                // while it's dragging a slider or typing.
-                if (!LobbyPanelBusy())
+                // while it's dragging a slider or typing. Whatever the rows
+                // show changes the lobby's counter or the catalog's version
+                // first, so the rest waits for one of those to move.
+                var key = $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|{SettlingShown()}";
+                if (key != _lobbyPanelKey && !LobbyPanelBusy())
                 {
+                    _lobbyPanelKey = key;
                     var structure = LobbyStructure();
                     if (structure != _lobbyStructure) RebuildLobbyPanel();
                     else
@@ -228,6 +232,8 @@ namespace SanctuaryHud
         // What the chat was last told: each mod's id and contents, and its
         // option values as shown.
         private List<(string id, string hash, string name, Dictionary<string, string> options)> _announced;
+        private string _announceKey;
+        private string _lobbyPanelKey;
 
         /// A line in the lobby chat whenever the pick changes, so nobody
         /// misses it: players see what they're about to play. A change of
@@ -238,6 +244,10 @@ namespace SanctuaryHud
             // Mid-change the host's values move with its controls; say it
             // once it has settled, so a dragged slider isn't a line per step.
             if (Lobby.Settling) return;
+            // Nothing new since the last look.
+            var key = $"{Lobby.ChangeCounter}|{ModCatalog.Version}";
+            if (key == _announceKey) return;
+            _announceKey = key;
             var sel = Lobby.Selection;
             var now = sel.Select(s => (s.Id, s.ContentHash, $"{s.Name} {s.Version}".TrimEnd(), OptionDisplay(s))).ToList();
             var was = _announced;
@@ -752,6 +762,7 @@ namespace SanctuaryHud
             _lobbyFor = null;
             _lobbySignature = "";
             _lobbyStructure = "";
+            _lobbyPanelKey = null;
             _lobbyUpdaters.Clear();
         }
     }

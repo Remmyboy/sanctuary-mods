@@ -45,7 +45,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.1) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover, play-vanilla switch; the lobby's Mods panel where the host picks gameplay mods |
+| [ModManager](ModManager/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.1) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.1) | Loads and hot-reloads every mod above from `SanctuaryMods` |
 | [ModApi](ModApi/) | — | The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, and the API mods are built on |
@@ -1467,11 +1467,6 @@ host last used come back when they switch a mod on again. Ladder lobbies
 (named `Ladder:`) are always vanilla: their Mods panel says so and nothing
 can be picked. Lua mods switched on under 0.6 are simply dropped.
 
-**Play vanilla**, at the top of the UI Mods tab, holds back every UI mod at
-once, as if none were installed, and brings them back as they were when
-switched off again (`[Plugins] VanillaMode`, which the loader also reads, so
-nothing starts at launch either).
-
 **UI mods** — the DLLs, every mod in this repo — each get a section headed
 by the mod's name with its on/off switch inline. Sections start folded, one
 row per mod; clicking a header unfolds that mod's settings beneath it. Off
@@ -1541,8 +1536,7 @@ Since 1.4 it knows the two kinds of mod. A folder whose `mod.json` says
 started only while the lobby host has picked that mod (the [Mod API](#modapi)
 tells it which folders through `SetActiveGameplayFolders`); they stop when the
 lobby or match ends, and a rebuild of one waits until the match is over, so
-the simulation never changes under a running game. The Mods page's **Play
-vanilla** (`[Plugins] VanillaMode`) holds back every UI mod the same way.
+the simulation never changes under a running game.
 Libraries an author ships by accident beside their DLL (`0Harmony.dll`,
 `Newtonsoft.Json.dll`, `BepInEx*.dll`, `Sanctuary.ModApi.dll`) are skipped with
 a warning: a second, renamed copy would break the real one.
