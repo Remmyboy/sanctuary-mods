@@ -45,10 +45,10 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.6.1) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
+| [ModManager](ModManager/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.7.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.3.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModLoader-1.3.1) | Loads and hot-reloads every mod above from `SanctuaryMods` |
-| [ModApi](ModApi/) | — | The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.7.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.7.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
