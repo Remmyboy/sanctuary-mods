@@ -1007,14 +1007,13 @@ Events.OnMatchStart(function()
         Announce("Zone Control is on, but this isn't a Zone Control map, so this is a normal match.")
         return
     end
-    -- Kill credit is asked for here, once the match has started, not as this
-    -- script loads. Asked for early, Mod API 1.2.0 puts its damage hooks in at
-    -- the start of the first tick, before the game's lobby setup (InitLobby
-    -- runs inside that tick, hostMain.lua:60). Its hooks import the unit and
-    -- weapon classes, and targeterCollider.lua then caches __TargeterColliders
-    -- before targeterManager.lua has made it, so every unit with a weapon
-    -- fails to build. Asked for now, the hooks go in straight away, after the
-    -- setup and before any turret is built.
+    -- Kill credit is asked for here, once the match has started. Mod API
+    -- 1.2.1 and later would wait for the game's setup either way, but 1.2.0
+    -- put its damage hooks in before it (InitLobby runs inside the first
+    -- tick, hostMain.lua:60): targeterCollider.lua then cached
+    -- __TargeterColliders before targeterManager.lua had made it, and every
+    -- unit with a weapon failed to build. Asked for now, the hooks go in
+    -- straight away on any version, before any turret is built.
     if economy then Events.OnUnitKilled(OnUnitKilled) end
     GuardTargeting()
     WatchShopOrders()
