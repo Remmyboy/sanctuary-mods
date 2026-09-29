@@ -39,4 +39,4 @@ function _G.ParseTagsFromString(str)
     return result
 end
 
-if Log then Log("Engineers and Raiders test mod: build lists limited to engineers and raiders (" .. tostring(Options.raiders) .. ").") end
+if Warn then Warn("Engineers and Raiders test mod: build lists limited to engineers and raiders (" .. tostring(Options.raiders) .. ").") end

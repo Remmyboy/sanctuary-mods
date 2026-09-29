@@ -13,5 +13,5 @@
 local Events = Import("modapi/events.lua").Events
 
 Events.OnMatchStart(function()
-    Log("SanctuaryModTemplate: the match has started.")
+    Warn("SanctuaryModTemplate: the match has started.")
 end)

@@ -528,7 +528,7 @@ ModEvents.OnLobbyLeft(this, () => ...);
 // Handlers are dropped when `this` is destroyed: a reload never calls an old copy.
 
 ModLua.Ready                   // the client Lua VM exists (in a match or replay)
-ModLua.Run("Log('hello')")     // run a chunk in your own client's VM
+ModLua.Run("Warn('hello')")    // run a chunk in your own client's VM
 ModLua.GetGlobal("MyValue")    // read a _G global back as a string
 
 Lobby.Selection                // the host's pick, as everyone sees it
