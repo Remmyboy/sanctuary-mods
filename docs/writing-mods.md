@@ -10,6 +10,9 @@ A player with no mods at all can still play with anyone: outside a lobby the
 game always runs vanilla, and a lobby with no gameplay mods picked is a vanilla
 lobby.
 
+New to this? [Your first mod](your-first-mod.md) is a step-by-step walkthrough
+that needs only a text editor. This page is the full reference.
+
 ## Two kinds of mod
 
 | | **UI mod** | **Gameplay mod** |
@@ -610,8 +613,9 @@ The framework forgives the usual install slips:
 - **An archive nobody extracted,** or a DLL dropped loose in `SanctuaryMods`.
   These show at the top of the Mods page, saying what to do.
 
-A DLL belongs to the nearest folder above it that has a `mod.json`, so
-`FasterTanks\bin\FasterTanks.dll` is still FasterTanks's.
+A DLL belongs to the mod whose folder it's in, however deep, so
+`FasterTanks\bin\FasterTanks.dll` is still FasterTanks's. A `mod.json` further
+down inside a mod's folder doesn't make a second mod.
 
 **Share the zip, not a checkout.** The content hash is byte-exact, and Git on
 Windows rewrites line endings on checkout (`core.autocrlf`). Two players who

@@ -17,9 +17,10 @@ It is also a **mod framework** anyone can build on: drop a mod's folder into
 and — for gameplay mods that change the match — let the lobby host pick it and
 hold Start until every player has an identical copy. Outside a lobby the game
 always runs vanilla, so players without mods can play with anyone.
-[docs/writing-mods.md](docs/writing-mods.md) is the author's guide, with a
-`dotnet new` [template](templates/sanctuary-mod/) and four
-[examples](examples/).
+[docs/your-first-mod.md](docs/your-first-mod.md) walks you through making a
+mod, from an empty folder to a match. [docs/writing-mods.md](docs/writing-mods.md)
+is the full author's guide, with a `dotnet new`
+[template](templates/sanctuary-mod/) and five [examples](examples/).
 
 Lobby-compatible is not the same as safe. Every DLL here, like any BepInEx
 plugin, is a full-trust client plugin: it runs inside the game process with
@@ -1421,6 +1422,14 @@ chunk, so an edit to it forces a reinstall rather than leaving the last build's
 agent running).
 ## ModManager
 
+> **Making a mod for the Mod Manager?** Start with
+> [docs/your-first-mod.md](docs/your-first-mod.md), a step-by-step tutorial
+> (a gameplay mod with an append, options and a host script, played and
+> shared, with only a text editor). Then use
+> [docs/writing-mods.md](docs/writing-mods.md), the full reference (every
+> `mod.json` field, match events, recipes, factions, C# mods and the API),
+> and the working mods in [examples/](examples/).
+
 A **Mods** entry in the front menu's sidebar (the cube icon, just below
 Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods
 and Gameplay Mods, and a **Mods** button in the lobby. The page is the game's own Settings screen, cloned and refilled:
@@ -1443,7 +1452,8 @@ short.
 background, the way the pause menu's Settings does); closing it returns to
 the game. UI mod toggles and settings changes apply immediately.
 
-It manages two kinds of mods (see [docs/writing-mods.md](docs/writing-mods.md)):
+It manages two kinds of mods (see [docs/your-first-mod.md](docs/your-first-mod.md)
+to make one, and [docs/writing-mods.md](docs/writing-mods.md) for everything):
 
 **Gameplay mods** are a mod folder's `*.lua`/`*.santp` files, laid out mirroring
 `LJ\lua` (and, with `"kind": "gameplay"` in its `mod.json`, its DLL). They are
@@ -1550,6 +1560,9 @@ destroys foreign root GameObjects after start-up (the same reason BepInEx
 needs `HideManagerGameObject = true` here, see Setup).
 
 ## ModApi
+
+> Writing a mod against this API? See [docs/your-first-mod.md](docs/your-first-mod.md)
+> (tutorial) and [docs/writing-mods.md](docs/writing-mods.md) (reference).
 
 `BepInEx\plugins\Sanctuary.ModApi.dll`: the stable core of the mod framework,
 and the one assembly third-party mods compile against. Like the loader it is
