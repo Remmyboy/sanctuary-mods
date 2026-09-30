@@ -46,11 +46,11 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
+| [ModManager](ModManager/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.3.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.8.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1690,6 +1690,21 @@ other mod's reloads, the Mod Manager's included:
   - It lends the looked-like faction's tag while a unit's prefab is built, so
     its shields, build beams, factory spawn bones and shield impacts follow.
   - It adds mods' units to `AvailableUnits`, the list the AI builds from.
+- **AIs.** A folder with `AIPlatoonFunctions.lua` at its root is an AI mod,
+  with or without a `mod.json` (whose `ais` can also name AI folders inside a
+  bigger mod).
+  - Its files go under `AI\mods\<folder>`, beside the game's AIs and never
+    over them.
+  - Some authors share the game's whole `AI` folder. Dropped in as it is, it
+    yields only that author's AIs; its shared files and its copies of the
+    stock AIs are left out.
+  - The host picks an AI per seat in the lobby row's Player/AI dropdown
+    (`AI: <name>`). Picking one also picks the mod.
+  - The picks go out like options and follow a seat's army number.
+  - The API writes them to `modapi/ai.lua`, and a `CreateArmies` hook applies
+    each pick after the seat's faction AI.
+  - A shim adds shared AI functions that newer AIs call, only where the game
+    lacks them.
 - **Borrowed models.** A unit template with `general.modelTpId` gets that
   model's placement ghost (under its own prefab name), portrait (unless its
   pack has one), wreck and hierarchy maps.
