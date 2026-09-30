@@ -137,6 +137,21 @@ namespace Sanctuary.ModApi
         public List<WireMod> mods = new List<WireMod>();
         /// The host's Lua hash with these mods applied.
         public string luaHash;
+        /// The AI seats playing a picked mod's AI; null or empty when every
+        /// AI seat plays the game's default.
+        public List<AiSeat> ais;
+    }
+
+    /// One AI seat playing a mod's AI. The match's Lua knows the seat by its
+    /// army number (the map start slot); the lobby by its row.
+    internal sealed class AiSeat
+    {
+        public int slot;
+        public int army;
+        public string mod;
+        public string key;
+        /// What the seat's dropdown shows, for players without the mod.
+        public string name;
     }
 
     internal sealed class ReportedMod

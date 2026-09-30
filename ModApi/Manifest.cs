@@ -77,6 +77,13 @@ namespace Sanctuary.ModApi
         /// Factions the mod adds to the lobby's faction dropdown. See
         /// <see cref="FactionDef"/>.
         public IReadOnlyList<FactionDef> Factions { get; internal set; } = Array.Empty<FactionDef>();
+        /// AIs the mod brings, which the lobby host can give any AI seat.
+        /// See <see cref="AiDef"/>.
+        public IReadOnlyList<AiDef> Ais { get; internal set; } = Array.Empty<AiDef>();
+        /// For a mod folder that is itself an AI (AIPlatoonFunctions.lua at
+        /// its root): the folder under LJ\lua its files go into, like
+        /// "AI/mods/IwillDUCKYOUup2". Empty for a mod laid out like LJ\lua.
+        public string AiFolder { get; internal set; } = "";
 
         /// True when <see cref="GameVersion"/> is stated and the running
         /// game isn't that version.
@@ -93,7 +100,7 @@ namespace Sanctuary.ModApi
 
         /// Parses mod.json text. Problems that don't stop the mod loading
         /// (an unknown kind, a bad requires entry) land in problems.
-        internal static ModManifest Parse(string json, string folderName, List<string> problems)
+        internal static ModManifest Parse(string json, string folderName, List<string> problems, bool isAiFolder = false)
         {
             var o = JObject.Parse(json);
             var m = new ModManifest
@@ -153,6 +160,16 @@ namespace Sanctuary.ModApi
             m.HostScript = ScriptPath(Str(o, "hostScript"), "hostScript", problems);
             m.ClientScript = ScriptPath(Str(o, "clientScript"), "clientScript", problems);
             m.Factions = FactionDef.ParseAll(o["factions"], problems);
+            if (isAiFolder)
+            {
+                // The folder is the AI: all of it goes under AI\mods, named
+                // by the id so every player's copy lands in the same place.
+                if (o["luaRoot"] != null)
+                    problems.Add("mod.json: luaRoot is ignored: this folder is an AI folder (it has AIPlatoonFunctions.lua), so the whole folder is the AI");
+                m.LuaRoot = ".";
+                m.AiFolder = ModApi.Ais.OverlayFolderFor(m.Id);
+            }
+            m.Ais = AiDef.ParseAll(o["ais"], problems, isAiFolder ? m.AiFolder : null, m.Name);
             return m;
         }
 

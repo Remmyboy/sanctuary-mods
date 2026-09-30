@@ -87,7 +87,7 @@ namespace Sanctuary.ModApi
         /// The faction column is narrow, sized for "Chosen": a longer name
         /// ("Ascendant (Warden)") shrinks to fit instead of running into the
         /// next column.
-        private static void FitHeader(BeamDropdown dropdown)
+        internal static void FitHeader(BeamDropdown dropdown)
         {
             var text = dropdown.headerText;
             if (text == null || text.enableAutoSizing) return;

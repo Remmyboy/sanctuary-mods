@@ -25,6 +25,8 @@ namespace Sanctuary.ModApi
             public string vanillaHash;
             public string luaHash;
             public List<WireMod> mods = new List<WireMod>();
+            /// The AI seats that played a mod's AI: part of the match's Lua.
+            public List<AiSeat> ais;
         }
 
         private static readonly AccessTools.FieldRef<string> RecordingPath =
@@ -118,6 +120,7 @@ namespace Sanctuary.ModApi
                         id = m.Id, name = m.Name, version = m.Version, hash = m.ContentHash, url = m.Manifest.Url,
                         options = m.Manifest.Options.Count == 0 ? null : Overlay.OptionsOf(m.Id)?.ToDictionary(kv => kv.Key, kv => kv.Value),
                     }).ToList(),
+                    ais = Overlay.AppliedAis.Count == 0 ? null : Overlay.AppliedAis.ToList(),
                 };
                 File.WriteAllText(SidecarOf(path), JsonConvert.SerializeObject(s, Formatting.Indented));
             }
@@ -225,7 +228,8 @@ namespace Sanctuary.ModApi
                 }
                 var options = s.mods.Where(w => w.options != null && ModManifest.IsValidId(w.id))
                     .GroupBy(w => w.id).ToDictionary(g => g.Key, g => g.First().options, StringComparer.Ordinal);
-                Overlay.Apply(mods, options);
+                var ais = s.ais?.Where(a => a != null && a.army > 0 && ModManifest.IsValidId(a.mod)).Take(32).ToList();
+                Overlay.Apply(mods, options, ais);
                 if (Overlay.Failed.Count > 0)
                 {
                     var failed = string.Join(", ", Overlay.Failed.Select(m => m.Name));

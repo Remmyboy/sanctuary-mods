@@ -113,6 +113,7 @@ namespace SanctuaryHud
             if (m.SantpCount > 0) parts.Add($"{m.SantpCount} santp");
             if (m.DllsAreGameplay && m.Dlls.Count > 0) parts.Add($"{m.Dlls.Count} dll");
             if (m.Manifest.Options.Count > 0) parts.Add(m.Manifest.Options.Count == 1 ? "1 option" : $"{m.Manifest.Options.Count} options");
+            if (m.Manifest.Ais.Count > 0) parts.Add(m.Manifest.Ais.Count == 1 ? "1 AI" : $"{m.Manifest.Ais.Count} AIs");
             if (m.Manifest.Author.Length > 0) parts.Add("by " + m.Manifest.Author);
             if (m.Manifest.IsForOtherGameVersion(Application.version)) parts.Add("made for game " + m.Manifest.GameVersion);
             return string.Join(", ", parts);
@@ -126,7 +127,14 @@ namespace SanctuaryHud
             if (m.Manifest.Synthesised) text += "This folder has no mod.json, so its name stands in for one. ";
             if (m.Manifest.Requires.Count > 0) text += $"Needs {string.Join(", ", m.Manifest.Requires)} picked too. ";
             if (m.Manifest.Url.Length > 0) text += $"Get it from {m.Manifest.Url}. ";
-            text += "To play it, host a lobby and switch it on in the lobby's Mods panel; everyone in the match needs an identical copy.";
+            text += m.Manifest.AiFolder.Length > 0
+                ?"To play against it, host a lobby and pick it in an AI seat's Player/AI dropdown; everyone in the match needs an identical copy."
+                : "To play it, host a lobby and switch it on in the lobby's Mods panel; everyone in the match needs an identical copy.";
+            if (m.Manifest.Ais.Count > 0)
+            {
+                text += "\n\nAIs, given to AI seats by the host from each seat's Player/AI dropdown:";
+                foreach (var a in m.Manifest.Ais) text += $"\n{a.Name}" + (a.Description.Length > 0 ? ": " + a.Description : "");
+            }
             if (m.Manifest.Options.Count > 0)
             {
                 text += "\n\nOptions, set by the host in the lobby's Mods panel:";
