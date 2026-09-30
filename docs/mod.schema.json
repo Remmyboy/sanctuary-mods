@@ -92,6 +92,24 @@
         "additionalProperties": false
       }
     },
+    "ais": {
+      "description": "AIs the mod brings. The lobby host gives one to any AI seat from that seat's Player/AI dropdown. In a mod folder that is itself an AI (AIPlatoonFunctions.lua at its root), leave out folder: the AI is the folder.",
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": { "description": "The mod's own name for the AI. Default: made from the name.", "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" },
+          "name": { "description": "Shown in the seat's dropdown (\"AI: <name>\").", "type": "string", "maxLength": 40 },
+          "folder": { "description": "The AI folder under the mod's lua folder, laid out like the game's AI/mods/AI-Sanctuary-Rush.", "type": "string", "examples": ["AI/mods/DuckAI"] },
+          "description": { "description": "Shown on the Mods page.", "type": "string", "maxLength": 300 },
+          "land": { "description": "May use the land layer. Default true.", "type": "boolean" },
+          "air": { "description": "May use the air layer. Default true.", "type": "boolean" },
+          "naval": { "description": "May use the water layer. Default false.", "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
     "factions": {
       "description": "Factions the mod adds to the lobby's faction dropdown while the host has it picked. The Mod API numbers them after the game's three, in pick order, and writes them into FactionsData; no C# needed.",
       "type": "array",

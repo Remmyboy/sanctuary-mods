@@ -123,6 +123,7 @@ file as you type and suggest the fields.
 | `hostScript`, `clientScript` | Lua files of yours, relative to `luaRoot`, that the framework imports in the host's simulation and in every player's client when the mod is picked. See [Host scripts and match events](#host-scripts-and-match-events). |
 | `gameVersion` | The game version you made and tested the mod for, such as `"0.0.1.20"`, or a prefix such as `"0.0.1"`. On any other version the Mods page shows "made for game 0.0.1.20", so after a game update players can see which mods might need one too. The mod still loads either way. |
 | `factions` | Factions the mod adds to the lobby's faction dropdown. See [Add a faction](#add-a-faction). |
+| `ais` | AIs the mod brings, which the host gives to AI seats. See [Add an AI](#add-an-ai). |
 
 A folder with no `mod.json` still works the way mods worked before
 manifests: its DLL is a UI mod, its Lua files are a gameplay mod whose id is
@@ -482,6 +483,71 @@ both and declare the faction instead.
 What a faction can't do (yet): **sounds**. The game loads its sound banks
 from their own files on disk, not from packs, so new units use the game's
 sounds.
+
+### Add an AI
+
+An AI is a folder laid out like the game's `AI\mods\AI-Sanctuary-Rush`:
+`AIPlatoonFunctions.lua`, `formers\` and `strategies\`, plus whatever files of
+its own it imports through `modDirectory`. The host gives it to any AI seat
+from that seat's **Player/AI** dropdown in the lobby ("AI: DuckAI"). Picking it
+there switches the mod on too. Different seats can play different AIs in one
+match, and seats left on plain **AI** play the game's own.
+
+**No mod.json needed.** Drop the AI folder straight into `SanctuaryMods` as
+you would into the game's `AI\mods`. The framework sees `AIPlatoonFunctions.lua`
+at its root and makes it a gameplay mod named after the folder. The AI's files
+go under `AI\mods\<folder>` for the match, so `modDirectory` works as usual.
+An AI named like one of the game's own (`AI-Sanctuary-Rush`, say) goes beside
+it as `AI\mods\<folder> (mod)` and never replaces the stock AI for other seats.
+
+**A whole AI folder works too.** AI authors often share the game's entire
+`AI` folder with their AI in its `mods\`. Drop that in as it is. Each AI of its
+own becomes a mod. Its copies of the game's AIs and its shared `AI\*.lua` files
+are left out, and the Mods page says so: every match runs the game's own
+shared AI code, so one author's AI can't change another's.
+
+**With a mod.json** in the AI folder, you choose the id, name, version and
+link, and can describe the AI:
+
+```json
+{
+  "id": "duck.duckai",
+  "name": "DuckAI",
+  "version": "2.0",
+  "author": "Duck",
+  "ais": [ { "name": "DuckAI", "description": "Takes the map early.", "air": true, "naval": false } ]
+}
+```
+
+A mod laid out like `LJ\lua` (with other files besides) can ship one or more
+AIs by folder:
+
+```json
+"ais": [ { "key": "duck", "name": "DuckAI", "folder": "AI/mods/DuckAI" } ]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Shown in the seat's dropdown. |
+| `folder` | The AI folder under the mod's `lua\`. Leave it out in an AI folder: the AI is the folder itself. |
+| `key` | Your own name for it. Default: made from the name. |
+| `description` | Shown on the Mods page. |
+| `land`, `air`, `naval` | The movement layers the AI may use, as the game's `useLayer`. Default land and air. |
+
+What the framework does with it:
+
+- **Routing.** The seat's army gets `modDirectory`, `modName` (the folder's
+  name) and `useLayer` from the pick, after its faction's AI (if any), so the
+  host's pick wins.
+- **Shared functions from newer games.** Some AIs are written against the
+  developers' next AI release and call shared functions this game doesn't
+  have yet. The framework adds the ones it knows of (such as
+  `AIMarkerGenerator.IsPathMapPathableWithinReach`) only where the game lacks
+  them, so the game's own versions take over after an update.
+- **Faction tables.** An AI's `{EDA, CHOSEN, GUARD}` tables are pointed at the
+  full faction list like the stock AI's, so it can play modded factions.
+- **Same copy, replays.** Seats and AIs are part of the Lua every player
+  checks before Start, and replays record them.
 
 ## Art packs
 
