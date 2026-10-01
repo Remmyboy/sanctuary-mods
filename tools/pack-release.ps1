@@ -362,7 +362,9 @@ if ($saZip) {
         'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll', 'BepInEx/config/BepInEx.cfg', 'winhttp.dll',
         'doorstop_config.ini', '.doorstop_version')
 }
-$zips = @($saZip, $mmZip) | Where-Object { $_ }
+# Kept an array even when one zip is left: a lone string splatted into gh
+# (@zips) goes in a character at a time ("no matches found for `C`").
+$zips = @(@($saZip, $mmZip) | Where-Object { $_ })
 
 Get-ChildItem $outPath -Filter "$Mod-$Version-*.zip" |
     ForEach-Object { "  {0,-42} {1,9:N0} bytes" -f $_.Name, $_.Length }
