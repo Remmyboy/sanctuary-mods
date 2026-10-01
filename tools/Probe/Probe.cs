@@ -65,7 +65,7 @@ public class Probe : BaseUnityPlugin
   replay <path|latest>        play a .sanreplay
   seek <tick> | speed <x> | pause | resume | replaystate   ReplayManager's player
   lobby [maxPlayers] [map]    private Steam lobby (default 2 players, The Forge)
-  maps                        stock maps and every folder under Sanctuary_Data\Maps
+  maps [text|*]               stock maps; installed map folders matching <text> (* = all)
   ai <slot> | army <slot> <id> | team <slot> <id> | faction <slot> <n>
   ready | start | lobbystate | select <modId;modId> | seat <slot> <mod> <key>|default
   skirmish [map]              lobby + AI opponent + start + waitmatch, in one
@@ -383,11 +383,18 @@ public class Probe : BaseUnityPlugin
                 break;
             }
             case "maps":
+            {
+                // maps [text]: the stock four, plus installed map folders whose name
+                // contains <text> (all ~140 of them only when asked with `maps *`).
                 foreach (var f in typeof(LobbyManager).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.Name.StartsWith("Map") && f.FieldType == typeof(string)))
                     Out($"  {f.Name.Substring(3),-18} {f.GetValue(null)}  (stock)");
-                foreach (var d in Directory.GetDirectories(Path.Combine(Application.dataPath, "Maps")).OrderBy(x => x))
+                var dirs = Directory.GetDirectories(Path.Combine(Application.dataPath, "Maps")).OrderBy(x => x).ToList();
+                if (arg.Length == 0) { Out($"  ({dirs.Count} installed map folders: maps <text> to search, maps * for all)"); break; }
+                string Norm(string s) => new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+                foreach (var d in dirs.Where(d => arg == "*" || Norm(Path.GetFileName(d)).Contains(Norm(arg))))
                     Out("  " + MapPath(d));
                 break;
+            }
             case "ai":
             {
                 var slot = a.Length > 0 ? int.Parse(a[0]) : 1;
