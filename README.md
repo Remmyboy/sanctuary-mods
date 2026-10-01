@@ -256,7 +256,9 @@ time per frame every ten seconds in a match, so "is it the mod" is
 answerable from the log alone.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
-  keeping roughly your current zoom (`Top bar · CommanderJumpZoom`).
+  keeping roughly your current zoom (`Top bar · CommanderJumpZoom`). It
+  stays away while a replay plays, where ReplayManager's army rows carry
+  each player's state and its panel often sits in that corner.
 - **Reclaim values** over the map while **Left Alt** is held (`Map labels ·
   ReclaimHoldKey`; `None` keeps them up permanently): the alloys left in every
   wreck and harvestable prop the client knows about, drawn at the spot.

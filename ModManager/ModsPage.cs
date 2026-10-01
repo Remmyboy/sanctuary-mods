@@ -878,12 +878,46 @@ namespace SanctuaryHud
                 tmp.alignment = TextAlignmentOptions.MidlineRight;
                 tmp.fontStyle = FontStyles.Normal;
                 tmp.characterSpacing = 0f;
+                tmp.textWrappingMode = TextWrappingModes.NoWrap;
+                tmp.overflowMode = TextOverflowModes.Ellipsis;
                 var um = v.GetComponent<UIManagerText>();
                 if (um != null) um.colorType = UIManagerText.ColorType.Accent;
+                var after = v.AddComponent<ValueAfterLabel>();
+                after.Label = labelText;
                 valueText = tmp;
             }
             Place(go, list);
             return (labelText, valueText);
+        }
+
+        /// Keeps an info row's value to the right of its label: the value
+        /// spans the row and reads from the right, so a long one (a mod's
+        /// author list) ran back over the label. It now starts where the
+        /// label's text ends and ends in "…" when it doesn't fit. Followed
+        /// as the label changes, for rows that update in place.
+        private sealed class ValueAfterLabel : MonoBehaviour
+        {
+            private const float Gap = 32f;
+            internal TMP_Text Label;
+            private string _laidOutFor;
+            private float _laidOutWidth = -1f;
+
+            private void LateUpdate()
+            {
+                if (Label == null) return;
+                var parent = (RectTransform)transform.parent;
+                var label = Label.rectTransform;
+                var width = parent.rect.width;
+                if (Label.text == _laidOutFor && Mathf.Approximately(width, _laidOutWidth)) return;
+                _laidOutFor = Label.text;
+                _laidOutWidth = width;
+                // The label's left edge in the row, and how far its text runs
+                // (no further than its own box, where the game cuts it off).
+                var labelLeft = label.localPosition.x + label.rect.xMin - parent.rect.xMin;
+                var textWidth = string.IsNullOrEmpty(Label.text) ? 0f : Mathf.Min(Label.GetPreferredValues(Label.text).x, label.rect.width);
+                var rt = (RectTransform)transform;
+                rt.offsetMin = new Vector2(labelLeft + textWidth + Gap, rt.offsetMin.y);
+            }
         }
 
         // Set while building rows that update in place: their value text
@@ -1046,13 +1080,28 @@ namespace SanctuaryHud
             { "mm", "matchmaking" }, { "cfg", "config" }, { "api", "API" }, { "id", "ID" }, { "vsync", "VSync" },
         };
 
+        /// Words with capitals of their own, kept whole and as written: the
+        /// split would make "QoL" "Qo l".
+        private static readonly string[] Unsplit = { "QoL" };
+
         internal static string Humanise(string key)
         {
             if (string.IsNullOrEmpty(key)) return "";
             var parts = new List<string>();
+            var verbatim = new HashSet<int>();
             var word = new System.Text.StringBuilder();
             for (var i = 0; i < key.Length; i++)
             {
+                var whole = Unsplit.FirstOrDefault(u => string.CompareOrdinal(key, i, u, 0, u.Length) == 0 &&
+                    (i + u.Length == key.Length || !char.IsLower(key[i + u.Length])));
+                if (whole != null)
+                {
+                    if (word.Length > 0) { parts.Add(word.ToString()); word.Clear(); }
+                    verbatim.Add(parts.Count);
+                    parts.Add(whole);
+                    i += whole.Length - 1;
+                    continue;
+                }
                 var c = key[i];
                 // A digit after a single letter stays attached ("T1", "T3"),
                 // after a word it starts one ("Tier 4").
@@ -1069,6 +1118,7 @@ namespace SanctuaryHud
             for (var i = 0; i < parts.Count; i++)
             {
                 var p = parts[i];
+                if (verbatim.Contains(i)) continue;
                 if (Words.TryGetValue(p, out var fixedWord)) p = fixedWord;
                 else if (p.Length > 1 && p.ToUpperInvariant() == p) { /* an acronym, or T1: as written */ }
                 else p = p.ToLowerInvariant();

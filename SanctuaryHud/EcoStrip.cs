@@ -22,6 +22,7 @@ namespace SanctuaryHud
     // Commander widget, top-right under the strip: the game's own strategic
     // icon with a health bar underneath, always visible so a commander under
     // fire is obvious; click to select the commander and fly the camera to it.
+    // Not shown during replay playback.
     //
     // Both are laid out by hand in canvas units (the IMGUI figures doubled)
     // on one container that carries the size setting, so the setting sizes
@@ -602,6 +603,17 @@ namespace SanctuaryHud
 
         // ---- the commander widget ---------------------------------------------------
 
+        /// Whether the game is playing a replay back (its replay socket is
+        /// the client's), rather than running a live match.
+        private static bool ReplayPlayback
+        {
+            get
+            {
+                try { return EM.Network.NetworkManager.IsReplayPlayback; }
+                catch { return false; }
+            }
+        }
+
         private sealed class Commander : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
         {
             private const float W = 216f;
@@ -677,7 +689,11 @@ namespace SanctuaryHud
 
             internal void Sync()
             {
-                var show = _commanderLocalIndex >= 0;
+                // Not while watching a replay: the widget is for flying to
+                // your own commander mid-game, ReplayManager's army rows
+                // carry each player's state there, and players tend to park
+                // the replay panel in this corner.
+                var show = _commanderLocalIndex >= 0 && !ReplayPlayback;
                 if (gameObject.activeSelf != show) gameObject.SetActive(show);
                 if (!show) return;
 
