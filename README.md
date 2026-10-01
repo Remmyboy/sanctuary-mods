@@ -1780,6 +1780,26 @@ deploys to `BepInEx\plugins`, because BepInEx is what loads *it* (see
 [ModLoader](#modloader)), and so does the [Mod API](#modapi). So
 `dotnet build` — of one project or the whole `SanctuaryMods.sln` — is the
 entire iteration loop, no game restart, except for those two, which need one.
+While the game is running a build compiles but does not deploy (a hot load
+mid-match can break it); add `-p:LiveDeploy=true` when you want it live.
+
+### Developer tools
+
+[CLAUDE.md](CLAUDE.md) lists them with when to use each; in short:
+
+- [tools/probe.ps1](tools/probe.ps1) + [tools/Probe](tools/Probe/) — a
+  dev-only plugin that drives the running game from a command file: Lua with
+  results, screenshots, UI hierarchy dumps, replays, a skirmish vs AI.
+  Never released.
+- [tools/game-ref.ps1](tools/game-ref.ps1) — a per-build local snapshot of the
+  game (decompiled C#, Lua, an API listing), a diff between builds, and a
+  check of every name the mods use against it. Run it after each game patch.
+- [tools/lua-check.ps1](tools/lua-check.ps1) — compiles every Lua file and
+  every Lua chunk inside C# strings with the game's own LuaJIT.
+- [tools/gamelog.ps1](tools/gamelog.ps1) — both game logs without the noise,
+  and which build of each mod is deployed.
+- [tools/worktrees.ps1](tools/worktrees.ps1) — uncommitted and unmerged work
+  across every worktree.
 
 [examples/](examples/) and [templates/](templates/) are deliberately outside
 the solution and outside `Directory.Build.props` (each has a stub that stops
@@ -1797,7 +1817,9 @@ pwsh -NoProfile -File tools/pack-release.ps1 -Mod EcoManager -Body body.txt
 
 Version and display name come from the mod's `[BepInPlugin]` attribute, so that
 attribute is the only place a version is written and a release cannot disagree
-with what the game reports. `-Body` is plain text that lands in the `README.txt`
+with what the game reports. A Lua-only gameplay mod has no attribute; its
+`mod.json` name and version are used, and the zip's files are checked against
+their committed blobs byte for byte. `-Body` is plain text that lands in the `README.txt`
 of both zips verbatim. Output goes to `release/` (gitignored), staged through a
 temp folder so packing never disturbs a running game.
 

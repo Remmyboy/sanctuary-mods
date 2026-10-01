@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Development-only test driver; never packed or released. Building it
+       deploys it to SanctuaryMods\SanctuaryProbe like any mod (and the game
+       hot-loads it); tools\probe.ps1 install/uninstall wraps that. -->
+  <PropertyGroup>
+    <AssemblyName>SanctuaryProbe</AssemblyName>
+    <!-- The installed ModApi, not a ProjectReference: building ModApi from a
+         branch would redeploy it over the player's BepInEx\plugins copy. -->
+    <ModApiDll Condition="'$(ModApiDll)' == ''">$(GamePath)\BepInEx\plugins\Sanctuary.ModApi.dll</ModApiDll>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Sanctuary.ModApi"><HintPath>$(ModApiDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="Michsky.UI.Beam"><HintPath>$(GamePath)\Sanctuary_Data\Managed\Michsky.UI.Beam.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Collections"><HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Collections.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>
