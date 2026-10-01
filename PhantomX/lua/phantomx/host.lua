@@ -809,7 +809,7 @@ local function StateFor(viewer)
 
     if phase == "pending" then
         s.timer = "Phantoms are chosen in " .. Clock(declareAt - now)
-    elseif nextRevealAt and phase == "playing" then
+    elseif nextRevealAt and phase == "playing" and Hidden() > 0 then
         s.timer = "Next reveal in " .. Clock(nextRevealAt - now)
     end
 

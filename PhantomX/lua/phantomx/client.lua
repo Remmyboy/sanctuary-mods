@@ -18,7 +18,8 @@ local Colours = {
     observer = "D0D6DE",
 }
 
-local panel = UI.Panel("sanctuarymods.phantomx", { title = "PHANTOM-X", x = 20, y = 140, align = "right" })
+-- Top left, under the economy bar: the right side has the commander and idle panels.
+local panel = UI.Panel("sanctuarymods.phantomx", { title = "PHANTOM-X", x = 20, y = 70 })
 local lastAlert = 0
 
 local function Request(op, target, value)
@@ -52,7 +53,7 @@ local function PlayerRow(s, p)
     local nameColour = p.alive and "FFFFFF" or Grey
     items[#items + 1] = UI.Text(p.name .. (p.me and " (you)" or ""), { size = 20, color = nameColour })
     if p.role then
-        items[#items + 1] = UI.Text(string.upper(p.role), { size = 18, color = Colours[p.role] or Grey, bold = true })
+        items[#items + 1] = UI.Text(string.upper(p.role), { size = 18, color = Colours[p.role] or Grey })
     end
     if not p.alive then
         items[#items + 1] = UI.Text("out", { size = 18, color = Grey })
@@ -76,10 +77,10 @@ end
 
 local function Render(s)
     local roleText, roleColour = RoleLine(s)
-    local items = { UI.Text(roleText, { size = 26, color = roleColour, bold = true }) }
+    local items = { UI.Text(roleText, { size = 26, color = roleColour }) }
 
     if s.result then
-        items[#items + 1] = UI.Text(s.result, { size = 24, color = "3DAFFF", bold = true })
+        items[#items + 1] = UI.Text(s.result, { size = 24, color = "3DAFFF" })
     end
     if s.timer then items[#items + 1] = UI.Text(s.timer, { size = 20, color = Grey }) end
     if s.bonus then
