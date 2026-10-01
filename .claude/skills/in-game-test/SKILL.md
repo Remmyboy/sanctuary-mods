@@ -52,8 +52,11 @@ Selection: `Import('client/input/selectionSystem.lua')` (GetSelectedUnitsIds,
 SetSelectedEntities). `luaf file.lua` runs a file - write it with the Write
 tool, never printf (backslash paths break).
 
-**A live match**: `skirmish` = private lobby on The Forge, AI in slot 1 on team
-2, ready, start, `waitmatch`. A replay instead: `replay latest`, `waitmatch`,
+**A live match**: `skirmish [map]` = private lobby (The Forge unless named),
+AI in slot 1 on team 2, ready, start, `waitmatch`. `maps` lists the stock maps
+and every installed map folder; a map is named by part of its name
+(`skirmish white desert`, `lobby 8 zone control`) or by its `Maps/...` path.
+The four stock maps take 8 players. A replay instead: `replay latest`, `waitmatch`,
 then `seek <tick>` / `speed <x>` / `replaystate` (ReplayManager must be loaded).
 In a replay's ALL view every army reads as focused.
 

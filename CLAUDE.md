@@ -56,8 +56,9 @@ it one of these instead.
 
 ## Shell environment (Windows)
 
-- `python` is the Microsoft Store stub; `py` is Python 3.11. Node, dotnet,
-  ilspycmd, gh and ffmpeg are installed. No zip, jq, strings or ImageMagick:
+- `python` / `python3` / `py` are Python 3.11 with pip (uv-managed; the Store
+  aliases are off since 2026-10-01). Node, dotnet, ilspycmd, gh and ffmpeg are
+  installed. No zip, jq, strings or ImageMagick:
   use PowerShell `System.IO.Compression`, `ConvertFrom-Json`, node.
 - Edit files with the Edit/Write tools, not sed/perl/heredocs: most C# files
   are CRLF (multi-line regexes silently miss), bash heredocs break on `'`,

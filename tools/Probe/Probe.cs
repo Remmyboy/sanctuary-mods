@@ -58,10 +58,11 @@ public class Probe : BaseUnityPlugin
   pfield <plugin> <member> [value]   an instance field/property of the live plugin object
   replay <path|latest>        play a .sanreplay
   seek <tick> | speed <x> | pause | resume | replaystate   ReplayManager's player
-  lobby [maxPlayers]          private Steam lobby on The Forge
+  lobby [maxPlayers] [map]    private Steam lobby (default 2 players, The Forge)
+  maps                        stock maps and every folder under Sanctuary_Data\Maps
   ai <slot> | army <slot> <id> | team <slot> <id> | faction <slot> <n>
   ready | start | lobbystate | select <modId;modId> | seat <slot> <mod> <key>|default
-  skirmish                    lobby + AI opponent + start + waitmatch, in one
+  skirmish [map]              lobby + AI opponent + start + waitmatch, in one
   leave                       quit the match to the menu (the game's own QuitGame)
   quit                        close the game (Application.Quit)
   echo <text>";
@@ -291,18 +292,31 @@ public class Probe : BaseUnityPlugin
             case "replaystate": Out(ReplayState()); break;
 
             case "lobby":
+            {
+                // lobby [maxPlayers] [map]: map as in `maps` (stock name, folder name or Maps/... path).
+                var players = a.Length > 0 && int.TryParse(a[0], out var n) ? n : 2;
+                var mapArg = string.Join(" ", a.SkipWhile(x => int.TryParse(x, out _)));
+                var map = mapArg.Length > 0 ? ResolveMap(mapArg) : LobbyManager.MapTheForge;
+                if (map == null) { Out("no map matching '" + mapArg + "' (try maps)"); break; }
                 LobbyManager.OnLobbyCreated -= Created;
                 LobbyManager.OnLobbyCreated += Created;
                 LobbyManager.CreateLobby(new LobbyManager.LobbyProperties
                 {
                     name = "Probe lobby",
-                    mapPath = LobbyManager.MapTheForge,
-                    maxPlayerCount = a.Length > 0 ? int.Parse(a[0]) : 2,
+                    mapPath = map,
+                    maxPlayerCount = players,
                     ownerName = LobbyManager.CurrentUserName,
                     type = LobbyManager.LobbyType.Private,
                 });
-                Out("create lobby requested");
+                Out($"create lobby requested on {map} for {players}");
                 Wait("lobby created", 20f, () => LobbyManager.CurrentState != null);
+                break;
+            }
+            case "maps":
+                foreach (var f in typeof(LobbyManager).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.Name.StartsWith("Map") && f.FieldType == typeof(string)))
+                    Out($"  {f.Name.Substring(3),-18} {f.GetValue(null)}  (stock)");
+                foreach (var d in Directory.GetDirectories(Path.Combine(Application.dataPath, "Maps")).OrderBy(x => x))
+                    Out("  " + MapPath(d));
                 break;
             case "ai":
             {
@@ -333,7 +347,7 @@ public class Probe : BaseUnityPlugin
             case "skirmish":
                 // Each AI setter resends the cached army/team, so the team must
                 // land before the army (sanctuary-probe-skirmish memory).
-                Prepend("lobby 2", "wait 3", "ai 1", "wait 3", "army 0 1", "wait 2", "team 1 2", "wait 3",
+                Prepend(("lobby 2 " + arg).Trim(), "wait 3", "ai 1", "wait 3", "army 0 1", "wait 2", "team 1 2", "wait 3",
                         "army 1 2", "wait 3", "ready", "wait 3", "lobbystate", "start", "waitmatch 240", "wait 5", "state");
                 break;
 
@@ -546,6 +560,28 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
         try { Out("mods selected: " + string.Join(", ", Lobby.Selection.Select(s => s.Id))); } catch { }
         try { Out("start blocked: " + (Lobby.StartBlockedReason ?? "no")); } catch { }
         Out($"canStart={LobbyManager.CanStartGame()} status={LobbyManager.lobbyGameStatus}");
+    }
+
+    // A stock map by its LobbyManager.Map* name ("forge", "WhiteDesert"), a map
+    // folder under Sanctuary_Data\Maps by part of its name ("zone control"),
+    // or a "Maps/<dir>/<file>.sanmap" path as is.
+    private static string ResolveMap(string arg)
+    {
+        if (arg.Contains("/") || arg.EndsWith(".sanmap", StringComparison.OrdinalIgnoreCase)) return arg;
+        string Norm(string s) => new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        var key = Norm(arg);
+        var stock = typeof(LobbyManager).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .FirstOrDefault(f => f.Name.StartsWith("Map") && f.FieldType == typeof(string) && Norm(f.Name.Substring(3)).Contains(key));
+        if (stock != null) return (string)stock.GetValue(null);
+        var dir = Directory.GetDirectories(Path.Combine(Application.dataPath, "Maps"))
+            .OrderBy(d => d.Length).FirstOrDefault(d => Norm(Path.GetFileName(d)).Contains(key));
+        return dir == null ? null : MapPath(dir);
+    }
+
+    private static string MapPath(string dir)
+    {
+        var file = Directory.GetFiles(dir, "*.sanmap").FirstOrDefault();
+        return "Maps/" + Path.GetFileName(dir) + "/" + (file != null ? Path.GetFileName(file) : Path.GetFileName(dir) + ".sanmap");
     }
 
     private static LobbyPlayer Player(string slot) => LobbyManager.CurrentState.players[int.Parse(slot)];
