@@ -9,6 +9,14 @@
   gamelog.ps1 -Previous        the previous launch's Player.log (crashes land there)
   gamelog.ps1 -Wait 'regex'    block until a new line matches (default 120 s, -Timeout)
   gamelog.ps1 -Deployed        each deployed mod DLL: build time, version, which worktree built it
+  gamelog.ps1 -Sessions        the past game sessions kept in BepInEx\LogArchive (Mod Manager's [Logs] Keep)
+  gamelog.ps1 -Session 1       the same report for a kept session: 0 = this one, 1 = the one before...,
+                               or its start time (2026-10-01_21-16), from both its logs
+
+  The Mod Manager's log archive (BepInEx\LogArchive, when [Logs] Keep is on)
+  holds <session>_bepinex.log (the whole session's BepInEx log, written as it
+  goes) and <session>_player.log (that session's Player.log, saved at the next
+  launch), <session> being the game's start time.
 
   Two logs matter and neither is complete:
     BepInEx\LogOutput.log   plugin Logger lines (overwritten every launch)
@@ -25,7 +33,9 @@ param(
     [switch]$Previous,
     [string]$Wait,
     [int]$Timeout = 120,
-    [switch]$Deployed
+    [switch]$Deployed,
+    [switch]$Sessions,
+    [string]$Session
 )
 
 $ErrorActionPreference = 'Stop'
@@ -46,6 +56,44 @@ $Noise = @(
     'already registered'
 )
 $NoiseRe = ($Noise -join '|')
+
+# The Mod Manager's archive of past sessions, newest first.
+$Archive = Join-Path $Game 'BepInEx\LogArchive'
+function Get-Sessions {
+    if (-not (Test-Path $Archive)) { return @() }
+    Get-ChildItem $Archive -File | Where-Object { $_.Name -match '^(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)_(bepinex|player)\.log$' } |
+        Group-Object { $_.Name.Substring(0, 19) } | Sort-Object Name -Descending |
+        ForEach-Object {
+            $files = $_.Group
+            [pscustomobject]@{
+                Stamp   = $_.Name
+                BepInEx = $files | Where-Object { $_.Name -like '*_bepinex.log' } | Select-Object -First 1
+                Player  = $files | Where-Object { $_.Name -like '*_player.log' } | Select-Object -First 1
+            }
+        }
+}
+
+if ($Sessions) {
+    $all = @(Get-Sessions)
+    if ($all.Count -eq 0) { "No kept sessions in $Archive (Mod Manager: [Logs] Keep = true starts it)."; return }
+    "Kept sessions in $Archive (newest first):"
+    for ($i = 0; $i -lt $all.Count; $i++) {
+        $s = $all[$i]
+        $kb = { param($f) if ($f) { '{0,7:N0} KB' -f ($f.Length / 1KB) } else { '      -   ' } }
+        '  {0,2}  {1}  bepinex {2}  player {3}' -f $i, $s.Stamp, (& $kb $s.BepInEx), (& $kb $s.Player)
+    }
+    '  (a session''s player log is saved when the game next starts)'
+    return
+}
+
+if ($Session) {
+    $all = @(Get-Sessions)
+    $pick = if ($Session -match '^\d+$' -and [int]$Session -lt $all.Count) { $all[[int]$Session] }
+            else { $all | Where-Object { $_.Stamp -like "$Session*" } | Select-Object -First 1 }
+    if (-not $pick) { "No kept session '$Session'; gamelog.ps1 -Sessions lists them."; exit 1 }
+    $BepLog = if ($pick.BepInEx) { $pick.BepInEx.FullName } else { Join-Path $Archive "$($pick.Stamp)_bepinex.log" }
+    $PlayerLog = if ($pick.Player) { $pick.Player.FullName } else { Join-Path $Archive "$($pick.Stamp)_player.log" }
+}
 
 function Read-Lines([string]$Path) {
     if (-not (Test-Path $Path)) { return @() }
@@ -105,7 +153,8 @@ if ($Deployed) {
 
 # --- the default report
 $proc = Get-Process -Name Sanctuary -ErrorAction SilentlyContinue
-if ($proc) { "Game: RUNNING (pid $($proc.Id), started $($proc.StartTime.ToString('HH:mm:ss')))" } else { 'Game: not running' }
+if ($Session) { "Kept session $($pick.Stamp)" }
+elseif ($proc) { "Game: RUNNING (pid $($proc.Id), started $($proc.StartTime.ToString('HH:mm:ss')))" } else { 'Game: not running' }
 foreach ($f in @($BepLog, $PlayerLog)) {
     if (Test-Path $f) { "  {0}  {1:HH:mm:ss}" -f $f, (Get-Item $f).LastWriteTime } else { "  (missing) $f" }
 }
@@ -126,7 +175,8 @@ for ($i = 0; $i -lt $bep.Count; $i++) {
 for ($i = 0; $i -lt $player.Count; $i++) {
     $l = $player[$i]
     if ($l -match $NoiseRe) { continue }
-    if ($l -match 'Exception|LUA ERROR|Lua error|\[string ".*"\]:\d+:|^\s*Error|error:|NullReference|Crash!!!') {
+    # "is invalid": the engine refusing a Lua call about an entity that is gone.
+    if ($l -match 'Exception|LUA ERROR|Lua error|\[string ".*"\]:\d+:|^\s*Error|error:|NullReference|Crash!!!|is invalid\.') {
         # Keep the first two frames of a stack so the source is visible.
         $frames = @($player[($i + 1)..([Math]::Min($i + 2, $player.Count - 1))] | Where-Object { $_ -match '^\s*(at |\S+\s*\(|\S+:\S+ \()' })
         $key = "Player.log: $l" + $(if ($frames) { "`n      " + ($frames -join "`n      ") } else { '' })
