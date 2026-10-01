@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The repo owner's own log keeper; never packed or released. Building it
+       deploys it to SanctuaryMods\LogKeeper like any mod (refused while the
+       game runs, see Directory.Build.targets). -->
+  <PropertyGroup>
+    <AssemblyName>LogKeeper</AssemblyName>
+  </PropertyGroup>
+
+</Project>
