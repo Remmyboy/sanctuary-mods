@@ -135,12 +135,52 @@ $tools = "$src\tools"
 $plugin = Get-ChildItem "$src\$Mod" -Filter *.cs -Recurse -ErrorAction SilentlyContinue |
     Select-String -Pattern '\[BepInPlugin\("[^"]+",\s*"([^"]+)",\s*"([^"]+)"\)\]' |
     Select-Object -First 1
-if (-not $plugin) { Fail "no [BepInPlugin] found under $Mod at $short - is that the right project name, and is it committed?" }
-$display = $plugin.Matches[0].Groups[1].Value
-if (-not $Version) { $Version = $plugin.Matches[0].Groups[2].Value }
-Write-Host "Packing $display $Version ($Mod) from $short" -ForegroundColor Cyan
+# A Lua-only gameplay mod (ZoneControl) has no DLL: mod.json is its identity.
+$luaMod = -not $plugin -and (Test-Path "$src\$Mod\mod.json")
+if ($luaMod) {
+    $manifest = Get-Content "$src\$Mod\mod.json" -Raw | ConvertFrom-Json
+    $display = $manifest.name
+    if (-not $Version) { $Version = $manifest.version }
+    if (-not $display -or -not $Version) { Fail "$Mod\mod.json needs a name and a version" }
+} else {
+    if (-not $plugin) { Fail "no [BepInPlugin] or mod.json found under $Mod at $short - is that the right project name, and is it committed?" }
+    $display = $plugin.Matches[0].Groups[1].Value
+    if (-not $Version) { $Version = $plugin.Matches[0].Groups[2].Value }
+}
+Write-Host "Packing $display $Version ($Mod$(if ($luaMod) { ', Lua-only' })) from $short" -ForegroundColor Cyan
+
+# ---- Lua-only: the committed files, byte for byte --------------------------
+# The lobby compares a gameplay mod's files byte for byte across players, so
+# the zip must hold exactly the committed blobs. A checkout (and git archive
+# with core.autocrlf) turns mod.json's LF into CRLF; archive with autocrlf off
+# and then prove every file against its blob hash.
+if ($luaMod) {
+    $lua = "$stage\luamod"
+    New-Item -ItemType Directory -Force -Path $lua | Out-Null
+    & git -c core.autocrlf=false -C $repo archive --format=tar -o "$stage\luamod.tar" $head -- $Mod
+    if ($LASTEXITCODE -ne 0) { Fail "git archive of $Mod failed" }
+    & "$env:SystemRoot\System32\tar.exe" -xf "$stage\luamod.tar" -C $lua
+    if ($LASTEXITCODE -ne 0) { Fail "extracting the archive of $Mod failed" }
+    # Repo plumbing, not part of the mod.
+    Get-ChildItem "$lua\$Mod" -Recurse -Force -Filter .gitattributes | Remove-Item -Force
+    $blobs = @{}
+    foreach ($l in (& git -C $repo ls-tree -r $head -- $Mod)) {
+        if ($l -match '^\d+ blob ([0-9a-f]{40})\t(.+)$') { $blobs[$Matches[2]] = $Matches[1] }
+    }
+    $sha1 = [Security.Cryptography.SHA1]::Create()
+    $files = Get-ChildItem "$lua\$Mod" -Recurse -File
+    foreach ($f in $files) {
+        $rel = $f.FullName.Substring("$lua\".Length).Replace('\', '/')
+        $bytes = [IO.File]::ReadAllBytes($f.FullName)
+        $header = [Text.Encoding]::ASCII.GetBytes("blob $($bytes.Length)`0")
+        $hash = -join ($sha1.ComputeHash([byte[]]($header + $bytes)) | ForEach-Object { $_.ToString('x2') })
+        if ($blobs[$rel] -ne $hash) { Fail "$rel in the archive does not match its committed blob (line endings?)" }
+    }
+    Write-Host "  $($files.Count) file(s), each identical to its committed blob"
+}
 
 # ---- build ----------------------------------------------------------------
+if (-not $luaMod) {
 Write-Host "  building Release..."
 $buildLog = & dotnet build "$src\SanctuaryMods.sln" -c Release -v q --nologo -p:DeployPath=$stage
 if ($LASTEXITCODE -ne 0) {
@@ -160,6 +200,7 @@ foreach ($dll in @("$Mod.dll", 'ModLoader.dll', 'Sanctuary.ModApi.dll') | Select
     if ($rev -ne $head) { Fail "$dll carries source revision $rev (product version '$pv'), expected $head" }
 }
 Write-Host "  DLLs carry source revision $short"
+}
 
 $outPath = if ([System.IO.Path]::IsPathRooted($OutDir)) { $OutDir } else { Join-Path $repo $OutDir }
 New-Item -ItemType Directory -Force -Path $outPath | Out-Null
@@ -172,7 +213,8 @@ function New-Zip($dir, $zip) {
 # ---- ModManager add-in ----------------------------------------------------
 $mm = "$stage\mm"
 New-Item -ItemType Directory -Force -Path "$mm\SanctuaryMods\$Mod" | Out-Null
-Copy-Item "$stage\$Mod.dll" "$mm\SanctuaryMods\$Mod\$Mod.dll"
+if ($luaMod) { Copy-Item "$stage\luamod\$Mod\*" "$mm\SanctuaryMods\$Mod\" -Recurse }
+else { Copy-Item "$stage\$Mod.dll" "$mm\SanctuaryMods\$Mod\$Mod.dll" }
 # A mod may ship data next to its DLL (SanctuaryHud's alert sounds live in
 # <Mod>\sounds); anything under the project's sounds folder goes along.
 if (Test-Path "$src\$Mod\sounds") { Copy-Item "$src\$Mod\sounds" "$mm\SanctuaryMods\$Mod\sounds" -Recurse }
@@ -210,9 +252,15 @@ $needsManager
 INSTALL
 1. Extract this zip into your Sanctuary 'engine' folder (the one with
    Sanctuary.exe), so the mod lands in SanctuaryMods\$Mod\.
+$(if ($luaMod) { @"
+2. It is a gameplay mod: it only runs in lobbies whose host switches it on
+   (Mods, in the lobby), and every player needs this same copy before Start
+   works. Outside those lobbies the game runs vanilla.
+"@ } else { @"
 2. That's it. If the game is already running the loader picks it up on the
    spot; it shows up under UI Mods on the Mods page, where it can be
    switched off and on and its settings changed.$frameworkNote
+"@ })
 
 WHAT IT DOES
 $bodyText
@@ -306,7 +354,7 @@ function Assert-Entries($zip, $expected) {
     $stray = $names | Where-Object { $_ -like 'BepInEx/config/*' -and $_ -ne 'BepInEx/config/BepInEx.cfg' }
     if ($stray) { Fail "$([IO.Path]::GetFileName($zip)) ships stray config: $($stray -join ', ')" }
 }
-$mmExpected = @("SanctuaryMods/$Mod/$Mod.dll", 'README.txt')
+$mmExpected = @($(if ($luaMod) { "SanctuaryMods/$Mod/mod.json" } else { "SanctuaryMods/$Mod/$Mod.dll" }), 'README.txt')
 if ($framework) { $mmExpected += 'BepInEx/plugins/ModLoader.dll', 'BepInEx/plugins/Sanctuary.ModApi.dll' }
 Assert-Entries $mmZip $mmExpected
 if ($saZip) {
@@ -337,7 +385,16 @@ if ($LASTEXITCODE -ne 2) { Fail "could not list origin's tags (git exit $LASTEXI
 & gh release view $tag 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) { Fail "release $tag already exists - bump [BepInPlugin] first" }
 
-$notesText = if ($Notes) { (Get-Content $Notes -Raw).TrimEnd() } else {
+$notesText = if ($Notes) { (Get-Content $Notes -Raw).TrimEnd() } elseif ($luaMod) {
+    @"
+$bodyText
+
+- **ModManager** - extract into the game's ``engine`` folder, so the mod lands in ``SanctuaryMods\$Mod\``. Needs the [Sanctuary Mod Manager](https://github.com/Remmyboy/sanctuary-mods/releases?q=ModManager).
+- **Every player** needs this same copy. The host opens **Mods** in the lobby and switches it on; Start waits until everyone matches.
+
+This is a gameplay mod: it changes the match's Lua, but only in lobbies where the host picks it. Outside those the game runs vanilla. Built for the game update of $BuiltFor.
+"@
+} else {
     @"
 $bodyText
 
