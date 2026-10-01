@@ -52,6 +52,7 @@ public class Probe : BaseUnityPlugin
   texts [path]                every TMP text under path
   click <path>                Button.onClick, or a synthetic pointer click
   tap <path>                  a synthetic pointer down/up/click, never Button.onClick
+  rtap <path>                 the same with the right button
   pointer <enter|exit|down|up|click> <path>   one pointer event
   active <0|1> <path>         SetActive (hide a stuck overlay for a shot)
   scroll <0..1> <path>        the ScrollRect on or around path (1 = top)
@@ -261,14 +262,19 @@ public class Probe : BaseUnityPlugin
             }
             case "click":
             case "tap":
+            case "rtap":
             {
                 var t = Find(arg);
                 if (t == null) { Out("not found: " + arg); break; }
                 // tap skips Button.onClick: rows whose own pointer handler
                 // does something else (the Mods page's folding sections).
+                // rtap is tap with the right button (unit and queue buttons).
                 var button = verb == "click" ? t.GetComponent<Button>() : null;
                 if (button != null) { button.onClick.Invoke(); Out("Button.onClick on " + PathOf(t)); break; }
-                var ev = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+                var ev = new PointerEventData(EventSystem.current)
+                {
+                    button = verb == "rtap" ? PointerEventData.InputButton.Right : PointerEventData.InputButton.Left
+                };
                 ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerDownHandler);
                 ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerUpHandler);
                 ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerClickHandler);

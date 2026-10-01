@@ -67,7 +67,8 @@ In a replay's ALL view every army reads as focused.
 **UI**: `tree [path] [depth]` (active, CanvasGroup alpha, canvas sort, sprite,
 text, size), `find <name>`, `texts [path]`, `click <path>`. `tap <path>` sends
 pointer events and never `Button.onClick` (the Mods page's folding rows, the
-lobby's Mods button and HUD tiles need it); `pointer <enter|exit|...> <path>`
+lobby's Mods button and HUD tiles need it), `rtap <path>` with the right
+button (take from a queue tile); `pointer <enter|exit|...> <path>`
 sends one (hover a build tile for the build card, clear a stuck sidebar
 highlight); `active <0|1> <path>` hides something for a shot; `scroll to <path>`
 or `scroll <0..1> <path>` moves a list. Paths can have spaces; `path#n` is the
