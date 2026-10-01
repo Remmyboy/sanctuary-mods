@@ -17,6 +17,7 @@ parties: `docs/writing-mods.md`, `docs/your-first-mod.md`, `templates/`,
 | Read the game's C# and Lua for the installed build | `pwsh tools/game-ref.ps1 path`, then Grep `cs\Trebuchet`, `lua\`, `api.txt` |
 | After a game patch: what moved, and which mod names broke | `pwsh tools/game-ref.ps1 snapshot`, `diff`, `check` - the **game-patch** skill |
 | Syntax-check every Lua chunk (files and C# strings) with the game's LuaJIT | `pwsh tools/lua-check.ps1 [paths]` |
+| Validate every mod.json against docs/mod.schema.json | `python tools/check-manifests.py` (needs `pip install jsonschema`) |
 | What the game and mods logged, minus noise; wait for a log line | `pwsh tools/gamelog.ps1 [-Mod X] [-Previous] [-Wait regex]` |
 | Which build of each mod is in the game, from which worktree | `pwsh tools/gamelog.ps1 -Deployed` |
 | Uncommitted or unmerged work across all worktrees | `pwsh tools/worktrees.ps1 [-Detail]` |
@@ -26,6 +27,10 @@ parties: `docs/writing-mods.md`, `docs/your-first-mod.md`, `templates/`,
 
 Prefer these over one-off scripts. If you build a throwaway tool twice, make
 it one of these instead.
+
+CI (`.github/workflows/checks.yml`) runs the Lua and manifest checks on pushes
+to main and on PRs. Nothing else can run there: the mods compile against the
+game's own DLLs, which can't be published.
 
 ## The game is the user's
 
