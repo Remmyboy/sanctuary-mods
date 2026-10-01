@@ -46,10 +46,16 @@ public class Probe : BaseUnityPlugin
   waitlua <seconds> <expr>    hold until <expr> is truthy, or fail after <seconds>
   waitmatch [seconds]         hold until the client Lua VM exists (default 180)
   shot <name>                 screenshot to shots\<name>.png
+  (a path is a full path, its tail, or a name; path#n is the nth active match from 0)
   tree [path] [depth]         UI hierarchy (default: the InterfaceManager canvas, depth 4)
   find <text> [max]           transforms whose name contains <text>, with paths
   texts [path]                every TMP text under path
   click <path>                Button.onClick, or a synthetic pointer click
+  tap <path>                  a synthetic pointer down/up/click, never Button.onClick
+  pointer <enter|exit|down|up|click> <path>   one pointer event
+  active <0|1> <path>         SetActive (hide a stuck overlay for a shot)
+  scroll <0..1> <path>        the ScrollRect on or around path (1 = top)
+  scroll to <path>            scroll path's list so path is at the top
   window <Name>               InterfaceManager.TransitionTo(Window.<Name>)
   modspage open|close         the Mod Manager page
   cfg <plugin>                list a plugin's settings (plugin = GUID, type or assembly name)
@@ -225,8 +231,10 @@ public class Probe : BaseUnityPlugin
             }
             case "tree":
             {
-                var root = a.Length > 0 && !int.TryParse(a[0], out _) ? Find(a[0]) : UiRoot();
+                // The path is every word but a trailing depth: paths have spaces.
                 var depth = a.Length > 0 && int.TryParse(a[a.Length - 1], out var d) ? d : 4;
+                var words = a.Length > 0 && int.TryParse(a[a.Length - 1], out _) ? a.Take(a.Length - 1).ToArray() : a;
+                var root = words.Length > 0 ? Find(string.Join(" ", words)) : UiRoot();
                 if (root == null) { Out("not found: " + arg); break; }
                 var sb = new StringBuilder();
                 sb.AppendLine(PathOf(root));
@@ -252,16 +260,78 @@ public class Probe : BaseUnityPlugin
                 break;
             }
             case "click":
+            case "tap":
             {
                 var t = Find(arg);
                 if (t == null) { Out("not found: " + arg); break; }
-                var button = t.GetComponent<Button>();
+                // tap skips Button.onClick: rows whose own pointer handler
+                // does something else (the Mods page's folding sections).
+                var button = verb == "click" ? t.GetComponent<Button>() : null;
                 if (button != null) { button.onClick.Invoke(); Out("Button.onClick on " + PathOf(t)); break; }
                 var ev = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
                 ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerDownHandler);
                 ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerUpHandler);
                 ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerClickHandler);
                 Out("pointer down/up/click on " + PathOf(t));
+                break;
+            }
+            case "pointer":
+            {
+                // pointer <enter|exit|down|up|click> <path>: one pointer event.
+                var t = a.Length > 1 ? Find(string.Join(" ", a.Skip(1))) : null;
+                if (t == null) { Out("usage: pointer <enter|exit|down|up|click> <path> (not found)"); break; }
+                var ev = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+                switch (a[0].ToLowerInvariant())
+                {
+                    case "enter": ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerEnterHandler); break;
+                    case "exit": ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerExitHandler); break;
+                    case "down": ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerDownHandler); break;
+                    case "up": ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerUpHandler); break;
+                    case "click": ExecuteEvents.Execute(t.gameObject, ev, ExecuteEvents.pointerClickHandler); break;
+                    default: Out("unknown pointer event: " + a[0]); return;
+                }
+                Out($"pointer {a[0]} on {PathOf(t)}");
+                break;
+            }
+            case "active":
+            {
+                // active <0|1> <path>: SetActive, for hiding a stuck overlay in a shot.
+                var t = a.Length > 1 ? Find(string.Join(" ", a.Skip(1))) : null;
+                if (t == null) { Out("usage: active <0|1> <path> (not found)"); break; }
+                t.gameObject.SetActive(a[0] == "1" || a[0].Equals("true", StringComparison.OrdinalIgnoreCase));
+                Out($"{PathOf(t)} active={t.gameObject.activeSelf}");
+                break;
+            }
+            case "scroll":
+            {
+                // scroll to <path>: the ScrollRect above path, scrolled so path's top is the view's top.
+                if (a.Length >= 2 && a[0] == "to")
+                {
+                    var target = Find(string.Join(" ", a.Skip(1))) as RectTransform;
+                    var sr = target != null ? target.GetComponentInParent<ScrollRect>() : null;
+                    if (sr == null || sr.content == null) { Out("no ScrollRect above: " + string.Join(" ", a.Skip(1))); break; }
+                    Canvas.ForceUpdateCanvases();
+                    var corners = new Vector3[4];
+                    target.GetWorldCorners(corners);
+                    var content = sr.content;
+                    var below = content.rect.yMax - content.InverseTransformPoint(corners[1]).y;
+                    var view = sr.viewport != null ? sr.viewport.rect.height : ((RectTransform)sr.transform).rect.height;
+                    var y = Mathf.Clamp(below, 0f, Mathf.Max(0f, content.rect.height - view));
+                    content.anchoredPosition = new Vector2(content.anchoredPosition.x, y);
+                    Out($"scrolled {PathOf(sr.transform)} to {PathOf(target)} ({y:0} of {content.rect.height - view:0})");
+                    break;
+                }
+                // scroll <0..1> <path>: the ScrollRect on or above path, 1 = top.
+                if (a.Length < 2 || !float.TryParse(a[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var to))
+                {
+                    Out("usage: scroll <0..1> <path>");
+                    break;
+                }
+                var t = Find(string.Join(" ", a.Skip(1)));
+                var rect = t != null ? t.GetComponentInParent<ScrollRect>() ?? t.GetComponentInChildren<ScrollRect>() : null;
+                if (rect == null) { Out("no ScrollRect at or around: " + string.Join(" ", a.Skip(1))); break; }
+                rect.verticalNormalizedPosition = Mathf.Clamp01(to);
+                Out($"scrolled {PathOf(rect.transform)} to {rect.verticalNormalizedPosition:0.##}");
                 break;
             }
             case "window":
@@ -627,7 +697,18 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
     // An exact path, else a path suffix, else a name; active objects first.
     private static Transform Find(string path)
     {
+        // path#n: the nth (from 0) active match, for siblings that share a name.
+        var nth = -1;
+        var hash = path.LastIndexOf('#');
+        if (hash > 0 && int.TryParse(path.Substring(hash + 1), out var n))
+        {
+            nth = n;
+            path = path.Substring(0, hash);
+        }
         var all = SceneTransforms().ToList();
+        if (nth >= 0)
+            return all.Where(t => t.gameObject.activeInHierarchy && (PathOf(t) == path || PathOf(t).EndsWith("/" + path) || t.name == path))
+                .Skip(nth).FirstOrDefault();
         var hit = all.Where(t => PathOf(t) == path)
             .Concat(all.Where(t => PathOf(t).EndsWith("/" + path)))
             .Concat(all.Where(t => t.name == path))
