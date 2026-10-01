@@ -40,18 +40,18 @@ mod builds to `<name>.dll`, and the project link is its source.
 | Project | Download | What it does |
 | --- | --- | --- |
 | [SanctuaryHud](SanctuaryHud/) | [**0.14.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.14.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging |
-| [IdleEngineers](IdleEngineers/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.5.3) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas |
-| [EcoManager](EcoManager/) | [**0.7.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.3) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
+| [IdleEngineers](IdleEngineers/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.6.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
+| [EcoManager](EcoManager/) | [**0.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.8.0) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
+| [ModManager](ModManager/) | [**0.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.10.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
-| [PhantomX](PhantomX/) | — | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [PhantomX](PhantomX/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.1.0) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (1.5.0, unreleased), and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.10.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.10.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1537,7 +1537,8 @@ value beside it. Problems show in the match's message log as
 
 A **gameplay mod**: Supreme Commander's Phantom-X (faf-phantomx v268, by
 Novaprim3, Duck_42, mead, SpikeyNoob and Fichom), ported. It is Lua only, and
-its panel is drawn by the Mod API from Lua, so it needs Mod API 1.5.0 or later.
+its panel is drawn by the Mod API from Lua, so it needs Mod Manager 0.10.0 or
+later (Mod API 1.5.0), for every player.
 
 - **Everyone starts allied**, whatever the lobby's teams, and nobody shares
   resources. A few minutes in (8 by default) some players secretly become

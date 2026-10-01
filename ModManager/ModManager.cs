@@ -25,7 +25,7 @@ namespace SanctuaryHud
     //
     // This plugin hot-reloads like any mod; the gameplay files a running
     // match reads live in the API, so reloading it mid-match is harmless.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.9.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.10.0")]
     [BepInDependency(ModApiPlugin.Guid)]
     public class ModManagerPlugin : BaseUnityPlugin
     {
