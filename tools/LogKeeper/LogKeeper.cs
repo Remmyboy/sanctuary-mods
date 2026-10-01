@@ -105,7 +105,16 @@ namespace LogKeeper
             // Listening first, so nothing logged while the file is copied is
             // missed (a line or two may then appear twice).
             BepInEx.Logging.Logger.Listeners.Add(_listener);
-            if (fresh) _listener.Prepend(ReadShared(Path.Combine(Paths.BepInExRootPath, "LogOutput.log")));
+            if (fresh)
+            {
+                // BepInEx buffers LogOutput.log and writes it out now and then:
+                // without a flush the file can still be empty at this point.
+                foreach (var disk in BepInEx.Logging.Logger.Listeners.OfType<DiskLogListener>().ToList())
+                {
+                    try { disk.LogWriter?.Flush(); } catch { }
+                }
+                _listener.Prepend(ReadShared(Path.Combine(Paths.BepInExRootPath, "LogOutput.log")));
+            }
             else _listener.Note("Log Keeper reloaded: lines logged while it was reloading are missing here");
             Prune();
             _log.LogInfo($"Log archive: keeping the last {_cfgSessions.Value} session(s), up to {_cfgMaxSizeMB.Value} MB, in {_folder}.");
