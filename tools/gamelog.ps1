@@ -9,11 +9,11 @@
   gamelog.ps1 -Previous        the previous launch's Player.log (crashes land there)
   gamelog.ps1 -Wait 'regex'    block until a new line matches (default 120 s, -Timeout)
   gamelog.ps1 -Deployed        each deployed mod DLL: build time, version, which worktree built it
-  gamelog.ps1 -Sessions        the past game sessions kept in BepInEx\LogArchive (Mod Manager's [Logs] Keep)
+  gamelog.ps1 -Sessions        the past game sessions kept in BepInEx\LogArchive (by tools/LogKeeper)
   gamelog.ps1 -Session 1       the same report for a kept session: 0 = this one, 1 = the one before...,
                                or its start time (2026-10-01_21-16), from both its logs
 
-  The Mod Manager's log archive (BepInEx\LogArchive, when [Logs] Keep is on)
+  tools/LogKeeper's archive (BepInEx\LogArchive, in the owner's game)
   holds <session>_bepinex.log (the whole session's BepInEx log, written as it
   goes) and <session>_player.log (that session's Player.log, saved at the next
   launch), <session> being the game's start time.
@@ -57,7 +57,7 @@ $Noise = @(
 )
 $NoiseRe = ($Noise -join '|')
 
-# The Mod Manager's archive of past sessions, newest first.
+# tools/LogKeeper's archive of past sessions, newest first.
 $Archive = Join-Path $Game 'BepInEx\LogArchive'
 function Get-Sessions {
     if (-not (Test-Path $Archive)) { return @() }
@@ -75,7 +75,7 @@ function Get-Sessions {
 
 if ($Sessions) {
     $all = @(Get-Sessions)
-    if ($all.Count -eq 0) { "No kept sessions in $Archive (Mod Manager: [Logs] Keep = true starts it)."; return }
+    if ($all.Count -eq 0) { "No kept sessions in $Archive (install it: dotnet build tools/LogKeeper/LogKeeper.csproj, game closed)."; return }
     "Kept sessions in $Archive (newest first):"
     for ($i = 0; $i -lt $all.Count; $i++) {
         $s = $all[$i]

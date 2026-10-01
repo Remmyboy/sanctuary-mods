@@ -11,31 +11,47 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using UnityEngine;
 
-namespace SanctuaryHud
+namespace LogKeeper
 {
     // Keeps the logs of the last few game sessions in BepInEx\LogArchive, so
     // what happened in a match can still be read after the game is closed or
-    // relaunched. The game keeps only its last two Player logs, and BepInEx
-    // empties LogOutput.log at every launch.
+    // relaunched (tools\gamelog.ps1 -Sessions). The game keeps only its last
+    // two Player logs, and BepInEx empties LogOutput.log at every launch.
     //
     //   <session>_bepinex.log  this session's BepInEx log: what LogOutput.log
-    //                          held when the manager loaded, then every line
-    //                          after it as it is logged (so it survives a crash)
+    //                          held when this loaded, then every line after it
+    //                          as it is logged (so it survives a crash)
     //   <session>_player.log   the game's own log (Player.log) of that session,
     //                          saved at the next launch from Player-prev.log
     //
-    // <session> is the game's start time, so a hot reload of the manager
-    // carries on with the same file. Old sessions go first when there are
-    // more than Sessions of them or the folder passes MaxSizeMB; one file
-    // stops at a quarter of MaxSizeMB, so a session flooding the log can't
-    // push every other one out.
+    // <session> is the game's start time, so a hot reload carries on with the
+    // same file. Old sessions go first when there are more than Sessions of
+    // them or the folder passes MaxSizeMB; one file stops at a quarter of
+    // MaxSizeMB, so a session flooding the log can't push every other one out.
+    //
+    // A personal dev tool for the repo owner's own game, like tools\Probe:
+    // never packed or released.
+    [BepInPlugin("com.sanctuarydb.logkeeper", "Log Keeper", "1.0.0")]
+    public class LogKeeperPlugin : BaseUnityPlugin
+    {
+        private LogArchive _archive;
+
+        private void Awake()
+        {
+            try { _archive = new LogArchive(Config, Logger); }
+            catch (Exception e) { Logger.LogWarning($"Log archive unavailable: {e.Message}"); }
+        }
+
+        // A reload's new copy carries on with the same session file.
+        private void OnDestroy() => _archive?.Dispose();
+    }
+
     internal sealed class LogArchive : IDisposable
     {
         private const string Stamp = "yyyy-MM-dd_HH-mm-ss";
         private static readonly Regex SessionFile = new Regex(@"^(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)_", RegexOptions.Compiled);
 
         private readonly ManualLogSource _log;
-        private readonly ConfigEntry<bool> _cfgKeep;
         private readonly ConfigEntry<int> _cfgSessions;
         private readonly ConfigEntry<int> _cfgMaxSizeMB;
         private readonly string _folder = Path.Combine(Paths.BepInExRootPath, "LogArchive");
@@ -45,9 +61,6 @@ namespace SanctuaryHud
         internal LogArchive(ConfigFile config, ManualLogSource log)
         {
             _log = log;
-            _cfgKeep = config.Bind("Logs", "Keep", false,
-                "Keep the BepInEx and game logs of your last few game sessions in BepInEx\\LogArchive, " +
-                "so problems in a match can be looked at after the game is closed.");
             _cfgSessions = config.Bind("Logs", "Sessions", 10,
                 new ConfigDescription("How many game sessions' logs to keep.", new AcceptableValueRange<int>(1, 50)));
             _cfgMaxSizeMB = config.Bind("Logs", "MaxSizeMB", 100,
@@ -55,7 +68,6 @@ namespace SanctuaryHud
                     new AcceptableValueRange<int>(10, 1000)));
             _session = SessionStamp();
 
-            _cfgKeep.SettingChanged += (_, __) => Apply();
             _cfgSessions.SettingChanged += (_, __) => Prune();
             _cfgMaxSizeMB.SettingChanged += (_, __) => Prune();
             Apply();
@@ -73,8 +85,7 @@ namespace SanctuaryHud
         {
             try
             {
-                if (_cfgKeep.Value) Start();
-                else Stop();
+                Start();
             }
             catch (Exception e)
             {
@@ -95,7 +106,7 @@ namespace SanctuaryHud
             // missed (a line or two may then appear twice).
             BepInEx.Logging.Logger.Listeners.Add(_listener);
             if (fresh) _listener.Prepend(ReadShared(Path.Combine(Paths.BepInExRootPath, "LogOutput.log")));
-            else _listener.Note("Mod Manager reloaded: lines logged while it was reloading are missing here");
+            else _listener.Note("Log Keeper reloaded: lines logged while it was reloading are missing here");
             Prune();
             _log.LogInfo($"Log archive: keeping the last {_cfgSessions.Value} session(s), up to {_cfgMaxSizeMB.Value} MB, in {_folder}.");
         }

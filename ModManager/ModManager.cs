@@ -93,9 +93,6 @@ namespace SanctuaryHud
         // panel. The hotkey opens the page full-screen during a match.
         private ModsPage _page;
 
-        // The last few sessions' logs, kept in BepInEx\LogArchive (off unless switched on).
-        private LogArchive _logs;
-
         private void Awake()
         {
             _log = Logger;
@@ -104,8 +101,6 @@ namespace SanctuaryHud
                 "Semicolon-separated GUIDs of C# plugins switched off on the Mods page. ModLoader 1.3+ never starts " +
                 "these; an older loader starts them and the manager stops them straight away.");
             MigrateLuaMods();
-            try { _logs = new LogArchive(Config, _log); }
-            catch (Exception e) { _log.LogWarning($"Log archive unavailable: {e.Message}"); }
 
             _page = new ModsPage(this, _log);
             _log.LogInfo($"Mod manager ready: {ModCatalog.Mods.Count} mod folder(s) in {ModCatalog.ModsRoot}. " +
@@ -129,9 +124,6 @@ namespace SanctuaryHud
 
         private void OnDestroy()
         {
-            // A reload's new copy carries on with the same session file.
-            try { _logs?.Dispose(); }
-            catch (Exception e) { _log.LogWarning($"Log archive teardown failed: {e.Message}"); }
             try { _page?.Destroy(); }
             catch (Exception e) { _log.LogWarning($"Mods page teardown failed: {e.Message}"); }
         }

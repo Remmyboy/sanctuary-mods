@@ -19,7 +19,7 @@ parties: `docs/writing-mods.md`, `docs/your-first-mod.md`, `templates/`,
 | Syntax-check every Lua chunk (files and C# strings) with the game's LuaJIT | `pwsh tools/lua-check.ps1 [paths]` |
 | Validate every mod.json against docs/mod.schema.json | `python tools/check-manifests.py` (needs `pip install jsonschema`) |
 | What the game and mods logged, minus noise; wait for a log line | `pwsh tools/gamelog.ps1 [-Mod X] [-Previous] [-Wait regex]` |
-| The user's past game sessions (both logs, kept by the Mod Manager) | `pwsh tools/gamelog.ps1 -Sessions`, then `-Session <n>` |
+| The user's past game sessions (both logs, kept by tools/LogKeeper) | `pwsh tools/gamelog.ps1 -Sessions`, then `-Session <n>` |
 | Which build of each mod is in the game, from which worktree | `pwsh tools/gamelog.ps1 -Deployed` |
 | Uncommitted or unmerged work across all worktrees | `pwsh tools/worktrees.ps1 [-Detail]` |
 | Past Claude sessions on this repo | `node tools/history.mjs list` / `search <regex>` / `show <id>` |
@@ -58,9 +58,9 @@ game's own DLLs, which can't be published.
   launch before). The `...\Sanctuary Shattered Sun\` folder beside it is a
   stale demo log. Crashes: `%TEMP%\Enhearten Media PTY\Sanctuary\Crashes`.
   Older sessions: `BepInEx\LogArchive\<start time>_bepinex.log` and
-  `_player.log`, kept by the Mod Manager (`[Logs] Keep`, on in the user's
-  game; 10 sessions, 100 MB). Launching the game for a test adds a session
-  and pushes the oldest out.
+  `_player.log`, kept by `tools/LogKeeper` (a dev-only plugin in the user's
+  game, never released; 10 sessions, 100 MB). Launching the game for a test
+  adds a session and pushes the oldest out.
 - Replays: `LocalLow\Enhearten Media PTY\Sanctuary\Replays`.
 - Game reference snapshots: `%LOCALAPPDATA%\SanctuaryRef\<buildid>` (never commit them).
 
