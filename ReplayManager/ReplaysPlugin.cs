@@ -79,6 +79,8 @@ namespace SanctuaryHud.Replays
 
         private sealed class EcoRow
         {
+            // In already includes Harvest: the host sets income to generation
+            // plus harvest (host/systems/economy.lua), so never add the two.
             public float ACur, AStore, AIn, AHarvest, AOut, AReq;
             public float ECur, EStore, EIn, EHarvest, EOut, EReq;
             public float ATotalIn, ATotalOut, ETotalIn, ETotalOut;   // whole game so far
@@ -229,9 +231,9 @@ namespace SanctuaryHud.Replays
             "        eco[data.armyId] = data.totals " +
             "        local a, e = data.totals.alloys or {}, data.totals.energy or {} " +
             "        local s = sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0 } " +
-            "        s.ai = s.ai + (a.income or 0) + (a.harvest or 0) " +
+            "        s.ai = s.ai + (a.income or 0) " +
             "        s.ao = s.ao + (a.outcome or 0) " +
-            "        s.ei = s.ei + (e.income or 0) + (e.harvest or 0) " +
+            "        s.ei = s.ei + (e.income or 0) " +
             "        s.eo = s.eo + (e.outcome or 0) " +
             "        sum[data.armyId] = s " +
             "        local parts = {} " +
@@ -912,9 +914,9 @@ namespace SanctuaryHud.Replays
                 if (_eco.TryGetValue(a.Id, out var e))
                 {
                     VRule(RowH);
-                    Resource(AlloyColour, e.ACur, e.AStore, e.AIn + e.AHarvest, e.AReq, e.AOut, e.ATotalOut);
+                    Resource(AlloyColour, e.ACur, e.AStore, e.AIn, e.AReq, e.AOut, e.ATotalOut);
                     VRule(RowH, true);
-                    Resource(EnergyColour, e.ECur, e.EStore, e.EIn + e.EHarvest, e.EReq, e.EOut, e.ETotalOut);
+                    Resource(EnergyColour, e.ECur, e.EStore, e.EIn, e.EReq, e.EOut, e.ETotalOut);
                 }
                 else
                 {
