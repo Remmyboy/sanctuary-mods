@@ -22,7 +22,7 @@ namespace SanctuaryHud.Replays
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.4.3")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.4.4")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -79,6 +79,8 @@ namespace SanctuaryHud.Replays
 
         private sealed class EcoRow
         {
+            // In already includes Harvest: the host sets income to generation
+            // plus harvest (host/systems/economy.lua), so never add the two.
             public float ACur, AStore, AIn, AHarvest, AOut, AReq;
             public float ECur, EStore, EIn, EHarvest, EOut, EReq;
             public float ATotalIn, ATotalOut, ETotalIn, ETotalOut;   // whole game so far
@@ -229,9 +231,9 @@ namespace SanctuaryHud.Replays
             "        eco[data.armyId] = data.totals " +
             "        local a, e = data.totals.alloys or {}, data.totals.energy or {} " +
             "        local s = sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0 } " +
-            "        s.ai = s.ai + (a.income or 0) + (a.harvest or 0) " +
+            "        s.ai = s.ai + (a.income or 0) " +
             "        s.ao = s.ao + (a.outcome or 0) " +
-            "        s.ei = s.ei + (e.income or 0) + (e.harvest or 0) " +
+            "        s.ei = s.ei + (e.income or 0) " +
             "        s.eo = s.eo + (e.outcome or 0) " +
             "        sum[data.armyId] = s " +
             "        local parts = {} " +
@@ -282,6 +284,51 @@ namespace SanctuaryHud.Replays
             "  __SdbReplayFocus = tostring(GetFocusArmy()) " +
             "end)";
 
+        // The game's result panel. The client shows VICTORY or DEFEAT the
+        // first time the focused army's result comes in, and in the all-armies
+        // view every army counts as focused, so in a replay it came up the
+        // moment the first player was wiped out. A replay has no "us": hold
+        // the panel back until the match is decided — some army has won, i.e.
+        // all its enemies are out — then show it for whichever view is being
+        // watched (GAME OVER in the all-armies view).
+        //
+        // The game's handler still runs for every update, with the panel
+        // calls muted, so anything else wrapping it (MatchStats records each
+        // army's result there) sees them all whichever order the wrappers
+        // went on in. Installed once the armies are registered, so nothing
+        // here is the first to Import the module.
+        private const string ResultChunk =
+            "if not __SdbReplayResult and type(Armies) == 'table' and next(Armies) ~= nil then " +
+            "  __SdbReplayResult = true " +
+            "  local ok, err = pcall(function() " +
+            "    local W = Import('client/winCondition.lua') " +
+            "    local inner = W.WinConditionUpdate " +
+            "    if type(inner) ~= 'function' then error('WinConditionUpdate is missing') end " +
+            "    local GR = (UIPanelType and UIPanelType.GameResult) or 9 " +
+            "    local cond, shown = {}, false " +
+            "    W.WinConditionUpdate = function(data, ...) " +
+            "      pcall(function() cond[data.armyID] = data.condition end) " +
+            "      local vis, txt = Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues " +
+            "      Engine.UI_SetPanelVisibility = function(t, v) if t ~= GR then return vis(t, v) end end " +
+            "      Engine.UI_SetGameResultValues = function() end " +
+            "      local ok2, err2 = pcall(inner, data, ...) " +
+            "      Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues = vis, txt " +
+            "      if not ok2 then error(err2, 0) end " +
+            "      if shown then return end " +
+            "      local over = false " +
+            "      for _, c in pairs(cond) do if c == 1 then over = true end end " +
+            "      if not over then return end " +
+            "      shown = true " +
+            "      local c = cond[GetFocusArmy()] " +
+            "      local text = (c == 1 and 'VICTORY!') or (c == 2 and 'DEFEAT!') or 'GAME OVER!' " +
+            "      local ok3, err3 = pcall(function() txt(EngineClasses.UIGameResultValues(text)) end) " +
+            "      if not ok3 then __SdbReplayHookErr = 'result text: ' .. tostring(err3) end " +
+            "      vis(GR, true) " +
+            "    end " +
+            "  end) " +
+            "  if not ok then __SdbReplayHookErr = (__SdbReplayHookErr or '') .. ' result: ' .. tostring(err) end " +
+            "end";
+
         private void InstallEarlyHooks()
         {
             EnsureLuaBridge();
@@ -304,6 +351,7 @@ namespace SanctuaryHud.Replays
 
             // Normally already done at start-up; this is the fallback.
             if (!_luaHooked && RunLua(InstallChunk)) _luaHooked = true;
+            RunLua(ResultChunk);
             if (!RunLua(QueryChunk)) return;
 
             ParseArmies(GetLuaGlobal("__SdbReplayArmies"));
@@ -866,9 +914,9 @@ namespace SanctuaryHud.Replays
                 if (_eco.TryGetValue(a.Id, out var e))
                 {
                     VRule(RowH);
-                    Resource(AlloyColour, e.ACur, e.AStore, e.AIn + e.AHarvest, e.AReq, e.AOut, e.ATotalOut);
+                    Resource(AlloyColour, e.ACur, e.AStore, e.AIn, e.AReq, e.AOut, e.ATotalOut);
                     VRule(RowH, true);
-                    Resource(EnergyColour, e.ECur, e.EStore, e.EIn + e.EHarvest, e.EReq, e.EOut, e.ETotalOut);
+                    Resource(EnergyColour, e.ECur, e.EStore, e.EIn, e.EReq, e.EOut, e.ETotalOut);
                 }
                 else
                 {
