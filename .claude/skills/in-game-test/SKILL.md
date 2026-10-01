@@ -15,6 +15,10 @@ Order of cheapness, use the first that answers the question:
 3. **Ask the user** to look - for feel, taste and anything visual the probe's
    screenshot can't settle.
 
+Verified end to end on 2026-10-01: install, launch, menu checks, `skirmish
+white desert`, in-match Lua (values, errors, syntax errors), `pfield`,
+`waitlua`, `tree`, `shot`, `leave`, `quit`, uninstall.
+
 ## Before touching the game
 
 - `Get-Process Sanctuary` right before **every** write into the game folder.
@@ -53,8 +57,8 @@ SetSelectedEntities). `luaf file.lua` runs a file - write it with the Write
 tool, never printf (backslash paths break).
 
 **A live match**: `skirmish [map]` = private lobby (The Forge unless named),
-AI in slot 1 on team 2, ready, start, `waitmatch`. `maps` lists the stock maps
-and every installed map folder; a map is named by part of its name
+AI in slot 1 on team 2, ready, start, `waitmatch`. `maps [text]` lists the stock maps
+and the installed map folders matching the text (`maps *` for all ~140); a map is named by part of its name
 (`skirmish white desert`, `lobby 8 zone control`) or by its `Maps/...` path.
 The four stock maps take 8 players. A replay instead: `replay latest`, `waitmatch`,
 then `seek <tick>` / `speed <x>` / `replaystate` (ReplayManager must be loaded).
