@@ -349,6 +349,29 @@ namespace Sanctuary.ModApi
 
         private static byte[] EventsLua() => Resource("modapi.events.lua");
 
+        internal const string UiPath = "modapi/ui.lua";
+
+        /// Whether any picked mod's Lua names the UI file. It only goes in
+        /// for those, so a match whose mods don't draw panels has the same
+        /// files (and Lua hash, and replays) as before the UI existed.
+        private static bool UsesUi(IList<ModInfo> mods)
+        {
+            foreach (var mod in mods)
+                foreach (var rel in mod.OverlayFiles)
+                {
+                    if (!rel.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
+                    // An AI folder's files are listed under the folder they're overlaid at.
+                    var prefix = mod.AiPrefix;
+                    var onDisk = prefix != null && rel.StartsWith(prefix, StringComparison.Ordinal) ? rel.Substring(prefix.Length) : rel;
+                    try
+                    {
+                        if (File.ReadAllText(Path.Combine(mod.LuaRootPath, onDisk)).Contains(UiPath)) return true;
+                    }
+                    catch { }
+                }
+            return false;
+        }
+
         private const string HookPrefix = "modapi.hooks.";
 
         /// The framework's appends to game files, by group ("factions",
@@ -478,6 +501,11 @@ namespace Sanctuary.ModApi
             {
                 PutFile(cache, EventsPath.Replace('/', '\\'), EventsLua());
                 count++;
+                if (UsesUi(mods))
+                {
+                    PutFile(cache, UiPath.Replace('/', '\\'), Resource("modapi.ui.lua"));
+                    count++;
+                }
                 if (AppendTo(cache, @"host\hostMain.lua", MainAppend("host", mods.Select(m => m.Manifest.HostScript).Where(s => s.Length > 0)), "Mod API host hooks")) count++;
                 if (AppendTo(cache, @"client\clientMain.lua", MainAppend("client", mods.Select(m => m.Manifest.ClientScript).Where(s => s.Length > 0)), "Mod API client hooks")) count++;
             }

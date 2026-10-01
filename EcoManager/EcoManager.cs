@@ -191,6 +191,8 @@ namespace SanctuaryHud
             if (showBuild)
             {
                 FillBuild();
+                // Resized by its grip: that's the new Scale setting.
+                if (_build.TakeResized() is float buildScale) _cfgBuildScale.Value = buildScale;
                 _build.SetScale(Mathf.Clamp(_cfgBuildScale.Value, 0.5f, 2.5f));
                 var at = _build.Place(new Vector2(_cfgBuildPosX.Value, _cfgBuildPosY.Value));
                 if (!_build.Dragging) Persist(_cfgBuildPosX, _cfgBuildPosY, at);
@@ -201,6 +203,7 @@ namespace SanctuaryHud
             if (showExtractors)
             {
                 FillExtractors();
+                if (_extractors.TakeResized() is float extractorsScale) _cfgExtractorsScale.Value = extractorsScale;
                 _extractors.SetScale(Mathf.Clamp(_cfgExtractorsScale.Value, 0.5f, 2.5f));
                 var at = _extractors.Place(new Vector2(_cfgExtractorsPosX.Value, _cfgExtractorsPosY.Value));
                 if (!_extractors.Dragging) Persist(_cfgExtractorsPosX, _cfgExtractorsPosY, at);
@@ -215,12 +218,14 @@ namespace SanctuaryHud
             _extractorRows.Clear();
 
             _build = HudPanel.Create(root, "Eco manager: build", () => _cfgLocked.Value);
+            _build.EnableResize(0.5f, 2.5f);
             var heads = _build.Row("Headings", 6f);
             _alloyHead = MakeHead(heads, "alloy", "ALLOY", AlloyColour);
             _energyHead = MakeHead(heads, "energy", "ENERGY", EnergyColour);
             _buildRowsBox = Column(_build.Rect, "Rows");
 
             _extractors = HudPanel.Create(root, "Eco manager: alloy", () => _cfgLocked.Value);
+            _extractors.EnableResize(0.5f, 2.5f);
             var head = _extractors.Row("Heading", 8f, TextAnchor.MiddleCenter);
             // Across the panel, so the mark sits centred over the tiles.
             head.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;

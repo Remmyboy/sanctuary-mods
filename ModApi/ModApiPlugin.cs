@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.4.0";
+        public const string Version = "1.5.0";
 
         private static ManualLogSource _log;
 
@@ -79,7 +79,10 @@ namespace Sanctuary.ModApi
             _cfgOptions = Config.Bind("Lobby", "Options", "",
                 "The gameplay mod options you last hosted with, as JSON ({\"mod.id\": {\"key\": \"value\"}}). " +
                 "Set them in the lobby's Mods panel; they come back when you switch the mod on again.");
+            ModUi.Init(Config);
             Config.Save();
+            // The HUD canvas helpers ModUi draws with log through this.
+            SanctuaryHud.HudCore._log = Log;
 
             try { System.IO.Directory.CreateDirectory(ModCatalog.ModsRoot); }
             catch (Exception e) { Log.LogWarning($"Could not create {ModCatalog.ModsRoot}: {e.Message}"); }
@@ -143,6 +146,9 @@ namespace Sanctuary.ModApi
 
             try { Lobby.Tick(); }
             catch (Exception e) { Log.LogError($"Lobby mods: {e}"); }
+
+            // Gameplay mods' Lua panels (modapi/ui.lua).
+            ModUi.Tick();
         }
     }
 }

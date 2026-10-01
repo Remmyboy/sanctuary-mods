@@ -14,7 +14,7 @@
     <!-- Mods bind against 1.0.0.0 whatever the release: bump only on a
          breaking change, and never within 1.x. -->
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.4.0</FileVersion>
+    <FileVersion>1.5.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
@@ -22,9 +22,16 @@
   <ItemGroup>
     <!-- The framework's own Lua, put in place alongside gameplay mods. -->
     <EmbeddedResource Include="lua\modapi\events.lua" LogicalName="modapi.events.lua" />
+    <EmbeddedResource Include="lua\modapi\ui.lua" LogicalName="modapi.ui.lua" />
     <EmbeddedResource Include="lua\modapi\factions_lib.lua" LogicalName="modapi.factions_lib.lua" />
     <!-- Appends to game files: hooks\<group>\<path under LJ\lua>. -->
     <EmbeddedResource Include="lua\modapi\hooks\**\*.lua" LogicalName="modapi.hooks.$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\','/'))" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Mods' Lua panels (ModUi.cs) are drawn with the HUD's own canvas
+         helpers, compiled in as they are into every HUD mod. -->
+    <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -18,6 +18,11 @@ namespace SanctuaryHud
     //
     // On the right half of the screen the panel keeps its right edge where
     // it is as it changes width, laying itself out from that edge.
+    //
+    // A panel can also be resized by the player (EnableResize): a grip in its
+    // bottom corner, on the side away from the edge it hangs from, scales the
+    // whole panel as it's dragged. The owner saves the size it ends at
+    // (TakeResized) and keeps passing it to SetScale.
     internal sealed class HudPanel
     {
         internal const float Pad = 12f;
@@ -25,6 +30,7 @@ namespace SanctuaryHud
         private RectTransform _rect;
         private VerticalLayoutGroup _column;
         private PanelDrag _drag;
+        private PanelGrip _grip;
         private bool _rightAligned;
         private float _lastWidth;
 
@@ -34,6 +40,8 @@ namespace SanctuaryHud
         internal bool RightAligned => _rightAligned;
         /// True while the mouse is dragging the panel.
         internal bool Dragging => _drag != null && _drag.Dragging;
+        /// True while the mouse is resizing the panel by its grip.
+        internal bool Resizing => _grip != null && _grip.Resizing;
 
         internal static HudPanel Create(RectTransform root, string name, Func<bool> locked)
         {
@@ -68,10 +76,70 @@ namespace SanctuaryHud
             _rect = null;
         }
 
-        /// The panel's own size on top of the canvas's.
+        /// The panel's own size on top of the canvas's. Ignored while the
+        /// player is resizing it, so a caller can pass its saved size every
+        /// frame.
         internal void SetScale(float scale)
         {
-            if (_rect != null) _rect.localScale = new Vector3(scale, scale, 1f);
+            if (_rect == null || Resizing) return;
+            if (_grip != null) scale = Mathf.Clamp(scale, _grip.Min, _grip.Max);
+            _rect.localScale = new Vector3(scale, scale, 1f);
+        }
+
+        /// The panel's own size now.
+        internal float Scale => _rect != null ? _rect.localScale.x : 1f;
+
+        /// Lets the player resize the panel, between min and max times its
+        /// standard size, with a grip in its bottom corner. Locked panels
+        /// can't be resized either.
+        internal void EnableResize(float min, float max)
+        {
+            if (_rect == null || _grip != null) return;
+            var accent = AccentColour;
+            accent.a = 0.45f;
+            var image = HudCanvas.Fill(_rect, "Resize grip", accent);
+            image.raycastTarget = true;
+            image.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            _grip = image.gameObject.AddComponent<PanelGrip>();
+            _grip.Panel = this;
+            _grip.Image = image;
+            _grip.Locked = _drag != null ? _drag.Locked : null;
+            _grip.Min = min;
+            _grip.Max = max;
+            PlaceGrip();
+        }
+
+        /// True once when a drag of the panel has just ended, for the owner
+        /// to save the position Place returned that frame. (A drag can begin
+        /// and end between two frames, so watching Dragging isn't enough.)
+        internal bool TakeDragged()
+        {
+            if (_drag == null || !_drag.Ended) return false;
+            _drag.Ended = false;
+            return true;
+        }
+
+        /// The size the player resized the panel to, once, when a resize has
+        /// just ended; otherwise null.
+        internal float? TakeResized()
+        {
+            if (_grip == null || !_grip.Finished) return null;
+            _grip.Finished = false;
+            return Scale;
+        }
+
+        // In the bottom corner on the side away from the edge the panel
+        // hangs from, so dragging it outwards grows the panel towards it.
+        private void PlaceGrip()
+        {
+            if (_grip == null) return;
+            var rt = (RectTransform)_grip.transform;
+            var x = _rightAligned ? 0f : 1f;
+            rt.anchorMin = rt.anchorMax = new Vector2(x, 0f);
+            rt.pivot = new Vector2(x, 0f);
+            rt.sizeDelta = new Vector2(14f, 14f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.SetAsLastSibling();
         }
 
         /// A row of the panel's column: a horizontal group, created once.
@@ -123,6 +191,7 @@ namespace SanctuaryHud
                 _rightAligned = right;
                 _column.childAlignment = right ? TextAnchor.UpperRight : TextAnchor.UpperLeft;
                 _rect.pivot = new Vector2(right ? 1f : 0f, 1f);
+                PlaceGrip();
             }
 
             x = Mathf.Clamp(x, 0f, Mathf.Max(0f, size.x - width));
@@ -138,6 +207,7 @@ namespace SanctuaryHud
             internal Func<bool> Locked;
             internal bool Dragging;
             internal bool Moved;
+            internal bool Ended;
             private RectTransform _rect;
 
             private void Awake() => _rect = (RectTransform)transform;
@@ -159,8 +229,66 @@ namespace SanctuaryHud
 
             public void OnEndDrag(PointerEventData eventData)
             {
+                if (Dragging) Ended = true;
                 Dragging = false;
                 Moved = true;
+            }
+        }
+
+        /// The resize grip: dragging it outwards from the corner the panel
+        /// hangs from scales the panel up, inwards scales it down.
+        internal sealed class PanelGrip : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
+            IPointerEnterHandler, IPointerExitHandler
+        {
+            internal HudPanel Panel;
+            internal Image Image;
+            internal Func<bool> Locked;
+            internal float Min = 0.5f, Max = 2.5f;
+            internal bool Resizing;
+            internal bool Finished;
+            private float _startScale;
+            private Vector2 _startMouse;
+            private Vector2 _size;
+
+            public void OnBeginDrag(PointerEventData eventData)
+            {
+                if (Locked != null && Locked()) return;
+                Resizing = true;
+                _startScale = Panel.Scale;
+                _startMouse = eventData.position;
+                _size = Panel.Rect.rect.size;
+            }
+
+            public void OnDrag(PointerEventData eventData)
+            {
+                if (!Resizing || _size.x <= 0f || _size.y <= 0f) return;
+                var canvas = HudCanvas.Canvas;
+                var k = canvas != null && canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
+                var moved = (eventData.position - _startMouse) / k;
+                // Outwards: away from the hanging edge horizontally, and down.
+                var dx = Panel.RightAligned ? -moved.x : moved.x;
+                var dy = -moved.y;
+                var grow = (dx / (_size.x * _startScale) + dy / (_size.y * _startScale)) / 2f;
+                var scale = Mathf.Clamp(_startScale * (1f + grow), Min, Max);
+                Panel.Rect.localScale = new Vector3(scale, scale, 1f);
+            }
+
+            public void OnEndDrag(PointerEventData eventData)
+            {
+                if (!Resizing) return;
+                Resizing = false;
+                Finished = true;
+            }
+
+            public void OnPointerEnter(PointerEventData eventData) => Tint(0.9f);
+            public void OnPointerExit(PointerEventData eventData) => Tint(0.45f);
+
+            private void Tint(float alpha)
+            {
+                if (Image == null) return;
+                var c = Image.color;
+                c.a = alpha;
+                Image.color = c;
             }
         }
     }

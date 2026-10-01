@@ -48,9 +48,10 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
+| [PhantomX](PhantomX/) | — | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, and the API mods are built on |
+| [ModApi](ModApi/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (1.5.0, unreleased), and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1531,6 +1532,35 @@ It needs Mod Manager 0.7.0 or later, whose Mod API has kill credit.
 Every number is in `lua\zonecontrol\balance.lua`, each with the original's
 value beside it. Problems show in the match's message log as
 `Zone Control problem: ...`, because the game's Lua warnings reach no log.
+
+## PhantomX
+
+A **gameplay mod**: Supreme Commander's Phantom-X (faf-phantomx v268, by
+Novaprim3, Duck_42, mead, SpikeyNoob and Fichom), ported. It is Lua only, and
+its panel is drawn by the Mod API from Lua, so it needs Mod API 1.5.0 or later.
+
+- **Everyone starts allied**, whatever the lobby's teams, and nobody shares
+  resources. A few minutes in (8 by default) some players secretly become
+  **phantoms**: by vote, or a set number, with volunteers more likely to be
+  picked or the pair chosen to balance the teams.
+- **Phantoms** get extra storage and a share of the innocents' combined income,
+  more the fewer innocents they're still allied with. They win by being the last
+  one standing. **Innocents** win by killing every phantom. **Paladins** are
+  innocents with a smaller share of the bonus, which a phantom can take away by
+  paying alloys to **mark** them.
+- **Reveals:** phantoms (or paladins, or both) are named at set times, to
+  everyone or only to phantoms or paladins. A player's role can be shown when
+  they die.
+- **Phantom war:** when only phantoms are left they become enemies, and each
+  gets back a share of the cost of what it kills.
+- **The Phantom-X panel** shows your role, your bonus, the timers and every
+  player, with buttons to break or offer alliances (both sides have to offer
+  peace; an AI always accepts), mark a paladin, vote and volunteer. Notices go
+  across the top of the screen and into the message log.
+
+Each player is only sent what their role lets them know. The host checks
+every request against the client it came from. Every number is in
+`lua\phantomxalance.lua`, beside the original's.
 
 ## MapLocalFiles
 
