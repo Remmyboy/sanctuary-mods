@@ -26,6 +26,43 @@ local function Request(op, target, value)
     SendToHost({ op = op, target = target, value = value }, RequestName)
 end
 
+-- Vision after an alliance changes. The game updates the army's intel mask
+-- (client/army.lua SetRelation) but never re-checks the units already on the
+-- map: each keeps the visible or hidden state, and the fog-lighting range
+-- rings, it had before, until the host next sends that unit new intel. So a
+-- broken alliance left an ex-ally's units drawn and lighting the fog, and a
+-- new one left an ally's units hidden. The game's matches never change
+-- alliances mid-match; this one does. So once the alliances change, every
+-- unit, its beams, and every shield go through the game's own intel check
+-- again, on the next tick (a change arrives as two commands, one each way).
+do
+    local Events = Import("modapi/events.lua").Events
+    local ClientArmy = Import("client/army.lua")
+    local stale = false
+
+    local originalSetRelationship = ClientArmy.SetRelationship
+    ClientArmy.SetRelationship = function(...)
+        originalSetRelationship(...)
+        stale = true
+    end
+
+    Events.OnTick(function()
+        if not stale then return end
+        stale = false
+        for _, unit in pairs(__Entities.Units) do
+            if unit.RecalculateIntel then
+                -- Forced: OnIntelVision also decides the range rings by whether
+                -- the unit is now ours or an ally's.
+                pcall(unit.RecalculateIntel, unit, true)
+                if unit.RecalculateBeamsIntel then pcall(unit.RecalculateBeamsIntel, unit) end
+            end
+        end
+        for _, shield in pairs(__Entities.Shields) do
+            if shield.RecalculateIntel then pcall(shield.RecalculateIntel, shield) end
+        end
+    end)
+end
+
 local function ArmyColour(id)
     local army = Armies and Armies[id]
     return army and army.color or "FFFFFF"
