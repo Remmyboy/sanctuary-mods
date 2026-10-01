@@ -83,9 +83,12 @@ local function Render(s)
         items[#items + 1] = UI.Text(s.result, { size = 24, color = "3DAFFF" })
     end
     if s.timer then items[#items + 1] = UI.Text(s.timer, { size = 20, color = Grey }) end
-    if s.bonus then
-        local label = s.phase == "war" and "Vampire" or "Bonus"
-        items[#items + 1] = UI.Text(string.format("%s +%s alloys/s, +%s energy/s (%s%%)", label,
+    if s.bonus and s.phase == "war" then
+        -- In the phantom war the bonus is a share of what you kill: the total so far.
+        items[#items + 1] = UI.Text(string.format("Vampire: +%s alloys, +%s energy from kills (%s%%)",
+            Thousands(s.bonus.alloys), Thousands(s.bonus.energy), tostring(s.bonus.percent)), { size = 20 })
+    elseif s.bonus then
+        items[#items + 1] = UI.Text(string.format("Bonus +%s alloys/s, +%s energy/s (%s%%)",
             tostring(s.bonus.alloys), Thousands(s.bonus.energy), tostring(s.bonus.percent)), { size = 20 })
     end
     if s.marks then
