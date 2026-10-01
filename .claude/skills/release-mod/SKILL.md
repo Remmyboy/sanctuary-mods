@@ -1,6 +1,6 @@
 ---
 name: release-mod
-description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader, and the ModApi framework DLL that ships inside them). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
+description: Publish a GitHub release for one of the mods in this repo (SanctuaryHud, IdleEngineers, EcoManager, BuildHotkeys, CameraUtilities, LadderReporter, ReplayManager, ModManager, ModLoader, the ModApi framework DLL that ships inside them, and Lua-only gameplay mods such as ZoneControl). Use when asked to release, publish, ship, or cut a version of a mod, or to build the release zips.
 ---
 
 # Releasing a mod
@@ -123,6 +123,17 @@ version unless they have already said to go ahead.
   got in.
 - **`MapLocalFiles` has no release** and is built from source; leave its
   Download cell as `—`.
+- **Lua-only gameplay mods (ZoneControl)** have no DLL: the packer finds no
+  `[BepInPlugin]`, sees `<Mod>/mod.json`, and takes the name and version from
+  there (bump `version` in mod.json). It archives the committed files with
+  `core.autocrlf` off and checks every file in the zip against its git blob
+  hash, because the lobby compares gameplay Lua byte for byte and a checkout
+  turns mod.json's LF into CRLF. One zip, `<Mod>-<ver>-ModManager.zip`; the
+  default notes use the gameplay-mod footer. A "WithMap" zip (mod plus its
+  map) is still assembled by hand.
+- **A ModManager release has a website side**: the sanctuary-unit-db site's
+  mods page and its all-in-one download were updated alongside ModManager
+  0.9.0. Ask the user whether the site needs the new version too.
 - **ModLoader has no release of its own any more** (the user's call,
   2026-09-28: the loader and the Mod Manager are one thing to players). It
   ships inside the ModManager release: the add-in zip carries

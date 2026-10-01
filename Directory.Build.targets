@@ -8,10 +8,26 @@
     <DeployPath Condition="'$(DeployPath)' == ''">$(GamePath)\SanctuaryMods\$(AssemblyName)</DeployPath>
   </PropertyGroup>
 
-  <Target Name="DeployToGame" AfterTargets="Build" Condition="Exists('$(GamePath)')">
-    <MakeDir Directories="$(DeployPath)" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployPath)" />
-    <Message Importance="high" Text="Deployed $(AssemblyName).dll to $(DeployPath)" />
+  <!-- A deploy into the game folder hot-loads into a running game, which may
+       be a real match. While Sanctuary is running, builds compile but do not
+       deploy unless -p:LiveDeploy=true says the hot load is wanted. A
+       DeployPath outside the game folder (a scratch dir) is always fine. -->
+  <Target Name="CheckGameRunning" Condition="Exists('$(GamePath)') And '$(LiveDeploy)' != 'true' And $([System.String]::Copy('$(DeployPath)').StartsWith('$(GamePath)'))">
+    <Exec Command="tasklist /FI &quot;IMAGENAME eq Sanctuary.exe&quot; /NH" ConsoleToMSBuild="true" StandardOutputImportance="low" EchoOff="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_TaskList" />
+    </Exec>
+    <PropertyGroup>
+      <_SkipDeploy Condition="$(_TaskList.Contains('Sanctuary.exe'))">true</_SkipDeploy>
+    </PropertyGroup>
+    <Warning Condition="'$(_SkipDeploy)' == 'true'" Text="Sanctuary is running: built $(AssemblyName) but did NOT deploy it (it would hot-load into the game). Rebuild with -p:LiveDeploy=true once that is OK." />
+  </Target>
+
+  <!-- The skip is checked per task: a target's own Condition is evaluated
+       before its DependsOnTargets run. -->
+  <Target Name="DeployToGame" AfterTargets="Build" DependsOnTargets="CheckGameRunning" Condition="Exists('$(GamePath)')">
+    <MakeDir Condition="'$(_SkipDeploy)' != 'true'" Directories="$(DeployPath)" />
+    <Copy Condition="'$(_SkipDeploy)' != 'true'" SourceFiles="$(TargetPath)" DestinationFolder="$(DeployPath)" />
+    <Message Condition="'$(_SkipDeploy)' != 'true'" Importance="high" Text="Deployed $(AssemblyName).dll to $(DeployPath)" />
   </Target>
 
   <!-- Data a mod ships beside its DLL: anything under the project's sounds
@@ -20,7 +36,7 @@
   <ItemGroup>
     <ModSoundFiles Include="$(MSBuildProjectDirectory)\sounds\**\*" />
   </ItemGroup>
-  <Target Name="DeploySoundsToGame" AfterTargets="DeployToGame" Condition="Exists('$(GamePath)') And '@(ModSoundFiles)' != ''">
+  <Target Name="DeploySoundsToGame" AfterTargets="DeployToGame" Condition="Exists('$(GamePath)') And '@(ModSoundFiles)' != '' And '$(_SkipDeploy)' != 'true'">
     <Copy SourceFiles="@(ModSoundFiles)" DestinationFolder="$(DeployPath)\sounds\%(RecursiveDir)" SkipUnchangedFiles="true" />
     <Message Importance="high" Text="Deployed sounds for $(AssemblyName)" />
   </Target>
