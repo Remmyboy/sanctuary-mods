@@ -22,9 +22,10 @@
 -- that client too: to change the match, send a request to the host from it
 -- (SendToHost) and act on it in the host script.
 --
--- Panels can be dragged; each player's position is remembered by panel id,
--- so give a panel an id starting with your mod's id. Clicking a panel's
--- title folds it away to the title and back.
+-- Players can drag a panel, resize it by the grip in its bottom corner, and
+-- click its title to fold it away to the title and back. Each player's
+-- position, size and folding are remembered by panel id, so give a panel an
+-- id starting with your mod's id.
 --
 -- Colours are "RRGGBB" (or "#RRGGBB", "RRGGBBAA"), or anything with r, g, b
 -- (or x, y, z) fields from 0 to 1, such as an army's colour.
@@ -62,13 +63,13 @@ end
 -- from them on every Set, and the framework reuses what it already drew, so
 -- calling Set every second costs little.
 
---- A line of text. o: size (canvas units, default 20), color, bold,
+--- A line of text. o: size (canvas units, default 20), color,
 --- width (wraps to that width), rich (TextMeshPro tags such as <b>; off by
 --- default, so a player's name is shown as it is).
 function UI.Text(text, o)
     o = options(o)
     return { t = "text", text = tostring(text or ""), size = o.size, color = colour(o.color),
-             bold = o.bold and true or nil, width = o.width, rich = o.rich and true or nil }
+             width = o.width, rich = o.rich and true or nil }
 end
 
 --- A button. onClick(button) runs in this client when it's clicked with

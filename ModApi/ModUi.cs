@@ -30,6 +30,7 @@ namespace Sanctuary.ModApi
         private const float PollSeconds = 0.1f;
         private const string RevGlobal = "__ModApiUIRev";
         private const string StateGlobal = "__ModApiUI";
+        private const float MinScale = 0.6f, MaxScale = 2.5f;
 
         private static readonly Color White = Color.white;
 
@@ -181,6 +182,7 @@ namespace Sanctuary.ModApi
             [JsonProperty("x", NullValueHandling = NullValueHandling.Ignore)] public float? X;
             [JsonProperty("y", NullValueHandling = NullValueHandling.Ignore)] public float? Y;
             [JsonProperty("folded", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool Folded;
+            [JsonProperty("scale", NullValueHandling = NullValueHandling.Ignore)] public float? Scale;
         }
 
         private static Dictionary<string, SavedPanel> Saved
@@ -193,6 +195,10 @@ namespace Sanctuary.ModApi
                 return _saved = _saved ?? new Dictionary<string, SavedPanel>(StringComparer.Ordinal);
             }
         }
+
+        /// The saved entry for a panel, made if it has none, to change and Save.
+        private static SavedPanel Entry(string id) =>
+            Saved.TryGetValue(id, out var entry) ? entry : new SavedPanel();
 
         private static void Save(string id, SavedPanel panel)
         {
@@ -243,6 +249,7 @@ namespace Sanctuary.ModApi
             {
                 Id = id;
                 _panel = HudPanel.Create(root, "Mod panel " + id, () => false);
+                _panel.EnableResize(MinScale, MaxScale);
                 _title = PanelHeading.Create(_panel.Rect, "Title", 24f, HudCore.AccentColour, TextAlignmentOptions.MidlineLeft);
                 _title.OnClick = ToggleFolded;
                 var content = new GameObject("Content", typeof(RectTransform));
@@ -256,9 +263,9 @@ namespace Sanctuary.ModApi
             {
                 var folded = _content.gameObject.activeSelf;
                 _content.gameObject.SetActive(!folded);
-                var saved = Saved.TryGetValue(Id, out var s) ? s : null;
-                if (saved != null) Save(Id, new SavedPanel { X = saved.X, Y = saved.Y, Folded = folded });
-                else Save(Id, new SavedPanel { Folded = folded });
+                var entry = Entry(Id);
+                entry.Folded = folded;
+                Save(Id, entry);
             }
 
             internal void Apply(JObject o)
@@ -285,6 +292,16 @@ namespace Sanctuary.ModApi
             internal void Place()
             {
                 if (!_panel.Showing) return;
+                // The player's size: saved when a resize ends, applied every frame.
+                var resized = _panel.TakeResized();
+                if (resized != null)
+                {
+                    var entry = Entry(Id);
+                    entry.Scale = resized.Value;
+                    Save(Id, entry);
+                }
+                _panel.SetScale(Saved.TryGetValue(Id, out var sized) && sized.Scale.HasValue ? sized.Scale.Value : 1f);
+
                 var saved = Saved.TryGetValue(Id, out var s) && s.X.HasValue && s.Y.HasValue ? s : null;
                 Vector2 want;
                 if (saved != null) want = new Vector2(saved.X.Value, saved.Y.Value);
@@ -302,7 +319,12 @@ namespace Sanctuary.ModApi
                 var dragging = _panel.Dragging;
                 // Saved when a drag ends, never for where the mod put it.
                 if (_wasDragging && !dragging)
-                    Save(Id, new SavedPanel { X = at.x, Y = at.y, Folded = !_content.gameObject.activeSelf });
+                {
+                    var entry = Entry(Id);
+                    entry.X = at.x;
+                    entry.Y = at.y;
+                    Save(Id, entry);
+                }
                 _wasDragging = dragging;
             }
 
@@ -451,7 +473,6 @@ namespace Sanctuary.ModApi
                     HudCanvas.SetText(node.Text, Str(o, "text") ?? "");
                     node.Text.fontSize = Num(o, "size", 20f);
                     node.Text.color = Col(o, "color", White);
-                    node.Text.fontStyle = Flag(o, "bold", false) ? FontStyles.Bold : FontStyles.Normal;
                     var width = Num(o, "width", 0f);
                     node.Text.textWrappingMode = width > 0f ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
                     node.Layout.preferredWidth = width > 0f ? width : -1f;
@@ -558,7 +579,7 @@ namespace Sanctuary.ModApi
                 _group = _plate.gameObject.AddComponent<CanvasGroup>();
                 _group.blocksRaycasts = false;
                 _group.interactable = false;
-                _title = HudCanvas.Text(_plate, "Title", 44f, HudCore.AccentColour, TextAlignmentOptions.Center, FontStyles.Bold);
+                _title = HudCanvas.Text(_plate, "Title", 44f, HudCore.AccentColour, TextAlignmentOptions.Center);
                 _text = HudCanvas.Text(_plate, "Text", 26f, White, TextAlignmentOptions.Center);
                 _plate.gameObject.SetActive(false);
             }

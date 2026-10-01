@@ -317,7 +317,8 @@ this way.
 A gameplay mod can put its own panel on the match HUD from its client script,
 in Lua. The Mod API draws it on the game's own HUD canvas, in the game's font
 and at the player's UI Scale, beside the HUD mods' panels. Players can drag
-it, and click its title to fold it away. Each player's position is remembered.
+it, resize it by the grip in its bottom corner, and click its title to fold it
+away. Each player's position, size and folding are remembered.
 
 ```lua
 -- lua\norush\client.lua (the mod's clientScript)
@@ -345,7 +346,7 @@ UI.Toast("No rush", "Attacks are allowed in 10 minutes", { seconds = 6 })
 | `UI.Panel(id, { title, x, y, align })` | Makes a panel, or returns the one with that id. `x` and `y` are where it first appears, in 1080p pixels from the top-left (`align = "right"` measures `x` from the right edge). Start the id with your mod's id. |
 | `panel:Set(items)` | Replaces what the panel shows. Call it whenever something changes. Elements that are the same kind as before are updated in place, so calling it every second is cheap. |
 | `panel:Show(bool)`, `panel:SetTitle(text)`, `panel:Remove()` | |
-| `UI.Text(text, { size, color, bold, width, rich })` | A line of text. `width` wraps it. `rich = true` lets TextMeshPro tags such as `<b>` through; it's off by default, so a player's name shows as typed. |
+| `UI.Text(text, { size, color, width, rich })` | A line of text. `width` wraps it. `rich = true` lets TextMeshPro tags such as `<color=#FF0000>` through; it's off by default, so a player's name shows as typed. The game's font has no bold weight, and TextMeshPro's stand-in smears it, so there's no `bold`. |
 | `UI.Button(label, fn, { color, enabled, size })` | `fn(button)` runs in this player's client on a click, `button` being `"left"` or `"right"`. |
 | `UI.Row(items, { spacing })`, `UI.Column(items, { spacing })` | Elements side by side, or one above another. |
 | `UI.Rule()`, `UI.Space(size)`, `UI.Swatch(color, size)` | A line across the panel, empty space, a square of colour. |

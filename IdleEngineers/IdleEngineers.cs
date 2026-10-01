@@ -118,6 +118,8 @@ namespace SanctuaryHud
 
             _panel.Show(true);
             Fill();
+            // Resized by its grip: that's the new Scale setting.
+            if (_panel.TakeResized() is float scale) _cfgScale.Value = scale;
             _panel.SetScale(Mathf.Clamp(_cfgScale.Value, 0.7f, 1.6f));
             var at = _panel.Place(new Vector2(_cfgPosX.Value, _cfgPosY.Value));
             // Persist the panel position once the drag is over.
@@ -132,6 +134,7 @@ namespace SanctuaryHud
         {
             _panel?.Destroy();
             _panel = HudPanel.Create(root, "Idle engineers", () => _cfgLocked.Value);
+            _panel.EnableResize(0.7f, 1.6f);
 
             var head = _panel.Row("Heading", 8f, TextAnchor.MiddleLeft);
             _title = HudCanvas.Text(head, "Title", 26f, IdleColour, TextAlignmentOptions.MidlineLeft);
