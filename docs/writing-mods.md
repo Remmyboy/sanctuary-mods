@@ -312,6 +312,66 @@ Events.Kills(army)   -- enemy units that army has killed
 The [`SupplyDrop`](../examples/SupplyDrop) example is a complete mod built
 this way.
 
+## Panels and notices (no DLL needed)
+
+A gameplay mod can put its own panel on the match HUD from its client script,
+in Lua. The Mod API draws it on the game's own HUD canvas, in the game's font
+and at the player's UI Scale, beside the HUD mods' panels. Players can drag
+it, and click its title to fold it away. Each player's position is remembered.
+
+```lua
+-- lua\norush\client.lua (the mod's clientScript)
+local UI = Import("modapi/ui.lua").UI
+
+local panel = UI.Panel("alice.norush", { title = "NO RUSH", x = 20, y = 300 })
+
+local function Draw(secondsLeft)
+    panel:Set({
+        UI.Text("Attacks allowed in " .. secondsLeft .. " s", { size = 24, color = "FFC040" }),
+        UI.Rule(),
+        UI.Row({
+            UI.Swatch(Armies[2].color),
+            UI.Text("Bob"),
+            UI.Button("Wave", function() SendToHost({ op = "wave" }, "NoRushRequest") end),
+        }),
+    })
+end
+
+UI.Toast("No rush", "Attacks are allowed in 10 minutes", { seconds = 6 })
+```
+
+| Call | What it does |
+| --- | --- |
+| `UI.Panel(id, { title, x, y, align })` | Makes a panel, or returns the one with that id. `x` and `y` are where it first appears, in 1080p pixels from the top-left (`align = "right"` measures `x` from the right edge). Start the id with your mod's id. |
+| `panel:Set(items)` | Replaces what the panel shows. Call it whenever something changes. Elements that are the same kind as before are updated in place, so calling it every second is cheap. |
+| `panel:Show(bool)`, `panel:SetTitle(text)`, `panel:Remove()` | |
+| `UI.Text(text, { size, color, bold, width, rich })` | A line of text. `width` wraps it. `rich = true` lets TextMeshPro tags such as `<b>` through; it's off by default, so a player's name shows as typed. |
+| `UI.Button(label, fn, { color, enabled, size })` | `fn(button)` runs in this player's client on a click, `button` being `"left"` or `"right"`. |
+| `UI.Row(items, { spacing })`, `UI.Column(items, { spacing })` | Elements side by side, or one above another. |
+| `UI.Rule()`, `UI.Space(size)`, `UI.Swatch(color, size)` | A line across the panel, empty space, a square of colour. |
+| `UI.Toast(title, text, { seconds, color })` | A notice across the top of the screen for a few seconds. |
+
+Sizes are in canvas units: text is 20 by default, and the game's build-menu
+tiles are 80 across. Colours are `"RRGGBB"` strings, or an army's `color`.
+
+**A panel is one player's view.** The client script runs on every player's
+machine and in replays, so each player draws their own panel from what their
+client knows. A button's function runs only in that client, so to change the
+match it sends a request to the host: `SendToHost(data, "YourRequest")` in the
+client, then handle it in your host script. To show a player something only
+the host knows, send it to them: `SendToClient(data, "YourState", clientId)`
+on the host, `RegisterListener("client_YourState", fn)` in the client.
+
+**Who sent a request?** The game hands host functions their data but not the
+client that sent it. If your rules depend on who asked, wrap the game's
+handler in your host script and keep the client id for your own call.
+[`PhantomX`](../PhantomX/lua/phantomx/host.lua) does this. Look for
+`ExecuteHostFunction`.
+
+`modapi/ui.lua` is only put in place for matches where a picked mod's Lua
+names it, so mods that don't draw panels run with exactly the files they did
+before. It needs Mod API 1.5.0 or later.
+
 ## Gameplay Lua
 
 When the host starts a match, the framework swaps the picked mods' files into
