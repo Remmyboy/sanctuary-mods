@@ -56,7 +56,7 @@ namespace SanctuaryHud
         /// The live size, so a resize drag doesn't write the config file on
         /// every frame of the drag; it is stored when the mouse comes up.
         private static float _size;
-        private static bool _resizing;
+        private static bool Resizing => _grip != null && _grip.Resizing;
 
         private static float _lastJump;
         private static bool _dragging;
@@ -139,15 +139,7 @@ namespace SanctuaryHud
             // a drag stuck on would leave the full-screen shield up with
             // nothing under it — every click in the game swallowed. The real
             // button state is the backstop.
-            if (!Input.GetMouseButton(0))
-            {
-                if (_dragging) _dragging = false;
-                if (_resizing)
-                {
-                    _resizing = false;
-                    _cfgSize.Value = _size;
-                }
-            }
+            if (!Input.GetMouseButton(0) && _dragging) _dragging = false;
 
             if (!InMatch)
             {
@@ -177,7 +169,8 @@ namespace SanctuaryHud
 
             // The settings page can change the size too, so follow it whenever
             // the corner isn't being dragged.
-            if (!_resizing && Math.Abs(_cfgSize.Value - _size) > 0.5f) _size = _cfgSize.Value;
+            if (_grip != null && _grip.TakeResized() is float resized) _cfgSize.Value = resized;
+            if (!Resizing && Math.Abs(_cfgSize.Value - _size) > 0.5f) _size = _cfgSize.Value;
 
             try
             {
@@ -209,9 +202,8 @@ namespace SanctuaryHud
         private static RawImage _backdrop, _fog;
         private static HudPanel.PanelDrag _drag;
         private static MapInput _input;
-        private static ResizeGrip _grip;
+        private static HudPanel.PanelGrip _grip;
         private static readonly Image[] _border = new Image[4];
-        private static readonly List<Image> _gripMarks = new List<Image>();
         private static readonly List<RawImage> _icons = new List<RawImage>();
         private static readonly List<Image> _spots = new List<Image>();
 
@@ -309,23 +301,13 @@ namespace SanctuaryHud
             Edge(_border[1], 0f, mapH - line, mapW, line);
             Edge(_border[2], 0f, 0f, line, mapH);
             Edge(_border[3], mapW - line, 0f, line, mapH);
-            var gripColour = new Color(0.55f, 0.7f, 0.9f, _resizing ? 0.95f : 0.5f);
-            for (var i = 0; i < 3; i++)
-            {
-                var inset = (i + 1) * 4f * k;
-                var mark = 2f * k;
-                _gripMarks[i * 2].color = gripColour;
-                _gripMarks[i * 2 + 1].color = gripColour;
-                Edge(_gripMarks[i * 2], plateW - inset - mark / 2f, plateH - 2f * k - mark, mark, mark);
-                Edge(_gripMarks[i * 2 + 1], plateW - 2f * k - mark, plateH - inset - mark / 2f, mark, mark);
-            }
-            ((RectTransform)_grip.transform).sizeDelta = new Vector2(Grip * k, Grip * k);
+            _grip.Place(new Vector2(1f, 0f), Grip * k);
 
             // Keep a release off the battlefield while a drag is on: the
             // release is what the game acts on, and letting go outside the
             // panel with a build queued would plant a building wherever the
-            // cursor ended up.
-            var shield = _dragging || _resizing;
+            // cursor ended up. (The grip shields its own drag.)
+            var shield = _dragging;
             if (_dragShield.gameObject.activeSelf != shield) _dragShield.gameObject.SetActive(shield);
         }
 
@@ -422,18 +404,11 @@ namespace SanctuaryHud
             for (var i = 0; i < _border.Length; i++) _border[i] = Dot(_map, "Border", BorderColour);
             // Lines hang from their top-left corner, as Edge places them.
             foreach (var line in _border) line.rectTransform.pivot = new Vector2(0f, 1f);
-            _gripMarks.Clear();
-            for (var i = 0; i < 6; i++) _gripMarks.Add(Dot(_plate, "Grip", Color.white));
-            foreach (var mark in _gripMarks) mark.rectTransform.pivot = new Vector2(0f, 1f);
-
-            var grip = HudCanvas.Fill(_plate, "Resize", Color.clear);
-            grip.raycastTarget = true;
-            grip.canvasRenderer.cullTransparentMesh = false;
-            var grt = grip.rectTransform;
-            grt.anchorMin = grt.anchorMax = new Vector2(1f, 0f);
-            grt.pivot = new Vector2(1f, 0f);
-            grt.anchoredPosition = Vector2.zero;
-            _grip = grip.gameObject.AddComponent<ResizeGrip>();
+            // The corner grip sets the size the map is drawn at, which the
+            // panel grows from its top-left corner by.
+            _grip = HudPanel.PanelGrip.Create(_plate, _plate, 120f, 640f, () => _cfgLocked.Value);
+            _grip.Get = () => _size;
+            _grip.Set = size => _size = size;
 
             // The whole-screen shield for a drag, on the canvas root so it
             // covers everything; off until a drag starts.
@@ -521,38 +496,6 @@ namespace SanctuaryHud
             }
         }
 
-        /// The corner grip: pulling it out and down is the size going up.
-        /// Both axes count, so a diagonal pull does what it looks like.
-        private sealed class ResizeGrip : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
-        {
-            private float _startSize;
-            private Vector2 _startMouse;
-
-            public void OnBeginDrag(PointerEventData eventData)
-            {
-                if (_cfgLocked.Value || eventData.button != PointerEventData.InputButton.Left) return;
-                _resizing = true;
-                _startSize = _size;
-                _startMouse = eventData.position;
-            }
-
-            public void OnDrag(PointerEventData eventData)
-            {
-                if (!_resizing) return;
-                var pxPerLogical = Screen.height / 1080f;
-                var delta = (eventData.position - _startMouse) / pxPerLogical;
-                // Screen y runs up; the corner goes down as the panel grows.
-                _size = Mathf.Clamp(_startSize + (delta.x - delta.y) * 0.5f, 120f, 640f);
-            }
-
-            public void OnEndDrag(PointerEventData eventData)
-            {
-                if (!_resizing) return;
-                _resizing = false;
-                _cfgSize.Value = _size;
-            }
-        }
-
         /// Moves the camera over a world position without changing the zoom.
         ///
         /// FitCameraToPositions is the client's own camera mover — the one the
@@ -593,7 +536,6 @@ namespace SanctuaryHud
             _dragShield = null;
             _icons.Clear();
             _spots.Clear();
-            _gripMarks.Clear();
         }
     }
 }

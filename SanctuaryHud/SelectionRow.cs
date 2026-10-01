@@ -135,7 +135,7 @@ namespace SanctuaryHud
             // The tiles are clones of the build panel's prefab, so the row
             // matches the build area; its own panel's if there is no build panel.
             var construction = FindPanel<ConstructionPanelUI>(UIPanelType.Construction);
-            var s = SanctuaryHudPlugin.HudScale;
+            var s = BottomDock.Scale;
             _row.Show(true);
             _row.Sync(construction != null ? (SanctuaryPanelUI)construction : panel, _entries, s);
 
@@ -156,7 +156,7 @@ namespace SanctuaryHud
                 }
             }
             _row.Place(at);
-            if (BuildStrip.Active) BottomDock.Add(new Rect(at.x, at.y, _row.Width, _row.Height));
+            if (BuildStrip.Active) BottomDock.Add(new Rect(at.x, at.y, _row.Width, _row.Height), _row.Rect);
         }
 
         /// The row's size on the canvas, 0 while it is not showing: what the

@@ -139,7 +139,7 @@ namespace SanctuaryHud
             UnitRow.Collect(queue != null && queue.IsVisible ? queue : null, _queue, false);
             CollectTabs(tabs != null && tabs.IsVisible ? tabs : null);
 
-            var s = SanctuaryHudPlugin.HudScale;
+            var s = BottomDock.Scale;
             var size = HudCanvas.Size;
 
             // Against the left column's right edge, on the baseline: the
@@ -156,7 +156,7 @@ namespace SanctuaryHud
                 _optionsRow.Show(true);
                 _optionsRow.Sync(options, _options, s, size.x - optionsX - Margin);
                 _optionsRow.Place(new Vector2(optionsX, origin.y));
-                BottomDock.Add(new Rect(optionsX, origin.y, _optionsRow.Width, _optionsRow.Height));
+                BottomDock.Add(new Rect(optionsX, origin.y, _optionsRow.Width, _optionsRow.Height), _optionsRow.Rect);
             }
             else _optionsRow.Show(false);
 
@@ -169,7 +169,7 @@ namespace SanctuaryHud
                 _tabRow.Show(true);
                 _tabRow.Sync(tabs, _tabs, s);
                 _tabRow.Place(new Vector2(ax, above));
-                BottomDock.Add(new Rect(ax, above, _tabRow.Width, _tabRow.Height));
+                BottomDock.Add(new Rect(ax, above, _tabRow.Width, _tabRow.Height), _tabRow.Rect);
                 ax += _tabRow.Width;
             }
             else _tabRow.Show(false);
@@ -180,7 +180,7 @@ namespace SanctuaryHud
                 // One line of it: a long queue past the screen's edge is noise.
                 _queueRow.Sync(options, _queue, s, size.x - ax - Margin, 1);
                 _queueRow.Place(new Vector2(ax, above));
-                BottomDock.Add(new Rect(ax, above, _queueRow.Width, _queueRow.Height));
+                BottomDock.Add(new Rect(ax, above, _queueRow.Width, _queueRow.Height), _queueRow.Rect);
             }
             else _queueRow.Show(false);
 
@@ -224,6 +224,7 @@ namespace SanctuaryHud
             private readonly List<ConstructionFilterToggleElement> _shown = new List<ConstructionFilterToggleElement>();
 
             internal bool Alive => _rect != null;
+            internal RectTransform Rect => _rect;
 
             internal static TabRow Create(RectTransform root, string name)
             {

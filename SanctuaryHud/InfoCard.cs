@@ -426,16 +426,16 @@ namespace SanctuaryHud
             }
 
             _card.Show(true);
-            _card.Fill(_values, building, SanctuaryHudPlugin.HudScale);
+            _card.Fill(_values, building, BottomDock.Scale);
             // On top of the orders row, in the left column — and on top of
             // where it would be when nothing is selected (a hovered unit has
             // no orders row), so the card never moves.
-            var scale = SanctuaryHudPlugin.HudScale;
+            var scale = BottomDock.Scale;
             var ordersHeight = BottomDock.OrdersHeight > 0f ? BottomDock.OrdersHeight : BottomDock.RowHeight * scale;
             var at = new Vector2(BottomDock.Origin.x, BottomDock.Origin.y + ordersHeight);
             _card.Place(at);
             BottomDock.Column(_card.PlacedWidth);
-            BottomDock.Add(new Rect(at.x, at.y, _card.PlacedWidth, _card.PlacedHeight));
+            BottomDock.Add(new Rect(at.x, at.y, _card.PlacedWidth, _card.PlacedHeight), _card.Rect);
         }
 
         private static string Rate(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
@@ -465,6 +465,7 @@ namespace SanctuaryHud
             private TMP_Text _jobPercent;
 
             internal bool Alive => _rect != null;
+            internal RectTransform Rect => _rect;
             internal float PlacedWidth => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
             internal float PlacedHeight => _rect != null ? _rect.rect.height * _rect.localScale.y : 0f;
 

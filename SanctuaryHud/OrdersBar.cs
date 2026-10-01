@@ -209,7 +209,7 @@ namespace SanctuaryHud
                 return;
             }
 
-            var s = SanctuaryHudPlugin.HudScale;
+            var s = BottomDock.Scale;
             _bar.Show(true);
             _bar.Sync(panel, _row, s);
             // The bottom of the left column; the card stands on it.
@@ -223,7 +223,7 @@ namespace SanctuaryHud
         {
             if (_bar == null || !_bar.Showing) return;
             _bar.SetWidth(BottomDock.ColumnWidth);
-            BottomDock.Add(new Rect(BottomDock.Origin.x, BottomDock.Origin.y, _bar.Width, _bar.Height));
+            BottomDock.Add(new Rect(BottomDock.Origin.x, BottomDock.Origin.y, _bar.Width, _bar.Height), _bar.Rect);
         }
 
         /// The order buttons (OrderTile) on a plate, one line.
@@ -235,6 +235,7 @@ namespace SanctuaryHud
             private readonly List<OrderButtonElement> _shown = new List<OrderButtonElement>();
 
             internal bool Alive => _rect != null;
+            internal RectTransform Rect => _rect;
             internal bool Showing => _rect != null && _rect.gameObject.activeSelf;
             internal float Width => _rect != null ? _rect.rect.width * _rect.localScale.x : 0f;
             internal float Height => _rect != null ? _rect.rect.height * _rect.localScale.y : 0f;

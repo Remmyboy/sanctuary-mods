@@ -95,42 +95,17 @@ namespace SanctuaryHud
         internal void EnableResize(float min, float max)
         {
             if (_rect == null || _grip != null) return;
-            var accent = AccentColour;
-            accent.a = 0.45f;
-            var image = HudCanvas.Fill(_rect, "Resize grip", accent);
-            image.raycastTarget = true;
-            image.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-            _grip = image.gameObject.AddComponent<PanelGrip>();
-            _grip.Panel = this;
-            _grip.Image = image;
-            _grip.Locked = _drag != null ? _drag.Locked : null;
-            _grip.Min = min;
-            _grip.Max = max;
+            _grip = PanelGrip.Create(_rect, _rect, min, max, _drag != null ? _drag.Locked : null);
             PlaceGrip();
         }
 
         /// The size the player resized the panel to, once, when a resize has
         /// just ended; otherwise null.
-        internal float? TakeResized()
-        {
-            if (_grip == null || !_grip.Finished) return null;
-            _grip.Finished = false;
-            return Scale;
-        }
+        internal float? TakeResized() => _grip != null ? _grip.TakeResized() : null;
 
         // In the bottom corner on the side away from the edge the panel
         // hangs from, so dragging it outwards grows the panel towards it.
-        private void PlaceGrip()
-        {
-            if (_grip == null) return;
-            var rt = (RectTransform)_grip.transform;
-            var x = _rightAligned ? 0f : 1f;
-            rt.anchorMin = rt.anchorMax = new Vector2(x, 0f);
-            rt.pivot = new Vector2(x, 0f);
-            rt.sizeDelta = new Vector2(14f, 14f);
-            rt.anchoredPosition = Vector2.zero;
-            rt.SetAsLastSibling();
-        }
+        private void PlaceGrip() => _grip?.Place(new Vector2(_rightAligned ? 0f : 1f, 0f));
 
         /// A row of the panel's column: a horizontal group, created once.
         internal RectTransform Row(string name, float spacing, TextAnchor alignment = TextAnchor.UpperLeft)
@@ -223,60 +198,156 @@ namespace SanctuaryHud
             }
         }
 
-        /// The resize grip: dragging it outwards from the corner the panel
-        /// hangs from scales the panel up, inwards scales it down.
+        /// A resize grip, for any panel on the HUD canvas: a small square in
+        /// one of its corners that scales the panel about the point it grows
+        /// from (Target's pivot, unless Anchor says otherwise) as it is
+        /// dragged, so the corner follows the mouse. What it changes is
+        /// Target's own scale unless Get and Set say otherwise (the
+        /// mini-map's size, say); either way the owner saves it when
+        /// TakeResized hands it over. Hidden while Locked. While a resize is
+        /// on, a clear sheet over the whole canvas keeps the release off the
+        /// map, where the game would act on it (plant a queued building).
         internal sealed class PanelGrip : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler,
             IPointerEnterHandler, IPointerExitHandler
         {
-            internal HudPanel Panel;
-            internal Image Image;
+            internal const float Side = 14f;
+            private const float Rest = 0.45f;
+
+            internal RectTransform Target;
             internal Func<bool> Locked;
             internal float Min = 0.5f, Max = 2.5f;
+            /// The size it changes, when that isn't Target's scale.
+            internal Func<float> Get = null;   // set by the panels that size something else
+            internal Action<float> Set = null;
+            /// The world point the panel grows from, when that isn't
+            /// Target's pivot.
+            internal Func<Vector3> Anchor = null;   // set by the panels that grow from elsewhere
             internal bool Resizing;
             internal bool Finished;
-            private float _startScale;
-            private Vector2 _startMouse;
-            private Vector2 _size;
+
+            private Image _image;
+            private float _start;
+            private Vector2 _anchor, _from;
+            private static Image _shield;
+
+            internal static PanelGrip Create(Transform parent, RectTransform target, float min, float max, Func<bool> locked)
+            {
+                var accent = AccentColour;
+                accent.a = Rest;
+                var image = HudCanvas.Fill(parent, "Resize grip", accent);
+                image.raycastTarget = true;
+                image.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                var grip = image.gameObject.AddComponent<PanelGrip>();
+                grip._image = image;
+                grip.Target = target;
+                grip.Locked = locked;
+                grip.Min = min;
+                grip.Max = max;
+                grip.Place(new Vector2(1f, 0f));
+                return grip;
+            }
+
+            internal float Value => Get != null ? Get() : Target != null ? Target.localScale.x : 1f;
+
+            /// Into this corner of its parent ((1, 0) is bottom-right), this
+            /// big in the parent's units, over everything else in it.
+            internal void Place(Vector2 corner, float side = Side)
+            {
+                var rt = (RectTransform)transform;
+                rt.anchorMin = rt.anchorMax = rt.pivot = corner;
+                rt.sizeDelta = new Vector2(side, side);
+                rt.anchoredPosition = Vector2.zero;
+                if (rt.GetSiblingIndex() != rt.parent.childCount - 1) rt.SetAsLastSibling();
+            }
+
+            /// The size the player resized to, once, when a resize has just
+            /// ended; otherwise null.
+            internal float? TakeResized()
+            {
+                if (!Finished) return null;
+                Finished = false;
+                return Value;
+            }
+
+            private bool IsLocked => Locked != null && Locked();
+
+            private void Update()
+            {
+                var locked = IsLocked;
+                if (_image != null && _image.enabled == locked) _image.enabled = !locked;
+                // A release outside the window may never reach OnEndDrag.
+                if (Resizing && !Input.GetMouseButton(0)) End();
+            }
+
+            private void OnDisable()
+            {
+                if (Resizing) End();
+            }
 
             public void OnBeginDrag(PointerEventData eventData)
             {
-                if (Locked != null && Locked()) return;
+                if (IsLocked || eventData.button != PointerEventData.InputButton.Left) return;
+                var anchor = Anchor != null ? Anchor() : Target != null ? Target.position : transform.position;
+                _anchor = RectTransformUtility.WorldToScreenPoint(eventData.pressEventCamera, anchor);
+                _from = eventData.pressPosition;
+                if ((_from - _anchor).sqrMagnitude < 1f) return;
                 Resizing = true;
-                _startScale = Panel.Scale;
-                _startMouse = eventData.position;
-                _size = Panel.Rect.rect.size;
+                _start = Value;
+                Shield(true);
             }
 
             public void OnDrag(PointerEventData eventData)
             {
-                if (!Resizing || _size.x <= 0f || _size.y <= 0f) return;
-                var canvas = HudCanvas.Canvas;
-                var k = canvas != null && canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
-                var moved = (eventData.position - _startMouse) / k;
-                // Outwards: away from the hanging edge horizontally, and down.
-                var dx = Panel.RightAligned ? -moved.x : moved.x;
-                var dy = -moved.y;
-                var grow = (dx / (_size.x * _startScale) + dy / (_size.y * _startScale)) / 2f;
-                var scale = Mathf.Clamp(_startScale * (1f + grow), Min, Max);
-                Panel.Rect.localScale = new Vector3(scale, scale, 1f);
+                if (!Resizing) return;
+                // How far the mouse is along the line from the anchor through
+                // where the drag started: the grip's corner stays under it.
+                var d = _from - _anchor;
+                var along = Vector2.Dot(eventData.position - _anchor, d) / d.sqrMagnitude;
+                var value = Mathf.Clamp(_start * along, Min, Max);
+                if (Set != null) Set(value);
+                else if (Target != null) Target.localScale = new Vector3(value, value, 1f);
             }
 
             public void OnEndDrag(PointerEventData eventData)
             {
-                if (!Resizing) return;
+                if (Resizing) End();
+            }
+
+            private void End()
+            {
                 Resizing = false;
                 Finished = true;
+                Shield(false);
+            }
+
+            private static void Shield(bool on)
+            {
+                var root = HudCanvas.Root;
+                if (on && _shield == null && root != null)
+                {
+                    _shield = HudCanvas.Fill(root, "Resize shield", Color.clear);
+                    _shield.raycastTarget = true;
+                    _shield.canvasRenderer.cullTransparentMesh = false;
+                    var rt = _shield.rectTransform;
+                    rt.anchorMin = Vector2.zero;
+                    rt.anchorMax = Vector2.one;
+                    rt.offsetMin = Vector2.zero;
+                    rt.offsetMax = Vector2.zero;
+                }
+                if (_shield == null) return;
+                if (on) _shield.transform.SetAsLastSibling();
+                if (_shield.gameObject.activeSelf != on) _shield.gameObject.SetActive(on);
             }
 
             public void OnPointerEnter(PointerEventData eventData) => Tint(0.9f);
-            public void OnPointerExit(PointerEventData eventData) => Tint(0.45f);
+            public void OnPointerExit(PointerEventData eventData) => Tint(Rest);
 
             private void Tint(float alpha)
             {
-                if (Image == null) return;
-                var c = Image.color;
+                if (_image == null) return;
+                var c = _image.color;
                 c.a = alpha;
-                Image.color = c;
+                _image.color = c;
             }
         }
     }
