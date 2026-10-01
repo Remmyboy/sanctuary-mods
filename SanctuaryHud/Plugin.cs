@@ -163,6 +163,7 @@ namespace SanctuaryHud
             foreach (var (role, label, newDefault, upgradeDefault) in CompleteRules) Rule(role, label, newDefault, upgradeDefault);
 
             MatchStats.Bind(Config);
+            QueueRightClick.Bind(Config);
 
             // Extras for the game's own controls, all off until switched on.
             CursorHint.Bind(Config);
@@ -330,6 +331,7 @@ namespace SanctuaryHud
                 Waypoints.Shutdown();
                 CursorHint.Shutdown();
                 SelectSameType.Shutdown();
+                QueueRightClick.Shutdown();
                 MatchStats.Shutdown();
                 HudCanvas.Destroy();
             }
@@ -411,6 +413,7 @@ namespace SanctuaryHud
             GameClock.Tick();
             CursorHint.Tick();
             SelectSameType.Tick();
+            QueueRightClick.Tick();
             MatchStats.Tick();
 
             // The built-in readouts only go while the strip is standing in for
