@@ -74,7 +74,8 @@ namespace SanctuaryHud
             _cfgToggleKey = Config.Bind("Overlay", "ToggleKey", KeyCode.F10, "Key that shows and hides the whole HUD.");
             _cfgScale = Config.Bind("Overlay", "Scale", 1f,
                 new ConfigDescription("Size of the whole HUD — the economy strip, the commander widget, the orders row, the unit card, " +
-                    "the selection row and the build strip — as a multiple of the standard size, on top of the game's own UI Scale.",
+                    "the selection row and the build strip — as a multiple of the standard size, on top of the game's own UI Scale. " +
+                    "Each panel has a size of its own on top of this, set by dragging the grip in its corner.",
                     new AcceptableValueRange<float>(0.6f, 1.5f)));
 
             _cfgHideBuiltIn = Config.Bind("TopBar", "HideGameEconomyBars", false,
@@ -84,6 +85,7 @@ namespace SanctuaryHud
             _cfgCommanderZoom = Config.Bind("TopBar", "CommanderJumpZoom", 0.5f,
                 "Clicking the commander widget (top right) jumps the camera to your commander. This is how far out the camera " +
                 "sits afterwards, as a fraction of its current height: higher is further out, 0.5 keeps roughly your zoom.");
+            EcoStrip.Bind(Config);
 
             // The stand-ins for the game's own bottom panels, under one switch:
             // with it off the game's panels stay as they are and only the
@@ -97,6 +99,7 @@ namespace SanctuaryHud
             SelectionRow.Bind(Config);
             BuildStrip.Bind(Config);
             TierTabs.Bind(Config);
+            BottomDock.Bind(Config);
 
             MiniMap.Bind(Config);
 

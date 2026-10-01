@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using SanctuaryUI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,8 +18,36 @@ namespace SanctuaryHud
     // the hairlines are drawn here: one along every exposed top edge of the
     // combined shape, thin dividers where two pieces meet, and the exposed
     // sides of a taller column, so the outline is the outline of the whole.
+    //
+    // The whole is sized together, too: one grip, in the top-right corner of
+    // the piece furthest right along the baseline, scales every piece from
+    // the dock's bottom-left corner.
     internal static class BottomDock
     {
+        private static ConfigEntry<float> _cfgScale;
+        private static ConfigEntry<bool> _cfgLocked;
+
+        private const float MinScale = 0.5f, MaxScale = 2f;
+
+        internal static void Bind(ConfigFile config)
+        {
+            _cfgScale = config.Bind("BottomPanels", "Scale", 1f,
+                new ConfigDescription("Size of the bottom panels together — the orders row, the unit card, the selection row and the build strip — " +
+                    "on top of the HUD's own Scale. Dragging the grip in the top-right corner of the panels sets this too.",
+                    new AcceptableValueRange<float>(MinScale, MaxScale)));
+            _cfgLocked = config.Bind("BottomPanels", "Locked", false,
+                "Keep the bottom panels the size they are: no resize grip.");
+        }
+
+        /// The live size, so a resize drag doesn't write the config file on
+        /// every frame of it; stored when the drag ends.
+        private static float _size = 1f;
+        private static HudPanel.PanelGrip _grip;
+
+        /// The size every piece is drawn at this frame: the HUD's, times
+        /// the dock's own.
+        internal static float Scale => SanctuaryHudPlugin.HudScale * _size;
+
         /// One row of tiles, plate included: the height every piece on the
         /// baseline shares.
         internal const float Pad = 12f;
@@ -39,13 +68,17 @@ namespace SanctuaryHud
         internal static float ColumnRight => Origin.x + ColumnWidth;
 
         private static readonly List<Rect> _pieces = new List<Rect>();
+        private static readonly List<RectTransform> _plates = new List<RectTransform>();
         private static readonly List<Image> _lines = new List<Image>();
         private static int _linesUsed;
 
         /// From Update, before the pieces tick: a fresh frame.
         internal static void Begin()
         {
+            if (_grip != null && _grip.TakeResized() is float resized) _cfgScale.Value = resized;
+            if (_grip == null || !_grip.Resizing) _size = Mathf.Clamp(_cfgScale.Value, MinScale, MaxScale);
             _pieces.Clear();
+            _plates.Clear();
             // Lines from a match that has ended went with its scene.
             _lines.RemoveAll(line => line == null);
             ColumnWidth = 0f;
@@ -67,13 +100,15 @@ namespace SanctuaryHud
         }
 
         /// A piece that showed this frame, where it was put (canvas units,
-        /// y up, bottom-left origin).
-        internal static void Add(Rect rect)
+        /// y up, bottom-left origin), and its plate.
+        internal static void Add(Rect rect, RectTransform plate)
         {
-            if (rect.width > 1f && rect.height > 1f) _pieces.Add(rect);
+            if (rect.width <= 1f || rect.height <= 1f) return;
+            _pieces.Add(rect);
+            _plates.Add(plate);
         }
 
-        /// From Update, after the pieces: the outline.
+        /// From Update, after the pieces: the outline and the grip.
         internal static void End()
         {
             _linesUsed = 0;
@@ -81,6 +116,7 @@ namespace SanctuaryHud
             if (root != null) Outline(root);
             for (var i = _linesUsed; i < _lines.Count; i++)
                 if (_lines[i] != null && _lines[i].gameObject.activeSelf) _lines[i].gameObject.SetActive(false);
+            PlaceGrip();
         }
 
         internal static void Shutdown()
@@ -88,6 +124,44 @@ namespace SanctuaryHud
             foreach (var line in _lines) if (line != null) Object.Destroy(line.gameObject);
             _lines.Clear();
             _linesUsed = 0;
+            if (_grip != null) Object.Destroy(_grip.gameObject);
+            _grip = null;
+        }
+
+        // ---- the grip ------------------------------------------------------------
+
+        /// In the top-right corner of the piece furthest right on the
+        /// baseline: the corner the whole grows towards.
+        private static void PlaceGrip()
+        {
+            RectTransform plate = null;
+            var right = float.MinValue;
+            for (var i = 0; i < _pieces.Count; i++)
+            {
+                var r = _pieces[i];
+                if (_plates[i] == null || Mathf.Abs(r.yMin - Origin.y) > Touch || r.xMax <= right) continue;
+                right = r.xMax;
+                plate = _plates[i];
+            }
+            if (plate == null)
+            {
+                if (_grip != null && _grip.gameObject.activeSelf) _grip.gameObject.SetActive(false);
+                return;
+            }
+            if (_grip == null)
+            {
+                _grip = HudPanel.PanelGrip.Create(plate, null, MinScale, MaxScale, () => _cfgLocked.Value);
+                _grip.Get = () => _size;
+                _grip.Set = size => _size = size;
+                _grip.Anchor = () =>
+                {
+                    var root = HudCanvas.Root;
+                    return root != null ? root.TransformPoint(root.rect.min + Origin) : Vector3.zero;
+                };
+            }
+            else if (_grip.transform.parent != plate) _grip.transform.SetParent(plate, false);
+            _grip.Place(new Vector2(1f, 1f));
+            if (!_grip.gameObject.activeSelf) _grip.gameObject.SetActive(true);
         }
 
         // ---- the outline ---------------------------------------------------------

@@ -103,7 +103,12 @@ has no release of its own yet; build it from source if you need it.
   commander widget, and the SanctuaryUI rows and card — drawn larger or
   smaller together, on top of the game's own UI Scale. At 1 the strip is
   its usual size and the rows and card a fifth up on their first release,
-  which read small. The mini-map has its own size, by dragging its corner. The gross in and gross out figures sit one
+  which read small. Each panel also has a size of its own on top of it, set
+  by dragging the grip in its corner: the strip (`TopBar · StripScale`) and
+  the commander widget (`TopBar · CommanderScale`) from their bottom-left,
+  the bottom panels together (`BottomPanels · Scale`) from the top-right of
+  the rightmost one, and the mini-map from its bottom-right. `TopBar · Locked`
+  and `BottomPanels · Locked` take the grips away. The gross in and gross out figures sit one
   over the other beside the net, so the two figures being compared line up.
   Each half leads with its resource's mark — an ingot for alloy, a bolt for
   energy — in place of the word; the same marks sit in front of every alloy,
@@ -251,7 +256,9 @@ time per frame every ten seconds in a match, so "is it the mod" is
 answerable from the log alone.
 - **Commander widget** top-right: the game's own strategic icon with a health
   bar underneath; click to select the commander and move the camera to it,
-  keeping roughly your current zoom (`Top bar · CommanderJumpZoom`).
+  keeping roughly your current zoom (`Top bar · CommanderJumpZoom`). It
+  stays away while a replay plays, where ReplayManager's army rows carry
+  each player's state and its panel often sits in that corner.
 - **Reclaim values** over the map while **Left Alt** is held (`Map labels ·
   ReclaimHoldKey`; `None` keeps them up permanently): the alloys left in every
   wreck and harvestable prop the client knows about, drawn at the spot.

@@ -61,7 +61,13 @@ then `seek <tick>` / `speed <x>` / `replaystate` (ReplayManager must be loaded).
 In a replay's ALL view every army reads as focused.
 
 **UI**: `tree [path] [depth]` (active, CanvasGroup alpha, canvas sort, sprite,
-text, size), `find <name>`, `texts [path]`, `click <path>`. Dump the tree
+text, size), `find <name>`, `texts [path]`, `click <path>`. `tap <path>` sends
+pointer events and never `Button.onClick` (the Mods page's folding rows, the
+lobby's Mods button and HUD tiles need it); `pointer <enter|exit|...> <path>`
+sends one (hover a build tile for the build card, clear a stuck sidebar
+highlight); `active <0|1> <path>` hides something for a shot; `scroll to <path>`
+or `scroll <0..1> <path>` moves a list. Paths can have spaces; `path#n` is the
+nth active match, for siblings that share a name (`Build options/Line/Tile#3`). Dump the tree
 before guessing at a layout bug - three blind redeploys were spent on the
 Mods page before a dump showed the sibling order.
 

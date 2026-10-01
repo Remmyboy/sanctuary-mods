@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,12 +22,35 @@ namespace SanctuaryHud
     // Commander widget, top-right under the strip: the game's own strategic
     // icon with a health bar underneath, always visible so a commander under
     // fire is obvious; click to select the commander and fly the camera to it.
+    // Not shown during replay playback.
     //
     // Both are laid out by hand in canvas units (the IMGUI figures doubled)
     // on one container that carries the size setting, so the setting sizes
-    // them without touching anything else.
+    // them without touching anything else. Each has a size of its own on
+    // top of that, which a grip in its bottom-left corner sets.
     internal static class EcoStrip
     {
+        internal static ConfigEntry<float> StripScale, CommanderScale;
+        internal static ConfigEntry<bool> Locked;
+
+        private const float MinScale = 0.5f, MaxScale = 2f;
+
+        internal static void Bind(ConfigFile config)
+        {
+            StripScale = config.Bind("TopBar", "StripScale", 1f,
+                new ConfigDescription("Size of the economy strip, on top of the HUD's own Scale. Dragging the grip in the strip's bottom-left corner sets this too.",
+                    new AcceptableValueRange<float>(MinScale, MaxScale)));
+            CommanderScale = config.Bind("TopBar", "CommanderScale", 1f,
+                new ConfigDescription("Size of the commander widget, on top of the HUD's own Scale. Dragging the grip in its bottom-left corner sets this too.",
+                    new AcceptableValueRange<float>(MinScale, MaxScale)));
+            Locked = config.Bind("TopBar", "Locked", false,
+                "Keep the strip and the commander widget the size they are: no resize grips.");
+        }
+
+        /// The live sizes, so a resize drag doesn't write the config file
+        /// on every frame of it; stored when the drag ends.
+        private static float _stripSize = 1f, _commanderSize = 1f;
+        private static HudPanel.PanelGrip _stripGrip, _commanderGrip;
         /// The strip's height in canvas units.
         internal const float Height = 96f;
         private const float Pad = 32f;
@@ -66,6 +90,11 @@ namespace SanctuaryHud
 
         private static void Sync(bool showing, float scale)
         {
+            if (_stripGrip != null && _stripGrip.TakeResized() is float strip) StripScale.Value = strip;
+            if (_commanderGrip != null && _commanderGrip.TakeResized() is float commander) CommanderScale.Value = commander;
+            if (_stripGrip == null || !_stripGrip.Resizing) _stripSize = Mathf.Clamp(StripScale.Value, MinScale, MaxScale);
+            if (_commanderGrip == null || !_commanderGrip.Resizing) _commanderSize = Mathf.Clamp(CommanderScale.Value, MinScale, MaxScale);
+
             Dictionary<string, float> eco;
             lock (_ecoLock) eco = _eco;
             if (!showing || eco == null)
@@ -79,7 +108,11 @@ namespace SanctuaryHud
             if (!_root.gameObject.activeSelf) _root.gameObject.SetActive(true);
 
             // The container spans the screen at 1/scale and is scaled up,
-            // so everything on it is laid out in unscaled units.
+            // so everything on it is laid out in unscaled units. The
+            // commander widget undoes the strip's own size for its own.
+            var commanderScale = _commanderSize / _stripSize;
+            _commander.transform.localScale = new Vector3(commanderScale, commanderScale, 1f);
+            scale *= _stripSize;
             var size = HudCanvas.Size;
             var width = size.x / scale;
             _root.localScale = new Vector3(scale, scale, 1f);
@@ -145,6 +178,19 @@ namespace SanctuaryHud
             }
 
             _commander = Commander.Create(_root);
+
+            // The grips, each scaling its piece from the corner it hangs
+            // from: the strip from the screen's top-left, the widget from
+            // its own top-right.
+            _stripGrip = HudPanel.PanelGrip.Create(_strip, _root, MinScale, MaxScale, () => Locked.Value);
+            _stripGrip.Get = () => _stripSize;
+            _stripGrip.Set = s => _stripSize = s;
+            _stripGrip.Place(new Vector2(0f, 0f));
+            var widget = (RectTransform)_commander.transform;
+            _commanderGrip = HudPanel.PanelGrip.Create(widget, widget, MinScale, MaxScale, () => Locked.Value);
+            _commanderGrip.Get = () => _commanderSize;
+            _commanderGrip.Set = s => _commanderSize = s;
+            _commanderGrip.Place(new Vector2(0f, 0f));
         }
 
         private static Image VerticalLine(Transform parent, Color colour)
@@ -557,6 +603,17 @@ namespace SanctuaryHud
 
         // ---- the commander widget ---------------------------------------------------
 
+        /// Whether the game is playing a replay back (its replay socket is
+        /// the client's), rather than running a live match.
+        private static bool ReplayPlayback
+        {
+            get
+            {
+                try { return EM.Network.NetworkManager.IsReplayPlayback; }
+                catch { return false; }
+            }
+        }
+
         private sealed class Commander : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
         {
             private const float W = 216f;
@@ -632,7 +689,11 @@ namespace SanctuaryHud
 
             internal void Sync()
             {
-                var show = _commanderLocalIndex >= 0;
+                // Not while watching a replay: the widget is for flying to
+                // your own commander mid-game, ReplayManager's army rows
+                // carry each player's state there, and players tend to park
+                // the replay panel in this corner.
+                var show = _commanderLocalIndex >= 0 && !ReplayPlayback;
                 if (gameObject.activeSelf != show) gameObject.SetActive(show);
                 if (!show) return;
 
