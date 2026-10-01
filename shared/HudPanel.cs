@@ -99,6 +99,16 @@ namespace SanctuaryHud
             PlaceGrip();
         }
 
+        /// True once when a drag of the panel has just ended, for the owner
+        /// to save the position Place returned that frame. (A drag can begin
+        /// and end between two frames, so watching Dragging isn't enough.)
+        internal bool TakeDragged()
+        {
+            if (_drag == null || !_drag.Ended) return false;
+            _drag.Ended = false;
+            return true;
+        }
+
         /// The size the player resized the panel to, once, when a resize has
         /// just ended; otherwise null.
         internal float? TakeResized() => _grip != null ? _grip.TakeResized() : null;
@@ -172,6 +182,7 @@ namespace SanctuaryHud
             internal Func<bool> Locked;
             internal bool Dragging;
             internal bool Moved;
+            internal bool Ended;
             private RectTransform _rect;
 
             private void Awake() => _rect = (RectTransform)transform;
@@ -193,6 +204,7 @@ namespace SanctuaryHud
 
             public void OnEndDrag(PointerEventData eventData)
             {
+                if (Dragging) Ended = true;
                 Dragging = false;
                 Moved = true;
             }

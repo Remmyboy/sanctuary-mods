@@ -241,7 +241,6 @@ namespace Sanctuary.ModApi
             private bool _visible, _hasTitle;
             private Vector2 _initial;
             private bool _alignRight;
-            private bool _wasDragging;
 
             internal bool Alive => _panel.Alive;
 
@@ -316,16 +315,14 @@ namespace Sanctuary.ModApi
                 else want = _initial;
 
                 var at = _panel.Place(want);
-                var dragging = _panel.Dragging;
                 // Saved when a drag ends, never for where the mod put it.
-                if (_wasDragging && !dragging)
+                if (_panel.TakeDragged())
                 {
                     var entry = Entry(Id);
                     entry.X = at.x;
                     entry.Y = at.y;
                     Save(Id, entry);
                 }
-                _wasDragging = dragging;
             }
 
             internal void Destroy()
