@@ -44,7 +44,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [EcoManager](EcoManager/) | [**0.7.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.7.3) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it |
 | [BuildHotkeys](BuildHotkeys/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | [**0.4.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.3) | Watch the game's replays fog-free from any seat, with every economy |
+| [ReplayManager](ReplayManager/) | [**0.4.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.4) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.9.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
@@ -1288,6 +1288,15 @@ is a few lines. Player names come from the recorded lobby: a wrapper on the
 `ReceiveDataClient` global captures `InitClient`'s roster. Both hooks are
 installed from a postfix on `ClientLuaInterface.Startup`, before the first
 packet is applied, with the half-second poll as fallback.
+
+**The result screen.** The game puts up VICTORY or DEFEAT the first time the
+focused army's result arrives, and in the all-armies view every army counts
+as focused, so a replay used to show DEFEAT (and MatchStats' window with it)
+the moment the first player was wiped out. The mod wraps the client's
+`WinConditionUpdate` with the panel calls muted, and shows the panel itself
+once the match is decided — some army has won — as VICTORY or DEFEAT for the
+army being watched, or GAME OVER in the all-armies view. The game's handler
+still sees every update, so other wrappers (MatchStats) do too.
 
 **The panel** has the clock, play/pause, a log-scale speed slider, +1
 minute, a FOG toggle, a TIMELINE toggle that hides the total length and the
