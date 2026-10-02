@@ -46,7 +46,7 @@ public class Probe : BaseUnityPlugin
   waitlua <seconds> <expr>    hold until <expr> is truthy, or fail after <seconds>
   waitmatch [seconds]         hold until the client Lua VM exists (default 180)
   shot <name>                 screenshot to shots\<name>.png
-  (a path is a full path, its tail, or a name; path#n is the nth active match from 0)
+  (a path is a full path, its tail, or a name; path#n is the nth shown match from 0, in hierarchy order)
   tree [path] [depth]         UI hierarchy (default: the InterfaceManager canvas, depth 4)
   find <text> [max]           transforms whose name contains <text>, with paths
   texts [path]                every TMP text under path
@@ -710,7 +710,9 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
     // An exact path, else a path suffix, else a name; active objects first.
     private static Transform Find(string path)
     {
-        // path#n: the nth (from 0) active match, for siblings that share a name.
+        // path#n: the nth (from 0) shown match in hierarchy order, for
+        // siblings that share a name. FindObjectsOfTypeAll has no order of
+        // its own, and the game pools buttons by scaling them to nothing.
         var nth = -1;
         var hash = path.LastIndexOf('#');
         if (hash > 0 && int.TryParse(path.Substring(hash + 1), out var n))
@@ -720,7 +722,9 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
         }
         var all = SceneTransforms().ToList();
         if (nth >= 0)
-            return all.Where(t => t.gameObject.activeInHierarchy && (PathOf(t) == path || PathOf(t).EndsWith("/" + path) || t.name == path))
+            return all.Where(t => t.gameObject.activeInHierarchy && t.localScale.x > 0.01f &&
+                                  (PathOf(t) == path || PathOf(t).EndsWith("/" + path) || t.name == path))
+                .OrderBy(HierarchyKey, StringComparer.Ordinal)
                 .Skip(nth).FirstOrDefault();
         var hit = all.Where(t => PathOf(t) == path)
             .Concat(all.Where(t => PathOf(t).EndsWith("/" + path)))
@@ -730,6 +734,10 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
     }
 
     private static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
+
+    // Sorts as the hierarchy reads, top to bottom: sibling indices from the root.
+    private static string HierarchyKey(Transform t) =>
+        (t.parent == null ? "" : HierarchyKey(t.parent) + "/") + t.GetSiblingIndex().ToString("D5");
 
     private static void Walk(Transform t, int depth, int max, StringBuilder sb)
     {

@@ -72,7 +72,9 @@ button (take from a queue tile); `pointer <enter|exit|...> <path>`
 sends one (hover a build tile for the build card, clear a stuck sidebar
 highlight); `active <0|1> <path>` hides something for a shot; `scroll to <path>`
 or `scroll <0..1> <path>` moves a list. Paths can have spaces; `path#n` is the
-nth active match, for siblings that share a name (`Build options/Line/Tile#3`). Dump the tree
+nth shown match **from 0**, in hierarchy order, for siblings that share a name
+(`Build options/Line/Tile#3` is the fourth tile; pooled buttons scaled to
+nothing are skipped). Before 2026-10-02 it took matches in no fixed order. Dump the tree
 before guessing at a layout bug - three blind redeploys were spent on the
 Mods page before a dump showed the sibling order.
 
