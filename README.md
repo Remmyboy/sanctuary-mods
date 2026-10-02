@@ -283,8 +283,8 @@ answerable from the log alone.
   throttles every build), and red once nothing is building it and it hasn't
   moved for a few seconds, an abandoned site; the estimate stays either way,
   since there is no better number. What is building a site comes from the
-  units whose build routine targets it (`isBuilding` / `buildTarget`, which
-  the host reports to every client). An upgrade whose upgrader is paused and
+  units whose build routine targets it (`isBuilding` / `buildTarget`). An
+  upgrade whose upgrader is paused and
   that nothing is building is left out altogether; an engineer assisting it
   builds straight through the pause, and then it shows. A game pause (the
   economy stream going quiet) freezes the clocks instead. Labels are placed
@@ -317,8 +317,8 @@ answerable from the log alone.
   report there, and what stood on screen was the last seat's figures going
   stale. The game's own readouts come back while they are away, so that
   view is never left with no economy display at all. The seat is read from
-  the client's own `GetFocusArmy`, where `-1` is the all-armies view; a
-  value it cannot read counts as focused, so a failed read is never what
+  the client's own focused army; a value it cannot read counts as focused,
+  so a failed read is never what
   makes the HUD vanish. The mini-map stays up regardless: it is the one
   thing here that reads just as well watching everybody.
 
@@ -420,15 +420,12 @@ a custom map too. (A map that names its rect just `Playable`, as Fields of Isis
 does, is not matched by the game's lookup and plays across the whole map — and
 its preview is full-map to match.)
 
-**It shows what the game shows, and no more.** The host broadcasts every unit
-in the game to every client and leaves fog, intel and economy filtering to the
-client, so a mini-map that plotted `__Entities.Units` would be a maphack. The
-filter is the client's own `ClientUnit:IsHighlightable()` — vision or radar,
-and not an upgrade shell — so the set of contacts on the mini-map is exactly
-the set the game is already drawing on the battlefield.
+**It shows what the game shows, and no more.** Contacts go through the
+client's own `ClientUnit:IsHighlightable()` — vision or radar, and not an
+upgrade shell — so the set of contacts on the mini-map is exactly the set the
+game is already drawing on the battlefield.
 
-**A radar contact is not told on.** It would be easy to draw every contact
-with its real strategic icon, and it would be cheating: `OnIntelRadar`
+**A radar contact is drawn as the game draws it.** `OnIntelRadar`
 *disables* a unit's strategic icon and enables a separate radar icon, which
 `unitTemplateLoader` builds as `<shape>_<tech>_none_normal` — the same plate
 with the role symbol left out — and draws pure white rather than in the army's
@@ -518,9 +515,8 @@ rather than once per unit. Colours are read off the army object rather than
 derived, because they are handed out by registration-order colour id and not by
 lobby army id — deriving one lands on somebody else's colour.
 
-In a replay the focus army is whatever ReplayManager is showing; the
-all-armies view focuses every army, which the client's own intel code treats as
-seeing everything, so the mini-map fills in without any special case.
+In a replay the mini-map follows whichever view ReplayManager is showing,
+the all-armies view included, without any special case.
 
 Hotkeys: **F10** toggles the overlay, **F2** the mini-map, **F9** dumps the UI
 hierarchy to the log.
@@ -556,14 +552,12 @@ keeps it to the button. (This was its own mod, MatchStats, before 0.14.0.)
   the chart puts a cursor on it and a readout of every army's value at that
   moment, highest first. Your own line is drawn thicker and on top.
 
-**Where the figures come from.** The host sends every army's economy totals
-to every client every tick, and every unit's creation, build progress and
-death, carrying its army; the client keeps only what it needs to draw its
-own army (see ReplayManager's notes below). The HUD wraps those commands'
-`Receive` fields in the client VM — a table-field swap, no file touched, so
-the lobby's Lua hash is unchanged — and keeps count there, in the client's
-memory, reading it out every two seconds. Nothing is sent anywhere, and
-nothing is shown until the game itself stops hiding anything.
+**Where the figures come from.** The HUD counts from the game's own unit
+and economy updates as the match runs, by wrapping those commands' `Receive`
+fields in the client VM — a table-field swap, no file touched, so the lobby's
+Lua hash is unchanged — and keeps count there, in the client's memory,
+reading it out every two seconds. Nothing is sent anywhere, and nothing is
+shown until the match has a result.
 
 - Economy figures are per tick in the stream (`economy.lua` adds income
   straight into the store), so a second's figures are ten ticks summed.
@@ -1275,9 +1269,8 @@ playtest update of 2026-09-04 the game records every match to
 and plays them from the main menu's replay list; the panel appears whenever
 one is playing, and **F7** shows and hides it.
 
-**What the game does.** Its replay is the host-to-client packet stream,
-written by the client as it arrives, behind a small header (map, game
-version + Lua hash, recording client). Playback goes through
+**What the game does.** Its replay is a recording of the match behind a
+small header (map, game version + Lua hash, recording client). Playback goes through
 `ReplayClientSockets`, a fake socket that synthesises the launch messages
 and then reads recorded packets into the client's receive buffer, paced by
 the sim speed, at most 32 ticks ahead. The client only steps a tick once its
@@ -1297,18 +1290,12 @@ the mod now only drives the game's socket:
   it leaves through the game's quit path (scene reload), calls the game's own
   `StartReplayPlayback` on the same file again, and fast-forwards from zero.
 
-**Seats, fog, economy.** The recording's `InitClient` message only seats the
-client that recorded it, so the view buttons call the client's own
-`SetFocusArmy` (`-1` is the game's all-armies observer mode) and the fog
-post-process is switched with the focus (or by hand). The client is marked
-an observer so clicks can't issue orders into the void. Every army's economy
-comes from a wrapper on `UpdateEconomyTotals.Receive` in the game's command
-registry, which keeps all armies' totals and sums income and spend per tick;
-the registry hands the receiver an already-decoded payload, so the wrapper
-is a few lines. Player names come from the recorded lobby: a wrapper on the
-`ReceiveDataClient` global captures `InitClient`'s roster. Both hooks are
-installed from a postfix on `ClientLuaInterface.Startup`, before the first
-packet is applied, with the half-second poll as fallback.
+**Seats and economy.** The view buttons switch playback between each
+recorded player's point of view and an all-armies view, and the FOG toggle
+follows the view (or can be set by hand). The client is marked an observer
+so clicks can't issue orders into the void. The per-army economy figures and
+player names are read from the recording as it plays, by hooks installed
+before its first tick is applied.
 
 **The result screen.** The game puts up VICTORY or DEFEAT the first time the
 focused army's result arrives, and in the all-armies view every army counts

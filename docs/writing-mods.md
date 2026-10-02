@@ -363,9 +363,9 @@ client, then handle it in your host script. To show a player something only
 the host knows, send it to them: `SendToClient(data, "YourState", clientId)`
 on the host, `RegisterListener("client_YourState", fn)` in the client.
 
-**Who sent a request?** The game hands host functions their data but not the
-client that sent it. If your rules depend on who asked, wrap the game's
-handler in your host script and keep the client id for your own call.
+**Who sent a request?** If your rules depend on which player asked, wrap
+the game's handler in your host script and keep the client id for your own
+call.
 [`PhantomX`](../PhantomX/lua/phantomx/host.lua) does this. Look for
 `ExecuteHostFunction`.
 
@@ -413,12 +413,10 @@ Things that trip everyone up:
   Lua hash. The framework's content hash covers them, so the lobby still
   catches a mismatch.
 - **The host is the authority, menus aren't.** Clients send requests
-  ("queue 3 of this unit", "build that here"), and the host doesn't always
-  check them against what the UI would allow. The build queue is one example:
-  the host queues whatever it is asked to. A rule that only changes a menu can
-  be walked around by anything that sends the request directly. Hotkey mods,
-  scripts and future UI all do. So enforce it where the host handles the
-  request too; EngineersAndRaiders does both.
+  ("queue 3 of this unit", "build that here"), and hotkey mods, scripts and
+  future UI send them without going through your menu. A rule that only
+  changes a menu doesn't hold on its own, so enforce it where the host
+  handles the request too; EngineersAndRaiders does both.
 - **Your append runs once per VM.** The host VM and every client VM each run
   the file, so anything with side effects (logging, counters) happens once
   per VM.
