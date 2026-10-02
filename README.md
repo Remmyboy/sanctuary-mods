@@ -39,7 +39,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.15.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.15.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.15.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.15.2) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.6.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.8.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.8.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
@@ -615,7 +615,20 @@ comes up, the HUD logs the result panel's object tree.
 ### QoL
 
 Everything here lives in the **QoL** section of the Mods page and is **off by
-default**; the factory queue drag above (`ReorderQueueByDragging`) is there too.
+default**, except the queue right-click fix below; the factory queue drag
+above (`ReorderQueueByDragging`) is there too.
+
+**Right-clicking a queue item takes from that item** (`QueueRightClickTakesClickedItem`,
+**on** by default, as it fixes the game). Factories start with repeat build on,
+and each finished item goes back on the end of the queue carrying the same
+queue ids as the original (`HostFactory:CompleteBuildQueueItem`). The game's
+right-click sends one of those ids and the host takes from the back, so with
+`Tank ×2 | Raider | Tank ×1` a right-click on the first tank removed the last
+one. This swaps the queue panel's click handler: a right-click sends an id no
+later item shares, or, when every id is shared, takes the items behind it off,
+takes from the clicked one and puts them back. Left clicks are the game's own.
+It covers the game's queue panel and the build strip; the commands are the
+game's own, so it works against unmodded hosts.
 
 **Match clock** (`ShowMatchClock`): the time since the match started and the sim
 speed (`12:34   1.5×`, or `PAUSED`), under the menu buttons in the middle of
