@@ -1151,9 +1151,13 @@ builds a key's `Alt-` / `Ctrl-` / `Shift-` prefix from its own record of which
 keys are down, and only a key-up clears it. Alt-Tab out during a loading screen
 can lose that key-up, and every key then arrives as `Alt-<key>` — for W, the
 reverse cycle, which opens on the air factory. The game's own hotkeys break the
-same way. So ten times a second, while the game has focus, any modifier the
-record holds but the keyboard reports up is cleared, with a line in the log
-when that happens.
+same way. So ten times a second, while the game has focus (and straight away
+when it gets focus back), any modifier the record holds but the keyboard
+reports up is cleared, with a line in the log when that happens. "The keyboard"
+is Windows' `GetAsyncKeyState`: until 0.4.1 this asked Unity's `Input.GetKey`,
+which learns key state from the same window messages the game does, so after
+Alt-Tab it said Alt was still held too and nothing was let go. When Unity and
+Windows disagree, the log says so once a match.
 
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into
