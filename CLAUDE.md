@@ -6,8 +6,9 @@ shared DLL. `ModLoader` (BepInEx\plugins) hot-loads everything under the game's
 `SanctuaryMods\`; `ModApi` is the framework (lobby protocol, gameplay mods, mod
 options, Lua bridge) and ships inside the ModManager release. Lua-only gameplay
 mods (ZoneControl) are a `mod.json` plus `lua/`. Modding guides for third
-parties: `docs/writing-mods.md`, `docs/your-first-mod.md`, `templates/`,
-`examples/`.
+parties: `docs/writing-mods.md`, `docs/your-first-mod.md`,
+`docs/modding-field-notes.md`, `templates/`, `examples/`. Public docs never
+spell out what each client receives, fog/focus calls or host trust gaps.
 
 ## Tools (tools/)
 

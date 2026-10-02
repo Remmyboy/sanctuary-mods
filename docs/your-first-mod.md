@@ -331,6 +331,9 @@ match. A mod with a DLL runs as a program on every player's PC.
   `mod.json` field, kills and damage events, replacing unit stats (`.santp`
   files), adding units and whole factions, C# mods, and how the lobby
   decides.
+- **[modding-field-notes.md](modding-field-notes.md)**, what we learnt about
+  the game: how a match runs, Lua scoping, UI, unit and economy data, maps,
+  debugging, and what breaks when the game patches.
 - **The examples** in [`examples/`](../examples), each a complete mod you
   can copy into `SanctuaryMods` and play:
   - **ExampleGameplayMod** is the colour part of this tutorial.

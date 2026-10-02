@@ -21,6 +21,9 @@ always runs vanilla, so players without mods can play with anyone.
 mod, from an empty folder to a match. [docs/writing-mods.md](docs/writing-mods.md)
 is the full author's guide, with a `dotnet new`
 [template](templates/sanctuary-mod/) and five [examples](examples/).
+[docs/modding-field-notes.md](docs/modding-field-notes.md) is everything we
+learnt about the game along the way: how it fits together, Lua and UI traps,
+game data, maps, debugging and surviving patches.
 
 Lobby-compatible is not the same as safe. Every DLL here, like any BepInEx
 plugin, is a full-trust client plugin: it runs inside the game process with
@@ -1447,6 +1450,8 @@ agent running).
 > [docs/writing-mods.md](docs/writing-mods.md), the full reference (every
 > `mod.json` field, match events, recipes, factions, C# mods and the API),
 > and the working mods in [examples/](examples/).
+> [docs/modding-field-notes.md](docs/modding-field-notes.md) collects what we
+> learnt about the game itself, and the traps that cost us the most time.
 
 A **Mods** entry in the front menu's sidebar (the cube icon, just below
 Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods

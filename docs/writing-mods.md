@@ -12,6 +12,8 @@ lobby.
 
 New to this? [Your first mod](your-first-mod.md) is a step-by-step walkthrough
 that needs only a text editor. This page is the full reference.
+[Field notes](modding-field-notes.md) has what we learnt about the game
+itself, and the traps that cost us the most time.
 
 ## Two kinds of mod
 
