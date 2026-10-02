@@ -957,8 +957,12 @@ namespace SanctuaryHud
 
                 if (_getPairedGlobalMi == null || _getHealthMi == null) return;
                 var pairedComponent = _getPairedGlobalMi.Invoke(em, new[] { entity });
-                _commanderGlobalId = _pairedGlobalField.GetValue(pairedComponent);
-                ReadCommanderHealth(_commanderGlobalId);
+                var globalId = _pairedGlobalField.GetValue(pairedComponent);
+                // A commander that has died can still be drawn for a while;
+                // its id is known to be gone, so don't ask about it again.
+                if (globalId == null || globalId.Equals(_refusedCommanderId)) return;
+                _commanderGlobalId = globalId;
+                if (!ReadCommanderHealth(globalId)) ForgetCommanderId();
             }
             catch
             {
@@ -971,13 +975,30 @@ namespace SanctuaryHud
         /// noticed within a quarter second, not a second later).
         private static object _commanderGlobalId;
 
+        /// The last id the engine refused: the commander died. Every refused
+        /// ask writes a line to the game's log, and the alerts ask four times
+        /// a second, so it is asked about once.
+        private static object _refusedCommanderId;
+
+        private static void ForgetCommanderId()
+        {
+            _refusedCommanderId = _commanderGlobalId;
+            _commanderGlobalId = null;
+        }
+
         /// Re-reads the commander's health off its cached global id. False
         /// when there is no commander on record or the engine refuses the
-        /// id (the entity is gone); the last values are kept either way.
+        /// id (the entity is gone, and the id is then forgotten); the last
+        /// values are kept either way.
         internal static bool RefreshCommanderHealth()
         {
             if (_commanderLocalIndex < 0 || _commanderGlobalId == null || _getHealthMi == null) return false;
-            try { return ReadCommanderHealth(_commanderGlobalId); }
+            try
+            {
+                if (ReadCommanderHealth(_commanderGlobalId)) return true;
+                ForgetCommanderId();
+                return false;
+            }
             catch { return false; }
         }
 
@@ -1808,7 +1829,10 @@ namespace SanctuaryHud
             if (!InMatch)
             {
                 // Leaving a match: drop everything so the next one starts clean
-                // rather than flashing the previous game's units.
+                // rather than flashing the previous game's units. Ids are
+                // reused between matches, so a refused one is forgotten too.
+                _commanderGlobalId = null;
+                _refusedCommanderId = null;
                 if (_commanderLocalIndex >= 0 || _idleCount > 0 || _idleFactoryCount > 0 || _alloyCount > 0 ||
                     _rowIcons.Count > 0)
                 {
