@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using BepInEx;
 using BepInEx.Configuration;
 using UnityEngine;
@@ -30,7 +31,7 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.4.0")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.4.1")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
@@ -549,6 +550,28 @@ namespace SanctuaryHud
 
         private float _modPoll;
         private int _unstuck;
+        private bool _unityDisagreed;
+
+        [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
+        private const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12;
+        private static bool _noAsyncKeys;
+
+        /// Whether Windows says a modifier is down right now (either side).
+        /// This is the keyboard itself, not a record built from window
+        /// messages, so it can't be stranded by Alt-Tab. Null where user32
+        /// isn't there to ask.
+        private static bool? OsKeyDown(int vk)
+        {
+            if (_noAsyncKeys) return null;
+            try { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
+            catch (Exception) { _noAsyncKeys = true; return null; }
+        }
+
+        // Back in focus: check straight away rather than on the next tick.
+        private void OnApplicationFocus(bool focused)
+        {
+            if (focused) _modPoll = 1f;
+        }
 
         /// Ten times a second while focused: which of Ctrl, Shift and Alt are
         /// physically up, into the hook's ReleaseMods, which clears any the
@@ -557,6 +580,12 @@ namespace SanctuaryHud
         /// queue: the physical state is read after that event, so a key that
         /// reads up has its key-up queued behind it. Unfocused, the game's own
         /// focus reset owns the state, so this keeps out.
+        ///
+        /// "Physically" means Windows' GetAsyncKeyState. Until 0.4.1 this read
+        /// Unity's Input.GetKey, which learns key state from the same window
+        /// messages the game does: the Alt-up that Alt-Tab sends to the other
+        /// window never reaches either, so Unity said Alt was still held too
+        /// and nothing was let go.
         private void ReleaseStuckModifiers()
         {
             if (!_installed || !Application.isFocused) return;
@@ -564,9 +593,22 @@ namespace SanctuaryHud
             if (_modPoll < 0.1f) return;
             _modPoll = 0f;
 
-            var ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            var shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            var alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || Input.GetKey(KeyCode.AltGr);
+            var unityCtrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            var unityShift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            var unityAlt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || Input.GetKey(KeyCode.AltGr);
+            var ctrl = OsKeyDown(VK_CONTROL) ?? unityCtrl;
+            var shift = OsKeyDown(VK_SHIFT) ?? unityShift;
+            var alt = OsKeyDown(VK_MENU) ?? unityAlt;
+
+            // Once a match, say so if Unity thought a modifier was held that
+            // the keyboard says isn't: that's the Alt-Tab case this is for.
+            if (!_unityDisagreed && ((unityCtrl && !ctrl) || (unityShift && !shift) || (unityAlt && !alt)))
+            {
+                _unityDisagreed = true;
+                Logger.LogInfo("Build hotkeys: Unity still had " +
+                               (unityAlt && !alt ? "Alt" : unityCtrl && !ctrl ? "Ctrl" : "Shift") +
+                               " held after it was let go (Alt-Tab?); going by the keyboard instead.");
+            }
             if (ctrl && shift && alt) return;
 
             string Up(bool held) => held ? "false" : "true";
@@ -809,6 +851,7 @@ namespace SanctuaryHud
                 _installedSignature = signature;
                 _builds = 0;
                 _unstuck = 0;
+                _unityDisagreed = false;
                 // The new install starts from the chunk's own snap and a fresh
                 // press counter, so last install's readings no longer hold.
                 _snapPushed = -1f;
