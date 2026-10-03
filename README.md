@@ -21,6 +21,9 @@ always runs vanilla, so players without mods can play with anyone.
 mod, from an empty folder to a match. [docs/writing-mods.md](docs/writing-mods.md)
 is the full author's guide, with a `dotnet new`
 [template](templates/sanctuary-mod/) and five [examples](examples/).
+[docs/modding-field-notes.md](docs/modding-field-notes.md) is everything we
+learnt about the game along the way: how it fits together, Lua and UI traps,
+game data, maps, debugging and surviving patches.
 
 Lobby-compatible is not the same as safe. Every DLL here, like any BepInEx
 plugin, is a full-trust client plugin: it runs inside the game process with
@@ -42,7 +45,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [SanctuaryHud](SanctuaryHud/) | [**0.15.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.15.2) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.6.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.8.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.8.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
-| [BuildHotkeys](BuildHotkeys/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
+| [BuildHotkeys](BuildHotkeys/) | [**0.4.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
 | [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
 | [ReplayManager](ReplayManager/) | [**0.4.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.4) | Watch the game's replays fog-free from any seat, with every economy |
 | [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
@@ -1161,9 +1164,13 @@ builds a key's `Alt-` / `Ctrl-` / `Shift-` prefix from its own record of which
 keys are down, and only a key-up clears it. Alt-Tab out during a loading screen
 can lose that key-up, and every key then arrives as `Alt-<key>` — for W, the
 reverse cycle, which opens on the air factory. The game's own hotkeys break the
-same way. So ten times a second, while the game has focus, any modifier the
-record holds but the keyboard reports up is cleared, with a line in the log
-when that happens.
+same way. So ten times a second, while the game has focus (and straight away
+when it gets focus back), any modifier the record holds but the keyboard
+reports up is cleared, with a line in the log when that happens. "The keyboard"
+is Windows' `GetAsyncKeyState`: until 0.4.1 this asked Unity's `Input.GetKey`,
+which learns key state from the same window messages the game does, so after
+Alt-Tab it said Alt was still held too and nothing was let go. When Unity and
+Windows disagree, the log says so once a match.
 
 Nothing here edits a Lua file, so `ComputeLuaHash` is untouched and a modded
 client still joins unmodded lobbies. The binding is a runtime insert into
@@ -1457,6 +1464,8 @@ agent running).
 > [docs/writing-mods.md](docs/writing-mods.md), the full reference (every
 > `mod.json` field, match events, recipes, factions, C# mods and the API),
 > and the working mods in [examples/](examples/).
+> [docs/modding-field-notes.md](docs/modding-field-notes.md) collects what we
+> learnt about the game itself, and the traps that cost us the most time.
 
 A **Mods** entry in the front menu's sidebar (the cube icon, just below
 Settings; **F8** opens it too) leading to a full page with two tabs, UI Mods
