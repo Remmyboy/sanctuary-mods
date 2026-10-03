@@ -42,7 +42,7 @@ namespace SanctuaryModLoader
     // off on the Mods page is held back before it is ever created, so none of
     // its code runs, and the manager lists, starts and stops plugins through
     // the static methods at the bottom rather than adding components itself.
-    [BepInPlugin(LoaderGuid, "Sanctuary Mod Loader", "1.4.0")]
+    [BepInPlugin(LoaderGuid, "Sanctuary Mod Loader", "1.4.1")]
     [BepInDependency(ModApiGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class LoaderPlugin : BaseUnityPlugin
     {

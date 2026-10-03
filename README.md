@@ -42,19 +42,19 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.15.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.15.2) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
-| [IdleEngineers](IdleEngineers/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.6.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
-| [EcoManager](EcoManager/) | [**0.8.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.8.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
-| [BuildHotkeys](BuildHotkeys/) | [**0.4.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.4.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
-| [LadderReporter](LadderReporter/) | [**0.3.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.4) | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | [**0.4.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.4.4) | Watch the game's replays fog-free from any seat, with every economy |
-| [CameraUtilities](CameraUtilities/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.10.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.10.1) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
+| [SanctuaryHud](SanctuaryHud/) | [**0.16.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.16.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
+| [IdleEngineers](IdleEngineers/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
+| [EcoManager](EcoManager/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.0) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
+| [BuildHotkeys](BuildHotkeys/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
+| [LadderReporter](LadderReporter/) | [**0.3.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.5) | Reports ranked results; launches matchmade games |
+| [ReplayManager](ReplayManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.0) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
+| [CameraUtilities](CameraUtilities/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.0) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
+| [ModManager](ModManager/) | [**0.11.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.11.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
-| [PhantomX](PhantomX/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.1.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [PhantomX](PhantomX/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.0) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.10.1) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.10.1) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.4.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.11.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.11.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1332,11 +1332,18 @@ view, then alloy and energy as a storage bar, net / in / out per second, and
 the amount used so far in the game. ALL shows every army. Armies that never
 show an economy — the empty slots of a map bigger than the game played on it,
 and the neutral army — are left out of the table; once an army has appeared
-it keeps its row, so being wiped out does not remove a player. Drag the
-title bar to move the panel and the grip in its bottom-right corner to
-resize it; both are remembered (`PanelX`, `PanelY`, `PanelScale`). The panel
-stays wholly on screen, and `UI · Locked` stops it being dragged. The
+it keeps its row, so being wiped out does not remove a player. Every column
+heading sorts the table: a click puts the highest first, a second click the
+lowest, and ARMY goes back to seat order; armies with no economy yet stay at
+the bottom. Drag the panel to move it and the grip in its bottom-right corner
+to resize it; both are remembered (`PanelX`, `PanelY`, `PanelScale`). The
+panel stays wholly on screen, and `UI · Locked` stops it being dragged. The
 resource columns are headed by the HUD's ingot and bolt marks.
+
+The panel is built like the HUD's (the game's font, its plates, clicks that
+stop at the panel) but on a canvas of the mod's own rather than the game's
+HUD canvas, so it stays up through a rewind and when Camera Utilities hides
+the game's UI.
 
 **Caveats.** A replay is tied to the game build and Lua hash it was recorded
 with; the game's own list greys out mismatches. Playback is a normal client,
@@ -1376,8 +1383,9 @@ and both views agree.
   `RecalculateRendering` rather than forcing every marker on, so a spot that
   gained an extractor meanwhile stays hidden, as it should.
 - **Health bars** — every health and progress bar.
-- **Game UI** — the whole HUD. This mod's own panel is Unity IMGUI rather than
-  the game's UI, so it stays up and F4 still gets everything back.
+- **Game UI** — the whole HUD. The game's switch turns off its whole UI
+  canvas, so this mod's panel sits on a canvas of its own: it stays up, still
+  takes clicks, and F4 still gets everything back.
 - **Unit draw distance** — how far the camera can get before units stop being
   drawn at all. The game stops drawing anything mobile past 100 world units
   and structures past 160, which is why a zoomed-out battle is nothing but
