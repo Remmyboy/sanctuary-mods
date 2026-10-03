@@ -815,21 +815,24 @@ namespace SanctuaryHud
         /// that folds the mod's settings away or back. The switch is a
         /// child button, so a click on it does not reach the row.
         private TMP_Text SectionRow(Transform list, string name, bool isOn, bool expanded,
-            Action<bool> onChanged, Func<bool> onToggleExpand)
+            Action<bool> onChanged, Func<bool> onToggleExpand, bool heading = true, bool interactable = true)
         {
             var go = Spawn(_tSwitchRow);
             go.name = "Section " + name;
             var text = go.transform.Find("Text");
             var tmp = text.GetComponent<TMP_Text>();
-            tmp.fontSize *= 1.25f;
-            var um = text.GetComponent<UIManagerText>();
-            if (um != null) um.fontType = UIManagerText.FontType.Semibold;
-            else tmp.fontStyle = FontStyles.Bold;
+            if (heading)
+            {
+                tmp.fontSize *= 1.25f;
+                var um = text.GetComponent<UIManagerText>();
+                if (um != null) um.fontType = UIManagerText.FontType.Semibold;
+                else tmp.fontStyle = FontStyles.Bold;
+            }
             tmp.text = SectionLabel(name, expanded);
 
             var sw = go.transform.Find("Switch").GetComponent<SwitchManager>();
             sw.isOn = isOn;
-            sw.isInteractable = true;
+            sw.isInteractable = interactable;
             sw.onValueChanged.AddListener(v => onChanged(v));
 
             // The click target: the row's SettingsElement, the Beam widget

@@ -62,12 +62,13 @@
           "label": { "description": "Shown in the lobby. Default: the key.", "type": "string" },
           "description": { "description": "Shown on the Mods page.", "type": "string" },
           "type": {
-            "description": "toggle: on or off. choice: one of a list. number: a number, optionally in a range and on a step.",
-            "enum": ["toggle", "choice", "number", "int"]
+            "description": "toggle: on or off. choice: one of a list. number: a number, optionally in a range and on a step. units: a set of units the host picks from the game's unit list.",
+            "enum": ["toggle", "choice", "number", "int", "units"]
           },
           "default": {
-            "description": "A toggle's true or false, a choice's value, or a number. Missing: off, the first choice, or the lowest number.",
-            "type": ["boolean", "string", "number"]
+            "description": "A toggle's true or false, a choice's value, a number, or a units option's unit ids. Missing: off, the first choice, the lowest number, or no units.",
+            "type": ["boolean", "string", "number", "array"],
+            "items": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" }
           },
           "choices": {
             "description": "For a choice: values, or { value, label } pairs.",

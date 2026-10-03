@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
+  "id": "sanctuarymods.unitrestrictions",
+  "name": "Unit Restrictions",
+  "version": "0.1.0",
+  "author": "Sanctuary Mods",
+  "description": "The host takes units out of the match: whole sections (land, air, naval, experimentals), a kind of unit for every faction (every T1 tank), or one faction's unit alone (just the EDA Puma). Restricted units leave every build menu and the host refuses them if anything queues one anyway, AI armies included. Engineers and commanders are never restricted by a section.",
+  "kind": "gameplay",
+  "luaRoot": "lua",
+  "gameVersion": "0.0.1.20",
+  "apiVersion": 1,
+  "options": [
+    { "key": "noLand", "label": "No land units", "type": "toggle", "default": false,
+      "description": "Every mobile land unit except engineers. Land factories stay, for their engineers." },
+    { "key": "noAir", "label": "No air units", "type": "toggle", "default": false,
+      "description": "Every aircraft. Air factories stay, for their engineers; restrict them in the unit list to take them out too." },
+    { "key": "noNaval", "label": "No naval units", "type": "toggle", "default": false,
+      "description": "Every ship and submarine. Naval factories stay, for their engineers; restrict them in the unit list to take them out too." },
+    { "key": "noExperimental", "label": "No experimentals", "type": "toggle", "default": false,
+      "description": "Every tier 4 unit and structure." },
+    { "key": "units", "label": "Restricted units", "type": "units",
+      "description": "Units picked one by one, on top of the sections above: a kind of unit for every faction, or one faction's unit alone. Structures, factories and their upgrades can be picked too." }
+  ]
+}

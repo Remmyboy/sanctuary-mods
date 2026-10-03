@@ -52,6 +52,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ModManager](ModManager/) | [**0.11.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.11.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.0) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [UnitRestrictions](UnitRestrictions/) | — | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.4.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.11.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.11.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), and the API mods are built on |
@@ -1575,6 +1576,24 @@ It needs Mod Manager 0.7.0 or later, whose Mod API has kill credit.
 Every number is in `lua\zonecontrol\balance.lua`, each with the original's
 value beside it. Problems show in the match's message log as
 `Zone Control problem: ...`, because the game's Lua warnings reach no log.
+
+## UnitRestrictions
+
+A **gameplay mod**: the lobby host picks it, and every player needs the same
+copy. It is Lua only, and its unit list is a Mod API `units` option, so it
+needs a Mod Manager with Mod API 1.7.0 or later, for every player.
+
+- **Sections:** no land units, no air units, no naval units, no experimentals.
+  Sections never take engineers or commanders, and leave factories standing
+  (they still make engineers). Experimentals are every tier 4 unit and
+  structure.
+- **Restricted units:** the lobby's Mods panel lists every unit the match can
+  build, by land, air, naval and structures, then by kind ("Tier 1: Tank").
+  A kind's switch restricts every faction's unit of it; unfolding it shows
+  each faction's own, to restrict one alone. Structures, factories and their
+  upgrades are listed too. Other players can open the list to see the pick.
+- Restricted units leave every build menu, and the host refuses them if
+  anything queues or places one anyway, AI armies included.
 
 ## PhantomX
 

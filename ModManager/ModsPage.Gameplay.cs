@@ -187,7 +187,7 @@ namespace SanctuaryHud
                 // while it's dragging a slider or typing. Whatever the rows
                 // show changes the lobby's counter or the catalog's version
                 // first, so the rest waits for one of those to move.
-                var key = $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|{SettlingShown()}";
+                var key = $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|{SettlingShown()}|{_pickerVersion}";
                 if (key != _lobbyPanelKey && !LobbyPanelBusy())
                 {
                     _lobbyPanelKey = key;
@@ -467,7 +467,7 @@ namespace SanctuaryHud
             var sb = new System.Text.StringBuilder();
             sb.Append(Lobby.IsHost).Append('|').Append(Lobby.HostHasModSupport).Append('|')
               .Append(Lobby.IsLadderLobby).Append('|').Append(Lobby.CanChangeSelection).Append('|')
-              .Append(ModCatalog.Version).Append('|');
+              .Append(ModCatalog.Version).Append('|').Append(PickerStructure()).Append('|');
             foreach (var s in Lobby.Selection)
             {
                 sb.Append(s.Id).Append('@').Append(s.ContentHash)
@@ -488,7 +488,8 @@ namespace SanctuaryHud
 
             // Where the list was scrolled to, kept across the rebuild.
             var content = (RectTransform)_lobbyList;
-            var scrolledTo = content.anchoredPosition.y;
+            var scrolledTo = _lobbyScrollToTop ? 0f : content.anchoredPosition.y;
+            _lobbyScrollToTop = false;
 
             Clear(_lobbyList);
             _lobbyUpdaters.Clear();
@@ -526,6 +527,7 @@ namespace SanctuaryHud
         private void FillLobbyPanel()
         {
             var host = Lobby.IsHost;
+            if (_pickerMod != null && FillUnitPicker()) return;
 
             if (!Lobby.HostHasModSupport && !host)
             {
@@ -579,6 +581,7 @@ namespace SanctuaryHud
                         var o = option;
                         var row = InfoRow(_lobbyList, OptionIndent + o.Label, "");
                         _lobbyUpdaters.Add(() => SetText(row.value, o.Display(CurrentOption(s.Id, o.Key))));
+                        if (o.Type == ModOptionType.Units) PickerButton(s.Id, o, false);
                     }
                 }
             }
@@ -648,10 +651,18 @@ namespace SanctuaryHud
                 {
                     var row = InfoRow(_lobbyList, label, "");
                     _lobbyUpdaters.Add(() => SetText(row.value, o.Display(Value())));
+                    if (o.Type == ModOptionType.Units) PickerButton(m.Id, o, false);
                     continue;
                 }
                 switch (o.Type)
                 {
+                    case ModOptionType.Units:
+                    {
+                        var row = InfoRow(_lobbyList, label, "");
+                        _lobbyUpdaters.Add(() => SetText(row.value, o.Display(Value())));
+                        PickerButton(m.Id, o, true);
+                        break;
+                    }
                     case ModOptionType.Toggle:
                     {
                         var sw = SwitchRow(_lobbyList, label, v == "true", true, on => Lobby.SetOption(m.Id, o.Key, on ? "true" : "false"));

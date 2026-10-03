@@ -157,10 +157,10 @@ everyone else sees the values, and the match runs with them on every machine.
 | Field | Meaning |
 | --- | --- |
 | `key` | **Required.** What your code reads the value by. A Lua name: letters, digits and `_`, not starting with a digit, not a Lua keyword. |
-| `type` | **Required.** `toggle` (on/off), `choice` (one of `choices`), or `number`. `int` is a number with `step` 1. |
+| `type` | **Required.** `toggle` (on/off), `choice` (one of `choices`), `number`, or `units` (a set of units). `int` is a number with `step` 1. |
 | `label` | Shown in the lobby. Defaults to the key. |
 | `description` | Shown on the Mods page. |
-| `default` | `true`/`false`, a choice's value, or a number. Missing: off, the first choice, or the lowest number. |
+| `default` | `true`/`false`, a choice's value, a number, or a list of unit ids. Missing: off, the first choice, the lowest number, or no units. |
 | `choices` | For a choice: values, or `{ "value": ..., "label": ... }` pairs. The code sees the value; the lobby shows the label. |
 | `min`, `max`, `step` | For a number. With both `min` and `max` the lobby shows a slider, otherwise a text box. Values are clamped to the range and snapped to `min` plus whole steps. |
 
@@ -178,7 +178,18 @@ local Options = Import("modoptions/alice.fastertanks.lua").Options
 if Options.noAir then ... end            -- toggle: true or false
 local ticks = Options.minutes * 60 * 10  -- number: a Lua number
 if Options.color == "lime" then ... end  -- choice: the value string
+if Options.banned[tpId] then ... end     -- units: a set, true for each picked unit id
 ```
+
+**Units.** A `units` option lets the host pick units from a list of every
+unit the match can build: the game's, plus those of the picked mods. In the
+lobby it shows how many are picked and a button that opens the list, by land,
+air, naval and structures, then by what the unit is ("Tier 1: Tank"). That
+row's switch picks every faction's unit of it; unfolding it shows each
+faction's own. Other players can open the same list to see the host's pick.
+Commanders, and units no builder can make, aren't listed. In C#,
+`options.GetUnits(key)` gives the ids. See the Unit Restrictions mod for one
+in use.
 
 The file always has every option you declared, set to the host's value or
 the default, so you never need to check for nil. It exists whenever your mod
@@ -733,7 +744,7 @@ Modding.FolderOf(this)         // for data files shipped beside the DLL
 Modding.InLobby / IsHost / InMatch / InReplay
 Modding.ActiveGameplayMods     // the gameplay mods live right now (empty = vanilla)
 Modding.IsActive("bob.tankcore")
-Modding.Options(this)          // your gameplay mod's option values: GetBool, GetNumber, GetInt, GetString
+Modding.Options(this)          // your gameplay mod's option values: GetBool, GetNumber, GetInt, GetString, GetUnits
 
 ModEvents.OnLobbyEntered(this, isHost => ...);
 ModEvents.OnSelectionChanged(this, () => ...);   // gameplay mods live here, or their options, changed
@@ -758,6 +769,7 @@ Factions.Current               // the picked mods' factions: Value, Label, Mod, 
 Factions.NameOf(value)         // "EDA", "Dycom (Mech)", ... for a lobby faction value
 Factions.ValueOf("bob.dycom", "dycom")  // a faction's lobby value, or -1
 Packs.Mounted                  // the art packs in the game's asset table right now
+UnitCatalog.Buildable(mods)    // every unit a match with these gameplay mods can build: Id, Name, Role, FactionName, Tech, Domain
 ```
 
 `ModLua` is presentation-side: it runs in *your* client's VM only and never

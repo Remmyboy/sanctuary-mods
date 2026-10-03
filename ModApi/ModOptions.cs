@@ -16,6 +16,9 @@ namespace Sanctuary.ModApi
         Choice,
         /// A number, optionally within a range and on a step.
         Number,
+        /// A set of units, picked from the game's unit list (and the picked
+        /// mods' units): their template ids, sorted, space-separated.
+        Units,
     }
 
     public sealed class ModOptionChoice
@@ -39,13 +42,17 @@ namespace Sanctuary.ModApi
     /// </code>
     ///
     /// Values travel and are stored as canonical strings: "true"/"false" for
-    /// a toggle, the choice's value, and a number written with a '.' and no
-    /// exponent. Every machine turns the same input into the same string,
-    /// which is what lets the lobby compare them.
+    /// a toggle, the choice's value, a number written with a '.' and no
+    /// exponent, and a set of units as their ids sorted and joined by spaces
+    /// ("" for none). Every machine turns the same input into the same
+    /// string, which is what lets the lobby compare them.
     public sealed class ModOption
     {
         internal const int MaxOptions = 32;
         private const int MaxChoices = 50;
+        private const int MaxUnits = 1000;
+
+        private static readonly Regex UnitIdPattern = new Regex("^[a-z0-9_]{1,40}$", RegexOptions.Compiled);
 
         public string Key { get; internal set; }
         public string Label { get; internal set; }
@@ -78,6 +85,8 @@ namespace Sanctuary.ModApi
         public string Normalize(string raw)
         {
             if (raw == null) return Default;
+            // An empty set is a value of its own, not "use the default".
+            if (Type == ModOptionType.Units) return JoinUnits(SplitUnits(raw));
             // A choice's value is taken as written first: it may have
             // spaces of its own.
             var exact = Type == ModOptionType.Choice ? Choices.FirstOrDefault(c => c.Value == raw) : null;
@@ -106,9 +115,29 @@ namespace Sanctuary.ModApi
             {
                 case ModOptionType.Toggle: return value == "true" ? "On" : "Off";
                 case ModOptionType.Choice: return Choices.FirstOrDefault(c => c.Value == value)?.Label ?? value;
+                case ModOptionType.Units:
+                    var n = SplitUnits(value).Count;
+                    return n == 0 ? "None" : n == 1 ? "1 unit" : $"{n} units";
                 default: return value;
             }
         }
+
+        /// A units value's ids: lower-cased, valid ones only, no repeats,
+        /// sorted. Spaces, commas and semicolons all separate.
+        public static IReadOnlyList<string> SplitUnits(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return Array.Empty<string>();
+            return value.Split(new[] { ' ', ',', ';', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.ToLowerInvariant())
+                .Where(s => UnitIdPattern.IsMatch(s))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(s => s, StringComparer.Ordinal)
+                .Take(MaxUnits)
+                .ToList();
+        }
+
+        /// A set of unit ids as a units option stores it.
+        public static string JoinUnits(IEnumerable<string> ids) => string.Join(" ", SplitUnits(string.Join(" ", ids ?? Array.Empty<string>())));
 
         private double Snap(double v)
         {
@@ -219,14 +248,25 @@ namespace Sanctuary.ModApi
                 case "toggle": case "bool": case "boolean": opt.Type = ModOptionType.Toggle; break;
                 case "choice": case "select": opt.Type = ModOptionType.Choice; break;
                 case "number": case "int": case "integer": opt.Type = ModOptionType.Number; break;
+                case "units": opt.Type = ModOptionType.Units; break;
                 default:
-                    problems.Add($"mod.json: option '{key}' has type '{type}'; use \"toggle\", \"choice\" or \"number\". Option ignored");
+                    problems.Add($"mod.json: option '{key}' has type '{type}'; use \"toggle\", \"choice\", \"number\" or \"units\". Option ignored");
                     return null;
             }
 
             var def = o["default"];
             switch (opt.Type)
             {
+                case ModOptionType.Units:
+                    // A list of ids, or one string of them.
+                    var given = def == null || def.Type == JTokenType.Null ? ""
+                        : def is JArray ids ? string.Join(" ", ids.Select(t => t.ToString()))
+                        : def.ToString();
+                    opt.Default = opt.Normalize(given);
+                    if (SplitUnits(given).Count < given.Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries).Length)
+                        problems.Add($"mod.json: option '{key}': some default unit ids aren't ids (a-z, 0-9, _) or are repeated; they're dropped");
+                    break;
+
                 case ModOptionType.Toggle:
                     opt.Default = "false";
                     if (def != null && def.Type != JTokenType.Null)
@@ -358,6 +398,9 @@ namespace Sanctuary.ModApi
 
         public int GetInt(string key) => (int)Math.Round(GetNumber(key));
 
+        /// A units option's ids, sorted; empty for none.
+        public IReadOnlyList<string> GetUnits(string key) => ModOption.SplitUnits(GetString(key));
+
         public override string ToString() => string.Join(", ", _values.Select(kv => kv.Key + "=" + kv.Value));
     }
 
@@ -407,6 +450,12 @@ namespace Sanctuary.ModApi
                 {
                     case ModOptionType.Toggle: sb.Append(v == "true" ? "true" : "false"); break;
                     case ModOptionType.Number: sb.Append(v); break;
+                    case ModOptionType.Units:
+                        // A set: Options.key[tpId] is true for each picked unit.
+                        sb.Append('{');
+                        foreach (var id in ModOption.SplitUnits(v)) sb.Append(" [").Append(LuaString(id)).Append("] = true,");
+                        sb.Append(" }");
+                        break;
                     default: sb.Append(LuaString(v)); break;
                 }
                 sb.Append(",\n");
