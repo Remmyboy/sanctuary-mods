@@ -41,6 +41,7 @@ namespace SanctuaryHud
                 go = Instantiate(prefab, holder);
                 go.name = "Tab";
                 var tab = go.AddComponent<TabTile>();
+                HoverGlow.Add(go);
                 if (prefab.transform is RectTransform prt && prt.rect.width > 1f && prt.rect.height > 1f) tab._native = prt.rect.size;
 
                 var element = go.GetComponent<ConstructionFilterToggleElement>();

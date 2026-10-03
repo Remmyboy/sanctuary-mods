@@ -326,6 +326,7 @@ namespace SanctuaryHud
         // ---- upkeep --------------------------------------------------------
 
         internal static bool ReclaimEnabled;
+        private static bool _reclaimWasOn;
         internal static bool BuildEtaEnabled;
 
         /// Called every frame from the plugin's Update.
@@ -346,6 +347,9 @@ namespace SanctuaryHud
                 return;
             }
 
+            // Scanned at once when the labels come on (the hold key going down).
+            if (ReclaimEnabled && !_reclaimWasOn) _reclaimAccum = 10f;
+            _reclaimWasOn = ReclaimEnabled;
             if (ReclaimEnabled)
             {
                 _reclaimAccum += Time.unscaledDeltaTime;
@@ -405,7 +409,6 @@ namespace SanctuaryHud
         // ---- drawing -------------------------------------------------------
 
         private static GUIStyle _stReclaim, _stReclaimEnergy, _stEta, _stEtaName;
-        private static Texture2D _texShadow;
         private static bool _stylesReady;
 
         private static readonly Color EtaColour = new Color(0.85f, 0.92f, 1f, 0.95f);
@@ -420,10 +423,6 @@ namespace SanctuaryHud
             _stReclaimEnergy = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = EnergyColour } };
             _stEta = new GUIStyle { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = EtaColour } };
             _stEtaName = new GUIStyle { fontSize = 10, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.75f, 0.82f, 0.9f, 0.85f) } };
-            _texShadow = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            _texShadow.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.55f));
-            _texShadow.Apply();
-            _texShadow.hideFlags = HideFlags.HideAndDontSave;
         }
 
         internal static void ApplyFont(Font font)
@@ -437,20 +436,20 @@ namespace SanctuaryHud
             _stEtaName.fontSize = 11;
         }
 
-        /// Text with a dark backing so it reads over terrain of any colour.
+        /// Text on the HUD's dark pill so it reads over terrain of any colour.
         private static void Label(Rect rect, string text, GUIStyle style, Texture2D mark = null)
         {
             var size = style.CalcSize(new GUIContent(text));
             var markSize = mark != null ? size.y - 2f : 0f;
             var lead = mark != null ? markSize + 3f : 0f;
-            var box = new Rect(rect.center.x - (size.x + lead) / 2f - 4f, rect.center.y - size.y / 2f - 1f, size.x + lead + 8f, size.y + 2f);
-            GUI.DrawTexture(box, _texShadow);
+            var box = new Rect(rect.center.x - (size.x + lead) / 2f - 7f, rect.center.y - size.y / 2f - 1f, size.x + lead + 14f, size.y + 2f);
+            GUI.Box(box, GUIContent.none, HudImgui.PillStyle);
             if (mark != null)
             {
                 // The resource's mark in the text's own colour.
                 var previous = GUI.color;
                 GUI.color = style.normal.textColor;
-                GUI.DrawTexture(new Rect(box.x + 4f, box.y + 2f, markSize, markSize), mark);
+                GUI.DrawTexture(new Rect(box.x + 7f, box.y + 2f, markSize, markSize), mark);
                 GUI.color = previous;
             }
             GUI.Label(new Rect(box.x + lead, box.y, box.width - lead, box.height), text, style);
@@ -626,11 +625,13 @@ namespace SanctuaryHud
                 var text = FmtEta(eta);
                 _stEta.normal.textColor = labelColour;
 
-                Label(new Rect(gui.x, y, 0f, 0f), text, _stEta);
-
-                // Bar: 54 px wide, under the time.
-                var barRect = new Rect(gui.x - 27f, y + 11f, 54f, 3f);
-                GUI.DrawTexture(new Rect(barRect.x - 1f, barRect.y - 1f, barRect.width + 2f, barRect.height + 2f), _texShadow);
+                // One pill: the time on top, the progress along its foot.
+                var size = _stEta.CalcSize(new GUIContent(text));
+                var pill = new Rect(0f, 0f, Mathf.Max(60f, size.x + 16f), size.y + 7f);
+                pill.center = new Vector2(gui.x, y + 3f);
+                GUI.Box(pill, GUIContent.none, HudImgui.PillStyle);
+                GUI.Label(new Rect(pill.x, pill.y, pill.width, size.y + 1f), text, _stEta);
+                var barRect = new Rect(pill.x + 6f, pill.yMax - 6f, pill.width - 12f, 2f);
                 var track = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, 0.15f);
                 GUI.DrawTexture(barRect, _texWhite);

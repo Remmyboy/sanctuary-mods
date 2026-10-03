@@ -130,6 +130,9 @@ namespace SanctuaryHud
         private void Awake()
         {
             _log ??= Logger;
+            // Only the in-match signal is used here, never what the shared
+            // unit scan finds, so this copy of the HUD core skips it.
+            UnitScan = false;
 
             _cfgEnabled = Config.Bind("Report", "Enabled", true,
                 "Report ranked 1v1 results to the SanctuaryDB ladder when the game ends. Only Steam lobbies " +

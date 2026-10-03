@@ -45,6 +45,7 @@ namespace SanctuaryHud
                 go = Instantiate(prefab, holder);
                 go.name = "Order";
                 var tile = go.AddComponent<OrderTile>();
+                HoverGlow.Add(go);
 
                 var element = go.GetComponent<OrderButtonElement>();
                 if (element != null)

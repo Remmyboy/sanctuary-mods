@@ -138,6 +138,8 @@ namespace SanctuaryHud
             var go = new GameObject("Economy strip", typeof(RectTransform));
             go.transform.SetParent(canvasRoot, false);
             _root = (RectTransform)go.transform;
+            // Its figures change every frame: re-batched on their own.
+            HudCanvas.OwnCanvas(go);
             _root.anchorMin = new Vector2(0f, 1f);
             _root.anchorMax = new Vector2(0f, 1f);
             _root.pivot = new Vector2(0f, 1f);
@@ -145,6 +147,9 @@ namespace SanctuaryHud
 
             var plate = HudCanvas.Fill(_root, "Strip", PanelColour);
             plate.raycastTarget = true;
+            // Shaded like the panels; the fade under it stands in for their
+            // shadow, which would spill off the top of the screen.
+            HudStyle.Dress(plate, 0f, false);
             _strip = plate.rectTransform;
             _strip.anchorMin = new Vector2(0f, 1f);
             _strip.anchorMax = new Vector2(0f, 1f);
@@ -217,13 +222,16 @@ namespace SanctuaryHud
 
         // ---- one half ---------------------------------------------------------------
 
+        /// The chip over a full store that is spilling: amber, with dark type.
+        private static readonly Color WasteColour = new Color(0.94f, 0.66f, 0.19f, 0.95f);
+
         private sealed class Half
         {
             private RectTransform _rect;
             private Color _tint;
             private RectTransform _storageRow;
             private TMP_Text _storage, _max, _net, _income, _spent, _chip;
-            private Image _track, _fill, _tip, _chipBox;
+            private Image _track, _fill, _tip, _tipGlow, _chipBox;
             private float _lead;
 
             internal static Half Create(Transform parent, string name, string key, string label, Color tint)
@@ -305,6 +313,7 @@ namespace SanctuaryHud
                 trt.pivot = new Vector2(0f, 1f);
                 trt.anchoredPosition = new Vector2(Pad, -72f);
                 half._fill = HudCanvas.Fill(trt, "Fill", tint);
+                HudStyle.ShadeBar(half._fill);
                 var frt = half._fill.rectTransform;
                 frt.anchorMin = new Vector2(0f, 0f);
                 frt.anchorMax = new Vector2(0f, 1f);
@@ -315,6 +324,16 @@ namespace SanctuaryHud
                 tprt.anchorMin = tprt.anchorMax = new Vector2(0f, 0.5f);
                 tprt.pivot = new Vector2(1f, 0.5f);
                 tprt.sizeDelta = new Vector2(2f, 12f);
+                // A soft light round the tip, so the fill ends on a bright edge.
+                half._tipGlow = HudCanvas.Fill(tprt, "Glow", new Color(1f, 1f, 1f, 0.5f));
+                half._tipGlow.sprite = HudStyle.Ring;
+                half._tipGlow.type = Image.Type.Sliced;
+                half._tipGlow.pixelsPerUnitMultiplier = 4f;
+                var grt = half._tipGlow.rectTransform;
+                grt.anchorMin = Vector2.zero;
+                grt.anchorMax = Vector2.one;
+                grt.offsetMin = new Vector2(-6f, -6f);
+                grt.offsetMax = new Vector2(6f, 6f);
 
                 // Warning chip at the end of the bar row, short of the flows.
                 half._chipBox = HudCanvas.Fill(rt, "Chip", DangerColour);
@@ -363,6 +382,9 @@ namespace SanctuaryHud
                 var net = s[0] - s[2];
 
                 HudCanvas.SetText(_storage, SanctuaryHudPlugin.Fmt(current));
+                // The figure itself pulses towards red while this store is
+                // what holds the economy back.
+                _storage.color = stalling ? Color.Lerp(Color.white, LossColour, HudStyle.Pulse()) : Color.white;
                 HudCanvas.SetText(_max, "/ " + SanctuaryHudPlugin.Fmt(limit));
 
                 var netText = (net >= 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(net) + "/s";
@@ -394,8 +416,23 @@ namespace SanctuaryHud
                 if (_tip.gameObject.activeSelf != showTip) _tip.gameObject.SetActive(showTip);
                 if (showTip) _tip.rectTransform.anchoredPosition = new Vector2(fillWidth, 0f);
 
+                // Stalling: how fast builds now go, which is what a stall
+                // costs you (actual spend over demand, the game's own
+                // satisfaction figure). Full and earning more than it spends:
+                // what is being thrown away. Otherwise a store on its way
+                // down: how long it has.
                 string chip = null;
-                if (stalling) chip = "STALL −" + SanctuaryHudPlugin.Fmt(wantedRaw - spendRaw) + "/s";
+                var wasting = false;
+                if (stalling)
+                {
+                    var speed = s[1] > 0.5f ? Mathf.Clamp01(s[2] / s[1]) : 0f;
+                    chip = "BUILD SPEED " + Mathf.RoundToInt(speed * 100f) + "%";
+                }
+                else if (current >= limit - 1f && s[0] - s[2] > 0.5f)
+                {
+                    wasting = true;
+                    chip = "WASTING " + SanctuaryHudPlugin.Fmt(s[0] - s[2]) + "/s";
+                }
                 else if (net < -0.5f)
                 {
                     var tte = current / -net;
@@ -406,7 +443,10 @@ namespace SanctuaryHud
                 if (showChip)
                 {
                     HudCanvas.SetText(_chip, chip);
-                    _chipBox.color = stalling ? DangerColour : new Color(0.75f, 0.45f, 0.15f, 0.9f);
+                    _chipBox.color = stalling ? Color.Lerp(DangerColour, new Color(1f, 0.35f, 0.3f, 1f), HudStyle.Pulse())
+                        : wasting ? WasteColour
+                        : new Color(0.75f, 0.45f, 0.15f, 0.9f);
+                    _chip.color = wasting ? new Color(0.1f, 0.07f, 0.02f) : Color.white;
                     _chipBox.rectTransform.anchoredPosition = new Vector2(flowsX - 20f, -58f);
                 }
             }
@@ -522,10 +562,17 @@ namespace SanctuaryHud
             internal GamePanel.PanelControl Control;
             internal bool Hovered;
             private Image _wash, _edge;
+            /// Drawn by the HUD (help, menu) rather than cloned.
+            private bool _own;
 
             internal static ControlTile Create(Transform parent, GamePanel.PanelControl control)
             {
                 if (control == null || control.Target == null || HudCanvas.Holder == null) return null;
+                if (control.Kind != GamePanel.ControlKind.Other)
+                {
+                    var own = CreateOwn(parent, control);
+                    if (own != null) return own;
+                }
                 GameObject go = null;
                 try
                 {
@@ -580,6 +627,59 @@ namespace SanctuaryHud
                 }
             }
 
+            /// The HUD's own tile for a control it knows (help, menu): its plate and edge,
+            /// and its own icon in place of the game's art. Null when an icon
+            /// can't be made, and the caller clones the game's button instead.
+            private static ControlTile CreateOwn(Transform parent, GamePanel.PanelControl control)
+            {
+                var name = control.Kind == GamePanel.ControlKind.Menu ? "menu" : "ring";
+                var sprite = HudStyle.Icon(name);
+                if (sprite == null) return null;
+                var go = new GameObject("Control " + control.Label, typeof(RectTransform));
+                go.transform.SetParent(HudCanvas.Holder, false);
+                var plate = go.AddComponent<Image>();
+                plate.sprite = HudStyle.Shade;
+                plate.type = Image.Type.Sliced;
+                plate.raycastTarget = true;
+                var tile = go.AddComponent<ControlTile>();
+                tile.Control = control;
+                tile._own = true;
+                tile._wash = plate;
+                tile._edge = HudCanvas.Fill(go.transform, "Edge", Color.white);
+                tile._edge.sprite = HudStyle.Frame;
+                tile._edge.type = Image.Type.Sliced;
+                var ert = tile._edge.rectTransform;
+                ert.anchorMin = Vector2.zero;
+                ert.anchorMax = Vector2.one;
+                ert.offsetMin = Vector2.zero;
+                ert.offsetMax = Vector2.zero;
+                var icon = HudCanvas.Fill(go.transform, "Icon", new Color(1f, 1f, 1f, 0.9f));
+                icon.sprite = sprite;
+                var irt = icon.rectTransform;
+                irt.anchorMin = irt.anchorMax = irt.pivot = new Vector2(0.5f, 0.5f);
+                irt.sizeDelta = new Vector2(ControlSize * 0.6f, ControlSize * 0.6f);
+                if (control.Kind == GamePanel.ControlKind.Help)
+                {
+                    var mark = HudCanvas.Text(go.transform, "Mark", ControlSize * 0.42f, new Color(1f, 1f, 1f, 0.9f), TextAlignmentOptions.Center, FontStyles.Bold);
+                    var mrt = mark.rectTransform;
+                    mrt.anchorMin = Vector2.zero;
+                    mrt.anchorMax = Vector2.one;
+                    mrt.offsetMin = Vector2.zero;
+                    mrt.offsetMax = Vector2.zero;
+                    HudCanvas.SetText(mark, "?");
+                }
+                var layout = go.AddComponent<LayoutElement>();
+                layout.preferredWidth = ControlSize;
+                layout.preferredHeight = ControlSize;
+                layout.minWidth = ControlSize;
+                layout.minHeight = ControlSize;
+                HoverGlow.Add(go);
+                tile.SetHover(false);
+                go.transform.SetParent(parent, false);
+                go.SetActive(true);
+                return tile;
+            }
+
             public void OnPointerEnter(PointerEventData eventData) => SetHover(true);
             public void OnPointerExit(PointerEventData eventData) => SetHover(false);
             private void OnDisable() => SetHover(false);
@@ -587,6 +687,13 @@ namespace SanctuaryHud
             private void SetHover(bool on)
             {
                 Hovered = on;
+                if (_own)
+                {
+                    // A faint light plate at rest; the accent under the mouse.
+                    _wash.color = on ? new Color(AccentColour.r, AccentColour.g, AccentColour.b, 0.32f) : new Color(1f, 1f, 1f, 0.08f);
+                    _edge.color = on ? new Color(AccentColour.r, AccentColour.g, AccentColour.b, 0.9f) : new Color(1f, 1f, 1f, 0.18f);
+                    return;
+                }
                 var wash = AccentColour;
                 wash.a = on ? 0.24f : 0.10f;
                 _wash.color = wash;
@@ -627,6 +734,8 @@ namespace SanctuaryHud
             {
                 var plate = HudCanvas.Fill(parent, "Commander", PanelColour);
                 plate.raycastTarget = true;
+                HudStyle.Dress(plate);
+                HoverGlow.Add(plate.gameObject);
                 var rt = plate.rectTransform;
                 rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
                 rt.pivot = new Vector2(1f, 1f);
@@ -634,7 +743,9 @@ namespace SanctuaryHud
                 rt.sizeDelta = new Vector2(W, H);
                 var widget = plate.gameObject.AddComponent<Commander>();
 
-                widget._hover = HudCanvas.Fill(rt, "Hover", new Color(1f, 1f, 1f, 0.12f));
+                widget._hover = HudCanvas.Fill(rt, "Hover", new Color(1f, 1f, 1f, 0.1f));
+                widget._hover.sprite = HudStyle.Shade;
+                widget._hover.type = Image.Type.Sliced;
                 var hrt = widget._hover.rectTransform;
                 hrt.anchorMin = Vector2.zero;
                 hrt.anchorMax = Vector2.one;
@@ -643,8 +754,10 @@ namespace SanctuaryHud
                 widget._hover.gameObject.SetActive(false);
                 var edge = AccentColour;
                 edge.a = 0.45f;
-                widget._edge = HudCanvas.Fill(rt, "Edge", edge);
+                widget._edge = HudCanvas.Fill(rt, "Line", edge);
                 HudCanvas.StretchAlongBottom(widget._edge.rectTransform, 2f);
+                widget._edge.rectTransform.offsetMin = new Vector2(HudStyle.CornerInset, 0f);
+                widget._edge.rectTransform.offsetMax = new Vector2(-HudStyle.CornerInset, 2f);
 
                 widget._label = At(rt, "Label", 24f, new Color(0.85f, 0.9f, 0.97f), TextAlignmentOptions.Center, new Vector2(0f, 12f), new Vector2(W, 40f));
                 HudCanvas.SetText(widget._label, "COMMANDER");
@@ -673,7 +786,7 @@ namespace SanctuaryHud
                 brt.offsetMin = new Vector2(20f, 16f);
                 brt.offsetMax = new Vector2(-20f, 24f);
                 widget._fill = HudCanvas.Fill(brt, "Fill", GainColour);
-                widget._fill.sprite = HudCanvas.White;
+                widget._fill.sprite = HudStyle.BarShade;
                 widget._fill.type = Image.Type.Filled;
                 widget._fill.fillMethod = Image.FillMethod.Horizontal;
                 widget._fill.fillOrigin = 0;

@@ -509,14 +509,15 @@ namespace SanctuaryHud.Replays
             if (_uiReady) return;
             _uiReady = true;
 
-            _texPanelBg = Rounded(10, new Color(0.05f, 0.07f, 0.09f, 0.9f));
-            _texBtn = Rounded(5, new Color(1f, 1f, 1f, 0.09f));
-            _texBtnHover = Rounded(5, new Color(1f, 1f, 1f, 0.17f));
+            // The HUD's own plate and buttons (shared/HudImgui.cs).
+            _texPanelBg = HudImgui.Panel;
+            _texBtn = HudImgui.Button;
+            _texBtnHover = HudImgui.ButtonHover;
             // White, so the on-state takes its colour from GUI.backgroundColor
             // at draw time: the accent for plain toggles, the army's own
             // colour for the view rows.
-            _texBtnOn = Rounded(5, Color.white);
-            _texBtnOnHover = Rounded(5, new Color(0.92f, 0.92f, 0.92f, 1f));
+            _texBtnOn = HudImgui.Tint;
+            _texBtnOnHover = HudImgui.TintHover;
             _texKnob = Rounded(7, new Color(0.95f, 0.96f, 0.98f, 1f));
             _texTrack = Rounded(3, Color.white);
             _texRestartIcon = SkipToStartIcon(32);
@@ -524,7 +525,7 @@ namespace SanctuaryHud.Replays
             _stPanel = new GUIStyle
             {
                 normal = { background = _texPanelBg },
-                border = new RectOffset(11, 11, 11, 11),
+                border = HudImgui.Border,
                 padding = new RectOffset(10, 10, 7, 8),
             };
             _stTitle = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = TextDim } };
@@ -538,7 +539,7 @@ namespace SanctuaryHud.Replays
                 normal = { background = _texBtn, textColor = TextMid },
                 hover = { background = _texBtnHover, textColor = Color.white },
                 active = { background = _texBtnHover, textColor = Color.white },
-                border = new RectOffset(6, 6, 6, 6),
+                border = HudImgui.Border,
                 padding = new RectOffset(6, 6, 2, 2),
                 margin = new RectOffset(2, 2, 1, 1),
                 fixedHeight = 20,
@@ -556,6 +557,7 @@ namespace SanctuaryHud.Replays
             _stBar = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             _stHeadRight = new GUIStyle(_stHead) { alignment = TextAnchor.LowerRight };
             _stBodyRight = new GUIStyle(_stBody) { alignment = TextAnchor.MiddleRight };
+            HudImgui.UseFont(_stTitle, _stTime, _stBody, _stDim, _stHead, _stButton, _stToggleBtn, _stNet, _stIn, _stOut, _stBar, _stHeadRight, _stBodyRight);
         }
 
         // A rounded square with an anti-aliased edge; sliced by the style's

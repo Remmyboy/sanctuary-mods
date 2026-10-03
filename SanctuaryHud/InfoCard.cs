@@ -732,7 +732,7 @@ namespace SanctuaryHud
                 var bar = HudCanvas.Fill(go.transform, "Bar", track);
                 bar.gameObject.AddComponent<LayoutElement>().preferredHeight = 8f;
                 gauge._fill = HudCanvas.Fill(bar.transform, "Fill", Color.white);
-                gauge._fill.sprite = HudCanvas.White;
+                gauge._fill.sprite = HudStyle.BarShade;
                 gauge._fill.type = Image.Type.Filled;
                 gauge._fill.fillMethod = Image.FillMethod.Horizontal;
                 gauge._fill.fillOrigin = 0;

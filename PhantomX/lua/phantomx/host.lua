@@ -26,6 +26,7 @@ local WinCondition = Import("common/winCondition.lua").WinCondition
 
 local RequestName = "PhantomXRequest"
 local StateName = "PhantomXState"
+local StoryName = "PhantomXStory"
 local StorageSource = -7171     -- the economy's key for the phantoms' extra storage
 
 local Colours = {
@@ -55,6 +56,23 @@ local vampireHooked = false
 local dirty = true
 local lastSent = {}         -- [client id] = the state it has, as JSON
 local started = false
+local bonusEntity = {}      -- [army] = the economy entity its bonus arrives through
+local story = {}            -- what happened when, sent to everyone once it's over (for replays)
+
+-- ============================================================
+-- The story, for replays
+-- ============================================================
+--
+-- A replay holds only what the recording player was sent, so it can't show
+-- the other players' roles. Once the match is over, the whole story goes to
+-- every client, which saves it beside its replay (modapi/replay.lua).
+
+local function Story(kind, fields)
+    fields = fields or {}
+    fields.kind = kind
+    fields.t = math.floor(Events.GameTime() * 10 + 0.5) / 10
+    story[#story + 1] = fields
+end
 
 -- ============================================================
 -- Reporting
@@ -172,21 +190,65 @@ local function Give(army, alloys, energy)
     if energy > 0 then economy:GiveResources("energy", energy) end
 end
 
+---Pays a bonus (per tick) as income rather than a gift: a resource entity
+---on the army's economy, so the game counts it in the income it shows (its
+---own panel, the HUD) and in its stall maths, instead of resources turning
+---up in storage from nowhere. The economy scales generation by its income
+---multiplier, which the shares were already taken from, so that is
+---divided out.
+local function SetBonusIncome(army, alloys, energy)
+    local economy = army.economy
+    if not economy then return end
+    local e = bonusEntity[army]
+    if not e then
+        if alloys <= 0 and energy <= 0 then return end
+        e = { id = "phantomx.bonus", category = "generation", income = { alloys = 0, energy = 0 }, outcome = {} }
+        economy:AddResourceEntity(e)
+        bonusEntity[army] = e
+    end
+    local m = economy.incomeAndBuildMultiplier
+    if type(m) ~= "number" or m <= 0 then m = 1 end
+    e.income = { alloys = math.max(0, alloys) / m, energy = math.max(0, energy) / m }
+    economy:UpdateResourceEntity(e)
+end
+
+---The bonus an army is being paid this tick, as it arrives.
+local function BonusOf(army)
+    local e = bonusEntity[army]
+    if not e then return 0, 0 end
+    local m = army.economy and army.economy.incomeAndBuildMultiplier
+    if type(m) ~= "number" or m <= 0 then m = 1 end
+    return e.income.alloys * m, e.income.energy * m
+end
+
 ---Every tick: each live phantom gets its share of the live innocents'
----combined income, and each unmarked paladin a part of that. The game adds
----given resources straight to storage, never to income, so (unlike FA)
----there's no feedback loop to filter out.
+---combined income, and each unmarked paladin a part of that, as income.
+---Paladins are innocents, so their own bonus is left out of what is shared
+---(it would feed itself otherwise); everyone not paid this tick goes back to
+---none.
 local function GiveBonus()
+    local paid = {}
+    local function Pay(army, alloys, energy)
+        paid[army] = true
+        SetBonusIncome(army, alloys, energy)
+    end
+    local function StopTheRest()
+        for army in pairs(bonusEntity) do
+            if not paid[army] then SetBonusIncome(army, 0, 0) end
+        end
+    end
+
     local live = Living(phantoms)
     local row = Row(#live)
-    if not row then return end
+    if not row then return StopTheRest() end
     local multiplier = Options.bonus / 100
 
     local alloys, energy = 0, 0
     local liveInnocents = Living(innocents)
     for _, army in ipairs(liveInnocents) do
-        alloys = alloys + army.economy:GetResourceIncome("alloys")
-        energy = energy + army.economy:GetResourceIncome("energy")
+        local ownA, ownE = BonusOf(army)
+        alloys = alloys + math.max(0, army.economy:GetResourceIncome("alloys") - ownA)
+        energy = energy + math.max(0, army.economy:GetResourceIncome("energy") - ownE)
     end
 
     local allied, enemy = false, false
@@ -211,7 +273,7 @@ local function GiveBonus()
                 end
             end
         end
-        Give(phantom, alloys * own, energy * own)
+        Pay(phantom, alloys * own, energy * own)
         P[phantom].bonus = { alloys = alloys * own * Events.TicksPerSecond, energy = energy * own * Events.TicksPerSecond,
                              percent = own * 100 }
     end
@@ -221,11 +283,12 @@ local function GiveBonus()
         if P[paladin].marked then
             P[paladin].bonus = { alloys = 0, energy = 0, percent = 0 }
         else
-            Give(paladin, alloys * paladinShare, energy * paladinShare)
+            Pay(paladin, alloys * paladinShare, energy * paladinShare)
             P[paladin].bonus = { alloys = alloys * paladinShare * Events.TicksPerSecond,
                                  energy = energy * paladinShare * Events.TicksPerSecond, percent = paladinShare * 100 }
         end
     end
+    StopTheRest()
 end
 
 ---Phantom war: a phantom gets back a share of the cost of each enemy unit
@@ -290,6 +353,7 @@ end
 local function ResolveMark(phantom, target)
     if not Alive(phantom) then return end
     local t = P[target]
+    Story("mark", { by = phantom.id, target = target.id, hit = t.role == "paladin" and not t.marked })
     if t.role == "paladin" and not t.marked then
         t.marked = true
         for _, other in ipairs(phantoms) do
@@ -339,6 +403,15 @@ local function EndMatch(winners, title, text)
     paying = {}
     nextRevealAt = nil
     RevealAll()
+    local ids = {}
+    for _, army in ipairs(winners) do ids[#ids + 1] = army.id end
+    Story("over", { result = title, winners = ids })
+    local everyone = {}
+    for _, army in ipairs(players) do
+        everyone[#everyone + 1] = { id = army.id, name = Name(army), role = P[army].role, marked = P[army].marked or nil }
+    end
+    local ok, err = pcall(SendToAllClients, { players = everyone, events = story, assignAt = declareAt }, StoryName)
+    if not ok then Report("story", err) end
     for _, army in ipairs(winners) do
         decided[army.id] = WinCondition.Won
         SessionCommands.ExecuteClientFunction.Send("WinConditionUpdate", { armyID = army.id, condition = WinCondition.Won })
@@ -348,6 +421,7 @@ end
 
 local function StartPhantomWar()
     phase = "war"
+    Story("war")
     nextRevealAt = nil
     local live = Living(phantoms)
     for a = 1, #live do
@@ -364,6 +438,7 @@ end
 local function OnDeath(army)
     paying[army] = nil
     local p = P[army]
+    Story("dead", { id = army.id, role = p.role })
     if phase == "pending" or not p.role then
         Alert(nil, Name(army) .. " is out", nil, Colours.neutral)
         return
@@ -458,6 +533,7 @@ local function Reveal(army)
         end
     end
     if Options.revealTo == "everyone" then public[army] = role end
+    Story("reveal", { id = army.id, role = role, to = Options.revealTo })
     if #viewers > 0 then
         Alert(viewers, Name(army) .. " is a " .. role .. "!", nil, Colours[role])
     end
@@ -654,6 +730,9 @@ local function Assign()
     end
     for _, army in ipairs(innocents) do P[army].role = "innocent" end
     for _, army in ipairs(paladins) do P[army].role = "paladin" end
+    local roles = {}
+    for _, army in ipairs(pool) do roles[#roles + 1] = { id = army.id, role = P[army].role } end
+    Story("assign", { roles = roles })
 
     phase = "playing"
     for _, army in ipairs(phantoms) do

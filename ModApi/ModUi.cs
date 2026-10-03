@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using BepInEx.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -348,6 +349,23 @@ namespace Sanctuary.ModApi
             internal readonly List<Node> Children = new List<Node>();
         }
 
+        /// The text without the characters its font can't draw, which would
+        /// otherwise show as boxes (a player's name with a symbol in it).
+        private static string Printable(TMP_Text text, string s)
+        {
+            var font = text != null ? text.font : null;
+            if (font == null || string.IsNullOrEmpty(s)) return s;
+            StringBuilder kept = null;
+            for (var i = 0; i < s.Length; i++)
+            {
+                var c = s[i];
+                var ok = !char.IsSurrogate(c) && (char.IsWhiteSpace(c) || font.HasCharacter(c, true, true));
+                if (ok) { kept?.Append(c); continue; }
+                if (kept == null) kept = new StringBuilder(s, 0, i, s.Length);
+            }
+            return kept == null ? s : kept.ToString().Trim();
+        }
+
         private static void Reconcile(Transform parent, List<Node> nodes, JToken items, PanelView view)
         {
             var list = items is JArray array ? array.OfType<JObject>().ToList() : new List<JObject>();
@@ -416,15 +434,21 @@ namespace Sanctuary.ModApi
                 case "button":
                 {
                     node.Image = HudCanvas.Fill(parent, "Button", UiButton.Normal);
+                    node.Image.sprite = HudStyle.Shade;
+                    node.Image.type = Image.Type.Sliced;
                     node.Image.raycastTarget = true;
                     node.Go = node.Image.gameObject;
                     var group = (HorizontalLayoutGroup)Row(node.Go, 0f);
-                    group.padding = new RectOffset(12, 12, 4, 4);
+                    group.padding = new RectOffset(14, 14, 5, 5);
+                    node.Layout = node.Go.AddComponent<LayoutElement>();
+                    node.Layout.minHeight = 34f;
                     group.childAlignment = TextAnchor.MiddleCenter;
                     node.Text = HudCanvas.Text(node.Go.transform, "Label", 20f, White, TextAlignmentOptions.Center);
                     node.Button = node.Go.AddComponent<UiButton>();
                     node.Button.Back = node.Image;
                     node.Button.Label = node.Text;
+                    var button = node.Button;
+                    HoverGlow.Add(node.Go).When = () => button.Enabled;
                     break;
                 }
                 case "row":
@@ -432,6 +456,14 @@ namespace Sanctuary.ModApi
                     node.Go = new GameObject(type == "row" ? "Row" : "Column", typeof(RectTransform));
                     node.Go.transform.SetParent(parent, false);
                     node.Group = type == "row" ? Row(node.Go, 8f) : Column(node.Go, 4f);
+                    node.Layout = node.Go.AddComponent<LayoutElement>();
+                    break;
+                case "fill":
+                    node.Go = new GameObject("Fill", typeof(RectTransform));
+                    node.Go.transform.SetParent(parent, false);
+                    node.Layout = node.Go.AddComponent<LayoutElement>();
+                    node.Layout.minWidth = 8f;
+                    node.Layout.flexibleWidth = 1f;
                     break;
                 case "rule":
                 {
@@ -467,7 +499,7 @@ namespace Sanctuary.ModApi
                 case "text":
                 {
                     node.Text.richText = Flag(o, "rich", false);
-                    HudCanvas.SetText(node.Text, Str(o, "text") ?? "");
+                    HudCanvas.SetText(node.Text, Printable(node.Text, Str(o, "text") ?? ""));
                     node.Text.fontSize = Num(o, "size", 20f);
                     node.Text.color = Col(o, "color", White);
                     var width = Num(o, "width", 0f);
@@ -478,9 +510,13 @@ namespace Sanctuary.ModApi
                 case "button":
                 {
                     node.Text.richText = false;
-                    HudCanvas.SetText(node.Text, Str(o, "text") ?? "");
+                    HudCanvas.SetText(node.Text, Printable(node.Text, Str(o, "text") ?? ""));
                     node.Text.fontSize = Num(o, "size", 20f);
-                    node.Text.color = Col(o, "color", White);
+                    // A colour tints the whole button, with its label lifted
+                    // towards white so it reads on the tint.
+                    var tint = Str(o, "color") != null ? Col(o, "color", White) : (Color?)null;
+                    node.Button.Tint = tint;
+                    node.Text.color = tint is Color t ? Color.Lerp(t, Color.white, 0.6f) : White;
                     var index = (int)Num(o, "id", 0);
                     node.Button.Enabled = Flag(o, "enabled", true) && index > 0;
                     node.Button.OnClick = button => view.OnClick(index, button);
@@ -490,6 +526,10 @@ namespace Sanctuary.ModApi
                 case "row":
                 case "column":
                     node.Group.spacing = Num(o, "spacing", node.Type == "row" ? 8f : 4f);
+                    // A row holding a fill stretches to the width it sits in, so
+                    // whatever comes after the fill lines up on the right.
+                    var stretches = node.Type == "row" && o["items"] is JArray kids && kids.OfType<JObject>().Any(k => Str(k, "t") == "fill");
+                    node.Layout.flexibleWidth = stretches ? 1f : -1f;
                     Reconcile(node.Go.transform, node.Children, o["items"], view);
                     break;
                 case "swatch":
@@ -522,11 +562,16 @@ namespace Sanctuary.ModApi
             internal TMP_Text Label;
             internal Action<string> OnClick;
             internal bool Enabled = true;
+            /// The mod's colour for this button, or null for the plain one.
+            internal Color? Tint;
             private bool _hover;
 
             internal void Refresh()
             {
-                if (Back != null) Back.color = !Enabled ? Off : _hover ? Lit : Normal;
+                if (Back != null)
+                    Back.color = !Enabled ? Off
+                        : Tint is Color t ? new Color(t.r, t.g, t.b, _hover ? 0.6f : 0.32f)
+                        : _hover ? Lit : Normal;
                 if (Label != null)
                 {
                     var c = Label.color;
