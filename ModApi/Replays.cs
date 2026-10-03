@@ -6,6 +6,7 @@ using EM.Network;
 using EM.Network.Replay;
 using HarmonyLib;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace Sanctuary.ModApi
@@ -27,6 +28,9 @@ namespace Sanctuary.ModApi
             public List<WireMod> mods = new List<WireMod>();
             /// The AI seats that played a mod's AI: part of the match's Lua.
             public List<AiSeat> ais;
+            /// Gameplay mods' replay notes (modapi/replay.lua), by key: what
+            /// the recording player's game was told once secrets were over.
+            public Dictionary<string, JToken> notes;
         }
 
         private static readonly AccessTools.FieldRef<string> RecordingPath =
@@ -75,7 +79,7 @@ namespace Sanctuary.ModApi
             try
             {
                 var text = File.ReadAllText(path);
-                if (text.Length > 64 * 1024) return null;
+                if (text.Length > 512 * 1024) return null;
                 var s = JsonConvert.DeserializeObject<Sidecar>(text);
                 if (s?.mods == null) return null;
                 return s;
@@ -107,6 +111,7 @@ namespace Sanctuary.ModApi
 
         private static void RecordingPostfix()
         {
+            _recording = null;
             try
             {
                 var path = RecordingPath();
@@ -123,6 +128,8 @@ namespace Sanctuary.ModApi
                     ais = Overlay.AppliedAis.Count == 0 ? null : Overlay.AppliedAis.ToList(),
                 };
                 File.WriteAllText(SidecarOf(path), JsonConvert.SerializeObject(s, Formatting.Indented));
+                _recording = path;
+                _notesRev = null;
             }
             catch (Exception e) { ModApiPlugin.Log.LogWarning($"Couldn't record this replay's mods: {e.Message}"); }
         }
@@ -203,6 +210,48 @@ namespace Sanctuary.ModApi
             catch (Exception e) { ModApiPlugin.Log.LogWarning($"Couldn't delete a replay's mod list: {e.Message}"); }
         }
 
+        // ---- notes ------------------------------------------------------------
+        //
+        // modapi/replay.lua: a mod's client calls Replay.Note, which keeps the
+        // notes as JSON in a global with a revision beside it; while this
+        // client records a modded match, a new revision is written into the
+        // recording's sidecar. Playing a replay, its notes are handed to the
+        // new Lua VM as a global for Replay.Get, again after a rewind (which
+        // makes a new VM).
+
+        private static string _recording, _notesRev, _playbackNotes;
+        private static float _notesAccum;
+
+        internal static void Tick()
+        {
+            _notesAccum += Time.unscaledDeltaTime;
+            if (_notesAccum < 1f) return;
+            _notesAccum = 0f;
+            if (!ModLua.Ready) return;
+            try
+            {
+                if (NetworkManager.IsReplayPlayback)
+                {
+                    if (_playbackNotes != null && ModLua.GetGlobal("__ModApiReplayLoadedRev") == null)
+                        ModLua.Run("__ModApiReplayLoaded = " + OptionValues.LuaString(_playbackNotes) + " __ModApiReplayLoadedRev = 1");
+                    return;
+                }
+                if (_recording == null) return;
+                var rev = ModLua.GetGlobal("__ModApiReplayNotesRev");
+                if (rev == null || rev == _notesRev) return;
+                _notesRev = rev;
+                var text = ModLua.GetGlobal("__ModApiReplayNotes");
+                if (string.IsNullOrEmpty(text) || text.Length > 256 * 1024) return;
+                var notes = JObject.Parse(text);
+                var s = Read(_recording);
+                if (s == null) return;
+                s.notes = notes.Properties().ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
+                File.WriteAllText(SidecarOf(_recording), JsonConvert.SerializeObject(s, Formatting.Indented));
+                ModApiPlugin.Log.LogInfo($"Replay notes saved beside {Path.GetFileName(_recording)}: {string.Join(", ", s.notes.Keys)}.");
+            }
+            catch (Exception e) { ModApiPlugin.Log.LogWarning($"Replay notes: {e.Message}"); }
+        }
+
         // ---- playback ---------------------------------------------------------
 
         // Before the replay's client world (and its Lua VM) is created: the
@@ -210,6 +259,7 @@ namespace Sanctuary.ModApi
         // A replay without a sidecar is a vanilla one.
         private static bool PlaybackPrefix(string filePath, ref string error, ref bool __result)
         {
+            _playbackNotes = null;
             try
             {
                 var s = Read(filePath);
@@ -248,6 +298,7 @@ namespace Sanctuary.ModApi
                 LoaderBridge.SetActiveGameplayFolders(mods.Where(m => m.DllsAreGameplay).Select(m => m.Folder).ToArray());
                 Packs.Sync(Overlay.Applied);
                 ModApiPlugin.Log.LogInfo($"Replay plays with gameplay mods: {string.Join(", ", mods)}.");
+                _playbackNotes = s.notes != null && s.notes.Count > 0 ? JsonConvert.SerializeObject(s.notes) : null;
             }
             catch (Exception e) { ModApiPlugin.Log.LogError($"Replay mods: {e}"); }
             return true;

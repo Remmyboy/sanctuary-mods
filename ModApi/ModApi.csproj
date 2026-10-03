@@ -14,7 +14,7 @@
     <!-- Mods bind against 1.0.0.0 whatever the release: bump only on a
          breaking change, and never within 1.x. -->
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.5.1</FileVersion>
+    <FileVersion>1.6.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
@@ -23,6 +23,7 @@
     <!-- The framework's own Lua, put in place alongside gameplay mods. -->
     <EmbeddedResource Include="lua\modapi\events.lua" LogicalName="modapi.events.lua" />
     <EmbeddedResource Include="lua\modapi\ui.lua" LogicalName="modapi.ui.lua" />
+    <EmbeddedResource Include="lua\modapi\replay.lua" LogicalName="modapi.replay.lua" />
     <EmbeddedResource Include="lua\modapi\factions_lib.lua" LogicalName="modapi.factions_lib.lua" />
     <!-- Appends to game files: hooks\<group>\<path under LJ\lua>. -->
     <EmbeddedResource Include="lua\modapi\hooks\**\*.lua" LogicalName="modapi.hooks.$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\','/'))" />

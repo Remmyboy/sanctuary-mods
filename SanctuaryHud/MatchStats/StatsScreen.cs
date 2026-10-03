@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using EM.DOTS.Engine.Loader;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
@@ -20,6 +21,11 @@ namespace SanctuaryHud
     // every click, so nothing reaches the map behind it. Closing it leaves
     // a MATCH STATS button under the game's result text to bring it back.
     //
+    // Both the window and that button carry a QUIT that leaves for the main
+    // menu the way the game's own menu does. While anyone is still playing
+    // (a defeat in a team game; the host leaving ends it for everyone) it
+    // asks for a second click first.
+    //
     // Laid out by hand in canvas units from the window's top-left rather
     // than by layout groups: the table and chart are rebuilt whole on each
     // refresh, which is cheap at this size and keeps the maths in one place.
@@ -35,13 +41,14 @@ namespace SanctuaryHud
         private static readonly Color TextColour = new Color(1f, 1f, 1f, 0.92f);
         private static readonly Color DimText = new Color(1f, 1f, 1f, 0.55f);
         private static readonly Color HeadText = new Color(1f, 1f, 1f, 0.5f);
-        private static readonly Color WindowColour = new Color(0.07f, 0.1f, 0.13f, 0.97f);
 
         private readonly RectTransform _root;
         private readonly GameObject _overlay;
         private readonly RectTransform _window;
         private readonly TMP_Text _title, _sub;
         private readonly PanelHeading _close;
+        private readonly PanelHeading _quit, _quitUnder;
+        private float _confirmUntil = -1f;
         private readonly List<PanelHeading> _tableTabs = new List<PanelHeading>();
         private readonly List<PanelHeading> _chartTabs = new List<PanelHeading>();
         private readonly RectTransform _table;
@@ -115,14 +122,18 @@ namespace SanctuaryHud
             Stretch(dim.rectTransform);
             _overlay = dim.gameObject;
 
-            var window = HudCanvas.Fill(dim.transform, "Window", WindowColour);
+            var window = HudCanvas.Fill(dim.transform, "Window", Color.white);
             window.raycastTarget = true;
+            HudStyle.Dress(window);
             _window = window.rectTransform;
             _window.anchorMin = _window.anchorMax = new Vector2(0.5f, 0.5f);
             _window.pivot = new Vector2(0.5f, 0.5f);
             var accent = AccentColour;
             accent.a = 0.7f;
-            HudCanvas.StretchAlongTop(HudCanvas.Fill(_window, "Accent", accent).rectTransform, 3f);
+            var top = HudCanvas.Fill(_window, "Accent", accent).rectTransform;
+            HudCanvas.StretchAlongTop(top, 3f);
+            top.offsetMin = new Vector2(HudStyle.CornerInset, -3f);
+            top.offsetMax = new Vector2(-HudStyle.CornerInset, 0f);
 
             _title = HudCanvas.Text(_window, "Title", 46f, AccentColour, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
             HudCanvas.SetText(_title, "MATCH STATS");
@@ -131,6 +142,9 @@ namespace SanctuaryHud
             _close = PanelHeading.Create(_window, "Close", 26f, TextColour, TextAlignmentOptions.Center);
             HudCanvas.SetText(_close.Text, "CLOSE");
             _close.OnClick = Close;
+
+            _quit = PanelHeading.Create(_window, "Quit", 26f, TextColour, TextAlignmentOptions.Center);
+            _quit.OnClick = Quit;
 
             foreach (var name in new[] { "ECONOMY", "UNITS" })
             {
@@ -163,7 +177,8 @@ namespace SanctuaryHud
             Stretch(_empty.rectTransform);
             HudCanvas.SetText(_empty, "Nothing was recorded for this match.");
 
-            var tip = HudCanvas.Fill(_window, "Readout", new Color(0.05f, 0.07f, 0.09f, 0.95f));
+            var tip = HudCanvas.Fill(_window, "Readout", Color.white);
+            HudStyle.Dress(tip, 0.6f);
             _tip = tip.rectTransform;
             _tip.anchorMin = _tip.anchorMax = new Vector2(0f, 1f);
             _tip.pivot = new Vector2(0f, 1f);
@@ -182,6 +197,7 @@ namespace SanctuaryHud
             _reopen = HudCanvas.Plate(root, "Match stats button");
             var group = _reopen.gameObject.AddComponent<HorizontalLayoutGroup>();
             group.padding = new RectOffset(12, 12, 8, 8);
+            group.spacing = 12f;
             group.childControlWidth = true;
             group.childControlHeight = true;
             HudCanvas.FitToContents(_reopen);
@@ -189,6 +205,10 @@ namespace SanctuaryHud
             reopen.gameObject.AddComponent<LayoutElement>().minWidth = 300f;
             HudCanvas.SetText(reopen.Text, "MATCH STATS");
             reopen.OnClick = () => Open(_data, _endTick);
+            _quitUnder = PanelHeading.Create(_reopen, "Quit", 28f, TextColour, TextAlignmentOptions.Center);
+            _quitUnder.gameObject.AddComponent<LayoutElement>().minWidth = 220f;
+            _quitUnder.OnClick = Quit;
+            QuitLabels();
             _reopen.gameObject.SetActive(false);
 
             _columns = new[]
@@ -261,6 +281,11 @@ namespace SanctuaryHud
         {
             if (!Alive) return;
             if (data != null) _data = data;
+            if (_confirmUntil >= 0f && Time.realtimeSinceStartup >= _confirmUntil)
+            {
+                _confirmUntil = -1f;
+                QuitLabels();
+            }
 
             var showButton = !IsOpen && result != null;
             if (_reopen.gameObject.activeSelf != showButton) _reopen.gameObject.SetActive(showButton);
@@ -270,6 +295,36 @@ namespace SanctuaryHud
             if (HudCanvas.Size != _laidOutFor) Refresh();
             else if (_data.Cursor != _shownCursor && Time.realtimeSinceStartup >= _refreshAt) Refresh();
             Hover();
+        }
+
+        // Back to the main menu: the flag the game's own restart uses, which
+        // runs its in-game menu's Quit (home screen, then tear the match
+        // down and reload the scene) on the engine loader's next frame,
+        // rather than from inside this click.
+        private void Quit()
+        {
+            if (StillPlaying() && _confirmUntil < 0f)
+            {
+                _confirmUntil = Time.realtimeSinceStartup + 4f;
+                QuitLabels();
+                return;
+            }
+            _confirmUntil = -1f;
+            _log?.LogInfo("Match stats: quitting to the main menu.");
+            EngineLoader.isGameRestartRequested = true;
+        }
+
+        /// Anyone without a result yet: the match goes on without us.
+        private bool StillPlaying() => _data == null || _data.Players().Any(a => a.Condition == 0);
+
+        private void QuitLabels()
+        {
+            var confirm = _confirmUntil >= 0f;
+            foreach (var q in new[] { _quit, _quitUnder })
+            {
+                HudCanvas.SetText(q.Text, confirm ? "CONFIRM QUIT" : "QUIT");
+                q.Text.color = confirm ? LossColour : TextColour;
+            }
         }
 
         private void PlaceButton(SanctuaryPanelUI result)
@@ -305,13 +360,14 @@ namespace SanctuaryHud
             var players = _data.Players();
             var inner = w - Pad * 2f;
 
-            // Header: title, map and length, close.
+            // Header: title, map and length, quit, close.
             Place(_title.rectTransform, Pad, Pad * 0.6f, inner * 0.5f, 60f);
             var seconds = _data.Seconds(_endTick >= 0 ? _endTick : _data.Tick);
             var map = _data.Map.Length > 0 ? _data.Map : "Unknown map";
             HudCanvas.SetText(_sub, $"<color=#FFFFFFDD>{Escape(map)}</color>      {Clock(seconds)}      {players.Count} {(players.Count == 1 ? "army" : "armies")}");
             Place(_sub.rectTransform, Pad, Pad * 0.6f + 58f, inner * 0.7f, 40f);
             Place((RectTransform)_close.transform, w - Pad - 200f, Pad * 0.6f, 200f, 60f);
+            Place((RectTransform)_quit.transform, w - Pad - 520f, Pad * 0.6f, 300f, 60f);
 
             // Table tabs, then the table.
             var y = HeaderH + Pad * 0.5f;

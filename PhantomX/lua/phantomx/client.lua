@@ -5,9 +5,19 @@
 -- DLL.
 
 local UI = Import("modapi/ui.lua").UI
+-- Replay notes are Mod API 1.6; an older one has none, and replays show the
+-- recorder's view only.
+local Replay = (function()
+    local ok, m = pcall(Import, "modapi/replay.lua")
+    if ok and type(m) == "table" and m.Replay then return m.Replay end
+    return { Playing = function() return false end, Note = function() end, Get = function() return nil end }
+end)()
+local Events = Import("modapi/events.lua").Events
 
 local RequestName = "PhantomXRequest"
 local StateName = "PhantomXState"
+local StoryName = "PhantomXStory"
+local NoteKey = "sanctuarymods.phantomx"
 
 local Grey = "A8B0BC"
 local Colours = {
@@ -85,6 +95,12 @@ local function RoleLine(s)
     return "Assignment pending", Colours.pending
 end
 
+-- Pushes what follows to the right edge, so the rows' buttons line up
+-- (UI.Fill is Mod API 1.6; an older one gets plain space).
+local function Fill()
+    return UI.Fill and UI.Fill() or UI.Space(8)
+end
+
 local function PlayerRow(s, p)
     local items = { UI.Swatch(ArmyColour(p.id), 16) }
     local nameColour = p.alive and "FFFFFF" or Grey
@@ -98,6 +114,7 @@ local function PlayerRow(s, p)
         items[#items + 1] = UI.Text(p.ally and "ally" or "enemy", { size = 18, color = p.ally and Colours.innocent or Colours.phantom })
         if p.wants then items[#items + 1] = UI.Text("wants peace", { size = 18, color = Colours.paladin }) end
     end
+    items[#items + 1] = Fill()
     if p.canWar then
         items[#items + 1] = UI.Button("War", function() Request("war", p.id) end, { color = Colours.phantom, size = 18 })
     end
@@ -139,6 +156,7 @@ local function Render(s)
         if s.vote == 0 then
             items[#items + 1] = UI.Row({
                 UI.Text("How many phantoms?", { size = 20 }),
+                Fill(),
                 UI.Button("1", function() Request("vote", nil, 1) end),
                 UI.Button("2", function() Request("vote", nil, 2) end),
                 UI.Button("3", function() Request("vote", nil, 3) end),
@@ -151,6 +169,7 @@ local function Render(s)
         if s.volunteer == "ask" then
             items[#items + 1] = UI.Row({
                 UI.Text("Volunteer to be a phantom?", { size = 20 }),
+                Fill(),
                 UI.Button("Yes", function() Request("volunteer", nil, true) end, { color = Colours.phantom }),
                 UI.Button("No", function() Request("volunteer", nil, false) end),
             })
@@ -175,7 +194,142 @@ local function Render(s)
     if newest then UI.Toast(newest.title, newest.text, { seconds = 7, color = newest.color }) end
 end
 
+-- ============================================================
+-- Replays
+-- ============================================================
+--
+-- A replay only holds what the recording player was sent: their own role,
+-- and what they learnt. So once a match is over the host sends everyone the
+-- whole story (who was what, and when things happened), and it is saved
+-- beside this player's replay. Playing that replay, the panel tells the
+-- story from it instead, for whichever player is being viewed: View on a row
+-- switches to them. A replay recorded before this (or by a player who left
+-- before the end) has only the recorder's view, as before.
+
+local showAll = true    -- every role, or only what the viewed player knew
+
+local function FocusArmy()
+    local ok, id = pcall(function() return _G.GetFocusArmy and _G.GetFocusArmy() end)
+    return ok and id or nil
+end
+
+local function StoryAt(story, now)
+    local at = { roles = {}, dead = {}, revealed = {}, marked = {} }
+    for _, e in ipairs(story.events or {}) do
+        if (e.t or 0) > now then break end
+        if e.kind == "assign" then
+            at.assigned = true
+            for _, r in ipairs(e.roles or {}) do at.roles[r.id] = r.role end
+        elseif e.kind == "dead" then at.dead[e.id] = true
+        elseif e.kind == "reveal" then at.revealed[e.id] = e.to or "everyone"
+        elseif e.kind == "mark" and e.hit then at.marked[e.target] = true
+        elseif e.kind == "war" then at.war = true
+        elseif e.kind == "over" then at.result = e.result
+        end
+    end
+    return at
+end
+
+---Whether the viewed player knew this player's role at this point.
+local function Knew(at, viewer, id)
+    if showAll or id == viewer then return true end
+    if at.dead[id] then return true end
+    local to = at.revealed[id]
+    if not to then return false end
+    local mine = viewer and at.roles[viewer]
+    return to == "everyone" or to == mine or (to == "both" and (mine == "phantom" or mine == "paladin"))
+end
+
+local function RenderStory(story)
+    local now = Events.GameTime()
+    local at = StoryAt(story, now)
+    local focus = FocusArmy()
+    local viewing
+    for _, p in ipairs(story.players or {}) do
+        if p.id == focus then viewing = p end
+    end
+
+    local items = {}
+    if viewing then
+        local role = at.roles[viewing.id]
+        items[#items + 1] = UI.Text("Viewing " .. viewing.name, { size = 22 })
+        items[#items + 1] = UI.Text(role and string.upper(role) or "Assignment pending",
+            { size = 26, color = role and Colours[role] or Colours.pending })
+    else
+        items[#items + 1] = UI.Text("Watching everyone", { size = 26, color = Colours.observer })
+    end
+    if at.result then
+        items[#items + 1] = UI.Text(at.result, { size = 24, color = "3DAFFF" })
+    elseif at.war then
+        items[#items + 1] = UI.Text("Phantom war", { size = 22, color = Colours.phantom })
+    elseif not at.assigned and story.assignAt then
+        items[#items + 1] = UI.Text("Phantoms are chosen in " .. string.format("%d:%02d",
+            math.floor(math.max(0, story.assignAt - now) / 60), math.floor(math.max(0, story.assignAt - now) % 60)),
+            { size = 20, color = Grey })
+    end
+    items[#items + 1] = UI.Row({
+        UI.Text(showAll and "Showing every role" or "Showing what they knew", { size = 18, color = Grey }),
+        UI.Fill and UI.Fill() or UI.Space(8),
+        UI.Button(showAll and "Hide spoilers" or "Show all", function()
+            showAll = not showAll
+            RenderStory(story)
+        end, { size = 18 }),
+    })
+
+    items[#items + 1] = UI.Rule()
+    for _, p in ipairs(story.players or {}) do
+        local row = { UI.Swatch(ArmyColour(p.id), 16) }
+        local alive = not at.dead[p.id]
+        row[#row + 1] = UI.Text(p.name .. (p.id == focus and " (viewing)" or ""), { size = 20, color = alive and "FFFFFF" or Grey })
+        local role = at.roles[p.id]
+        if role and Knew(at, focus, p.id) then
+            row[#row + 1] = UI.Text(string.upper(role), { size = 18, color = Colours[role] or Grey })
+        end
+        if at.marked[p.id] then row[#row + 1] = UI.Text("marked", { size = 18, color = Colours.paladin }) end
+        if not alive then row[#row + 1] = UI.Text("out", { size = 18, color = Grey }) end
+        row[#row + 1] = UI.Fill and UI.Fill() or UI.Space(8)
+        if p.id ~= focus then
+            row[#row + 1] = UI.Button("View", function()
+                pcall(function() _G.SetFocusArmy(p.id) end)
+            end, { size = 18 })
+        end
+        items[#items + 1] = UI.Row(row, { spacing = 8 })
+    end
+    panel:Set(items)
+end
+
+local function ReplayTick()
+    local story = Replay.Get(NoteKey)
+    if not story then return false end
+    local ok, err = xpcall(RenderStory, debug.traceback, story)
+    if not ok then Warn("Phantom-X replay panel: " .. tostring(err)) end
+    return true
+end
+
+if Replay.Playing() then
+    -- Redrawn as the replay plays, and at once when the view switches to
+    -- another player (the replay may be paused, with no ticks to wait for).
+    Events.Every(0.5, ReplayTick)
+    local setFocus = _G.SetFocusArmy
+    if type(setFocus) == "function" then
+        _G.SetFocusArmy = function(...)
+            local r = setFocus(...)
+            pcall(ReplayTick)
+            return r
+        end
+    end
+else
+    -- Live: the whole story arrives once the match is over; keep it with
+    -- this player's replay.
+    RegisterListener("client_" .. StoryName, function(story)
+        local ok, err = pcall(Replay.Note, NoteKey, story)
+        if not ok then Warn("Phantom-X couldn't save the story for the replay: " .. tostring(err)) end
+    end)
+end
+
 RegisterListener("client_" .. StateName, function(state)
+    -- In a replay with the story, the story tells it.
+    if Replay.Playing() and Replay.Get(NoteKey) then return end
     local ok, err = xpcall(Render, debug.traceback, state)
     if not ok then Warn("Phantom-X panel: " .. tostring(err)) end
 end)

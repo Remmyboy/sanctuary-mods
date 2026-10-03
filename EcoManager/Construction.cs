@@ -62,6 +62,9 @@ namespace SanctuaryHud
         // client ties it to what it was building; this is what lets the same
         // tile release exactly what it held.
         private readonly Dictionary<string, List<int>> _pausedByTile = new Dictionary<string, List<int>>();
+        /// Moves on every pause or resume, so the BUILD panel refills at once
+        /// rather than at the next poll.
+        private int _pauseVersion;
 
         // Placement ghosts (progress 0) are queued, not started, so they are
         // left out; the demand is zero and the tile would only be noise.
@@ -138,6 +141,7 @@ namespace SanctuaryHud
                 if (_buildGroups.Count > 0) _buildGroups = new List<BuildGroup>();
                 // The VM goes with the match, and the builders with it.
                 _pausedByTile.Clear();
+                _pauseVersion++;
                 return;
             }
 
@@ -227,6 +231,7 @@ namespace SanctuaryHud
             if (_pausedByTile.TryGetValue(g.TpId, out var held) && held.Count > 0)
             {
                 _pausedByTile.Remove(g.TpId);
+                _pauseVersion++;
                 SetPause(held, false);
                 Logger.LogInfo($"Released {held.Count} builder(s) on {g.Name}.");
             }
@@ -234,6 +239,7 @@ namespace SanctuaryHud
             {
                 var ids = g.BuilderIds.Distinct().ToList();
                 _pausedByTile[g.TpId] = ids;
+                _pauseVersion++;
                 SetPause(ids, true);
                 Logger.LogInfo($"Paused {ids.Count} builder(s) on {g.Name}.");
             }
@@ -251,6 +257,7 @@ namespace SanctuaryHud
             {
                 var held = _pausedByTile[key];
                 _pausedByTile.Remove(key);
+                _pauseVersion++;
                 SetPause(held, false);
                 Logger.LogInfo($"Released {held.Count} paused builder(s): nothing of {key} is under construction any more.");
             }
@@ -262,6 +269,7 @@ namespace SanctuaryHud
             if (_pausedByTile.Count == 0) return;
             var all = _pausedByTile.Values.SelectMany(v => v).Distinct().ToList();
             _pausedByTile.Clear();
+            _pauseVersion++;
             if (LuaReady) SetPause(all, false);
         }
 

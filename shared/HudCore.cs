@@ -951,7 +951,7 @@ namespace SanctuaryHud
                 {
                     var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
                     var localId = _localIdField.GetValue(localComponent);
-                    var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                    var indexField = IndexField(localId);
                     if (indexField != null) _commanderLocalIndex = Convert.ToInt32(indexField.GetValue(localId));
                 }
 
@@ -1072,7 +1072,7 @@ namespace SanctuaryHud
                 // role; factories carry what they build (land/air/naval), and
                 // commanders carry "direct" — so this is what separates them.
                 if (bufLength == 0) return;
-                var strategic = itemGetter.GetValue(buffer, new object[] { 0 });
+                var strategic = ItemAt(itemGetter, buffer, 0);
                 var name = IconName(Convert.ToInt32(_iconIndexField.GetValue(strategic)));
                 if (string.IsNullOrEmpty(name)) return;
 
@@ -1111,7 +1111,7 @@ namespace SanctuaryHud
                 {
                     var component = _getLocalIdMi.Invoke(em, new[] { entity });
                     var localId = _localIdField.GetValue(component);
-                    var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                    var indexField = IndexField(localId);
                     if (indexField != null) group.UnitIds.Add(Convert.ToInt32(indexField.GetValue(localId)));
                 }
             }
@@ -1328,7 +1328,7 @@ namespace SanctuaryHud
                 if (_localIdField == null || _getLocalIdMi == null) return;
                 var component = _getLocalIdMi.Invoke(em, new[] { entity });
                 var localId = _localIdField.GetValue(component);
-                var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                var indexField = IndexField(localId);
                 if (indexField == null) return;
                 var localIndex = Convert.ToInt32(indexField.GetValue(localId));
                 if (!_factoryKinds.TryGetValue(localIndex, out var kind)) return;
@@ -1381,7 +1381,7 @@ namespace SanctuaryHud
                 {
                     var component = _getLocalIdMi.Invoke(em, new[] { entity });
                     var localId = _localIdField.GetValue(component);
-                    var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                    var indexField = IndexField(localId);
                     if (indexField != null) localIndex = Convert.ToInt32(indexField.GetValue(localId));
                 }
 
@@ -1593,7 +1593,7 @@ namespace SanctuaryHud
                 if (_localIdField == null || _getLocalIdMi == null) return -1;
                 var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
                 var localId = _localIdField.GetValue(localComponent);
-                var indexField = localId.GetType().GetField("index", BindingFlags.Public | BindingFlags.Instance);
+                var indexField = IndexField(localId);
                 return indexField != null ? Convert.ToInt32(indexField.GetValue(localId)) : -1;
             }
             catch
@@ -1601,6 +1601,46 @@ namespace SanctuaryHud
                 return -1;
             }
         }
+
+        // ---- reflection, looked up once ----------------------------------------
+        //
+        // The once-a-second unit scan reads every unit's icon buffer through
+        // reflection; looking the members up again for each unit and element
+        // was most of its cost, so they are looked up once per type here.
+
+        private static readonly Dictionary<Type, FieldInfo> _indexFields = new Dictionary<Type, FieldInfo>();
+        private static readonly Dictionary<Type, PropertyInfo[]> _listProps = new Dictionary<Type, PropertyInfo[]>();
+        private static readonly Dictionary<Type, MethodInfo> _toEntityArray = new Dictionary<Type, MethodInfo>();
+        private static readonly object[] _oneArg = new object[1];
+
+        /// The 'index' field of a local-id struct, or null.
+        private static FieldInfo IndexField(object localId)
+        {
+            var type = localId.GetType();
+            if (!_indexFields.TryGetValue(type, out var field))
+                _indexFields[type] = field = type.GetField("index", BindingFlags.Public | BindingFlags.Instance);
+            return field;
+        }
+
+        /// A list-like type's Length and Item properties.
+        private static PropertyInfo[] ListProps(Type type)
+        {
+            if (!_listProps.TryGetValue(type, out var props))
+                _listProps[type] = props = new[] { type.GetProperty("Length"), type.GetProperty("Item") };
+            return props;
+        }
+
+        /// list[i] through its Item property, with no array allocated per call.
+        private static object ItemAt(PropertyInfo item, object list, int i)
+        {
+            _oneArg[0] = i;
+            return item.GetValue(list, _oneArg);
+        }
+
+        /// Whether this mod runs the once-a-second unit scan (idle groups,
+        /// extractors, the commander). On by default; a mod that only needs
+        /// the in-match signal turns it off and skips the scan.
+        internal static bool UnitScan = true;
 
         private static void PollIdleBuilders()
         {
@@ -1661,19 +1701,25 @@ namespace SanctuaryHud
                     var query = _createQueryMi.Invoke(em, new object[] { ctArray });
                     try
                     {
-                        var entitiesArray = query.GetType().GetMethod("ToEntityArray").Invoke(query, new[] { _allocatorTemp });
+                        var queryType = query.GetType();
+                        if (!_toEntityArray.TryGetValue(queryType, out var toArray))
+                            _toEntityArray[queryType] = toArray = queryType.GetMethod("ToEntityArray");
+                        var entitiesArray = toArray.Invoke(query, new[] { _allocatorTemp });
                         try
                         {
-                            var lengthProp = entitiesArray.GetType().GetProperty("Length");
-                            var itemProp = entitiesArray.GetType().GetProperty("Item");
-                            var length = (int)lengthProp.GetValue(entitiesArray);
+                            var arrayProps = ListProps(entitiesArray.GetType());
+                            var itemProp = arrayProps[1];
+                            var length = (int)arrayProps[0].GetValue(entitiesArray);
+                            var bufferArgs = new object[2];
+                            bufferArgs[1] = true;
                             for (var i = 0; i < length; i++)
                             {
-                                var entity = itemProp.GetValue(entitiesArray, new object[] { i });
-                                var buffer = _getBufferMi.Invoke(em, new[] { entity, (object)true });
-                                var bufferType = buffer.GetType();
-                                var bufLength = (int)bufferType.GetProperty("Length").GetValue(buffer);
-                                var itemGetter = bufferType.GetProperty("Item");
+                                var entity = ItemAt(itemProp, entitiesArray, i);
+                                bufferArgs[0] = entity;
+                                var buffer = _getBufferMi.Invoke(em, bufferArgs);
+                                var bufferProps = ListProps(buffer.GetType());
+                                var bufLength = (int)bufferProps[0].GetValue(buffer);
+                                var itemGetter = bufferProps[1];
 
                                 // The strategic icon (slot 0) identifies what
                                 // the unit is; the rest of the buffer carries
@@ -1683,7 +1729,7 @@ namespace SanctuaryHud
                                 string iconName = null;
                                 if (bufLength > 0 && _iconIndexField != null)
                                 {
-                                    var strategic = itemGetter.GetValue(buffer, new object[] { 0 });
+                                    var strategic = ItemAt(itemGetter, buffer, 0);
                                     var strategicIndex = Convert.ToInt32(_iconIndexField.GetValue(strategic));
                                     iconName = IconName(strategicIndex);
 
@@ -1704,7 +1750,7 @@ namespace SanctuaryHud
                                     var upgrading = false;
                                     for (var e = 0; e < bufLength; e++)
                                     {
-                                        var element = itemGetter.GetValue(buffer, new object[] { e });
+                                        var element = ItemAt(itemGetter, buffer, e);
                                         var index = Convert.ToInt32(_iconIndexField.GetValue(element));
                                         if (index != _idleImageIndex && index != _upgradeImageIndex) continue;
                                         if (!(bool)_iconEnabledField.GetValue(element)) continue;
@@ -1741,7 +1787,7 @@ namespace SanctuaryHud
                                 }
                                 else if (bufLength > IdleIconIndex)
                                 {
-                                    var element = itemGetter.GetValue(buffer, new object[] { IdleIconIndex });
+                                    var element = ItemAt(itemGetter, buffer, IdleIconIndex);
                                     if ((bool)_iconEnabledField.GetValue(element)) count++;
                                 }
                             }
@@ -1873,7 +1919,7 @@ namespace SanctuaryHud
             if (_pollAccum >= 1f)
             {
                 _pollAccum = 0f;
-                PollIdleBuilders();
+                if (UnitScan) PollIdleBuilders();
                 PollFocusArmy();
             }
 

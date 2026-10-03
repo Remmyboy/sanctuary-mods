@@ -164,6 +164,7 @@ namespace SanctuaryHud
 
             MatchStats.Bind(Config);
             QueueRightClick.Bind(Config);
+            CommanderGuard.Bind(Config);
 
             // Extras for the game's own controls, all off until switched on.
             CursorHint.Bind(Config);
@@ -332,6 +333,7 @@ namespace SanctuaryHud
                 CursorHint.Shutdown();
                 SelectSameType.Shutdown();
                 QueueRightClick.Shutdown();
+                CommanderGuard.Shutdown();
                 MatchStats.Shutdown();
                 HudCanvas.Destroy();
             }
@@ -394,7 +396,11 @@ namespace SanctuaryHud
 
             // Config is read every frame so the Mod Manager's settings page
             // takes effect at once; the entries are cheap to read.
-            WorldOverlays.ReclaimEnabled = _cfgReclaim.Value;
+            // Reclaim is only scanned while its labels can show: with a hold
+            // key, while it is held (scanning every rock on the map once a
+            // second for labels nobody sees was most of the overlay's cost).
+            var reclaimKey = _cfgReclaimHoldKey.Value;
+            WorldOverlays.ReclaimEnabled = _cfgReclaim.Value && (reclaimKey == KeyCode.None || Input.GetKey(reclaimKey));
             WorldOverlays.BuildEtaEnabled = _cfgBuildEta.Value || _cfgAlertBuildComplete.Value;
             Alerts.AttackedEnabled = _cfgAlertAttacked.Value;
             Alerts.CriticalEnabled = _cfgAlertCritical.Value;
@@ -414,6 +420,7 @@ namespace SanctuaryHud
             CursorHint.Tick();
             SelectSameType.Tick();
             QueueRightClick.Tick();
+            CommanderGuard.Tick();
             MatchStats.Tick();
 
             // The built-in readouts only go while the strip is standing in for

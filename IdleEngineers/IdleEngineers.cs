@@ -102,6 +102,12 @@ namespace SanctuaryHud
         private Image _rule;
         private PanelHeading _factoryHeading;
 
+        /// What the panel was last filled from. The groups are new lists each
+        /// poll (once a second), so refilling every frame from the same ones
+        /// only cost time and garbage.
+        private (object groups, object factories, bool right, string status) _filled;
+        private static readonly List<IdleGroup> NoGroups = new List<IdleGroup>();
+
         private void SyncPanel()
         {
             // The panel only exists when there is something to act on.
@@ -134,6 +140,7 @@ namespace SanctuaryHud
         {
             _panel?.Destroy();
             _panel = HudPanel.Create(root, "Idle engineers", () => _cfgLocked.Value);
+            _filled = default;
             _panel.EnableResize(0.7f, 1.6f);
 
             var head = _panel.Row("Heading", 8f, TextAnchor.MiddleLeft);
@@ -179,11 +186,14 @@ namespace SanctuaryHud
                 factories = _idleFactoryGroups;
             }
             // Switched off mid-match: hide at once rather than at the next poll.
-            if (!_cfgFactories.Value) factories = new List<IdleGroup>();
+            if (!_cfgFactories.Value) factories = NoGroups;
 
             // On the right half of the screen the panel lays itself out from
             // its right edge; the headings follow.
             var right = _panel.RightAligned;
+            var key = ((object)groups, (object)factories, right, _pollStatus);
+            if (_filled.Equals(key)) return;
+            _filled = key;
             _title.alignment = right ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft;
             _factoryHeading.Text.alignment = right ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft;
 

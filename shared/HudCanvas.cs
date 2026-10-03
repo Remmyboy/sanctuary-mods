@@ -92,6 +92,10 @@ namespace SanctuaryHud
                 _root.offsetMax = Vector2.zero;
                 _root.localScale = Vector3.one;
                 go.AddComponent<LayoutElement>().ignoreLayout = true;
+                // A canvas of its own: a change to anything on it (a figure, a
+                // mini-map icon) re-batches only this mod's UI, not the game's
+                // whole HUD with it.
+                OwnCanvas(go);
 
                 var holder = new GameObject("Holder", typeof(RectTransform));
                 holder.SetActive(false);
@@ -195,7 +199,8 @@ namespace SanctuaryHud
                     if (ui != null)
                     {
                         _gameScaler = ui.GetComponentInChildren<CanvasScaler>(true);
-                        if (_font == null) TakeFont(ui.GetComponentInChildren<TMP_Text>(true));                    }
+                        if (_font == null) TakeFont(ui.GetComponentInChildren<TMP_Text>(true));
+                    }
                 }
                 catch
                 {
@@ -204,6 +209,17 @@ namespace SanctuaryHud
             }
             var scale = _gameScaler != null && _gameScaler.scaleFactor > 0f ? _gameScaler.scaleFactor : Screen.height / 2160f;
             if (_ownScaler != null && !Mathf.Approximately(_ownScaler.scaleFactor, scale)) _ownScaler.scaleFactor = scale;
+        }
+
+        /// Gives a GameObject its own nested canvas, so changes under it are
+        /// re-batched on their own rather than with everything around it, and
+        /// the raycaster a nested canvas needs to take clicks. It draws in the
+        /// same order and at the same scale as before.
+        internal static void OwnCanvas(GameObject go)
+        {
+            if (go.GetComponent<Canvas>() != null) return;
+            go.AddComponent<Canvas>();
+            go.AddComponent<GraphicRaycaster>();
         }
 
         /// Shows or hides everything on the root at once: the HUD hidden
@@ -405,27 +421,26 @@ namespace SanctuaryHud
 
         // ---- plates ---------------------------------------------------------------
 
-        /// Dresses a plate: the HUD's plain plate, with the hairline along
-        /// its top as asked.
+        /// Dresses a plate: the HUD's shaded plate with its shadow, with the
+        /// hairline along its top as asked.
         internal static void PlateStyle(RectTransform plate, bool hairline)
         {
             if (plate == null) return;
             var image = plate.GetComponent<Image>();
             if (image == null) return;
-            if (image.sprite != null || image.color != PanelColour)
+            if (image.sprite != HudStyle.Shade || image.color != HudStyle.PlateTint)
             {
-                image.sprite = null;
+                HudStyle.Dress(image);
                 image.material = null;
-                image.color = PanelColour;
             }
-            var line = plate.childCount > 0 ? plate.GetChild(0) : null;
+            var line = plate.Find("Accent");
             if (line != null && line.name == "Accent" && line.gameObject.activeSelf != hairline) line.gameObject.SetActive(hairline);
         }
 
         // ---- building blocks ----------------------------------------------------
 
-        /// A plate for a row: the game's panel colour with the accent hairline
-        /// along its top, anchored by its bottom-left corner on the root, and
+        /// A plate for a row: the game's panel colour, shaded, with a soft
+        /// shadow round it and the accent hairline along its top, anchored by its bottom-left corner on the root, and
         /// a raycast target so the gaps between tiles don't let a click
         /// through to the map either. The caller adds the layout group; the
         /// hairline is child 0 and stays out of the layout.
@@ -444,7 +459,11 @@ namespace SanctuaryHud
             accent.a = 0.6f;
             var line = Fill(rt, "Accent", accent);
             StretchAlongTop(line.rectTransform, 2f);
+            // Short of the rounded corners.
+            line.rectTransform.offsetMin = new Vector2(HudStyle.CornerInset, -2f);
+            line.rectTransform.offsetMax = new Vector2(-HudStyle.CornerInset, 0f);
             line.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            HudStyle.Dress(back);
             return rt;
         }
 

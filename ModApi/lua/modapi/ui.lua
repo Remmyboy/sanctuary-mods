@@ -103,6 +103,13 @@ function UI.Space(size)
     return { t = "space", size = size }
 end
 
+--- Stretchy space in a row: takes whatever width is left, so what comes
+--- after it lines up on the right. A row with one in it stretches to the
+--- panel's width, so the rows of a list line up with each other.
+function UI.Fill()
+    return { t = "fill" }
+end
+
 --- A small square of colour, such as an army's. size defaults to 16.
 function UI.Swatch(color, size)
     return { t = "swatch", color = colour(color) or "FFFFFF", size = size }

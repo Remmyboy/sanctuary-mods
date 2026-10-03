@@ -50,7 +50,7 @@ namespace SanctuaryHud
 
         /// The border doubles as the handle that moves the panel, so the map
         /// itself is free to mean "go here".
-        private const float Frame = 5f;
+        private const float Frame = 6f;
         private const float Grip = 14f;
 
         /// The live size, so a resize drag doesn't write the config file on
@@ -207,9 +207,8 @@ namespace SanctuaryHud
         private static readonly List<RawImage> _icons = new List<RawImage>();
         private static readonly List<Image> _spots = new List<Image>();
 
-        private static readonly Color FillColour = new Color(0.05f, 0.07f, 0.09f, 1f);
         private static readonly Color MapBackColour = new Color(0.09f, 0.11f, 0.14f, 1f);
-        private static readonly Color BorderColour = new Color(0.35f, 0.55f, 0.8f, 0.7f);
+        private static readonly Color BorderColour = new Color(0.239f, 0.686f, 1f, 0.45f);
 
         private static void ShowPanel(bool showing)
         {
@@ -258,8 +257,9 @@ namespace SanctuaryHud
             _rect = new Rect(x / k, y / k, plateW / k, plateH / k);
 
             var opacity = _cfgOpacity.Value;
-            var fill = FillColour;
-            fill.a = opacity;
+            // The HUD's plate, as faint as the opacity setting asks.
+            var fill = HudStyle.PlateTint;
+            fill.a *= opacity;
             _plateImage.color = fill;
             var back = MapBackColour;
             back.a = opacity;
@@ -378,9 +378,12 @@ namespace SanctuaryHud
             // The last match's images went with its scene.
             _icons.Clear();
             _spots.Clear();
-            _plateImage = HudCanvas.Fill(root, "Mini-map", FillColour);
+            _plateImage = HudCanvas.Fill(root, "Mini-map", HudStyle.PlateTint);
             _plateImage.raycastTarget = true;
+            HudStyle.Dress(_plateImage);
             _plate = _plateImage.rectTransform;
+            // Its icons move several times a second: re-batched on their own.
+            HudCanvas.OwnCanvas(_plate.gameObject);
             _plate.anchorMin = _plate.anchorMax = new Vector2(0f, 1f);
             _plate.pivot = new Vector2(0f, 1f);
             _drag = _plate.gameObject.AddComponent<HudPanel.PanelDrag>();

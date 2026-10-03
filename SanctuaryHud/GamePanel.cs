@@ -261,6 +261,10 @@ namespace SanctuaryHud
                     : eco.pauseBtn != null && node == eco.pauseBtn.transform ? ControlKind.Pause
                     : node.name.IndexOf("help", StringComparison.OrdinalIgnoreCase) >= 0 ? ControlKind.Help
                     : ControlKind.Other;
+                // The pause button does nothing: the game never wires it up
+                // (EconomyPanelUI.pauseBtn has no listener, and the game has no
+                // pause, only speeds down to 0.1), so the strip leaves it out.
+                if (kind == ControlKind.Pause) continue;
                 Controls.Add(new PanelControl
                 {
                     Target = node.gameObject,

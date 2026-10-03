@@ -76,6 +76,7 @@ namespace SanctuaryHud
                 go = Instantiate(prefab, holder);
                 go.name = "Tile";
                 var tile = go.AddComponent<UnitTile>();
+                HoverGlow.Add(go);
                 tile._native = NativeSize(panel);
 
                 var element = go.GetComponent<UnitButtonElement>();
