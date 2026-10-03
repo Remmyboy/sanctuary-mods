@@ -2,7 +2,9 @@ using System;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using TMPro;
 using UnityEngine;
+using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud.CameraUtils
 {
@@ -22,8 +24,10 @@ namespace SanctuaryHud.CameraUtils
     // setting here that isn't live — see DrawDistance.
     //
     // The work itself is in RenderState and DrawDistance; this is the config,
-    // the hotkey and the panel.
-    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.1.2")]
+    // the hotkey and the panel. The panel is on a canvas of the mod's own,
+    // not the game's HUD canvas: hiding the game's UI switches that canvas
+    // off, and the panel is how it comes back.
+    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.2.0")]
     public class CameraUtilitiesPlugin : BaseUnityPlugin
     {
         private ConfigEntry<KeyCode> _cfgToggleKey;
@@ -44,10 +48,6 @@ namespace SanctuaryHud.CameraUtils
         private Harmony _harmony;
 
         private bool _open;
-        private Rect _rect = new Rect(12, 420, 0, 0);
-        private int _lastRowCount = -1;
-
-        private const float PanelW = 268f;
 
         private void Awake()
         {
@@ -98,9 +98,6 @@ namespace SanctuaryHud.CameraUtils
                 _harmony = null;
             }
 
-            _rect.x = _cfgPosX.Value;
-            _rect.y = _cfgPosY.Value;
-
             Logger.LogInfo($"Camera Utilities loaded: {_cfgToggleKey.Value} opens the panel in a match, " +
                            "and the same switches are on the Mods page.");
         }
@@ -111,6 +108,9 @@ namespace SanctuaryHud.CameraUtils
             // the wrapper comes off RenderUpdate and every flag goes back.
             RenderState.Uninstall();
             _harmony?.UnpatchSelf();
+            // A hot reload leaves the old assembly loaded; its panel goes.
+            HudCanvas.Destroy();
+            _panel = null;
         }
 
         private void Update()
@@ -133,118 +133,141 @@ namespace SanctuaryHud.CameraUtils
 
             if (Input.GetKeyDown(_cfgToggleKey.Value) && RenderState.Active) _open = !_open;
 
-            // Persist the panel position once the drag is over.
-            if (_open && !Input.GetMouseButton(0) &&
-                (Math.Abs(_cfgPosX.Value - _rect.x) > 0.5f || Math.Abs(_cfgPosY.Value - _rect.y) > 0.5f))
-            {
-                _cfgPosX.Value = _rect.x;
-                _cfgPosY.Value = _rect.y;
-            }
+            UpdatePanel();
         }
 
         // ---- the panel -----------------------------------------------------
 
-        private void OnGUI()
+        // Canvas units: twice the 1080-logical pixels. The panel is at least
+        // Inner wide inside its padding; rows of switches share it out.
+        private const float Inner = 488f, RowH = 44f, Text = 22f, Head = 20f, Step = 56f;
+
+        private HudPanel _panel;
+        private TMP_Text _camHeight, _threshold, _distance, _nextMatch;
+        private RectTransform _thresholdRow;
+        private HudButton _show, _far, _never;
+        private HudButton _intel, _attack, _build, _orderLines, _plannedBuilds, _alloySpots, _healthBars, _gameUi;
+
+        private void UpdatePanel()
         {
-            if (!_open || !RenderState.Active) return;
-            EnsureUi();
-
-            var scale = Screen.height / 1080f;
-            var previousMatrix = GUI.matrix;
-            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
-            try
+            var showing = _open && RenderState.Active && !MenuOpen();
+            if (showing && (_panel == null || !_panel.Alive))
             {
-                var logicalWidth = Screen.width / scale;
-                var logicalHeight = Screen.height / scale;
-
-                // A layout window grows to its content but never shrinks, so
-                // zero the height when the row count changes — the threshold
-                // row only exists in one of the three icon modes.
-                var rows = _cfgIcons.Value == IconMode.HideWhenClose ? 1 : 0;
-                if (rows != _lastRowCount)
-                {
-                    _lastRowCount = rows;
-                    _rect.height = 0;
-                }
-
-                _rect.x = Mathf.Clamp(_rect.x, -PanelW + 80, logicalWidth - 80);
-                _rect.y = Mathf.Clamp(_rect.y, 0, logicalHeight - 40);
-                _rect = GUILayout.Window(0x43414D55, _rect, DrawPanel, GUIContent.none, _stPanel, GUILayout.Width(PanelW));
+                var root = HudCanvas.EnsureOwn();
+                if (root != null) Build(root);
             }
-            finally
-            {
-                GUI.matrix = previousMatrix;
-            }
-        }
+            if (_panel == null || !_panel.Alive) return;
+            if (showing) HudCanvas.EnsureOwn();
+            _panel.Show(showing);
+            if (!showing) return;
 
-        private void DrawPanel(int id)
-        {
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("CAMERA UTILITIES", _stTitle);
-            GUILayout.FlexibleSpace();
             var height = RenderState.CameraHeight;
-            GUILayout.Label(height < 0 ? "" : $"cam {height:0}", _stDim);
-            GUILayout.EndHorizontal();
+            HudCanvas.SetText(_camHeight, height < 0 ? "" : $"cam {height:0}");
 
-            GUILayout.Space(4);
-            GUILayout.Label("SHOW STRATEGIC ICONS", _stHead);
-            GUILayout.BeginHorizontal();
             var mode = _cfgIcons.Value;
-            if (ModeButton("ALWAYS", mode, IconMode.Show)) _cfgIcons.Value = IconMode.Show;
-            if (ModeButton("WHEN FAR", mode, IconMode.HideWhenClose)) _cfgIcons.Value = IconMode.HideWhenClose;
-            if (ModeButton("NEVER", mode, IconMode.Hide)) _cfgIcons.Value = IconMode.Hide;
-            GUILayout.EndHorizontal();
+            _show.SetOn(mode == IconMode.Show);
+            _far.SetOn(mode == IconMode.HideWhenClose);
+            _never.SetOn(mode == IconMode.Hide);
+            var far = mode == IconMode.HideWhenClose;
+            if (_thresholdRow.gameObject.activeSelf != far) _thresholdRow.gameObject.SetActive(far);
+            HudCanvas.SetText(_threshold, $"{_cfgIconHeight.Value:0}");
 
-            if (mode == IconMode.HideWhenClose)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label("far is above", _stBody, GUILayout.Width(78));
-                if (GUILayout.Button("-", _stButton, GUILayout.Width(28))) StepThreshold(-10f);
-                GUILayout.Label($"{_cfgIconHeight.Value:0}", _stValue, GUILayout.Width(46));
-                if (GUILayout.Button("+", _stButton, GUILayout.Width(28))) StepThreshold(10f);
-                GUILayout.EndHorizontal();
-            }
+            _intel.SetOn(_cfgIntel.Value);
+            _attack.SetOn(_cfgAttack.Value);
+            _build.SetOn(_cfgBuild.Value);
+            _orderLines.SetOn(_cfgOrderLines.Value);
+            _plannedBuilds.SetOn(_cfgPlannedBuilds.Value);
+            _alloySpots.SetOn(_cfgAlloySpots.Value);
+            _healthBars.SetOn(_cfgHealthBars.Value);
+            _gameUi.SetOn(_cfgGameUi.Value);
 
-            GUILayout.Space(4);
-            GUILayout.Label("HIDE", _stHead);
-            GUILayout.BeginHorizontal();
-            _cfgIntel.Value = Toggle(_cfgIntel.Value, "INTEL", GUILayout.Width(76));
-            _cfgAttack.Value = Toggle(_cfgAttack.Value, "ATTACK", GUILayout.Width(76));
-            _cfgBuild.Value = Toggle(_cfgBuild.Value, "BUILD", GUILayout.Width(76));
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            _cfgOrderLines.Value = Toggle(_cfgOrderLines.Value, "ORDER LINES", GUILayout.Width(118));
-            _cfgPlannedBuilds.Value = Toggle(_cfgPlannedBuilds.Value, "PLANNED BUILDS", GUILayout.Width(118));
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            _cfgAlloySpots.Value = Toggle(_cfgAlloySpots.Value, "ALLOY SPOTS", GUILayout.Width(118));
-            _cfgHealthBars.Value = Toggle(_cfgHealthBars.Value, "HEALTH BARS", GUILayout.Width(118));
-            GUILayout.EndHorizontal();
-            _cfgGameUi.Value = Toggle(_cfgGameUi.Value, "GAME UI");
-
-            GUILayout.Space(4);
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("UNIT DRAW DISTANCE", _stHead);
-            GUILayout.FlexibleSpace();
+            var distance = _cfgDrawDistance.Value;
+            HudCanvas.SetText(_distance, distance <= 0f ? "game default" : $"{distance:0}");
             // The distances are baked into the render prefabs as a match's
             // templates load, so a change here is not live — say so rather
             // than letting the button look broken.
-            if (DrawDistance.Applied != _cfgDrawDistance.Value) GUILayout.Label("next match", _stDim);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("-", _stButton, GUILayout.Width(28))) StepDrawDistance(-250f);
-            var distance = _cfgDrawDistance.Value;
-            GUILayout.Label(distance <= 0f ? "game default" : $"{distance:0}", _stValue, GUILayout.Width(96));
-            if (GUILayout.Button("+", _stButton, GUILayout.Width(28))) StepDrawDistance(250f);
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("OFF", _stButton, GUILayout.Width(44))) _cfgDrawDistance.Value = 0f;
-            GUILayout.EndHorizontal();
+            var pending = DrawDistance.Applied != distance;
+            if (_nextMatch.gameObject.activeSelf != pending) _nextMatch.gameObject.SetActive(pending);
 
-            GUILayout.Space(2);
-            if (GUILayout.Button("SHOW EVERYTHING", _stButton)) ShowEverything();
-
-            GUI.DragWindow(new Rect(0, 0, 10000, 22));
+            var at = _panel.Place(new Vector2(_cfgPosX.Value, _cfgPosY.Value));
+            if (_panel.TakeDragged())
+            {
+                _cfgPosX.Value = at.x;
+                _cfgPosY.Value = at.y;
+            }
         }
+
+        private void Build(RectTransform root)
+        {
+            _panel = HudPanel.Create(root, "Camera utilities", () => false);
+            var rect = _panel.Rect;
+
+            var title = HudControls.Row(rect, "Title", 8f);
+            HudControls.Size(title.gameObject, Inner, -1f);
+            HudControls.Label(title, "Title", "CAMERA UTILITIES", Text, Color.white, TextAlignmentOptions.MidlineLeft);
+            HudControls.Flexible(title);
+            _camHeight = HudControls.Label(title, "Height", "", Text, HudControls.TextDim, TextAlignmentOptions.MidlineRight);
+
+            Heading(rect, "SHOW STRATEGIC ICONS");
+            var modes = HudControls.Row(rect, "Modes", 4f);
+            _show = Switch(modes, "ALWAYS", () => _cfgIcons.Value = IconMode.Show);
+            _far = Switch(modes, "WHEN FAR", () => _cfgIcons.Value = IconMode.HideWhenClose);
+            _never = Switch(modes, "NEVER", () => _cfgIcons.Value = IconMode.Hide);
+
+            _thresholdRow = HudControls.Row(rect, "Threshold", 4f);
+            HudControls.Label(_thresholdRow, "Label", "far is above", Text, HudControls.TextMid, TextAlignmentOptions.MidlineLeft, 156f);
+            HudButton.Create(_thresholdRow, "Less", "-", Step, RowH).OnClick = () => StepThreshold(-10f);
+            _threshold = HudControls.Label(_thresholdRow, "Value", "", 24f, Color.white, TextAlignmentOptions.Center, 92f);
+            HudButton.Create(_thresholdRow, "More", "+", Step, RowH).OnClick = () => StepThreshold(10f);
+
+            Heading(rect, "HIDE");
+            var ranges = HudControls.Row(rect, "Ranges", 4f);
+            _intel = Toggle(ranges, "INTEL", _cfgIntel);
+            _attack = Toggle(ranges, "ATTACK", _cfgAttack);
+            _build = Toggle(ranges, "BUILD", _cfgBuild);
+            var orders = HudControls.Row(rect, "Orders", 4f);
+            _orderLines = Toggle(orders, "ORDER LINES", _cfgOrderLines);
+            _plannedBuilds = Toggle(orders, "PLANNED BUILDS", _cfgPlannedBuilds);
+            var markers = HudControls.Row(rect, "Markers", 4f);
+            _alloySpots = Toggle(markers, "ALLOY SPOTS", _cfgAlloySpots);
+            _healthBars = Toggle(markers, "HEALTH BARS", _cfgHealthBars);
+            var ui = HudControls.Row(rect, "Game UI", 4f);
+            _gameUi = Toggle(ui, "GAME UI", _cfgGameUi);
+
+            HudControls.Cell(rect, "Gap", 0f, 2f);
+            var drawHead = HudControls.Row(rect, "Draw distance heading", 8f);
+            HudControls.Label(drawHead, "Heading", "UNIT DRAW DISTANCE", Head, HudControls.TextDim, TextAlignmentOptions.BottomLeft);
+            HudControls.Flexible(drawHead);
+            _nextMatch = HudControls.Label(drawHead, "Next match", "next match", Text, HudControls.TextDim, TextAlignmentOptions.BottomRight);
+            var draw = HudControls.Row(rect, "Draw distance", 4f);
+            HudButton.Create(draw, "Less", "-", Step, RowH).OnClick = () => StepDrawDistance(-250f);
+            _distance = HudControls.Label(draw, "Value", "", 24f, Color.white, TextAlignmentOptions.Center, 192f);
+            HudButton.Create(draw, "More", "+", Step, RowH).OnClick = () => StepDrawDistance(250f);
+            HudControls.Flexible(draw);
+            HudButton.Create(draw, "Off", "OFF", 88f, RowH).OnClick = () => _cfgDrawDistance.Value = 0f;
+
+            var reset = HudControls.Row(rect, "Reset", 4f);
+            HudButton.Create(reset, "Show everything", "SHOW EVERYTHING", 0f, RowH).Flexible().OnClick = ShowEverything;
+        }
+
+        private static void Heading(RectTransform parent, string text)
+        {
+            // A little air above each group, as the IMGUI panel had.
+            HudControls.Cell(parent, "Gap", 0f, 2f);
+            HudControls.Label(parent, "Heading", text, Head, HudControls.TextDim, TextAlignmentOptions.BottomLeft);
+        }
+
+        // Rows of switches share the panel's width evenly.
+        private static HudButton Switch(Transform row, string label, Action onClick)
+        {
+            var button = HudButton.Create(row, label, label, 0f, RowH).Flexible();
+            button.OnClick = onClick;
+            return button;
+        }
+
+        // Lit means hidden, so the on-state is the loud one.
+        private static HudButton Toggle(Transform row, string label, ConfigEntry<bool> entry) =>
+            Switch(row, label, () => entry.Value = !entry.Value);
 
         private void StepThreshold(float delta)
         {
@@ -267,64 +290,6 @@ namespace SanctuaryHud.CameraUtils
             _cfgAlloySpots.Value = false;
             _cfgHealthBars.Value = false;
             _cfgGameUi.Value = false;
-        }
-
-        /// One of a set of mutually exclusive modes. Returns true on the frame
-        /// it is picked, so the caller can commit the new mode.
-        private static bool ModeButton(string label, IconMode current, IconMode value)
-        {
-            return GUILayout.Toggle(current == value, label, _stToggle, GUILayout.Width(76)) && current != value;
-        }
-
-        private static bool Toggle(bool on, string label, params GUILayoutOption[] options)
-        {
-            return GUILayout.Toggle(on, label, _stToggle, options);
-        }
-
-        // ---- look ----------------------------------------------------------
-
-        private static readonly Color TextDim = new Color(1f, 1f, 1f, 0.5f);
-        private static readonly Color TextMid = new Color(1f, 1f, 1f, 0.78f);
-
-        private static bool _uiReady;
-        private static GUIStyle _stPanel, _stTitle, _stHead, _stBody, _stDim, _stValue, _stButton, _stToggle;
-
-        private static void EnsureUi()
-        {
-            if (_uiReady) return;
-            _uiReady = true;
-
-            _stPanel = new GUIStyle
-            {
-                normal = { background = HudImgui.Panel },
-                border = HudImgui.Border,
-                padding = new RectOffset(12, 12, 10, 12),
-            };
-            _stTitle = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
-            _stHead = new GUIStyle { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.LowerLeft, normal = { textColor = TextDim }, margin = new RectOffset(2, 2, 2, 2) };
-            _stBody = new GUIStyle { fontSize = 11, alignment = TextAnchor.MiddleLeft, normal = { textColor = TextMid }, margin = new RectOffset(2, 2, 4, 2) };
-            _stDim = new GUIStyle(_stBody) { normal = { textColor = TextDim }, alignment = TextAnchor.MiddleRight };
-            _stValue = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white }, margin = new RectOffset(2, 2, 4, 2) };
-            _stButton = new GUIStyle
-            {
-                fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
-                normal = { background = HudImgui.Button, textColor = TextMid },
-                hover = { background = HudImgui.ButtonHover, textColor = Color.white },
-                active = { background = HudImgui.ButtonHover, textColor = Color.white },
-                border = HudImgui.Border,
-                padding = new RectOffset(6, 6, 3, 3),
-                margin = new RectOffset(2, 2, 2, 2),
-                fixedHeight = 22,
-                clipping = TextClipping.Clip,
-            };
-            // Lit means hidden, so the on-state is the loud one.
-            _stToggle = new GUIStyle(_stButton)
-            {
-                onNormal = { background = HudImgui.On, textColor = HudImgui.OnText },
-                onHover = { background = HudImgui.OnHover, textColor = HudImgui.OnText },
-                onActive = { background = HudImgui.OnHover, textColor = HudImgui.OnText },
-            };
-            HudImgui.UseFont(_stTitle, _stHead, _stBody, _stDim, _stValue, _stButton, _stToggle);
         }
     }
 }

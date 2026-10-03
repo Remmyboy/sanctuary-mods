@@ -121,6 +121,96 @@ namespace SanctuaryHud
             }
         }
 
+        // ---- a canvas of the mod's own --------------------------------------------
+        //
+        // For a panel that has to outlive the game's HUD: the game's own
+        // "hide the UI" switches its whole UI manager off, canvas and all,
+        // and a replay rebuilds the scene under a rewind. A canvas of the
+        // mod's own, kept across scenes, has neither problem and still takes
+        // the event system's clicks off the map: the game only asks
+        // EventSystem.IsPointerOverGameObject, which any raycast canvas
+        // answers. It copies the game's UI scale and font whenever the game
+        // has a HUD up, so it looks and sizes the same as one on the HUD.
+
+        private static GameObject _own;
+        private static CanvasScaler _ownScaler, _gameScaler;
+        private static float _nextLook;
+
+        /// The root on a canvas of the mod's own (see above), built the first
+        /// time and kept until Destroy. Call it every frame the root is
+        /// wanted: it keeps the scale in step with the game's.
+        internal static RectTransform EnsureOwn()
+        {
+            if (_root == null)
+            {
+                try
+                {
+                    var name = typeof(HudCanvas).Assembly.GetName().Name;
+                    _own = new GameObject(name + " canvas", typeof(RectTransform));
+                    UnityEngine.Object.DontDestroyOnLoad(_own);
+                    var canvas = _own.AddComponent<Canvas>();
+                    canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                    // Over the game's HUD; its menus are stood aside for by
+                    // the owner (HudCore.MenuOpen).
+                    canvas.sortingOrder = 50;
+                    _ownScaler = _own.AddComponent<CanvasScaler>();
+                    _ownScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                    _ownScaler.scaleFactor = Screen.height / 2160f;
+                    _own.AddComponent<GraphicRaycaster>();
+
+                    var go = new GameObject(name, typeof(RectTransform));
+                    _root = (RectTransform)go.transform;
+                    _root.SetParent(_own.transform, false);
+                    _root.anchorMin = Vector2.zero;
+                    _root.anchorMax = Vector2.one;
+                    _root.offsetMin = Vector2.zero;
+                    _root.offsetMax = Vector2.zero;
+                    var holder = new GameObject("Holder", typeof(RectTransform));
+                    holder.SetActive(false);
+                    holder.transform.SetParent(_root, false);
+                    _holder = holder.transform;
+                    _canvas = canvas;
+                    _log?.LogInfo("HUD canvas: root on a canvas of its own.");
+                }
+                catch (Exception e)
+                {
+                    _log?.LogWarning($"HUD canvas of its own could not be built ({e.Message}).");
+                    Destroy();
+                    return null;
+                }
+            }
+            FollowGame();
+            return _root;
+        }
+
+        // The game's UI scale is screen height over 2160 times its UI Scale
+        // setting, which the game's manager writes to its canvas scalers; a
+        // scaler keeps the value with its object switched off. The font is
+        // taken the first time a HUD is there to take it from.
+        private static void FollowGame()
+        {
+            if (_own == null) return;
+            if (_gameScaler == null && Time.realtimeSinceStartup >= _nextLook)
+            {
+                _nextLook = Time.realtimeSinceStartup + 1f;
+                try
+                {
+                    var ui = SanctuaryUIManager.Instance;
+                    if (ui != null)
+                    {
+                        _gameScaler = ui.GetComponentInChildren<CanvasScaler>(true);
+                        if (_font == null) TakeFont(ui.GetComponentInChildren<TMP_Text>(true));
+                    }
+                }
+                catch
+                {
+                    _gameScaler = null;
+                }
+            }
+            var scale = _gameScaler != null && _gameScaler.scaleFactor > 0f ? _gameScaler.scaleFactor : Screen.height / 2160f;
+            if (_ownScaler != null && !Mathf.Approximately(_ownScaler.scaleFactor, scale)) _ownScaler.scaleFactor = scale;
+        }
+
         /// Gives a GameObject its own nested canvas, so changes under it are
         /// re-batched on their own rather than with everything around it, and
         /// the raycaster a nested canvas needs to take clicks. It draws in the
@@ -145,6 +235,10 @@ namespace SanctuaryHud
         internal static void Destroy()
         {
             if (_root != null) UnityEngine.Object.Destroy(_root.gameObject);
+            if (_own != null) UnityEngine.Object.Destroy(_own);
+            _own = null;
+            _ownScaler = null;
+            _gameScaler = null;
             _canvas = null;
             _root = null;
             _holder = null;
