@@ -2027,14 +2027,15 @@ namespace SanctuaryHud
         /// menu, or a front-end screen such as settings or the Mods page. The
         /// game's own HUD and map labels sit beneath those; IMGUI draws over
         /// everything, so a mod's panels have to step aside instead.
-        internal static bool MenuOpen()
+        /// countResult: whether the end-of-match result screen counts.
+        internal static bool MenuOpen(bool countResult = true)
         {
             try
             {
                 var ui = SanctuaryUI.SanctuaryUIManager.Instance;
                 // The end-of-match result screen counts too: the game's own
                 // HUD is done by then, so the mods' panels should be as well.
-                if (ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.GameResult, out var result) && result.IsVisible) return true;
+                if (countResult && ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.GameResult, out var result) && result.IsVisible) return true;
                 // InterfaceManager.TransitionTo turns this backdrop on for
                 // every screen except None, and None is what a match runs
                 // under. Since 0.0.1.20 that includes the pause menu, which

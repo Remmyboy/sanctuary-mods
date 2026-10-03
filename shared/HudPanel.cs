@@ -38,6 +38,9 @@ namespace SanctuaryHud
         internal bool Alive => _rect != null;
         internal bool Showing => _rect != null && _rect.gameObject.activeSelf;
         internal bool RightAligned => _rightAligned;
+        /// Hang from the left edge wherever the panel is, so its resize grip
+        /// stays bottom-right: for a panel whose width hardly changes.
+        internal bool HangLeft = false;   // set by the panels that want it
         /// True while the mouse is dragging the panel.
         internal bool Dragging => _drag != null && _drag.Dragging;
         /// True while the mouse is resizing the panel by its grip.
@@ -160,7 +163,7 @@ namespace SanctuaryHud
             if (!dragged && _rightAligned && _lastWidth > 0f) x += _lastWidth - width;
             _lastWidth = width;
             var centre = x + width / 2f;
-            var right = centre > size.x / 2f;
+            var right = !HangLeft && centre > size.x / 2f;
             if (right != _rightAligned)
             {
                 _rightAligned = right;
