@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.5.1";
+        public const string Version = "1.6.0";
 
         private static ManualLogSource _log;
 
@@ -136,8 +136,11 @@ namespace Sanctuary.ModApi
             // Mods are hot: added, edited and removed folders are seen within
             // a couple of seconds. Only folders whose files changed are hashed
             // again. A running match keeps the files it started with.
+            // In a match the files it started with are the ones it keeps, so
+            // the catalog only feeds the Mods page there: looked at far less
+            // often than in the menus, where a new mod should show at once.
             _scanAccum += UnityEngine.Time.unscaledDeltaTime;
-            if (_scanAccum >= 2f)
+            if (_scanAccum >= (ModLua.Ready ? 15f : 2f))
             {
                 _scanAccum = 0f;
                 try { ModCatalog.Rescan(); }
@@ -149,6 +152,9 @@ namespace Sanctuary.ModApi
 
             // Gameplay mods' Lua panels (modapi/ui.lua).
             ModUi.Tick();
+
+            // Gameplay mods' replay notes (modapi/replay.lua).
+            Replays.Tick();
         }
     }
 }

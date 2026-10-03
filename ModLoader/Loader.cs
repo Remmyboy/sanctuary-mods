@@ -82,6 +82,12 @@ namespace SanctuaryModLoader
         private readonly HashSet<string> _skippedLibraries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _deferredLogged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private float _pollAccum;
+        /// The DLLs found by the last search of the folder. Each second only
+        /// these are checked for changes; the whole folder (hundreds of files,
+        /// mostly Lua) is searched for new ones every few seconds.
+        private List<string> _knownDlls;
+        private float _discoverAccum;
+        private const float DiscoverEvery = 5f;
 
         private void Awake()
         {
@@ -105,6 +111,7 @@ namespace SanctuaryModLoader
             }
 
             _pollAccum += Time.unscaledDeltaTime;
+            _discoverAccum += Time.unscaledDeltaTime;
             if (_pollAccum < 1f) return;
             _pollAccum = 0f;
             LoadChanged(force: false);
@@ -176,14 +183,23 @@ namespace SanctuaryModLoader
             if (!Directory.Exists(_modsDir)) return;
 
             // One folder per mod is the convention, but a DLL dropped anywhere
-            // under SanctuaryMods is picked up — no silent no-shows.
-            var onDisk = new List<string>();
-            foreach (var path in Directory.GetFiles(_modsDir, "*.dll", SearchOption.AllDirectories))
+            // under SanctuaryMods is picked up — no silent no-shows. Between
+            // searches, the DLLs already known are checked; one that has gone
+            // drops out at once.
+            List<string> onDisk;
+            if (force || _knownDlls == null || _discoverAccum >= DiscoverEvery)
             {
-                if (!IsLibrary(path)) { onDisk.Add(path); continue; }
-                if (_skippedLibraries.Add(path))
-                    Logger.LogWarning($"{path.Substring(_modsDir.Length).TrimStart('\\')}: a library the game already has; not loaded. Mods reference it, they don't ship it.");
+                _discoverAccum = 0f;
+                onDisk = new List<string>();
+                foreach (var path in Directory.GetFiles(_modsDir, "*.dll", SearchOption.AllDirectories))
+                {
+                    if (!IsLibrary(path)) { onDisk.Add(path); continue; }
+                    if (_skippedLibraries.Add(path))
+                        Logger.LogWarning($"{path.Substring(_modsDir.Length).TrimStart('\\')}: a library the game already has; not loaded. Mods reference it, they don't ship it.");
+                }
+                _knownDlls = new List<string>(onDisk);
             }
+            else onDisk = _knownDlls.Where(File.Exists).ToList();
 
             var frozen = GameplayFrozen();
 

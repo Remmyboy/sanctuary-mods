@@ -61,8 +61,10 @@ has no release of its own yet; build it from source if you need it.
 - **Economy strip** across the top: alloy on the left, energy on the right,
   each showing current storage, gross income, gross spend and net per second,
   over a capacity bar that lengthens with your storage and reddens as the store
-  heads for empty. `STALL −N/s` appears when a resource can't pay for what is
-  queued. Source: Harmony postfix on `SanctuaryUI.EconomyPanelUI`, the C#
+  heads for empty. `BUILD SPEED N%` appears when a resource can't pay for what
+  is queued (what it can pay over what is asked for, which is how fast every
+  build now goes), and `WASTING N/s` when a full store earns more than it
+  spends. Source: Harmony postfix on `SanctuaryUI.EconomyPanelUI`, the C#
   receiver of Lua's `Engine.UI_SetEconomyValues`.
 
   While a resource is stalling, its spend figure is what your queue is
@@ -609,8 +611,16 @@ comes up, the HUD logs the result panel's object tree.
 ### QoL
 
 Everything here lives in the **QoL** section of the Mods page and is **off by
-default**, except the queue right-click fix below; the factory queue drag
-above (`ReorderQueueByDragging`) is there too.
+default**, except the queue right-click fix and the commander delete check
+below; the factory queue drag above (`ReorderQueueByDragging`) is there too.
+
+**Deleting your commander asks first** (`ConfirmCommanderDelete`, **on** by
+default). Delete (or Ctrl-Delete) with your commander in the selection opens a
+popup — blow it up or cancel — instead of the commander going at once;
+pressing Delete again confirms, and it cancels itself after 8 seconds. Any
+selection without the commander deletes as before. It swaps the two delete
+functions on `client/simpleEvents.lua` for ones that hold the order while the
+popup is up, then send the game's own order for the same units.
 
 **Right-clicking a queue item takes from that item** (`QueueRightClickTakesClickedItem`,
 **on** by default, as it fixes the game). Factories start with repeat build on,

@@ -230,27 +230,53 @@ namespace SanctuaryHud
             var raw = GetLuaGlobal("__SdbMmData");
             if (raw == null) return;
 
+            // Read in place: every field is a whole number, and splitting the
+            // text made an array and six strings per unit, several times a
+            // second.
             var list = new List<Contact>(raw.Length / 14 + 1);
-            foreach (var entry in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            var i = 0;
+            while (i < raw.Length)
             {
-                var f = entry.Split(',');
-                if (f.Length < 6) continue;
-                if (!int.TryParse(f[0], NumberStyles.Integer, Inv, out var army) ||
-                    !float.TryParse(f[1], NumberStyles.Float, Inv, out var x) ||
-                    !float.TryParse(f[2], NumberStyles.Float, Inv, out var z) ||
-                    !int.TryParse(f[3], NumberStyles.Integer, Inv, out var ordinal)) continue;
-                float.TryParse(f[5], NumberStyles.Float, Inv, out var visionRadius);
+                int army = 0, x = 0, z = 0, ordinal = 0, seen = 0, visionRadius = 0;
+                var ok = NextInt(raw, ref i, out army) && Comma(raw, ref i)
+                    && NextInt(raw, ref i, out x) && Comma(raw, ref i)
+                    && NextInt(raw, ref i, out z) && Comma(raw, ref i)
+                    && NextInt(raw, ref i, out ordinal) && Comma(raw, ref i)
+                    && NextInt(raw, ref i, out seen) && Comma(raw, ref i)
+                    && NextInt(raw, ref i, out visionRadius);
+                while (i < raw.Length && raw[i] != ';') i++;
+                i++;
+                if (!ok) continue;
                 list.Add(new Contact
                 {
                     X = x,
                     Z = z,
                     Army = army,
                     Icon = ordinal >= 1 && ordinal <= icons.Length ? icons[ordinal - 1] : -1,
-                    Seen = f[4] == "1",
+                    Seen = seen == 1,
                     VisionRadius = visionRadius,
                 });
             }
             Live = list;
+        }
+
+        /// A whole number at s[i], moving i past it.
+        private static bool NextInt(string s, ref int i, out int value)
+        {
+            value = 0;
+            var negative = i < s.Length && s[i] == '-';
+            if (negative) i++;
+            var start = i;
+            while (i < s.Length && s[i] >= '0' && s[i] <= '9') value = value * 10 + (s[i++] - '0');
+            if (negative) value = -value;
+            return i > start;
+        }
+
+        private static bool Comma(string s, ref int i)
+        {
+            if (i >= s.Length || s[i] != ',') return false;
+            i++;
+            return true;
         }
 
         /// Turns this pass's distinct icon names into atlas indices, in the

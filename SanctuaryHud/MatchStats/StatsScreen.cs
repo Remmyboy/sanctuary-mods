@@ -41,7 +41,6 @@ namespace SanctuaryHud
         private static readonly Color TextColour = new Color(1f, 1f, 1f, 0.92f);
         private static readonly Color DimText = new Color(1f, 1f, 1f, 0.55f);
         private static readonly Color HeadText = new Color(1f, 1f, 1f, 0.5f);
-        private static readonly Color WindowColour = new Color(0.07f, 0.1f, 0.13f, 0.97f);
 
         private readonly RectTransform _root;
         private readonly GameObject _overlay;
@@ -123,14 +122,18 @@ namespace SanctuaryHud
             Stretch(dim.rectTransform);
             _overlay = dim.gameObject;
 
-            var window = HudCanvas.Fill(dim.transform, "Window", WindowColour);
+            var window = HudCanvas.Fill(dim.transform, "Window", Color.white);
             window.raycastTarget = true;
+            HudStyle.Dress(window);
             _window = window.rectTransform;
             _window.anchorMin = _window.anchorMax = new Vector2(0.5f, 0.5f);
             _window.pivot = new Vector2(0.5f, 0.5f);
             var accent = AccentColour;
             accent.a = 0.7f;
-            HudCanvas.StretchAlongTop(HudCanvas.Fill(_window, "Accent", accent).rectTransform, 3f);
+            var top = HudCanvas.Fill(_window, "Accent", accent).rectTransform;
+            HudCanvas.StretchAlongTop(top, 3f);
+            top.offsetMin = new Vector2(HudStyle.CornerInset, -3f);
+            top.offsetMax = new Vector2(-HudStyle.CornerInset, 0f);
 
             _title = HudCanvas.Text(_window, "Title", 46f, AccentColour, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
             HudCanvas.SetText(_title, "MATCH STATS");
@@ -174,7 +177,8 @@ namespace SanctuaryHud
             Stretch(_empty.rectTransform);
             HudCanvas.SetText(_empty, "Nothing was recorded for this match.");
 
-            var tip = HudCanvas.Fill(_window, "Readout", new Color(0.05f, 0.07f, 0.09f, 0.95f));
+            var tip = HudCanvas.Fill(_window, "Readout", Color.white);
+            HudStyle.Dress(tip, 0.6f);
             _tip = tip.rectTransform;
             _tip.anchorMin = _tip.anchorMax = new Vector2(0f, 1f);
             _tip.pivot = new Vector2(0f, 1f);

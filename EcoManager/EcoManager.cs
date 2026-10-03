@@ -218,6 +218,8 @@ namespace SanctuaryHud
             _extractorRows.Clear();
 
             _build = HudPanel.Create(root, "Eco manager: build", () => _cfgLocked.Value);
+            _filledBuild = default;
+            _filledExtractors = default;
             _build.EnableResize(0.5f, 2.5f);
             var heads = _build.Row("Headings", 6f);
             _alloyHead = MakeHead(heads, "alloy", "ALLOY", AlloyColour);
@@ -310,9 +312,18 @@ namespace SanctuaryHud
 
         // ---- the BUILD panel ------------------------------------------------
 
+        /// What each panel was last filled from. Its groups are new lists each
+        /// poll (once a second), so refilling every frame from the same ones,
+        /// sorting and summing them each time, only cost time and garbage.
+        private (object groups, int rows, bool tips, bool pauses, int paused) _filledBuild;
+        private (object tiers, object upgrading, string status, bool tips) _filledExtractors;
+
         private void FillBuild()
         {
             var groups = _buildGroups;
+            var key = ((object)groups, _cfgBuildRows.Value, _cfgTooltips.Value, _cfgRightClickPauses.Value, _pauseVersion);
+            if (_filledBuild.Equals(key)) return;
+            _filledBuild = key;
 
             // A column per resource, each headed by its total, each sorted
             // by its own spend so the top tile is the biggest.
@@ -386,6 +397,9 @@ namespace SanctuaryHud
                 tiers = _alloyGroups;
                 upgrading = _alloyUpgradingGroups;
             }
+            var key = ((object)tiers, (object)upgrading, _pollStatus, _cfgTooltips.Value);
+            if (_filledExtractors.Equals(key)) return;
+            _filledExtractors = key;
             var status = _pollStatus != "ok" ? _pollStatus : "";
             HudCanvas.SetText(_extractorStatus, status);
             if (_extractorStatus.gameObject.activeSelf != status.Length > 0) _extractorStatus.gameObject.SetActive(status.Length > 0);

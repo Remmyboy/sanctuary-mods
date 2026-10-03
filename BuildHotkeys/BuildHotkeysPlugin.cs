@@ -192,7 +192,14 @@ namespace SanctuaryHud
             Logger.LogInfo($"Build Hotkeys loaded with {Roles.All.Count} roles (configure them from the F8 mod manager).");
         }
 
-        private void OnDestroy() => Remove();
+        private void OnDestroy()
+        {
+            Remove();
+            // A hot reload leaves the old assembly loaded; its strip and canvas
+            // root go with it.
+            _strip.Destroy();
+            HudCanvas.Destroy();
+        }
 
         /// One setting per game hotkey, defaulting to the keys the game ships
         /// it on, so the box shows what the key is today.
@@ -337,141 +344,15 @@ namespace SanctuaryHud
             return pending;
         }
 
-        /// How much of the next entry leans into view past the band edge.
-        private const float PeekFraction = 0.45f;
-
-        private GUIStyle _stCycleTier, _stCycleCaption;
-
-        /// Shows what the last press actually picked and the rest of that key's
-        /// cycle, as a strip of the same art the build menu uses: the live one
-        /// lit, the others faded, left to right in the order further presses
-        /// reach them. Drawn, never interactive — no GUI.Window or Button, so
-        /// it cannot swallow a click meant for the battlefield underneath.
-        private void OnGUI()
-        {
-            if (!_cfgOverlay.Value || _cycleNames == null || _cycleNames.Length == 0) return;
-            if (Time.unscaledTime - _cycleAt > Mathf.Max(0.2f, _cfgOverlaySeconds.Value)) return;
-
-            EnsureStyles();
-            if (_stCycleTier == null)
-            {
-                _stCycleTier = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 1f, 1f, 0.45f) } };
-                _stCycleCaption = new GUIStyle { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-            }
-
-            var scale = Screen.height / 1080f;
-            var previousMatrix = GUI.matrix;
-            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
-
-            var icon = Mathf.Clamp(_cfgOverlayIcon.Value, 16f, 256f);
-            var captioned = _cfgOverlayNames.Value;
-            const float cellPad = 6f, padX = 8f, padY = 8f, chipW = 26f, captionH = 22f;
-
-            var total = _cycleNames.Length;
-            var liveIndex = Mathf.Clamp(_cycleIndex - 1, 0, total - 1);
-
-            // A short cycle is shown whole — point defence is one entry per
-            // tier, and banding that would leave a single icon on screen.
-            // Only once the cycle outgrows the cap does it show a tier at a
-            // time: a T3 engineer's factory key is nine entries with naval in,
-            // which at this icon size would span the screen. The candidate list
-            // is sorted by tier, so a band is the contiguous run around the
-            // live entry sharing its tier — and that, rather than a fixed block
-            // of N, is the grouping that reads right, since a block would
-            // straddle two tiers whenever a faction lacks a domain at one.
-            var cap = Mathf.Max(1, _cfgOverlayMax.Value);
-            int first = 0, last = total - 1;
-            if (total > cap)
-            {
-                first = last = liveIndex;
-                if (_cycleTiers != null && _cycleTiers.Length == total)
-                {
-                    var tier = _cycleTiers[liveIndex];
-                    while (first > 0 && _cycleTiers[first - 1] == tier) first--;
-                    while (last < total - 1 && _cycleTiers[last + 1] == tier) last++;
-                }
-                if (last - first + 1 > cap)
-                {
-                    first = Mathf.Clamp(liveIndex - cap / 2, first, last - cap + 1);
-                    last = first + cap - 1;
-                }
-            }
-            var shown = last - first + 1;
-            var hidden = total - shown;
-
-            // Rather than count what is left, let the next entry run off the
-            // edge: half an icon says "there is more" without asking anyone to
-            // read a number. Only forwards, and only when there really is a
-            // next one — no peek on the final band is itself the signal that
-            // the cycle ends there.
-            var peek = last < total - 1;
-
-            // The key itself is not worth a column — you just pressed it. Only
-            // the tier earns the space, and only while banding is hiding the
-            // rest of the cycle; with the whole thing on screen the label would
-            // read as applying to a strip that spans tiers.
-            var banded = hidden > 0 && _cycleTiers != null && _cycleTiers.Length == total;
-            var chip = banded ? chipW : 0f;
-
-            var cellW = icon + cellPad * 2f;
-            var cellH = icon + cellPad * 2f;
-            var width = padX * 2f + chip + cellW * shown + (peek ? cellW * PeekFraction : 0f);
-            var height = padY * 2f + cellH + (captioned ? captionH : 0f);
-
-            var x = Mathf.Round((Screen.width / scale - width) * 0.5f);
-            var y = _cfgOverlayY.Value;
-
-            GUI.DrawTexture(new Rect(x, y, width, height), _texPanel);
-            var previousColour = GUI.color;
-
-            if (banded)
-                GUI.Label(new Rect(x + padX, y + padY, chipW, cellH),
-                    "T" + _cycleTiers[liveIndex], _stCycleTier);
-
-            for (var i = first; i <= last; i++)
-            {
-                var cellX = x + padX + chip + (i - first) * cellW;
-                var cellY = y + padY;
-                var live = i == liveIndex;
-
-                if (live)
-                {
-                    GUI.DrawTexture(new Rect(cellX, cellY, cellW, cellH), _texRowHover);
-                    GUI.DrawTexture(new Rect(cellX, cellY + cellH - 3f, cellW, 3f), _texWhite);
-                }
-
-                // Options not landed on are faded, so the live one reads at a
-                // glance without having to hunt for the highlight.
-                GUI.color = live ? Color.white : new Color(1f, 1f, 1f, 0.3f);
-                var art = new Rect(cellX + cellPad, cellY + cellPad, icon, icon);
-                if (_cycleBgs != null && i < _cycleBgs.Length) DrawSprite(art, _cycleBgs[i]);
-                if (_cycleIcons != null && i < _cycleIcons.Length) DrawSprite(art, _cycleIcons[i]);
-                GUI.color = previousColour;
-            }
-
-            // The next entry, cut off mid-icon: the cycle carries on past this
-            // band, so a key that looks like it has three options does not read
-            // as the whole story.
-            if (peek && _cycleIcons != null && last + 1 < _cycleIcons.Length)
-            {
-                var peekX = x + padX + chip + shown * cellW;
-                GUI.color = new Color(1f, 1f, 1f, 0.18f);
-                var peekArt = new Rect(peekX + cellPad, y + padY + cellPad, icon * PeekFraction, icon);
-                if (_cycleBgs != null && last + 1 < _cycleBgs.Length)
-                    DrawSprite(peekArt, _cycleBgs[last + 1], PeekFraction);
-                DrawSprite(peekArt, _cycleIcons[last + 1], PeekFraction);
-                GUI.color = previousColour;
-            }
-
-            if (captioned)
-                GUI.Label(new Rect(x, y + height - captionH - 3f, width, captionH),
-                    _cycleNames[liveIndex], _stCycleCaption);
-
-            GUI.matrix = previousMatrix;
-        }
+        /// What the last press picked and the rest of that key's cycle, on
+        /// the HUD canvas (CycleStrip.cs).
+        private readonly CycleStrip _strip = new CycleStrip();
 
         private void Update()
         {
+            _strip.Sync(_cfgOverlay.Value, _cycleNames, _cycleIcons, _cycleBgs, _cycleTiers, _cycleIndex,
+                Time.unscaledTime - _cycleAt, Mathf.Max(0.2f, _cfgOverlaySeconds.Value), _cfgOverlayIcon.Value,
+                _cfgOverlayMax.Value, _cfgOverlayNames.Value, _cfgOverlayY.Value);
             PushSnap();
             PushMenuOpen();
             ReleaseStuckModifiers();

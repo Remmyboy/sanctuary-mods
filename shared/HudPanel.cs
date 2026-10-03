@@ -247,6 +247,9 @@ namespace SanctuaryHud
                 var accent = AccentColour;
                 accent.a = Rest;
                 var image = HudCanvas.Fill(parent, "Resize grip", accent);
+                // Diagonal strokes in the corner, the usual sign for "drag to
+                // resize"; the whole square still takes the drag.
+                image.sprite = HudStyle.Icon("grip");
                 image.raycastTarget = true;
                 image.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
                 var grip = image.gameObject.AddComponent<PanelGrip>();
@@ -268,6 +271,9 @@ namespace SanctuaryHud
                 var rt = (RectTransform)transform;
                 rt.anchorMin = rt.anchorMax = rt.pivot = corner;
                 rt.sizeDelta = new Vector2(side, side);
+                // The strokes are drawn for the bottom-right: mirrored into the
+                // corner this one hangs in.
+                rt.localScale = new Vector3(corner.x < 0.5f ? -1f : 1f, corner.y > 0.5f ? -1f : 1f, 1f);
                 rt.anchoredPosition = Vector2.zero;
                 if (rt.GetSiblingIndex() != rt.parent.childCount - 1) rt.SetAsLastSibling();
             }
@@ -397,6 +403,8 @@ namespace SanctuaryHud
             layout.minWidth = Width;
             layout.minHeight = Height;
             var tile = go.AddComponent<PanelTile>();
+            // The HUD's hover glow, on the tiles a click does something on.
+            HoverGlow.Add(go).When = () => tile.OnClick != null;
 
             // The art sits a little below the top edge, where the figure and
             // the progress bar go.
@@ -592,7 +600,10 @@ namespace SanctuaryHud
             group.childControlHeight = true;
             group.childForceExpandWidth = true;
             group.childForceExpandHeight = false;
-            heading._hover = HudCanvas.Fill(go.transform, "Hover", new Color(1f, 1f, 1f, 0.12f));
+            // The HUD's hover in a heading's shape: a rounded wash of the accent.
+            heading._hover = HudCanvas.Fill(go.transform, "Hover", new Color(AccentColour.r, AccentColour.g, AccentColour.b, 0.22f));
+            heading._hover.sprite = HudStyle.Shade;
+            heading._hover.type = Image.Type.Sliced;
             heading._hover.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
             var hrt = heading._hover.rectTransform;
             hrt.anchorMin = Vector2.zero;

@@ -283,7 +283,6 @@ namespace SanctuaryHud.CameraUtils
 
         // ---- look ----------------------------------------------------------
 
-        private static readonly Color Accent = new Color(0.95f, 0.55f, 0.2f, 0.95f);
         private static readonly Color TextDim = new Color(1f, 1f, 1f, 0.5f);
         private static readonly Color TextMid = new Color(1f, 1f, 1f, 0.78f);
 
@@ -297,7 +296,8 @@ namespace SanctuaryHud.CameraUtils
 
             _stPanel = new GUIStyle
             {
-                normal = { background = Tex(new Color(0.04f, 0.06f, 0.08f, 0.88f)) },
+                normal = { background = HudImgui.Panel },
+                border = HudImgui.Border,
                 padding = new RectOffset(12, 12, 10, 12),
             };
             _stTitle = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
@@ -308,9 +308,10 @@ namespace SanctuaryHud.CameraUtils
             _stButton = new GUIStyle
             {
                 fontSize = 11, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
-                normal = { background = Tex(new Color(1f, 1f, 1f, 0.09f)), textColor = TextMid },
-                hover = { background = Tex(new Color(1f, 1f, 1f, 0.17f)), textColor = Color.white },
-                active = { background = Tex(new Color(1f, 1f, 1f, 0.17f)), textColor = Color.white },
+                normal = { background = HudImgui.Button, textColor = TextMid },
+                hover = { background = HudImgui.ButtonHover, textColor = Color.white },
+                active = { background = HudImgui.ButtonHover, textColor = Color.white },
+                border = HudImgui.Border,
                 padding = new RectOffset(6, 6, 3, 3),
                 margin = new RectOffset(2, 2, 2, 2),
                 fixedHeight = 22,
@@ -319,18 +320,11 @@ namespace SanctuaryHud.CameraUtils
             // Lit means hidden, so the on-state is the loud one.
             _stToggle = new GUIStyle(_stButton)
             {
-                onNormal = { background = Tex(Accent), textColor = new Color(0.08f, 0.06f, 0.04f) },
-                onHover = { background = Tex(new Color(1f, 0.65f, 0.3f, 1f)), textColor = new Color(0.08f, 0.06f, 0.04f) },
-                onActive = { background = Tex(new Color(1f, 0.65f, 0.3f, 1f)), textColor = new Color(0.08f, 0.06f, 0.04f) },
+                onNormal = { background = HudImgui.On, textColor = HudImgui.OnText },
+                onHover = { background = HudImgui.OnHover, textColor = HudImgui.OnText },
+                onActive = { background = HudImgui.OnHover, textColor = HudImgui.OnText },
             };
-        }
-
-        private static Texture2D Tex(Color colour)
-        {
-            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
-            tex.SetPixel(0, 0, colour);
-            tex.Apply();
-            return tex;
+            HudImgui.UseFont(_stTitle, _stHead, _stBody, _stDim, _stValue, _stButton, _stToggle);
         }
     }
 }

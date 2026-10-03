@@ -350,6 +350,7 @@ UI.Toast("No rush", "Attacks are allowed in 10 minutes", { seconds = 6 })
 | `UI.Button(label, fn, { color, enabled, size })` | `fn(button)` runs in this player's client on a click, `button` being `"left"` or `"right"`. |
 | `UI.Row(items, { spacing })`, `UI.Column(items, { spacing })` | Elements side by side, or one above another. |
 | `UI.Rule()`, `UI.Space(size)`, `UI.Swatch(color, size)` | A line across the panel, empty space, a square of colour. |
+| `UI.Fill()` | Stretchy space in a row: what comes after it lines up on the right, and rows with one line up with each other (Mod API 1.6). |
 | `UI.Toast(title, text, { seconds, color })` | A notice across the top of the screen for a few seconds. |
 
 Sizes are in canvas units: text is 20 by default, and the game's build-menu
@@ -372,6 +373,17 @@ call.
 `modapi/ui.lua` is only put in place for matches where a picked mod's Lua
 names it, so mods that don't draw panels run with exactly the files they did
 before. It needs Mod API 1.5.0 or later.
+
+**Replays of secrets.** A player's replay shows that player's panel as it
+was, so a mod that keeps things from each player (hidden roles) can't show
+them in its replays on its own. `modapi/replay.lua` (Mod API 1.6) lets each
+client keep notes beside its replay: once the match is over and nothing is
+secret, send everyone the full story from the host, save it with
+`Replay.Note(key, data)` in the client, and in a replay read it back with
+`Replay.Get(key)`, which has it from the start. `Replay.Playing()` says
+whether this is a replay. Key notes by your mod's id and keep them small (a
+few KB of plain tables). [`PhantomX`](../PhantomX/lua/phantomx/client.lua)
+does this to show every player's role in its replays.
 
 ## Gameplay Lua
 

@@ -31,6 +31,8 @@ namespace SanctuaryHud
             public bool JumpToCommander;
             /// A white card with dark type instead of the strip's dark panel.
             public bool Light;
+            /// Whether its arrival has been marked with a sweep of light.
+            public bool Swept;
         }
 
         private static readonly List<Toast> _toasts = new List<Toast>();
@@ -548,7 +550,8 @@ namespace SanctuaryHud
         // ---- the toasts on the canvas ----------------------------------------------
         //
         // Stacked top-centre just under the strip; newest on top. Fades in
-        // fast and out over the last second. Clicking a commander toast is
+        // fast, settling from slightly small with a light sweeping across it
+        // once, and fades out over the last second. Clicking a commander toast is
         // the same as clicking the widget. Each toast is a card of the
         // strip's colour (or a white card with dark type) with a bar of the
         // alert's colour down its left edge and along its bottom.
@@ -585,7 +588,7 @@ namespace SanctuaryHud
                     var t = _toasts[i];
                     var age = now - t.Shown;
                     var left = t.Expires - now;
-                    view.Set(t, Mathf.Clamp01(age / 0.15f) * Mathf.Clamp01(left / 1f));
+                    view.Set(t, Mathf.Clamp01(age / 0.15f) * Mathf.Clamp01(left / 1f), age);
                 }
                 for (var i = _toasts.Count; i < _views.Count; i++)
                     if (_views[i].gameObject.activeSelf) _views[i].gameObject.SetActive(false);
@@ -624,11 +627,13 @@ namespace SanctuaryHud
             private CanvasGroup _group;
             private Image _card, _bar, _line;
             private TMP_Text _text;
+            private Sweep _sweep;
 
             internal static ToastView Create(Transform parent)
             {
                 var card = HudCanvas.Fill(parent, "Toast", PanelColour);
                 card.raycastTarget = true;
+                HudStyle.Dress(card);
                 var go = card.gameObject;
                 var view = go.AddComponent<ToastView>();
                 view._card = card;
@@ -655,14 +660,25 @@ namespace SanctuaryHud
                 view._line = HudCanvas.Fill(go.transform, "Line", Color.white);
                 view._line.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
                 HudCanvas.StretchAlongBottom(view._line.rectTransform, 2f);
+                view._sweep = Sweep.Add(card.rectTransform);
                 return view;
             }
 
-            internal void Set(Toast toast, float alpha)
+            internal void Set(Toast toast, float alpha, float age)
             {
                 _toast = toast;
                 _group.alpha = alpha;
-                _card.color = toast.Light ? new Color(0.95f, 0.96f, 0.97f, 0.95f) : PanelColour;
+                // Arriving: from 92% size to full with a slight overshoot,
+                // which the stack's layout leaves alone.
+                var size = age < 0.3f ? Mathf.LerpUnclamped(0.92f, 1f, HudStyle.Overshoot(age / 0.3f)) : 1f;
+                transform.localScale = new Vector3(size, size, 1f);
+                if (!toast.Swept)
+                {
+                    toast.Swept = true;
+                    _sweep.Play();
+                }
+                _card.color = toast.Light ? new Color(0.95f, 0.96f, 0.97f, 0.95f) : HudStyle.PlateTint;
+                _card.sprite = toast.Light ? HudStyle.ShadeLight : HudStyle.Shade;
                 _bar.color = toast.Colour;
                 _line.color = toast.Colour;
                 // Dark type on a light card; on the dark panel, the alert's

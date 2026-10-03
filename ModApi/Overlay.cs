@@ -350,11 +350,13 @@ namespace Sanctuary.ModApi
         private static byte[] EventsLua() => Resource("modapi.events.lua");
 
         internal const string UiPath = "modapi/ui.lua";
+        internal const string ReplayPath = "modapi/replay.lua";
 
-        /// Whether any picked mod's Lua names the UI file. It only goes in
-        /// for those, so a match whose mods don't draw panels has the same
-        /// files (and Lua hash, and replays) as before the UI existed.
-        private static bool UsesUi(IList<ModInfo> mods)
+        /// Whether any picked mod's Lua names one of the framework's optional
+        /// files (the UI, replay notes). Each only goes in for those, so a
+        /// match whose mods don't use it has the same files (and Lua hash, and
+        /// replays) as before it existed.
+        private static bool Uses(IList<ModInfo> mods, string path)
         {
             foreach (var mod in mods)
                 foreach (var rel in mod.OverlayFiles)
@@ -365,7 +367,7 @@ namespace Sanctuary.ModApi
                     var onDisk = prefix != null && rel.StartsWith(prefix, StringComparison.Ordinal) ? rel.Substring(prefix.Length) : rel;
                     try
                     {
-                        if (File.ReadAllText(Path.Combine(mod.LuaRootPath, onDisk)).Contains(UiPath)) return true;
+                        if (File.ReadAllText(Path.Combine(mod.LuaRootPath, onDisk)).Contains(path)) return true;
                     }
                     catch { }
                 }
@@ -501,9 +503,14 @@ namespace Sanctuary.ModApi
             {
                 PutFile(cache, EventsPath.Replace('/', '\\'), EventsLua());
                 count++;
-                if (UsesUi(mods))
+                if (Uses(mods, UiPath))
                 {
                     PutFile(cache, UiPath.Replace('/', '\\'), Resource("modapi.ui.lua"));
+                    count++;
+                }
+                if (Uses(mods, ReplayPath))
+                {
+                    PutFile(cache, ReplayPath.Replace('/', '\\'), Resource("modapi.replay.lua"));
                     count++;
                 }
                 if (AppendTo(cache, @"host\hostMain.lua", MainAppend("host", mods.Select(m => m.Manifest.HostScript).Where(s => s.Length > 0)), "Mod API host hooks")) count++;
