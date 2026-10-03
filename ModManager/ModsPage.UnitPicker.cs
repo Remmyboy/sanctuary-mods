@@ -30,8 +30,17 @@ namespace SanctuaryHud
         private string _pickerKey;
         private int _pickerVersion;
         private bool _lobbyScrollToTop;
-        // Symbol name to sprite, misses included (as null).
-        private readonly Dictionary<string, Sprite> _symbolSprites = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+        // Symbol name to its art, misses included (as null).
+        private readonly Dictionary<string, SymbolArt> _symbolArt = new Dictionary<string, SymbolArt>(StringComparer.Ordinal);
+
+        /// A strategic symbol split the way the game's UI shader reads it:
+        /// the sprite is an opaque square with the symbol in red and its glow
+        /// in green. Each becomes a white mask, so the glow can be tinted.
+        private sealed class SymbolArt
+        {
+            internal Sprite Symbol;
+            internal Sprite Glow;
+        }
 
         private const float PickerGap = 8f;
 
@@ -83,7 +92,8 @@ namespace SanctuaryHud
         private sealed class PickerBox
         {
             internal Image Back;
-            internal Image Icon;
+            internal Image Icon;   // the glow, tinted by state
+            internal Image Symbol;
             internal TMP_Text Text;
             internal Color Accent; // a header's own text colour (factions)
             internal bool IsCell;  // one unit, rather than a group header
@@ -226,7 +236,7 @@ namespace SanctuaryHud
                             foreach (var u in list)
                             {
                                 var name = u.Name.Length > 0 ? u.Name : kind;
-                                var box = Box(cell, name, SymbolSprite(u.IconSymbol), Toggle(new[] { u.Id }), rowHeight, fontSize, TextAllowed, false);
+                                var box = Box(cell, name, SymbolArtFor(u.IconSymbol), Toggle(new[] { u.Id }), rowHeight, fontSize, TextAllowed, false);
                                 box.IsCell = true;
                                 box.Back.gameObject.AddComponent<LayoutElement>().preferredHeight = rowHeight;
                                 Paint(box, new[] { u.Id }, name);
@@ -272,7 +282,7 @@ namespace SanctuaryHud
 
         /// A filled box with a label, and a symbol on its left when given
         /// one; a button when it does something.
-        private PickerBox Box(Transform parent, string text, Sprite icon, Action onClick, float height, float fontSize, Color accent, bool centred)
+        private PickerBox Box(Transform parent, string text, SymbolArt icon, Action onClick, float height, float fontSize, Color accent, bool centred)
         {
             var go = new GameObject("Box", typeof(RectTransform), typeof(Image));
             var rt = (RectTransform)go.transform;
@@ -302,18 +312,24 @@ namespace SanctuaryHud
             var iconSize = Mathf.Min(height - 2f * pad, 64f);
             if (icon != null)
             {
-                var ig = new GameObject("Symbol", typeof(RectTransform), typeof(Image));
-                var irt = (RectTransform)ig.transform;
-                irt.SetParent(rt, false);
-                irt.anchorMin = irt.anchorMax = new Vector2(0f, 0.5f);
-                irt.pivot = new Vector2(0f, 0.5f);
-                irt.sizeDelta = new Vector2(iconSize, iconSize);
-                irt.anchoredPosition = new Vector2(left, 0f);
-                box.Icon = ig.GetComponent<Image>();
-                box.Icon.sprite = icon;
-                box.Icon.preserveAspect = true;
-                box.Icon.raycastTarget = false;
-                box.Icon.color = GlowBlue;
+                Image Layer(string name, Sprite sprite, Color colour)
+                {
+                    var ig = new GameObject(name, typeof(RectTransform), typeof(Image));
+                    var irt = (RectTransform)ig.transform;
+                    irt.SetParent(rt, false);
+                    irt.anchorMin = irt.anchorMax = new Vector2(0f, 0.5f);
+                    irt.pivot = new Vector2(0f, 0.5f);
+                    irt.sizeDelta = new Vector2(iconSize, iconSize);
+                    irt.anchoredPosition = new Vector2(left, 0f);
+                    var image = ig.GetComponent<Image>();
+                    image.sprite = sprite;
+                    image.preserveAspect = true;
+                    image.raycastTarget = false;
+                    image.color = colour;
+                    return image;
+                }
+                box.Icon = Layer("Glow", icon.Glow, GlowBlue);
+                box.Symbol = Layer("Symbol", icon.Symbol, Color.white);
                 left += iconSize + pad;
             }
 
@@ -342,25 +358,76 @@ namespace SanctuaryHud
 
         /// The strategic symbol the game's UI draws for a unit
         /// (UI/Sprites/Icons/UnitSymbols), loaded from the game's data the
-        /// way its Engine.LoadSprite does, so it works in the lobby too.
-        /// Null when there's no such sprite: the cell is then text only.
-        private Sprite SymbolSprite(string symbol)
+        /// way its Engine.LoadSprite does, so it works in the lobby too, and
+        /// split into symbol and glow masks. Null when there's no such
+        /// sprite: the cell is then text only.
+        private SymbolArt SymbolArtFor(string symbol)
         {
             if (string.IsNullOrEmpty(symbol)) symbol = "none";
-            if (_symbolSprites.TryGetValue(symbol, out var cached)) return cached;
-            Sprite sprite = null;
+            if (_symbolArt.TryGetValue(symbol, out var cached)) return cached;
+            SymbolArt art = null;
             try
             {
                 var entry = Load.GetFileEntryFromPath("UI/Sprites/Icons/UnitSymbols/icon_unit_symbol_" + symbol + ".sansprite");
-                sprite = entry == null ? null : Load.LoadGamedataSprite(entry)?.GetSprite();
+                var sprite = entry == null ? null : Load.LoadGamedataSprite(entry)?.GetSprite();
                 if (sprite == null) _log.LogInfo($"Unit picker: no symbol sprite for '{symbol}'.");
+                else art = Split(sprite);
             }
             catch (Exception e)
             {
                 _log.LogWarning($"Unit picker: symbol '{symbol}' failed to load: {e.Message}");
             }
-            _symbolSprites[symbol] = sprite;
-            return sprite;
+            _symbolArt[symbol] = art;
+            return art;
+        }
+
+        /// Reads the sprite back through a render texture (the game's copy
+        /// isn't CPU-readable) and makes a white mask of each channel.
+        private static SymbolArt Split(Sprite sprite)
+        {
+            var tex = sprite.texture;
+            var r = sprite.textureRect;
+            // The game's sprites are stored upside down, with a negative
+            // rect height: read the rows they cover, then flip them back.
+            var flipped = r.height < 0f;
+            int w = Mathf.RoundToInt(Mathf.Abs(r.width)), h = Mathf.RoundToInt(Mathf.Abs(r.height));
+            float x0 = Mathf.Min(r.x, r.x + r.width), y0 = Mathf.Min(r.y, r.y + r.height);
+            if (w <= 0 || h <= 0) return null;
+            var rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            var was = RenderTexture.active;
+            Color32[] pixels;
+            try
+            {
+                Graphics.Blit(tex, rt);
+                RenderTexture.active = rt;
+                var read = new Texture2D(w, h, TextureFormat.RGBA32, false, true);
+                read.ReadPixels(new Rect(x0, y0, w, h), 0, 0);
+                read.Apply();
+                pixels = read.GetPixels32();
+                if (flipped)
+                {
+                    var rows = new Color32[pixels.Length];
+                    for (var y = 0; y < h; y++) Array.Copy(pixels, y * w, rows, (h - 1 - y) * w, w);
+                    pixels = rows;
+                }
+                UnityEngine.Object.Destroy(read);
+            }
+            finally
+            {
+                RenderTexture.active = was;
+                RenderTexture.ReleaseTemporary(rt);
+            }
+
+            Sprite Mask(Func<Color32, byte> channel)
+            {
+                var mask = new Color32[pixels.Length];
+                for (var i = 0; i < pixels.Length; i++) mask[i] = new Color32(255, 255, 255, channel(pixels[i]));
+                var t = new Texture2D(w, h, TextureFormat.RGBA32, true) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                t.SetPixels32(mask);
+                t.Apply(true, true);
+                return Sprite.Create(t, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
+            }
+            return new SymbolArt { Symbol = Mask(c => c.r), Glow = Mask(c => c.g) };
         }
     }
 }
