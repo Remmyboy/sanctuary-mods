@@ -183,10 +183,11 @@ if Options.banned[tpId] then ... end     -- units: a set, true for each picked u
 
 **Units.** A `units` option lets the host pick units from a list of every
 unit the match can build: the game's, plus those of the picked mods. In the
-lobby it shows how many are picked and a button that opens the list, by land,
-air, naval and structures, then by what the unit is ("Tier 1: Tank"). That
-row's switch picks every faction's unit of it; unfolding it shows each
-faction's own. Other players can open the same list to see the host's pick.
+lobby it shows how many are picked and a button that opens a grid per section
+(land, air, naval, structures): a column per faction, a row per kind of unit
+under its tech level, and in each cell the unit's strategic symbol and name.
+A click picks a unit; a kind's, faction's or tech level's header picks all of
+them. Other players can open the same grid to see the host's pick.
 Commanders, and units no builder can make, aren't listed. In C#,
 `options.GetUnits(key)` gives the ids. See the Unit Restrictions mod for one
 in use.

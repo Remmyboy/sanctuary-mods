@@ -1587,11 +1587,13 @@ needs a Mod Manager with Mod API 1.7.0 or later, for every player.
   Sections never take engineers or commanders, and leave factories standing
   (they still make engineers). Experimentals are every tier 4 unit and
   structure.
-- **Restricted units:** the lobby's Mods panel lists every unit the match can
-  build, by land, air, naval and structures, then by kind ("Tier 1: Tank").
-  A kind's switch restricts every faction's unit of it; unfolding it shows
-  each faction's own, to restrict one alone. Structures, factories and their
-  upgrades are listed too. Other players can open the list to see the pick.
+- **Restricted units:** the lobby's Mods panel shows every unit the match can
+  build as a grid per section (land, air, naval, structures): a column per
+  faction, a row per kind of unit under its tech level, each cell the unit's
+  strategic symbol and name. Click a unit to restrict it alone, or a kind, a
+  faction or a tech level to restrict all of it; restricted cells turn red.
+  Structures, factories and their upgrades are there too. Other players can
+  open the grid to see the pick.
 - Restricted units leave every build menu, and the host refuses them if
   anything queues or places one anyway, AI armies included.
 

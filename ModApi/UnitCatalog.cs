@@ -27,6 +27,12 @@ namespace Sanctuary.ModApi
         /// "land", "air", "naval" or "structure".
         public string Domain { get; internal set; }
         public bool Mobile { get; internal set; }
+        /// Its strategic icon: the frame ("land1", "structure2") and the
+        /// symbol in it ("direct", "aa"), as the map draws them.
+        public string IconShape { get; internal set; } = "";
+        public string IconSymbol { get; internal set; } = "";
+        /// The build menu's plate behind it: "land", "air", "water" or "amphibious".
+        public string IconUIType { get; internal set; } = "";
         public IReadOnlyCollection<string> Tags { get; internal set; } = Array.Empty<string>();
         /// The mod whose template this is; null for the game's own.
         public ModInfo Mod { get; internal set; }
@@ -105,6 +111,9 @@ namespace Sanctuary.ModApi
                     Tech = tech,
                     Domain = tags.Contains("STRUCTURE") ? "structure" : tags.Contains("AIR") ? "air" : tags.Contains("NAVAL") ? "naval" : "land",
                     Mobile = tags.Contains("MOBILE"),
+                    IconShape = tp.Shape,
+                    IconSymbol = tp.Symbol,
+                    IconUIType = tp.UIType,
                     Tags = tags,
                     Mod = mod,
                 });
@@ -130,6 +139,9 @@ namespace Sanctuary.ModApi
             internal string Name = "";
             internal string Role = "";
             internal string UpgradesTo = "";
+            internal string Shape = "";
+            internal string Symbol = "";
+            internal string UIType = "";
             internal List<string> Tags = new List<string>();
         }
 
@@ -163,6 +175,12 @@ namespace Sanctuary.ModApi
                 {
                     tp.Name = Str(general, "name");
                     tp.Role = Str(general, "displayName");
+                    tp.UIType = Str(general, "iconUIType");
+                    if (general.TryGetValue("icon", out var i) && i is Dictionary<object, object> icon)
+                    {
+                        tp.Shape = Str(icon, "shape");
+                        tp.Symbol = Str(icon, "symbol");
+                    }
                 }
                 if (root.TryGetValue("construction", out var c) && c is Dictionary<object, object> construction)
                     tp.UpgradesTo = Str(construction, "upgradesTo").ToLowerInvariant();
