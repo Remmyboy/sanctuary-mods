@@ -11,4 +11,12 @@
     <AssemblyVersion>1.4.1</AssemblyVersion>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- mod.json's "kind", read as the Mod API reads it; the game ships Newtonsoft. -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
 </Project>
