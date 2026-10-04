@@ -50,22 +50,38 @@ namespace SanctuaryHud.CameraUtils
 
         /// True while the agent is live in the client VM — so, in a match or a
         /// replay. The panel hides when it isn't.
-        internal static bool Active => _installed;
+        internal static bool Active => _live;
 
-        private static bool _installed;
+        // Every match brings a fresh Lua state, so the agent has to go back
+        // in; the hook also catches a VM swapped between two checks, and its
+        // marker is a hash of the chunk, so a hot reload with edited Lua
+        // replaces the last build's agent rather than leaving it running.
+        private static readonly LuaHook Hook = new LuaHook(AgentGlobal, "Camera Utilities render agent", InstallChunk,
+            "pcall(function() if " + AgentGlobal + " then " + AgentGlobal + ".restore() end end) " + AgentGlobal + " = nil")
+        {
+            // A fresh agent starts with everything shown: push the state again.
+            Installed = () => _pushed = null,
+        };
+
+        private static bool _live;
         private static string _pushed;
         private static float _accum;
         private static string _lastErr;
 
-        // No version constant to remember to bump: the version global carries
-        // a hash of the install chunk, so editing the chunk re-installs it
-        // over a hot reload instead of leaving the last build's agent running.
-        private static readonly string Version = "cu" + InstallTemplate.GetHashCode().ToString("x8");
-        private static string InstallChunk => InstallTemplate.Replace("@VER@", Version);
+        /// Whether a state with the health bars hidden has gone in and not been
+        /// taken back since: the scale it zeroes is engine-wide and outlives the
+        /// VM, so unloading outside a match has to put it back from here.
+        private static bool _hidBars;
+
+        // The state chunk, rebuilt only when one of its inputs moves rather
+        // than formatted and compared every frame.
+        private static string _stateChunk;
+        private static int _stateFlags = -1;
+        private static float _stateHeight, _stateBarScale;
 
         internal static void Reset()
         {
-            _installed = false;
+            _live = false;
             _pushed = null;
             CameraHeight = -1f;
             // The next match rebuilds its render prefabs from scratch, so
@@ -80,33 +96,26 @@ namespace SanctuaryHud.CameraUtils
             // into Lua here would dereference a null state natively.
             if (!LuaReady)
             {
-                if (_installed) Reset();
+                if (_live) Reset();
                 return;
             }
 
-            // Installing and reading back are on a quarter second; a change of
-            // state is not, so a click in the panel reads as instant.
+            // Reading back is on a quarter second; a change of state is not,
+            // so a click in the panel reads as instant.
             _accum += dt;
             var due = _accum >= 0.25f;
             if (due) _accum = 0f;
 
-            if (!_installed)
-            {
-                if (!due) return;
-                // Every match brings a fresh Lua state, so the agent has to go
-                // back in; a hot reload of this DLL finds it already there.
-                if (GetLuaGlobal(VersionGlobal) != Version)
-                {
-                    RunLua(InstallChunk);
-                    _pushed = null;
-                }
-                _installed = GetLuaGlobal(VersionGlobal) == Version;
-                if (!_installed) return;
-                log?.LogInfo("Camera Utilities: render agent installed in the client VM.");
-            }
+            Hook.Tick();
+            _live = Hook.Live;
+            if (!_live) return;
 
             var want = StateChunk();
-            if (want != _pushed && RunLua(want)) _pushed = want;
+            if (!ReferenceEquals(want, _pushed) && RunLua(want))
+            {
+                _pushed = want;
+                _hidBars = HideHealthBars;
+            }
 
             if (!due) return;
 
@@ -135,13 +144,34 @@ namespace SanctuaryHud.CameraUtils
         /// client exactly as the game had it.
         internal static void Uninstall()
         {
-            if (LuaReady) RunLua("pcall(function() if __CameraUtils then __CameraUtils.restore() end end)");
+            Hook.Remove();
+            RestoreBarScale();
             Reset();
+        }
+
+        /// The bar scale is an engine global that outlives the match, so a mod
+        /// switched off or unloaded on the menu with HideHealthBars on would
+        /// leave every later match without bars. With no VM to ask, set it the
+        /// way the game's own setter does. In a match the agent's restore has
+        /// already put it back and this finds it non-zero.
+        private static void RestoreBarScale()
+        {
+            if (!_hidBars) return;
+            _hidBars = false;
+            try
+            {
+                ref var rendering = ref EM.GameUtils.DebugManager.data.rendering;
+                if (rendering.progressBarScaling <= 0f) rendering.progressBarScaling = _barScale > 0f ? _barScale : 1f;
+            }
+            catch (System.Exception e)
+            {
+                _log?.LogWarning($"Camera Utilities: could not put the health bar scale back ({e.Message}); bars stay hidden until the game resets it.");
+            }
         }
 
         // ---- the Lua side --------------------------------------------------
 
-        private const string VersionGlobal = "__CameraUtilsVersion";
+        private const string AgentGlobal = "__CameraUtils";
         private const string HeightGlobal = "__CameraUtilsHeight";
         private const string ErrorGlobal = "__CameraUtilsErr";
         private const string BarScaleGlobal = "__CameraUtilsBarScale";
@@ -155,8 +185,17 @@ namespace SanctuaryHud.CameraUtils
 
         private static string StateChunk()
         {
+            var flags = (int)Icons | (HideIntel ? 1 << 2 : 0) | (HideAttack ? 1 << 3 : 0) | (HideBuild ? 1 << 4 : 0) |
+                        (HideOrderLines ? 1 << 5 : 0) | (HidePlannedBuildings ? 1 << 6 : 0) | (HideAlloySpots ? 1 << 7 : 0) |
+                        (HideHealthBars ? 1 << 8 : 0) | (HideGameUi ? 1 << 9 : 0);
+            if (_stateChunk != null && flags == _stateFlags && HideIconsBelow == _stateHeight && _barScale == _stateBarScale)
+                return _stateChunk;
+            _stateFlags = flags;
+            _stateHeight = HideIconsBelow;
+            _stateBarScale = _barScale;
+
             var inv = CultureInfo.InvariantCulture;
-            return "if __CameraUtils then local S = __CameraUtils " +
+            return _stateChunk = "if __CameraUtils then local S = __CameraUtils " +
                    // Seed the fresh match's agent with the scale we learned in
                    // an earlier one, so a match that starts with bars already
                    // hidden still knows what to put back.
@@ -171,7 +210,7 @@ namespace SanctuaryHud.CameraUtils
                    "pcall(S.sweep) end";
         }
 
-        // Installed once per match. `S` is the shared state C# writes into,
+        // Installed once per VM. `S` is the shared state C# writes into,
         // and the wrapper around rendering.RenderUpdate re-asserts it.
         //
         // - Icons: rendering.UpdateIcons calls Engine.SetIconsRenderingEnabled
@@ -190,7 +229,7 @@ namespace SanctuaryHud.CameraUtils
         // - Game UI: Engine.ToggleUIHUD has no getter, so we keep our own
         //   belief of it and only ever toggle on a change.
         // - Order lines and planned buildings: see the two blocks below.
-        private const string InstallTemplate =
+        private const string InstallChunk =
             "local ok, err = pcall(function() " +
             "  local S = _G.__CameraUtils " +
             "  if not S then " +
@@ -204,6 +243,7 @@ namespace SanctuaryHud.CameraUtils
             "  local ATTACK = { [M.AttackDirect] = 1, [M.AttackIndirect] = 1, [M.AttackAntiAir] = 1, " +
             "                   [M.AttackAntiNavy] = 1, [M.AttackCounter] = 1 } " +
             "  local BUILD = { [M.Build] = 1, [M.Assist] = 1 } " +
+            "  local EMPTY = {} " +
             // Weak keys, so a dead unit takes its entry with it.
             "  S.applied = S.applied or setmetatable({}, { __mode = 'k' }) " +
             // Compared against the wanted flag to decide whether to toggle, so
@@ -222,7 +262,13 @@ namespace SanctuaryHud.CameraUtils
             // entirely rather than asking every unit its build progress.
             "    local ghostSweep = S.ghosts or next(S.hiddenGhosts) ~= nil " +
             "    local focus = ghostSweep and GetFocusArmy() or nil " +
-            "    for _, u in pairs(__Entities.Units) do " +
+            // Nothing hidden now and nothing at the last full walk either: no
+            // unit needs a ring written, so the walk is skipped. A unit that
+            // appears meanwhile stays unmarked, which the next walk with
+            // something hidden treats as untouched — the same as marked 0.
+            "    local walk = ghostSweep or mask ~= 0 or S.sweptMask ~= 0 " +
+            "    if walk then S.sweptMask = mask end " +
+            "    for _, u in pairs(walk and __Entities.Units or EMPTY) do " +
             "      local rings = u.rangeRings " +
             "      local was = S.applied[u] " +
             "      if rings and was ~= mask then " +
@@ -305,11 +351,12 @@ namespace SanctuaryHud.CameraUtils
             "    elseif S.icons == 1 then " +
             "      Engine.SetIconsRenderingEnabled(Engine.GetCameraWorldSpaceHeight() >= S.height) " +
             "    end " +
-            // The sweep walks every unit, so it runs on a quarter second; the
-            // icon check above is per frame because it is two engine calls and
-            // has to follow the camera without lagging it.
-            "    S.frames = (S.frames or 0) + 1 " +
-            "    if S.frames >= 15 then S.frames = 0 S.sweep() end " +
+            // The sweep walks every unit, so it runs on a quarter second of
+            // real time, whatever the frame rate; the icon check above is per
+            // frame because it is two engine calls and has to follow the
+            // camera without lagging it.
+            "    local now = Engine.GetCurrentRealtimeInSeconds() " +
+            "    if now >= (S.nextSweep or 0) then S.nextSweep = now + 0.25 S.sweep() end " +
             "  end " +
             "  local rendering = Import('client/rendering/rendering.lua') " +
             "  S.origRenderUpdate = S.origRenderUpdate or rendering.RenderUpdate " +
@@ -357,11 +404,11 @@ namespace SanctuaryHud.CameraUtils
             "    S.orders = false S.ghosts = false S.spots = false S.bars = false S.ui = false " +
             "    pcall(S.sweep) " +
             "    _G.__CameraUtils = nil " +
-            "    _G." + VersionGlobal + " = nil " +
             "  end " +
             "  _G." + ErrorGlobal + " = '' " +
             "end) " +
-            "if ok then _G." + VersionGlobal + " = '@VER@' " +
-            "else Warn('CameraUtilities: agent install failed: ' .. tostring(err)) end";
+            // Raised rather than only logged, so the hook sees the failure and
+            // retries on its back-off instead of marking it installed.
+            "if not ok then error('CameraUtilities: agent install failed: ' .. tostring(err)) end";
     }
 }
