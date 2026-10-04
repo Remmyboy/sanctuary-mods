@@ -239,14 +239,14 @@ namespace SanctuaryHud
                 var rt = t as RectTransform;
                 sb.Append(' ', depth * 2).Append(t.name)
                   .Append(t.gameObject.activeSelf ? "" : " (inactive)")
-                  .Append(rt != null ? $" {rt.rect.width:0}x{rt.rect.height:0}" : "");
+                  .Append(rt != null ? FormattableString.Invariant($" {rt.rect.width:0}x{rt.rect.height:0}") : "");
                 foreach (var c in t.GetComponents<Component>())
                     if (!(c is Transform)) sb.Append(' ').Append(c.GetType().Name);
                 sb.Append('\n');
                 if (depth < 6) for (var i = 0; i < t.childCount; i++) Walk(t.GetChild(i), depth + 1);
             }
             Walk(panel.transform, 0);
-            _log?.LogInfo(sb.ToString());
+            _log?.LogDebug(sb.ToString());
         }
 
         // ---- Lua side --------------------------------------------------------

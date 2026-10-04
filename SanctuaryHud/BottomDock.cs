@@ -89,8 +89,18 @@ namespace SanctuaryHud
                 if (ui != null && ui.TryGetPanel(UIPanelType.Orders, out var orders) && HudCanvas.LocalRect(orders, out var rect))
                     Origin = new Vector2(rect.x, rect.y);
             }
-            catch { /* the last origin stands */ }
+            catch (System.Exception e)
+            {
+                // The last origin stands.
+                if (!_originLogged)
+                {
+                    _originLogged = true;
+                    _log?.LogWarning($"Bottom dock: the orders panel could not be measured (logged once): {e.Message}");
+                }
+            }
         }
+
+        private static bool _originLogged;
 
         /// A piece of the left column, placed: the column grows to fit it.
         internal static void Column(float width, float ordersHeight = -1f)

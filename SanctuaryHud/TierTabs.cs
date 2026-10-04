@@ -35,10 +35,20 @@ namespace SanctuaryHud
                     var ui = SanctuaryUIManager.Instance;
                     if (ui != null && ui.TryGetPanel(UIPanelType.ConstructionFilter, out var found)) panel = found as ConstructionFilterPanelUI;
                 }
-                catch { panel = null; }
+                catch (System.Exception e)
+                {
+                    panel = null;
+                    if (!_findLogged)
+                    {
+                        _findLogged = true;
+                        _log?.LogWarning($"Tier tabs: the game's tab panel could not be found (logged once): {e.Message}");
+                    }
+                }
             }
             _conceal.Apply(panel != null && LiveTabs(panel) <= 1 ? panel : null);
         }
+
+        private static bool _findLogged;
 
         internal static void Shutdown() => _conceal.Release();
 

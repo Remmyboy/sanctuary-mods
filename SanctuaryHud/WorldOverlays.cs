@@ -41,7 +41,19 @@ namespace SanctuaryHud
         // prop's global index, with the prop object itself kept alongside to
         // notice an index being reused by a new prop. Only the value is
         // recomputed per poll, and only props with something left are sent.
-        private const string ReclaimChunk =
+        //
+        // Both polls are functions installed once per VM (LuaHook), so a
+        // poll compiles a call, not the whole query.
+        private static readonly LuaHook Polls = new LuaHook("__SdbOverlays", "map label polls",
+            "__SdbOverlays = { Reclaim = function() " + ReclaimBody + " end, Builds = function() " + BuildBody + " end }",
+            "__SdbOverlays = nil __SdbReclaimCache = nil")
+        {
+            LogInstalls = false,
+        };
+
+        internal static void Shutdown() => Polls.Remove();
+
+        private const string ReclaimBody =
             "__SdbReclaim = '' " +
             "local ok, err = pcall(function() " +
             "  local cache = __SdbReclaimCache " +
@@ -79,8 +91,8 @@ namespace SanctuaryHud
 
         private static void PollReclaim()
         {
-            EnsureLuaBridge();
-            if (!LuaReady || !RunLua(ReclaimChunk)) return;
+            Polls.Tick();
+            if (!Polls.Call("__SdbOverlays.Reclaim()")) return;
 
             var err = GetLuaGlobal("__SdbReclaimErr");
             if (!string.IsNullOrEmpty(err) && !_loggedReclaimErr)
@@ -92,16 +104,21 @@ namespace SanctuaryHud
             var raw = GetLuaGlobal("__SdbReclaim");
             if (raw == null) return;
 
+            // Read in place, as Contacts reads its list: a few thousand props
+            // split into seven strings each was most of the poll.
             var list = new List<Reclaim>(raw.Length / 24 + 1);
-            foreach (var entry in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            var i = 0;
+            while (i < raw.Length)
             {
-                var f = entry.Split(',');
-                if (f.Length < 5) continue;
-                if (!float.TryParse(f[0], NumberStyles.Float, Inv, out var x) ||
-                    !float.TryParse(f[1], NumberStyles.Float, Inv, out var y) ||
-                    !float.TryParse(f[2], NumberStyles.Float, Inv, out var z) ||
-                    !float.TryParse(f[3], NumberStyles.Float, Inv, out var a) ||
-                    !float.TryParse(f[4], NumberStyles.Float, Inv, out var e)) continue;
+                float x = 0f, y = 0f, z = 0f, a = 0f, e = 0f;
+                var ok = Contacts.NextFloat(raw, ref i, out x) && Contacts.Comma(raw, ref i)
+                    && Contacts.NextFloat(raw, ref i, out y) && Contacts.Comma(raw, ref i)
+                    && Contacts.NextFloat(raw, ref i, out z) && Contacts.Comma(raw, ref i)
+                    && Contacts.NextFloat(raw, ref i, out a) && Contacts.Comma(raw, ref i)
+                    && Contacts.NextFloat(raw, ref i, out e);
+                while (i < raw.Length && raw[i] != ';') i++;
+                i++;
+                if (!ok) continue;
                 list.Add(new Reclaim { Position = new Vector3(x, y, z), Alloys = a, Energy = e });
             }
             _reclaim = list;
@@ -156,7 +173,7 @@ namespace SanctuaryHud
         // since the higher-tier replacement is a second structure building
         // on the same spot. progress is in build-time units, so it is
         // divided by tp.economy.buildTime to get a fraction.
-        private const string BuildChunk =
+        private const string BuildBody =
             "__SdbBuilds = '' " +
             "local ok, err = pcall(function() " +
             "  local out, n = {}, 0 " +
@@ -216,7 +233,7 @@ namespace SanctuaryHud
 
         private static void PollBuilds()
         {
-            EnsureLuaBridge();
+            Polls.Tick();
             if (!LuaReady) return;
 
             // A pause is not a stall: nothing moves because nothing is
@@ -234,7 +251,7 @@ namespace SanctuaryHud
                 }
                 return;
             }
-            if (!RunLua(BuildChunk)) return;
+            if (!Polls.Call("__SdbOverlays.Builds()")) return;
 
             var err = GetLuaGlobal("__SdbBuildsErr");
             if (!string.IsNullOrEmpty(err) && !_loggedBuildErr)
@@ -437,9 +454,17 @@ namespace SanctuaryHud
         }
 
         /// Text on the HUD's dark pill so it reads over terrain of any colour.
+        private static readonly GUIContent _measure = new GUIContent();
+
+        private static Vector2 Measure(GUIStyle style, string text)
+        {
+            _measure.text = text;
+            return style.CalcSize(_measure);
+        }
+
         private static void Label(Rect rect, string text, GUIStyle style, Texture2D mark = null)
         {
-            var size = style.CalcSize(new GUIContent(text));
+            var size = Measure(style, text);
             var markSize = mark != null ? size.y - 2f : 0f;
             var lead = mark != null ? markSize + 3f : 0f;
             var box = new Rect(rect.center.x - (size.x + lead) / 2f - 7f, rect.center.y - size.y / 2f - 1f, size.x + lead + 14f, size.y + 2f);
@@ -470,6 +495,96 @@ namespace SanctuaryHud
             public float Weight;
         }
 
+        // Kept between frames, so drawing the labels allocates nothing.
+        private static readonly Dictionary<long, Cell> _cells = new Dictionary<long, Cell>();
+        private static readonly List<Cell> _clusters = new List<Cell>();
+        private static readonly Dictionary<long, int> _gridHead = new Dictionary<long, int>();
+        private static int[] _gridNext = new int[64];
+        private static bool[] _gone = new bool[64];
+        private static readonly Comparison<Cell> HeaviestFirst = (p, q) => q.Weight.CompareTo(p.Weight);
+
+        private static long GridKey(long x, long y) => (x << 32) ^ (y & 0xffffffffL);
+
+        private static long GridKey(Vector2 at, float size) =>
+            GridKey((long)Mathf.Floor(at.x / size), (long)Mathf.Floor(at.y / size));
+
+        /// Grid cells alone leave two figures side by side whenever a wreck
+        /// field straddles a cell edge ("181 125"), so clusters whose centres
+        /// sit closer than `distance` are merged, largest first: each takes
+        /// in the largest smaller one in reach of its centre, then looks
+        /// again from where the merge moved it, until none is in reach. A
+        /// grid of that size finds the candidates (only the nine squares
+        /// round a centre can hold one), and passes repeat until one merges
+        /// nothing, since a merged centre can move into reach of a larger
+        /// cluster already done.
+        private static void MergeClusters(List<Cell> clusters, float distance)
+        {
+            var reach = distance * distance;
+            bool merged;
+            do
+            {
+                merged = false;
+                clusters.Sort(HeaviestFirst);
+                var n = clusters.Count;
+                if (_gridNext.Length < n)
+                {
+                    _gridNext = new int[n * 2];
+                    _gone = new bool[n * 2];
+                }
+                _gridHead.Clear();
+                for (var j = 0; j < n; j++)
+                {
+                    _gone[j] = false;
+                    var c = clusters[j];
+                    var key = GridKey(c.Weighted / c.Weight, distance);
+                    _gridNext[j] = _gridHead.TryGetValue(key, out var head) ? head : -1;
+                    _gridHead[key] = j;
+                }
+
+                for (var i = 0; i < n; i++)
+                {
+                    if (_gone[i]) continue;
+                    var a = clusters[i];
+                    while (true)
+                    {
+                        var pa = a.Weighted / a.Weight;
+                        var gx = (long)Mathf.Floor(pa.x / distance);
+                        var gy = (long)Mathf.Floor(pa.y / distance);
+                        var best = -1;
+                        for (var dy = -1; dy <= 1; dy++)
+                        for (var dx = -1; dx <= 1; dx++)
+                        {
+                            if (!_gridHead.TryGetValue(GridKey(gx + dx, gy + dy), out var j)) continue;
+                            for (; j >= 0; j = _gridNext[j])
+                            {
+                                // Only the smaller ones (after it), the largest first.
+                                if (j <= i || _gone[j] || (best >= 0 && j > best)) continue;
+                                var b = clusters[j];
+                                if ((b.Weighted / b.Weight - pa).sqrMagnitude <= reach) best = j;
+                            }
+                        }
+                        if (best < 0) break;
+                        var m = clusters[best];
+                        a.Alloys += m.Alloys;
+                        a.Energy += m.Energy;
+                        a.Weighted += m.Weighted;
+                        a.Weight += m.Weight;
+                        _gone[best] = true;
+                        merged = true;
+                    }
+                    clusters[i] = a;
+                }
+
+                if (merged)
+                {
+                    var kept = 0;
+                    for (var i = 0; i < n; i++)
+                        if (!_gone[i]) clusters[kept++] = clusters[i];
+                    clusters.RemoveRange(kept, n - kept);
+                }
+            } while (merged);
+        }
+
         /// Reclaim labels. Everything visible is bucketed into a screen-space
         /// grid and each cell drawn as one summed figure at its value-weighted
         /// centre — so at close zoom each wreck has its own number and zoomed
@@ -484,13 +599,12 @@ namespace SanctuaryHud
             EnsureOverlayStyles();
 
             var cell = Mathf.Max(24f, cellPixels);
-            var cells = new Dictionary<long, Cell>();
+            var cells = _cells;
+            cells.Clear();
             foreach (var r in items)
             {
                 if (!Project(camera, r.Position, scale, logicalWidth, logicalHeight, out var gui)) continue;
-                var cx = (long)Mathf.Floor(gui.x / cell);
-                var cy = (long)Mathf.Floor(gui.y / cell);
-                var key = (cx << 32) ^ (cy & 0xffffffffL);
+                var key = GridKey(gui, cell);
                 cells.TryGetValue(key, out var c);
                 var w = r.Alloys + r.Energy * 0.1f + 1f;
                 c.Alloys += r.Alloys;
@@ -500,36 +614,10 @@ namespace SanctuaryHud
                 cells[key] = c;
             }
 
-            // Grid cells alone leave two figures side by side whenever a
-            // wreck field straddles a cell edge ("181 125"), so clusters
-            // whose centres sit closer than a cell are merged, largest first,
-            // until none are.
-            var clusters = new List<Cell>(cells.Values);
-            var mergeDistance = cell * 0.95f;
-            bool merged;
-            do
-            {
-                merged = false;
-                clusters.Sort((p, q) => q.Weight.CompareTo(p.Weight));
-                for (var i = 0; i < clusters.Count && !merged; i++)
-                {
-                    var a = clusters[i];
-                    var pa = a.Weighted / a.Weight;
-                    for (var j = i + 1; j < clusters.Count; j++)
-                    {
-                        var b = clusters[j];
-                        if ((b.Weighted / b.Weight - pa).sqrMagnitude > mergeDistance * mergeDistance) continue;
-                        a.Alloys += b.Alloys;
-                        a.Energy += b.Energy;
-                        a.Weighted += b.Weighted;
-                        a.Weight += b.Weight;
-                        clusters[i] = a;
-                        clusters.RemoveAt(j);
-                        merged = true;
-                        break;
-                    }
-                }
-            } while (merged);
+            var clusters = _clusters;
+            clusters.Clear();
+            foreach (var c in cells.Values) clusters.Add(c);
+            MergeClusters(clusters, cell * 0.95f);
 
             foreach (var c in clusters)
             {
@@ -572,6 +660,10 @@ namespace SanctuaryHud
         /// one is skipped, and no more than `maxLabels` are drawn. Zoomed
         /// out that leaves the few nearest completion; zoomed in on the base
         /// there is room for all of them.
+        private static readonly List<Build> _ordered = new List<Build>();
+        private static readonly List<Rect> _placed = new List<Rect>();
+        private static readonly Comparison<Build> FurthestAlong = (p, q) => q.Fraction.CompareTo(p.Fraction);
+
         internal static void DrawBuildEtas(float scale, float logicalWidth, float logicalHeight, int maxLabels)
         {
             var builds = _buildList;
@@ -584,9 +676,12 @@ namespace SanctuaryHud
             // A stall in either resource throttles every build (construction
             // draws on both), so it colours them all at once.
             var economyStalling = SanctuaryHudPlugin.EconomyStalling();
-            var ordered = new List<Build>(builds);
-            ordered.Sort((p, q) => q.Fraction.CompareTo(p.Fraction));
-            var placed = new List<Rect>();
+            var ordered = _ordered;
+            ordered.Clear();
+            ordered.AddRange(builds);
+            ordered.Sort(FurthestAlong);
+            var placed = _placed;
+            placed.Clear();
             var drawn = 0;
             foreach (var b in ordered)
             {
@@ -626,7 +721,7 @@ namespace SanctuaryHud
                 _stEta.normal.textColor = labelColour;
 
                 // One pill: the time on top, the progress along its foot.
-                var size = _stEta.CalcSize(new GUIContent(text));
+                var size = Measure(_stEta, text);
                 var pill = new Rect(0f, 0f, Mathf.Max(60f, size.x + 16f), size.y + 7f);
                 pill.center = new Vector2(gui.x, y + 3f);
                 GUI.Box(pill, GUIContent.none, HudImgui.PillStyle);

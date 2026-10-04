@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using BepInEx.Configuration;
 using HarmonyLib;
 using SanctuaryUI;
 using TMPro;
@@ -38,27 +39,52 @@ namespace SanctuaryHud
         private static readonly List<Toast> _toasts = new List<Toast>();
 
         // ---- config, bound by the plugin ----
-        internal static bool AttackedEnabled = true;
-        internal static bool CriticalEnabled = true;
-        internal static bool BuildCompleteEnabled = true;
-        /// Which completions get a toast, keyed "<role>.new" / "<role>.upgrade"
-        /// for the roles WorldOverlays assigns (factory, extractor, energy,
-        /// intel, defence, tech, strategic, other). Bound by the plugin from
-        /// one config switch each, so the Mod Manager shows them as rows.
-        internal static readonly Dictionary<string, bool> CompleteRules = new Dictionary<string, bool>();
+        //
+        // The entries themselves, read where they are used, so a change on
+        // the Mods page takes effect at once without anything copying them
+        // across every frame. Before UseSettings (never, in practice) each
+        // reads as its setting's default.
+
+        internal sealed class Settings
+        {
+            internal ConfigEntry<bool> Attacked, Critical, BuildComplete, AnyTier4, Sound, Disconnect;
+            internal ConfigEntry<float> CriticalAt;
+            internal ConfigEntry<int> Volume;
+            internal ConfigEntry<string> VoicePack;
+            /// Which completions get a toast, keyed "<role>.new" / "<role>.upgrade"
+            /// for the roles WorldOverlays assigns (factory, extractor, energy,
+            /// intel, defence, tech, strategic, other): one config switch
+            /// each, so the Mod Manager shows them as rows.
+            internal Dictionary<string, ConfigEntry<bool>> CompleteRules;
+        }
+
+        private static Settings _cfg = new Settings();
+
+        internal static void UseSettings(Settings settings) => _cfg = settings ?? new Settings();
+
+        private static bool On(ConfigEntry<bool> entry, bool fallback) => entry != null ? entry.Value : fallback;
+
+        internal static bool AttackedEnabled => On(_cfg.Attacked, true);
+        internal static bool CriticalEnabled => On(_cfg.Critical, true);
+        internal static bool BuildCompleteEnabled => On(_cfg.BuildComplete, true);
         /// A tier-4 structure finishing is announced whatever its role.
-        internal static bool CompleteAnyTier4 = true;
-        internal static bool SoundEnabled = true;
+        internal static bool CompleteAnyTier4 => On(_cfg.AnyTier4, true);
+        internal static bool SoundEnabled => On(_cfg.Sound, false);
+        internal static bool DisconnectEnabled => On(_cfg.Disconnect, true);
+        internal static float Volume => _cfg.Volume != null ? _cfg.Volume.Value / 100f : 0.5f;
+        /// Commander health fraction below which the critical alert fires.
+        internal static float CriticalFraction => _cfg.CriticalAt != null ? Mathf.Clamp(_cfg.CriticalAt.Value, 0.05f, 0.9f) : 0.35f;
+        /// Voice pack: a subfolder of the sounds folder. An empty name, or
+        /// one with no folder, falls through to files placed directly in the
+        /// sounds folder, and then to the tones.
+        internal static string VoicePack => _cfg.VoicePack != null ? _cfg.VoicePack.Value : "machine";
 
         private static bool WantsCompletion(WorldOverlays.Build b)
         {
             if (CompleteAnyTier4 && b.Tier >= 4) return true;
             var key = (b.Role ?? "other") + (b.IsUpgrade ? ".upgrade" : ".new");
-            return CompleteRules.TryGetValue(key, out var on) && on;
+            return _cfg.CompleteRules != null && _cfg.CompleteRules.TryGetValue(key, out var on) && on.Value;
         }
-        internal static float Volume = 0.5f;
-        /// Commander health fraction below which the critical alert fires.
-        internal static float CriticalFraction = 0.35f;
 
         // ---- commander state ----
         private static float _healthAccum;
@@ -103,7 +129,8 @@ namespace SanctuaryHud
                 return;
             }
 
-            _toasts.RemoveAll(t => now >= t.Expires);
+            for (var i = _toasts.Count - 1; i >= 0; i--)
+                if (now >= _toasts[i].Expires) _toasts.RemoveAt(i);
             SyncGameAlertMute();
 
             if (_commanderLocalIndex < 0) return;
@@ -173,15 +200,21 @@ namespace SanctuaryHud
         //
         // The registry looks Receive up on the command at dispatch, and
         // Receive is already a raw field, so replacing it bypasses the
-        // command table's assignment guard. Guarded by a global, and each
-        // match builds a fresh VM, so re-running the chunk is harmless.
+        // command table's assignment guard. Installed once per VM (LuaHook);
+        // the switch is a global set only when it changes.
+        private static readonly LuaHook GameAlertHook = new LuaHook("__SdbCmdAlert", "game commander alert mute", GameAlertHookChunk)
+        {
+            LogInstalls = false,
+            // A fresh VM has the switch unset: send it again.
+            Installed = () => _muteSent = -1,
+        };
+
         private const string GameAlertHookChunk =
             // pcall'd so a game without the command (older, or renamed) is
-            // a quiet no-op rather than a failed chunk logged every second.
-            "if not __SdbCmdAlertHook then pcall(function() " +
+            // a quiet no-op rather than a failed chunk retried and logged.
+            "do local S = {} pcall(function() " +
             "  local c = Import('common/commands/definitions/session.lua').PlayUnitDamagedAlert " +
             "  if c and type(c.Receive) == 'function' then " +
-            "    __SdbCmdAlertHook = true " +
             "    local orig = c.Receive " +
             "    local commanderEvent = {} " +
             // An event name is the commander's if every template carrying it
@@ -208,34 +241,35 @@ namespace SanctuaryHud
             "      commanderEvent[name] = result " +
             "      return result " +
             "    end " +
-            "    rawset(c, 'Receive', function(data, ...) " +
+            "    local mine = function(data, ...) " +
             "      if __SdbMuteGameCmdAlert == 1 and data and isCommanderEvent(data.eventName) then return end " +
             "      return orig(data, ...) " +
-            "    end) " +
+            "    end " +
+            "    rawset(c, 'Receive', mine) " +
+            "    S.Remove = function() " +
+            "      if rawget(c, 'Receive') == mine then rawset(c, 'Receive', orig) end " +
+            "      __SdbMuteGameCmdAlert = 0 " +
+            "    end " +
             "  end " +
-            "end) end " +
-            "__SdbMuteGameCmdAlert = __MUTE__";
+            "end) __SdbCmdAlert = S end";
 
-        private static float _muteAccum;
         private static int _muteSent = -1;
 
         /// Ours plays whenever the attacked alert fires with sound on.
         private static bool OursSounds => AttackedEnabled && SoundEnabled && Volume > 0f && !_audioFailed;
 
-        /// Installs the wrapper and sets its switch, once a second while in a
-        /// match: cheap, and it catches a fresh VM or a changed setting.
+        /// Keeps the wrapper in (LuaHook checks once a second) and sets its
+        /// switch whenever what it should be changes.
         private static void SyncGameAlertMute()
         {
-            _muteAccum += Time.unscaledDeltaTime;
+            GameAlertHook.Tick();
+            if (!GameAlertHook.Live) return;
             var want = OursSounds ? 1 : 0;
-            if (_muteAccum < 1f && want == _muteSent) return;
-            _muteAccum = 0f;
-            if (!LuaReady) return;
-            if (!RunLua(GameAlertHookChunk.Replace("__MUTE__", want.ToString()))) return;
-            if (want != _muteSent)
-                _log?.LogInfo(want == 1
-                    ? "Game's commander damage alert muted: ours sounds instead."
-                    : "Game's commander damage alert left on: ours is silent.");
+            if (want == _muteSent) return;
+            if (!RunLua("__SdbMuteGameCmdAlert = " + (want == 1 ? "1" : "0"))) return;
+            _log?.LogInfo(want == 1
+                ? "Game's commander damage alert muted: ours sounds instead."
+                : "Game's commander damage alert left on: ours is silent.");
             _muteSent = want;
         }
 
@@ -253,8 +287,6 @@ namespace SanctuaryHud
         }
 
         // ---- players dropping out ------------------------------------------
-
-        internal static bool DisconnectEnabled = true;
 
         // The game reports these in its log panel, top right in small type:
         // "Player <nickname> disconnected!" (host/commands.lua, broadcast to
@@ -347,11 +379,6 @@ namespace SanctuaryHud
         private static string SoundsDir =>
             System.IO.Path.Combine(BepInEx.Paths.GameRootPath, "SanctuaryMods", "SanctuaryHud", "sounds");
 
-        /// Voice pack: a subfolder of the sounds folder. Set from config; an
-        /// empty name, or one with no folder, falls through to files placed
-        /// directly in the sounds folder, and then to the tones.
-        internal static string VoicePack = "machine";
-
         /// The file to play for an alert, or null when there is none and the
         /// synthesised tone applies. The pack's folder wins over a loose file.
         private static string Resolve(string name)
@@ -394,7 +421,7 @@ namespace SanctuaryHud
                 var volume = Mathf.Clamp01(Volume);
                 var source = Resolve(name);
                 var stamp = source != null ? System.IO.File.GetLastWriteTimeUtc(source).Ticks : 0L;
-                var key = $"{source ?? name}|{volume:0.00}|{stamp}";
+                var key = FormattableString.Invariant($"{source ?? name}|{volume:0.00}|{stamp}");
                 if (!_rendered.TryGetValue(key, out var path) || !System.IO.File.Exists(path))
                 {
                     var pcm = (source != null ? LoadWav(source) : null) ?? MakeTone(hz1, s1, hz2, s2, repeats);
@@ -514,7 +541,8 @@ namespace SanctuaryHud
                         default: throw new FormatException($"unsupported WAV format {format} at {bits} bits");
                     }
                 }
-                _log?.LogInfo($"Alert sound: {System.IO.Path.GetFileName(path)} ({rate} Hz, {channels} ch, {bits}-bit, {frames / channels / (float)rate:0.00}s).");
+                _log?.LogInfo(FormattableString.Invariant(
+                    $"Alert sound: {System.IO.Path.GetFileName(path)} ({rate} Hz, {channels} ch, {bits}-bit, {frames / channels / (float)rate:0.00}s)."));
                 return new Pcm { Data = data, Channels = channels, Rate = rate };
             }
             catch (Exception e)
@@ -539,9 +567,8 @@ namespace SanctuaryHud
 
         internal static void Shutdown()
         {
-            // The wrapper stays in the VM (a reloaded copy finds it by its
-            // guard); switched off, it passes everything through.
-            if (_muteSent == 1 && LuaReady) RunLua("__SdbMuteGameCmdAlert = 0");
+            // The wrapper comes out, and with it the switch.
+            GameAlertHook.Remove();
             _muteSent = -1;
             _toasts.Clear();
             _rendered.Clear();

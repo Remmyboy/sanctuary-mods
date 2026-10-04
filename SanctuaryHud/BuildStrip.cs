@@ -86,14 +86,10 @@ namespace SanctuaryHud
 
         private static Component StripMeasure(Component panel)
         {
-            Component measure = panel;
-            try
-            {
-                var dashed = panel.transform.Find("Panel Dashed");
-                if (dashed != null) measure = dashed;
-            }
-            catch { /* the root will do */ }
-            return measure;
+            // A panel destroyed under us is Unity-null: nothing to look in.
+            if (panel == null) return panel;
+            var dashed = panel.transform.Find("Panel Dashed");
+            return dashed != null ? dashed : panel;
         }
 
         // ---- the rows -----------------------------------------------------------
@@ -188,13 +184,23 @@ namespace SanctuaryHud
             // build card: cost and time for that template.
             var hovered = UnitTile.Hovered;
             string template = null;
-            if (hovered != null && hovered.Source != null && _options.Exists(e => e.Element == hovered.Source))
+            if (hovered != null && hovered.Source != null && IsOption(hovered.Source))
             {
                 var portrait = hovered.Source.portraitImage != null ? hovered.Source.portraitImage.overrideSprite : null;
                 template = UnitDomains.TemplateOf(portrait);
             }
             InfoCard.SetHover(template);
         }
+
+        private static bool IsOption(UnitButtonElement element)
+        {
+            foreach (var entry in _options)
+                if (entry.Element == element) return true;
+            return false;
+        }
+
+        private static readonly PanelChildren<ConstructionFilterToggleElement, Toggle> _tabChildren =
+            new PanelChildren<ConstructionFilterToggleElement, Toggle>();
 
         private static void CollectTabs(ConstructionFilterPanelUI panel)
         {
@@ -205,8 +211,7 @@ namespace SanctuaryHud
             {
                 var child = container.GetChild(i);
                 if (!child.gameObject.activeInHierarchy || child.localScale.x < 0.5f) continue;
-                var element = child.GetComponent<ConstructionFilterToggleElement>();
-                var toggle = child.GetComponent<Toggle>();
+                var (element, toggle) = _tabChildren.Get(container, child);
                 if (element == null || toggle == null || !toggle.interactable) continue;
                 _tabs.Add(element);
             }
@@ -222,6 +227,9 @@ namespace SanctuaryHud
             private SanctuaryPanelUI _panel;
             private readonly List<TabTile> _tiles = new List<TabTile>();
             private readonly List<ConstructionFilterToggleElement> _shown = new List<ConstructionFilterToggleElement>();
+            private bool _dirty = true;
+            private float _scale = -1f;
+            private float _cloneFailedAt = -1f;
 
             internal bool Alive => _rect != null;
             internal RectTransform Rect => _rect;
@@ -244,8 +252,9 @@ namespace SanctuaryHud
 
             internal void Show(bool showing)
             {
-                if (_rect == null) return;
-                if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+                if (_rect == null || _rect.gameObject.activeSelf == showing) return;
+                _rect.gameObject.SetActive(showing);
+                if (showing) _dirty = true;
             }
 
             internal void Place(Vector2 bottomLeft)
@@ -273,15 +282,30 @@ namespace SanctuaryHud
                     foreach (var tile in _tiles) if (tile != null) UnityEngine.Object.Destroy(tile.gameObject);
                     _tiles.Clear();
                     _shown.Clear();
+                    _cloneFailedAt = -1f;
+                    _dirty = true;
                 }
-                _rect.localScale = new Vector3(scale, scale, 1f);
-                HudCanvas.PlateStyle(_rect, false);
+                if (scale != _scale)
+                {
+                    _scale = scale;
+                    _rect.localScale = new Vector3(scale, scale, 1f);
+                    _dirty = true;
+                }
+                if (_dirty) HudCanvas.PlateStyle(_rect, false);
 
                 var same = tabs.Count == _shown.Count;
                 for (var i = 0; same && i < tabs.Count; i++) same = tabs[i] == _shown[i];
+                // A tab that would not clone is tried again after a pause,
+                // not every frame.
+                if (same && _cloneFailedAt >= 0f && Time.unscaledTime >= _cloneFailedAt + 5f) same = false;
                 if (!same)
                 {
+                    _dirty = true;
+                    _cloneFailedAt = -1f;
+                    // What was asked for, whether or not every tile cloned:
+                    // tile i stands for tab i, up to the first that failed.
                     _shown.Clear();
+                    _shown.AddRange(tabs);
                     foreach (var tile in _tiles) if (tile != null && tile.gameObject.activeSelf) tile.gameObject.SetActive(false);
                     var at = 0;
                     var sibling = 1;   // after the hairline
@@ -293,20 +317,27 @@ namespace SanctuaryHud
                         else
                         {
                             tile = TabTile.Create(panel, _rect);
-                            if (tile == null) continue;
+                            if (tile == null)
+                            {
+                                _cloneFailedAt = Time.unscaledTime;
+                                break;
+                            }
                             _tiles.Add(tile);
                         }
                         at++;
                         tile.transform.SetSiblingIndex(sibling++);
                         if (!tile.gameObject.activeSelf) tile.gameObject.SetActive(true);
-                        _shown.Add(tab);
                     }
                 }
                 for (var i = 0; i < _shown.Count && i < _tiles.Count; i++)
                 {
-                    if (_tiles[i] != null) _tiles[i].Mirror(_shown[i]);
+                    if (_tiles[i] != null && _tiles[i].gameObject.activeSelf) _tiles[i].Mirror(_shown[i]);
                 }
-                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                if (_dirty)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                    _dirty = false;
+                }
             }
         }
 
@@ -316,21 +347,21 @@ namespace SanctuaryHud
         {
             try
             {
-                _log?.LogInfo("Build strip concealed; the options panel:");
+                _log?.LogDebug("Build strip concealed; the options panel:");
                 PanelConceal.DumpSubtree(options.transform, 0, _log, 2);
                 if (options.buttonPrefab != null)
                 {
-                    _log?.LogInfo("...its button prefab:");
+                    _log?.LogDebug("...its button prefab:");
                     PanelConceal.DumpSubtree(options.buttonPrefab.transform, 0, _log, 3);
                 }
                 if (queue != null)
                 {
-                    _log?.LogInfo("...and the queue panel:");
+                    _log?.LogDebug("...and the queue panel:");
                     PanelConceal.DumpSubtree(queue.transform, 0, _log, 2);
                 }
                 if (tabs != null)
                 {
-                    _log?.LogInfo("...and the tier tabs, with their prefab:");
+                    _log?.LogDebug("...and the tier tabs, with their prefab:");
                     PanelConceal.DumpSubtree(tabs.transform, 0, _log, 2);
                     if (tabs.buttonPrefab != null) PanelConceal.DumpSubtree(tabs.buttonPrefab.transform, 0, _log, 3);
                 }

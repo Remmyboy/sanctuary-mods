@@ -90,6 +90,7 @@ namespace SanctuaryHud
             _conceal.Release();
             _bar?.Destroy();
             _bar = null;
+            _nameBySprite.Clear();
             OrderTile.ReleaseGlyphs();
         }
 
@@ -116,36 +117,73 @@ namespace SanctuaryHud
             ["manual_fire_02"] = "MANUAL FIRE 2",
         };
 
-        private sealed class OrderButton
+        /// One button on show this frame. A struct, so reading the panel
+        /// every frame allocates nothing.
+        private struct OrderButton
         {
             public OrderButtonElement Element;
-            public string Key;
-            public string Label;
-            public Color Tint;
+            public OrderName Name;
             public bool Active;
         }
 
-        private static readonly List<OrderButton> _row = new List<OrderButton>();
-
-        private static string KeyOf(OrderButtonElement element, int index)
+        /// An order's key and how the row names it, made once per key.
+        private sealed class OrderName
         {
-            var sprite = element.icon != null ? element.icon.sprite : null;
+            public string Key, Label, LabelOn;
+        }
+
+        private static readonly List<OrderButton> _row = new List<OrderButton>();
+        private static readonly PanelChildren<OrderButtonElement, Button> _children = new PanelChildren<OrderButtonElement, Button>();
+        private static readonly Dictionary<Sprite, OrderName> _nameBySprite = new Dictionary<Sprite, OrderName>();
+        private static readonly Dictionary<string, OrderName> _nameByKey = new Dictionary<string, OrderName>();
+
+        /// The order a sprite names ("icon_order_stop" is "stop"), or null
+        /// when its name says nothing.
+        private static string KeyFromSprite(Sprite sprite)
+        {
             var name = sprite != null ? sprite.name ?? "" : "";
             const string prefix = "icon_order_";
             var at = name.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (at >= 0)
-            {
-                var key = name.Substring(at + prefix.Length).ToLowerInvariant();
-                var dot = key.IndexOf('.');
-                if (dot >= 0) key = key.Substring(0, dot);
-                if (key.EndsWith("(clone)")) key = key.Substring(0, key.Length - 7).Trim();
-                if (key.Length > 0) return key;
-            }
-            return index < ByIndex.Length ? ByIndex[index] : "order" + index;
+            if (at < 0) return null;
+            var key = name.Substring(at + prefix.Length).ToLowerInvariant();
+            var dot = key.IndexOf('.');
+            if (dot >= 0) key = key.Substring(0, dot);
+            if (key.EndsWith("(clone)")) key = key.Substring(0, key.Length - 7).Trim();
+            return key.Length > 0 ? key : null;
         }
+
+        private static string KeyByIndex(int index) => index < ByIndex.Length ? ByIndex[index] : "order" + index;
+
+        private static string KeyOf(OrderButtonElement element, int index) =>
+            KeyFromSprite(element.icon != null ? element.icon.sprite : null) ?? KeyByIndex(index);
 
         private static string LabelOf(string key) =>
             Labels.TryGetValue(key, out var label) ? label : key.Replace('_', ' ').ToUpperInvariant();
+
+        private static OrderName NameFor(string key)
+        {
+            if (!_nameByKey.TryGetValue(key, out var name))
+            {
+                var label = LabelOf(key);
+                _nameByKey[key] = name = new OrderName { Key = key, Label = label, LabelOn = label + "  ·  ON" };
+            }
+            return name;
+        }
+
+        /// The order's name, worked out once per icon sprite; a sprite whose
+        /// name says nothing is remembered as such, and the button's place
+        /// in the panel names it.
+        private static OrderName NameOf(OrderButtonElement element, int index)
+        {
+            var sprite = element.icon != null ? element.icon.sprite : null;
+            if (sprite == null) return NameFor(KeyByIndex(index));
+            if (!_nameBySprite.TryGetValue(sprite, out var name))
+            {
+                var key = KeyFromSprite(sprite);
+                _nameBySprite[sprite] = name = key != null ? NameFor(key) : null;
+            }
+            return name ?? NameFor(KeyByIndex(index));
+        }
 
         /// Reads the game's panel: every button that is on and enabled for
         /// the current selection, in the panel's order.
@@ -158,22 +196,19 @@ namespace SanctuaryHud
             for (var i = 0; i < container.childCount; i++)
             {
                 var child = container.GetChild(i);
-                var element = child.GetComponent<OrderButtonElement>();
+                var (element, button) = _children.Get(container, child);
                 if (element == null) continue;
                 var at = index++;
                 // The panel pools buttons it isn't using by scaling them to
                 // nothing; the game dims the rest by making them non-interactable.
                 if (!child.gameObject.activeInHierarchy || child.localScale.x < 0.5f) continue;
-                var button = child.GetComponent<Button>();
                 if (button == null || !button.interactable) continue;
-                var key = KeyOf(element, at);
-                if (hideInert && !Wired.Contains(key)) continue;
+                var name = NameOf(element, at);
+                if (hideInert && !Wired.Contains(name.Key)) continue;
                 _row.Add(new OrderButton
                 {
                     Element = element,
-                    Key = key,
-                    Label = LabelOf(key),
-                    Tint = element.background != null ? element.background.color : AccentColour,
+                    Name = name,
                     // SetColorTint gives the frame an alpha of 1/255 at rest
                     // and 1 while the toggle is on; SetActive swaps between them.
                     Active = button.colors.normalColor.a > 0.5f,
@@ -233,6 +268,11 @@ namespace SanctuaryHud
             private SanctuaryPanelUI _panel;
             private readonly List<OrderTile> _tiles = new List<OrderTile>();
             private readonly List<OrderButtonElement> _shown = new List<OrderButtonElement>();
+            /// How many of the tiles are standing for buttons, from the first.
+            private int _used;
+            private bool _dirty = true;
+            private float _scale = -1f;
+            private float _cloneFailedAt = -1f;
 
             internal bool Alive => _rect != null;
             internal RectTransform Rect => _rect;
@@ -262,8 +302,9 @@ namespace SanctuaryHud
 
             internal void Show(bool showing)
             {
-                if (_rect == null) return;
-                if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+                if (_rect == null || _rect.gameObject.activeSelf == showing) return;
+                _rect.gameObject.SetActive(showing);
+                if (showing) _dirty = true;
             }
 
             internal void Place(Vector2 bottomLeft)
@@ -286,6 +327,7 @@ namespace SanctuaryHud
                 _rect = null;
                 _tiles.Clear();
                 _shown.Clear();
+                _used = 0;
             }
 
             internal void Sync(SanctuaryPanelUI panel, List<OrderButton> buttons, float scale)
@@ -297,41 +339,64 @@ namespace SanctuaryHud
                     foreach (var tile in _tiles) if (tile != null) UnityEngine.Object.Destroy(tile.gameObject);
                     _tiles.Clear();
                     _shown.Clear();
+                    _used = 0;
+                    _cloneFailedAt = -1f;
+                    _dirty = true;
                 }
-                _rect.localScale = new Vector3(scale, scale, 1f);
-                HudCanvas.PlateStyle(_rect, false);
+                if (scale != _scale)
+                {
+                    _scale = scale;
+                    _rect.localScale = new Vector3(scale, scale, 1f);
+                    _dirty = true;
+                }
+                if (_dirty) HudCanvas.PlateStyle(_rect, false);
 
                 var same = buttons.Count == _shown.Count;
                 for (var i = 0; same && i < buttons.Count; i++) same = buttons[i].Element == _shown[i];
+                // A button that would not clone is tried again after a
+                // pause, not every frame.
+                if (same && _cloneFailedAt >= 0f && Time.unscaledTime >= _cloneFailedAt + 5f) same = false;
                 if (!same)
                 {
+                    _dirty = true;
+                    _cloneFailedAt = -1f;
+                    // What was asked for, whether or not every tile cloned:
+                    // tile i stands for button i, up to the first that failed.
                     _shown.Clear();
+                    foreach (var button in buttons) _shown.Add(button.Element);
                     foreach (var tile in _tiles) if (tile != null && tile.gameObject.activeSelf) tile.gameObject.SetActive(false);
-                    var at = 0;
+                    _used = 0;
                     var sibling = 1;   // after the hairline
-                    foreach (var button in buttons)
+                    for (var i = 0; i < buttons.Count; i++)
                     {
-                        while (at < _tiles.Count && _tiles[at] == null) _tiles.RemoveAt(at);
+                        while (_used < _tiles.Count && _tiles[_used] == null) _tiles.RemoveAt(_used);
                         OrderTile tile;
-                        if (at < _tiles.Count) tile = _tiles[at];
+                        if (_used < _tiles.Count) tile = _tiles[_used];
                         else
                         {
                             tile = OrderTile.Create(panel, _rect);
-                            if (tile == null) continue;
+                            if (tile == null)
+                            {
+                                _cloneFailedAt = Time.unscaledTime;
+                                break;
+                            }
                             _tiles.Add(tile);
                         }
-                        at++;
+                        _used++;
                         tile.transform.SetSiblingIndex(sibling++);
                         if (!tile.gameObject.activeSelf) tile.gameObject.SetActive(true);
-                        _shown.Add(button.Element);
                     }
                 }
-                for (var i = 0; i < _shown.Count && i < _tiles.Count && i < buttons.Count; i++)
+                for (var i = 0; i < _used && i < _tiles.Count && i < buttons.Count; i++)
                 {
                     var button = buttons[i];
-                    if (_tiles[i] != null) _tiles[i].Mirror(button.Element, button.Label + (button.Active ? "  ·  ON" : ""));
+                    if (_tiles[i] != null) _tiles[i].Mirror(button.Element, button.Active ? button.Name.LabelOn : button.Name.Label);
                 }
-                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                if (_dirty)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                    _dirty = false;
+                }
                 SetWidth(0f);
             }
         }
@@ -349,7 +414,7 @@ namespace SanctuaryHud
             if (sprite == null) return "no sprite" + (icon.sprite != null ? " (override null, sprite set)" : "");
             var tex = sprite.texture;
             string rect;
-            try { var r = sprite.textureRect; rect = $"{r.x:0},{r.y:0} {r.width:0}x{r.height:0}"; }
+            try { var r = sprite.textureRect; rect = FormattableString.Invariant($"{r.x:0},{r.y:0} {r.width:0}x{r.height:0}"); }
             catch (Exception e) { rect = "unreadable: " + e.GetType().Name; }
             return $"sprite '{sprite.name}' packed={sprite.packed} tex={(tex != null ? $"'{tex.name}' {tex.width}x{tex.height}" : "none")} rect={rect} colour={icon.color}";
         }
@@ -371,11 +436,11 @@ namespace SanctuaryHud
                         index++;
                     }
                 }
-                _log?.LogInfo($"Orders panel found; {found.Count} button(s): {string.Join(" | ", found)}.");
+                _log?.LogDebug($"Orders panel found; {found.Count} button(s): {string.Join(" | ", found)}.");
                 PanelConceal.DumpSubtree(panel.transform, 0, _log, 1);
                 if (panel.buttonPrefab != null)
                 {
-                    _log?.LogInfo("...and its button prefab:");
+                    _log?.LogDebug("...and its button prefab:");
                     PanelConceal.DumpSubtree(panel.buttonPrefab.transform, 0, _log, 3);
                 }
             }

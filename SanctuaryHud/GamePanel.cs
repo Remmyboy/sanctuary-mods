@@ -51,28 +51,12 @@ namespace SanctuaryHud
             }
 
             // Static TMP atlases ship without their source TTF, so the usual
-            // outcome is a fallback. Bahnschrift is on every Windows 10/11
-            // and is the same condensed, squared-off cut as Rajdhani.
-            try
-            {
-                var installed = new HashSet<string>(Font.GetOSInstalledFontNames(), StringComparer.OrdinalIgnoreCase);
-                foreach (var name in new[] { "Rajdhani SemiBold", "Rajdhani", "Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold", "Segoe UI" })
-                {
-                    if (!installed.Contains(name)) continue;
-                    _font = Font.CreateDynamicFontFromOSFont(name, 16);
-                    if (_font != null)
-                    {
-                        _font.hideFlags = HideFlags.HideAndDontSave;
-                        log?.LogInfo($"Strip font: installed '{name}'.");
-                        return _font;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                log?.LogInfo($"Installed font lookup failed ({e.Message}); using the default.");
-            }
-            return null;
+            // outcome is a fallback: the HUD's own pick of the installed
+            // faces (HudImgui.Font, the same list at the same size), kept and
+            // freed with the rest of the HUD's generated objects.
+            _font = HudImgui.Font;
+            if (_font != null) log?.LogInfo($"Strip font: installed '{_font.name}'.");
+            return _font;
         }
 
         private static Font FontFromTextMeshPro()
@@ -104,8 +88,18 @@ namespace SanctuaryHud
                 if (a.HasValue) alloy = a.Value;
                 if (e.HasValue) energy = e.Value;
             }
-            catch { /* colours are cosmetic; the fallback tints stand */ }
+            catch (Exception e)
+            {
+                // Colours are cosmetic; the fallback tints stand.
+                if (!_sampleLogged)
+                {
+                    _sampleLogged = true;
+                    HudCore._log?.LogWarning($"Strip tints could not be read off the game's panel (logged once): {e.Message}");
+                }
+            }
         }
+
+        private static bool _sampleLogged;
 
         private static Color? BarTint(RadialProgressBarElement bar)
         {
@@ -322,7 +316,7 @@ namespace SanctuaryHud
             var components = string.Join(",", node.GetComponents<Component>()
                 .Where(c => c != null).Select(c => c.GetType().Name)
                 .Where(n => n != "RectTransform" && n != "CanvasRenderer"));
-            log?.LogInfo($"  {new string(' ', depth * 2)}{node.name}{(node.gameObject.activeSelf ? "" : " (hidden)")} {{{components}}}");
+            log?.LogDebug($"  {new string(' ', depth * 2)}{node.name}{(node.gameObject.activeSelf ? "" : " (hidden)")} {{{components}}}");
             if (!node.gameObject.activeSelf) return;
             for (var i = 0; i < node.childCount; i++) DumpSubtree(node.GetChild(i), depth + 1, log);
         }

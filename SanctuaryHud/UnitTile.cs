@@ -128,9 +128,16 @@ namespace SanctuaryHud
 
         /// Takes the given game button's look for this frame: its plate and
         /// art, strategic icon, count, progress and whether it can be clicked.
+        /// The source's own Button, looked up when the source changes.
+        private Button _sourceButton;
+
         internal void Mirror(UnitButtonElement source)
         {
-            _source = source;
+            if (source != _source)
+            {
+                _source = source;
+                _sourceButton = source.GetComponent<Button>();
+            }
             _layout.preferredWidth = _native.x;
             _layout.preferredHeight = _native.y;
             _layout.minWidth = _native.x;
@@ -185,12 +192,7 @@ namespace SanctuaryHud
                 }
             }
 
-            if (_button != null)
-            {
-                var sourceButton = source.GetComponent<Button>();
-                _button.interactable = sourceButton == null || sourceButton.interactable;
-            }
-
+            if (_button != null) _button.interactable = _sourceButton == null || _sourceButton.interactable;
         }
 
         // ---- pointer events, passed to the game's button -----------------------

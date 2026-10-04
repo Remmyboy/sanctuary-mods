@@ -34,11 +34,18 @@ namespace SanctuaryHud
         private static ConfigEntry<bool> _cfgDrag;
         private static ConfigEntry<float> _cfgGrabPixels;
 
-        private static bool _installed;
-        private static string _installedSignature;
-        private static float _accum;
-        private static float _retryAt;
         private static int _moves;
+
+        // The chunk carries the settings, so a change of setting is a
+        // different chunk: LuaHook takes the old one out and puts this in.
+        private static readonly LuaHook Hook = new LuaHook("__SdbWaypoints", "waypoints", Chunk)
+        {
+            LogInstalls = false,
+            Installed = OnInstalled,
+        };
+
+        private static string _chunk;
+        private static string _chunkSignature;
 
         internal static void Bind(ConfigFile config)
         {
@@ -57,107 +64,70 @@ namespace SanctuaryHud
                 "points on the host only, so this shows the ones set since the match (or the mod) started.");
         }
 
-        internal static void Shutdown() => Remove();
+        internal static void Shutdown() => Hook.Remove();
 
         // Alt-Tab mid-drag loses the button's release, and the next click
         // anywhere would then drop the waypoint there. Put it back instead.
         internal static void FocusLost()
         {
-            if (!_installed || !LuaReady) return;
-            RunLua("if __SdbWaypoints and __SdbWaypoints.drag then __SdbWaypoints.Cancel() end");
+            if (!Hook.Live || !LuaReady) return;
+            Hook.Call("if __SdbWaypoints.drag then __SdbWaypoints.Cancel() end");
         }
 
-        private static string Signature() =>
-            $"{_cfgRally.Value}|{_cfgDrag.Value}|{_cfgGrabPixels.Value.ToString(CultureInfo.InvariantCulture)}";
+        /// The install chunk with the settings in, made again only when one
+        /// of them changes (LuaHook asks for it every check).
+        private static string Chunk()
+        {
+            var grab = Mathf.Clamp(_cfgGrabPixels.Value, 4f, 60f).ToString(CultureInfo.InvariantCulture);
+            var signature = (_cfgRally.Value ? "r" : "-") + (_cfgDrag.Value ? "d" : "-") + grab;
+            if (_chunk == null || signature != _chunkSignature)
+            {
+                _chunkSignature = signature;
+                _chunk = InstallChunk
+                    .Replace("__RALLY__", _cfgRally.Value ? "true" : "false")
+                    .Replace("__DRAG__", _cfgDrag.Value ? "true" : "false")
+                    .Replace("__GRAB__", grab);
+            }
+            return _chunk;
+        }
+
+        private static void OnInstalled()
+        {
+            _moves = 0;
+            _log?.LogInfo("Waypoints installed for this match" +
+                          (_cfgRally.Value ? ": rally points shown" : "") +
+                          (_cfgDrag.Value ? (_cfgRally.Value ? ", " : ": ") + "waypoints draggable" : "") + ".");
+        }
+
+        private static float _accum;
 
         internal static void Tick()
         {
+            // The client VM exists exactly while a match or replay runs, so it
+            // is the whole gate, as in BuildHotkeys. LuaHook checks once a
+            // second, puts it back in a new VM, and swaps it for a settings
+            // change; a failed install waits before it is tried again.
+            Hook.Tick(_cfgRally.Value || _cfgDrag.Value);
+            if (!Hook.Live) return;
+
             _accum += Time.unscaledDeltaTime;
             if (_accum < 1f) return;
             _accum = 0f;
-
-            // The client VM exists exactly while a match or replay runs, so it
-            // is the whole gate, as in BuildHotkeys.
-            EnsureLuaBridge();
-            if (!LuaReady)
-            {
-                _installed = false;
-                _installedSignature = null;
-                return;
-            }
-
-            var wanted = _cfgRally.Value || _cfgDrag.Value;
-            var signature = Signature();
-            if (_installed)
-            {
-                if (!wanted || signature != _installedSignature) Remove();
-                else if (StillInstalled())
-                {
-                    // Another mod unhooking itself (CameraUtilities puts its
-                    // saved originals back) can take ours out with it.
-                    RunLua("if __SdbWaypoints then __SdbWaypoints.Ensure() end");
-                    return;
-                }
-                else _installed = false;   // VM swapped under us; reinstall below.
-            }
-
-            // A failed install logs the whole chunk, so don't retry it every second.
-            if (wanted && Time.unscaledTime >= _retryAt) Install(signature);
+            // Another mod unhooking itself (CameraUtilities puts its saved
+            // originals back) can take ours out with it.
+            Hook.Call("__SdbWaypoints.Ensure()");
+            CountMoves();
         }
 
-        /// True while the hook is live in the VM the game is running. Doubles
-        /// as the counter of waypoints moved. A number, since the read-back
-        /// bridge is lua_tostring and reads no booleans.
-        private static bool StillInstalled()
+        /// The counter of waypoints moved, for the log. A number, since the
+        /// read-back bridge is lua_tostring and reads no booleans.
+        private static void CountMoves()
         {
             var raw = GetLuaGlobal("__SdbWaypointsCount");
-            if (raw == null) return false;
-            if (int.TryParse(raw, out var count) && count > _moves)
+            if (raw != null && int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) && count > _moves)
             {
                 _moves = count;
                 _log?.LogInfo($"Waypoints: {count} waypoint(s) moved this match.");
-            }
-            return true;
-        }
-
-        private static void Install(string signature)
-        {
-            var chunk = InstallChunk
-                .Replace("__RALLY__", _cfgRally.Value ? "true" : "false")
-                .Replace("__DRAG__", _cfgDrag.Value ? "true" : "false")
-                .Replace("__GRAB__", Mathf.Clamp(_cfgGrabPixels.Value, 4f, 60f).ToString(CultureInfo.InvariantCulture));
-            try
-            {
-                if (!RunLua(chunk))
-                {
-                    _retryAt = Time.unscaledTime + 30f;
-                    return;
-                }
-                _installed = true;
-                _installedSignature = signature;
-                _moves = 0;
-                _log?.LogInfo("Waypoints installed for this match" +
-                              (_cfgRally.Value ? ": rally points shown" : "") +
-                              (_cfgDrag.Value ? (_cfgRally.Value ? ", " : ": ") + "waypoints draggable" : "") + ".");
-            }
-            catch (Exception e)
-            {
-                _log?.LogWarning($"Waypoints could not be installed: {e.Message}");
-            }
-        }
-
-        private static void Remove()
-        {
-            if (!_installed) return;
-            _installed = false;
-            _installedSignature = null;
-            try
-            {
-                if (LuaReady) RunLua("if __SdbWaypoints then __SdbWaypoints.Remove() end");
-            }
-            catch (Exception e)
-            {
-                _log?.LogWarning($"Waypoints could not be removed: {e.Message}");
             }
         }
 
@@ -280,9 +250,15 @@ if not __SdbWaypoints then
   end end)
 
   ----------------------------------------------------------------- drawing
+  -- The order manager redraws every frame, but what this adds seldom
+  -- changes: each frame's lines and nodes are listed first (W.want, flat
+  -- numbers), and the prefabs are only remade when the list differs from
+  -- what is up (W.shown).
+  W.want, W.shown = {}, {}
   local function clearDrawn()
     for _, id in ipairs(W.drawn) do Engine.DeletePrefabInstance(id) end
     W.drawn = {}
+    W.shown = {}
   end
 
   -- The same prefabs and calls CreateOrderLine and DrawOrderNode use, with
@@ -294,6 +270,17 @@ if not __SdbWaypoints then
     if LINE_STYLE[task] == 2 then return _G.OrderNodePrefabIDRed end
     if LINE_STYLE[task] == 3 then return _G.OrderNodePrefabIDPurple end
     return _G.OrderNodePrefabIDBlue
+  end
+  -- Eight numbers an item: kind (1 line, 2 node), a, b (0s for a node), task.
+  local function wantLine(a, b, task)
+    local w, n = W.want, #W.want
+    w[n + 1], w[n + 2], w[n + 3], w[n + 4] = 1, a.x, a.y, a.z
+    w[n + 5], w[n + 6], w[n + 7], w[n + 8] = b.x, b.y, b.z, task or 0
+  end
+  local function wantNode(p, task)
+    local w, n = W.want, #W.want
+    w[n + 1], w[n + 2], w[n + 3], w[n + 4] = 2, p.x, p.y, p.z
+    w[n + 5], w[n + 6], w[n + 7], w[n + 8] = 0, 0, 0, task or 0
   end
   local function drawLine(a, b, task)
     a = MU.SnapToWaterVisualMarkerHeight(copy3(a))
@@ -329,8 +316,8 @@ if not __SdbWaypoints then
         prev.x, prev.y, prev.z = prev.x / n, prev.y / n, prev.z / n
         for _, s in ipairs(grp.specs) do
           local task = s.build and OT.BUILD or s.task
-          drawLine(prev, s.pos, task)
-          drawNode(s.pos, task)
+          wantLine(prev, s.pos, task)
+          wantNode(s.pos, task)
           prev = s.pos
         end
       end
@@ -375,9 +362,9 @@ if not __SdbWaypoints then
     return out
   end
 
+  -- What is wanted this frame, into W.want.
   W.inheritTick = 0
-  W.DrawExtras = function()
-    clearDrawn()
+  local function listExtras()
     -- CameraUtilities hiding order lines hides these as well.
     local cu = rawget(_G, '__CameraUtils')
     if cu and cu.orders then return end
@@ -397,10 +384,32 @@ if not __SdbWaypoints then
       local p = rallyOf(f)
       if p then
         if D and D.active and D.rally == f and D.pos then p = D.pos end
-        drawLine(f:GetPosition(), p, OT.MOVE)
-        drawNode(p, OT.MOVE)
+        wantLine(f:GetPosition(), p, OT.MOVE)
+        wantNode(p, OT.MOVE)
       end
     end
+  end
+
+  W.DrawExtras = function()
+    W.want = {}
+    listExtras()
+    local want, shown = W.want, W.shown
+    local same = #want == #shown
+    for i = 1, #want do
+      if not same then break end
+      same = want[i] == shown[i]
+    end
+    if same then return end
+    clearDrawn()
+    for i = 1, #want, 8 do
+      local a = { x = want[i + 1], y = want[i + 2], z = want[i + 3] }
+      if want[i] == 1 then
+        drawLine(a, { x = want[i + 4], y = want[i + 5], z = want[i + 6] }, want[i + 7])
+      else
+        drawNode(a, want[i + 7])
+      end
+    end
+    W.shown = want
   end
 
   hook(COM, 'DebugDraw', function(orig) return function(...)

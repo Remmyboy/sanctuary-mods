@@ -37,6 +37,16 @@ namespace SanctuaryHud
         private readonly List<UnitTile> _live = new List<UnitTile>();
         private readonly List<int> _wrap = new List<int>();
 
+        /// Lay out again on the next Sync: the tiles, the wrap or the scale
+        /// changed, or it was just shown. Otherwise the row is the size it was.
+        private bool _dirty = true;
+        private float _scale = -1f;
+
+        /// When a tile last failed to clone, or -1: it is tried again after
+        /// a pause, not on every frame.
+        private float _cloneFailedAt = -1f;
+        private const float CloneRetry = 5f;
+
         internal RectTransform Rect => _rect;
         internal bool Alive => _rect != null;
 
@@ -66,8 +76,9 @@ namespace SanctuaryHud
 
         internal void Show(bool showing)
         {
-            if (_rect == null) return;
-            if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+            if (_rect == null || _rect.gameObject.activeSelf == showing) return;
+            _rect.gameObject.SetActive(showing);
+            if (showing) _dirty = true;
         }
 
         internal void Place(Vector2 bottomLeft)
@@ -111,15 +122,23 @@ namespace SanctuaryHud
                 _shownLines.Clear();
                 _live.Clear();
                 _tileSize = UnitTile.NativeSize(prefabPanel);
+                _cloneFailedAt = -1f;
+                _dirty = true;
             }
-            HudCanvas.PlateStyle(_rect, false);
-            _rect.localScale = new Vector3(scale, scale, 1f);
+            if (scale != _scale)
+            {
+                _scale = scale;
+                _rect.localScale = new Vector3(scale, scale, 1f);
+                _dirty = true;
+            }
+            if (_dirty) HudCanvas.PlateStyle(_rect, false);
 
             Wrap(entries, maxWidth / Mathf.Max(scale, 0.01f), maxLines);
 
             var same = _wrapTotal == _shown.Count && _wrap.Count == _shownLines.Count;
             for (var i = 0; same && i < _wrapTotal; i++) same = entries[i].Element == _shown[i];
             for (var i = 0; same && i < _wrap.Count; i++) same = _wrap[i] == _shownLines[i];
+            if (same && _cloneFailedAt >= 0f && Time.unscaledTime >= _cloneFailedAt + CloneRetry) same = false;
             if (!same) Rebuild(prefabPanel, entries);
 
             for (var i = 0; i < _live.Count && i < entries.Count; i++)
@@ -130,8 +149,13 @@ namespace SanctuaryHud
                 if (entry.Element != null) tile.Mirror(entry.Element);
             }
 
-            // So the size is right for whoever lays out beside the row this frame.
-            LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+            // So the size is right for whoever lays out beside the row this
+            // frame, on the frames it changed.
+            if (_dirty)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                _dirty = false;
+            }
         }
 
         /// Splits the entries into lines no wider than maxWidth (in unscaled
@@ -171,6 +195,8 @@ namespace SanctuaryHud
 
         private void Rebuild(SanctuaryPanelUI panel, List<UnitRow.Entry> entries)
         {
+            _dirty = true;
+            _cloneFailedAt = -1f;
             foreach (var tile in _tiles) if (tile != null && tile.gameObject.activeSelf) tile.gameObject.SetActive(false);
             foreach (var separator in _separators) if (separator != null && separator.activeSelf) separator.SetActive(false);
             foreach (var line in _lines) if (line != null && line.gameObject.activeSelf) line.gameObject.SetActive(false);
@@ -206,7 +232,16 @@ namespace SanctuaryHud
                         else
                         {
                             tile = UnitTile.Create(panel, line);
-                            if (tile == null) continue;
+                            if (tile == null)
+                            {
+                                // Left as a gap, so the tiles after it still
+                                // line up with their entries; tried again
+                                // after a pause.
+                                _shown.Add(entry.Element);
+                                _live.Add(null);
+                                _cloneFailedAt = Time.unscaledTime;
+                                continue;
+                            }
                             _tiles.Add(tile);
                         }
                         tileAt++;
