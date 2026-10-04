@@ -37,24 +37,30 @@ namespace SanctuaryHud
         private ConfigEntry<bool> _cfgAssistPauses;
         private ConfigEntry<float> _cfgAssistPauseDelay;
 
-        private bool _assistHookInstalled;
-        private string _assistSignature;
-        private float _installAccum;
+        /// The hook in the client VM: back in with each match's fresh Lua
+        /// state, and replaced when the pause settings baked into it change.
+        private LuaHook _assistHook;
         private float _tickAccum;
+        private float _countAccum;
         private int _upgradesQueued;
 
-        // Guarded by a global inside the VM, so re-running it is harmless —
-        // which is what makes retrying safe. Each match builds a fresh Lua
-        // state, so the flag (and the hook) go away with the old one.
+        // The install chunk as last built, and the settings it was built
+        // from, so the hook's once-a-second check costs two comparisons.
+        private string _assistChunk;
+        private bool _assistChunkPauses;
+        private float _assistChunkDelay;
+
+        // Everything lives on one table, __SdbAssist, so taking the hook out
+        // leaves nothing behind but the count, which Remove clears too.
         private const string InstallChunk =
-            "if not __SdbAssistUpgrade then " +
-            "  __SdbAssistUpgrade = true " +
-            "  __SdbAssistPause = __PAUSE__ " +
-            "  __SdbAssistPauseDelay = __DELAY__ " +
-            "  __SdbAssistPendingList = {} " +
+            "do " +
             "  local m = Import('client/inputEventsFunctions.lua') " +
             "  local orig = m.IssueAssistOrder " +
-            "  __SdbAssistUpgradeOrig = orig " +
+            // Wrapping nothing would break the assist key outright.
+            "  if type(orig) ~= 'function' then error('EcoManager: no IssueAssistOrder to wrap') end " +
+            PauseLua +
+            "  local S = { pause = __PAUSE__, delay = __DELAY__, pending = {} } " +
+            "  __SdbAssistCount = 0 " +
             "  local wrapped = function(...) " +
             "    local ok, err = pcall(function() " +
             // GetHoverUnit is a global *of that module's environment table*,
@@ -103,21 +109,19 @@ namespace SanctuaryHud
             ".RequestQueueAmount.Send({ hover.id }, { itemId }, up, 1) " +
             // Remember the extractor, so the tick below can hold its upgrade
             // until work on it actually begins.
-            "      if __SdbAssistPause then " +
+            "      if S.pause then " +
             "        local now = (os and os.clock) and os.clock() or 0 " +
-            "        table.insert(__SdbAssistPendingList, " +
-            "          { u = hover, due = now + __SdbAssistPauseDelay, paused = false }) " +
+            "        table.insert(S.pending, { u = hover, due = now + S.delay, paused = false }) " +
             "      end " +
             // Lets the C# side confirm the hook is actually firing; the Lua
-            // log is not much use for that from here.
-            "      __SdbAssistUpgradeCount = (__SdbAssistUpgradeCount or 0) + 1 " +
+            // log is not much use for that from here. A plain global, as the
+            // read-back bridge reads no table fields.
+            "      __SdbAssistCount = (__SdbAssistCount or 0) + 1 " +
             "    end) " +
-            "    if not ok then Warn('SanctuaryHud assist-upgrade: ' .. tostring(err)) end " +
+            "    if not ok then Warn('EcoManager assist-upgrade: ' .. tostring(err)) end " +
             // The assist itself always goes through untouched, upgrade or not.
             "    return orig(...) " +
             "  end " +
-            "  m.IssueAssistOrder = wrapped " +
-            "  IssueAssistOrder = wrapped " +
 
             // Queue five engineers onto five extractors and all five upgrades
             // start at once, which drains the economy flat. Pausing each one
@@ -138,14 +142,11 @@ namespace SanctuaryHud
             // assisting engineer will not start on, so a pause landing that
             // early would hold the upgrade for good. The delay before any of
             // this lets the queued upgrade settle first.
-            "  function __SdbAssistToggle(unit, on) " +
-            "    Import('common/commands/definitions/toggles.lua').RequestUnitsToggle.Send( " +
-            "      { unit.id }, Import('common/toggles.lua').ToggleNameToToggleType('Pause'), on) " +
-            "  end " +
+            "  S.Toggle = function(unit, on) sdbPause({ unit.id }, on) end " +
 
-            "  function __SdbAssistTick() " +
-            "    local list = __SdbAssistPendingList " +
-            "    if not list or #list == 0 then return end " +
+            "  local function tick() " +
+            "    local list = S.pending " +
+            "    if #list == 0 then return end " +
             // Upgrades with a builder on them right now, by upgrading
             // structure. The structure building its own upgrade doesn't count;
             // anyone else's engineer, an ally's included, does.
@@ -168,13 +169,13 @@ namespace SanctuaryHud
             "        if worked[u.id.index] or not (u.IsUpgradeQueued and u:IsUpgradeQueued()) then " +
             // Being built, or finished or cancelled: let go either way, so a
             // cancelled upgrade never strands a paused extractor.
-            "          if e.paused then __SdbAssistToggle(u, false) end " +
+            "          if e.paused then S.Toggle(u, false) end " +
             "          drop = true " +
             "        elseif not e.paused then " +
             "          local site = u.upgradeTarget " +
             "          if site and site.progress and site.progress > 0 then " +
             "            if u.HasToggle and u:HasToggle('Pause') then " +
-            "              __SdbAssistToggle(u, true) " +
+            "              S.Toggle(u, true) " +
             "              e.paused = true " +
             "            else " +
             "              drop = true " +
@@ -185,38 +186,31 @@ namespace SanctuaryHud
             "      if drop then table.remove(list, i) end " +
             "    end " +
             "  end " +
-            "end";
-
-        // Puts the client's own IssueAssistOrder back, and releases anything
-        // still held paused — leaving an extractor stopped with nothing running
-        // to explain it would be the worst way to unload.
-        private const string RemoveChunk =
-            "if __SdbAssistUpgrade and __SdbAssistUpgradeOrig then " +
-            "  for _, e in pairs(__SdbAssistPendingList or {}) do " +
-            "    if e.paused and e.u and e.u.id then pcall(__SdbAssistToggle, e.u, false) end " +
+            // pcall so one dead unit reference cannot spam the log five times
+            // a second, but say so once: a tick that keeps failing leaves
+            // upgrades held paused.
+            "  S.Tick = function() " +
+            "    local ok, err = pcall(tick) " +
+            "    if not ok and not S.tickWarned then S.tickWarned = true Warn('EcoManager assist tick: ' .. tostring(err)) end " +
             "  end " +
-            "  local m = Import('client/inputEventsFunctions.lua') " +
-            "  m.IssueAssistOrder = __SdbAssistUpgradeOrig " +
-            "  IssueAssistOrder = __SdbAssistUpgradeOrig " +
-            "  __SdbAssistUpgrade = nil " +
-            "  __SdbAssistUpgradeOrig = nil " +
-            "  __SdbAssistPendingList = nil " +
-            "end";
 
-        private void RemoveAssistHook()
-        {
-            if (!_assistHookInstalled) return;
-            _assistHookInstalled = false;
-            _assistSignature = null;
-            try
-            {
-                if (LuaReady) RunLua(RemoveChunk);
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning($"Assist-starts-upgrade hook could not be removed: {e.Message}");
-            }
-        }
+            // Puts the client's own IssueAssistOrder back (unless something
+            // has wrapped it since), and releases anything still held paused —
+            // leaving an extractor stopped with nothing running to explain it
+            // would be the worst way to unload.
+            "  S.Remove = function() " +
+            "    for _, e in pairs(S.pending) do " +
+            "      if e.paused and e.u and e.u.id then pcall(S.Toggle, e.u, false) end " +
+            "    end " +
+            "    S.pending = {} " +
+            "    if m.IssueAssistOrder == wrapped then m.IssueAssistOrder = orig end " +
+            "    if IssueAssistOrder == wrapped then IssueAssistOrder = orig end " +
+            "    __SdbAssistCount = nil " +
+            "  end " +
+            "  m.IssueAssistOrder = wrapped " +
+            "  IssueAssistOrder = wrapped " +
+            "  __SdbAssist = S " +
+            "end";
 
         private void AwakeAssistUpgrade()
         {
@@ -231,94 +225,81 @@ namespace SanctuaryHud
             _cfgAssistPauseDelay = Config.Bind("Assist", "AssistPauseSeconds", 1f,
                 "The least time to wait after queueing before pausing. The pause also waits for the upgrade to " +
                 "have actually begun, since an engineer cannot start on one paused before then.");
+
+            _assistHook = new LuaHook("__SdbAssist", "assist-starts-upgrade hook", AssistChunk)
+            {
+                LogInstalls = false,
+                Installed = AssistInstalled,
+            };
         }
 
-        private string AssistSignature() =>
-            $"{_cfgAssistPauses.Value}|{_cfgAssistPauseDelay.Value}";
+        /// The install chunk for the settings now. They are baked into it, so
+        /// a change from the mod manager makes a different chunk, which the
+        /// hook replaces rather than waiting for the next match.
+        private string AssistChunk()
+        {
+            var pauses = _cfgAssistPauses.Value;
+            var delay = Math.Max(0f, _cfgAssistPauseDelay.Value);
+            if (_assistChunk == null || pauses != _assistChunkPauses || !delay.Equals(_assistChunkDelay))
+            {
+                _assistChunkPauses = pauses;
+                _assistChunkDelay = delay;
+                _assistChunk = InstallChunk
+                    .Replace("__PAUSE__", pauses ? "true" : "false")
+                    .Replace("__DELAY__", delay.ToString(CultureInfo.InvariantCulture));
+            }
+            return _assistChunk;
+        }
 
-        /// Called each frame; installs the hook once the match's Lua VM is up.
+        /// After each install, or on finding it already in (a hot reload):
+        /// the count starts from what the VM holds, so the next poll reports
+        /// only upgrades started from here on.
+        private void AssistInstalled()
+        {
+            _upgradesQueued = AssistCount();
+            Logger.LogInfo("Assist-starts-upgrade hook installed for this match" +
+                           (_assistChunkPauses ? " (upgrades held paused until an engineer starts building them)." : "."));
+        }
+
+        private static int AssistCount() =>
+            int.TryParse(GetLuaGlobal("__SdbAssistCount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
+                ? count
+                : 0;
+
+        /// Called each frame; the hook goes in once the match's Lua VM is up,
+        /// back in with the next match's, and out when switched off.
         private void UpdateAssistUpgrade(float deltaTime)
         {
-            if (!_cfgAssistStartsUpgrade.Value)
-            {
-                // Turned off mid-match: take the hook back out.
-                if (_assistHookInstalled) RemoveAssistHook();
-                return;
-            }
+            // Outside a match there is no VM worth hooking, and the one a
+            // match had goes with it.
+            if (!InMatch) return;
+            _assistHook.Tick(_cfgAssistStartsUpgrade.Value);
+            if (!_assistHook.Live) return;
 
-            if (!InMatch)
-            {
-                // The VM is torn down between matches, taking the hook with
-                // it, so the next match reinstalls from scratch.
-                _assistHookInstalled = false;
-                _assistSignature = null;
-                return;
-            }
-
-            // The pause settings are baked into the chunk, so a change from the
-            // mod manager has to reinstall rather than wait for the next match.
-            if (_assistHookInstalled && _assistSignature != AssistSignature()) RemoveAssistHook();
-
-            // Faster than the install upkeep below: this is what actually
-            // applies the delayed pause and watches for an engineer starting
-            // work, and a second's granularity would be visible on both.
-            if (_assistHookInstalled && _cfgAssistPauses.Value)
+            // Faster than the hook's own upkeep: this is what actually applies
+            // the delayed pause and watches for an engineer starting work, and
+            // a second's granularity would be visible on both.
+            if (_cfgAssistPauses.Value)
             {
                 _tickAccum += deltaTime;
                 if (_tickAccum >= 0.2f)
                 {
                     _tickAccum = 0f;
-                    // pcall so one dead unit reference cannot spam the log five
-                    // times a second, but say so once: a tick that keeps failing
-                    // leaves upgrades held paused.
-                    RunLua("if __SdbAssistTick then local ok, err = pcall(__SdbAssistTick) " +
-                           "if not ok and not __SdbAssistTickWarned then __SdbAssistTickWarned = true " +
-                           "Warn('EcoManager assist tick: ' .. tostring(err)) end end");
+                    _assistHook.Call("__SdbAssist.Tick()");
                 }
             }
 
-            _installAccum += deltaTime;
-            if (_installAccum < 1f) return;
-            _installAccum = 0f;
+            _countAccum += deltaTime;
+            if (_countAccum < 1f) return;
+            _countAccum = 0f;
 
-            // A quick restart can bring up a new match's VM, without the hook,
-            // before InMatch ever drops. (A number: the read-back bridge is
-            // lua_tostring, which reads no booleans.)
-            if (_assistHookInstalled && GetLuaGlobal("__SdbAssistPauseDelay") == null)
+            // Report each upgrade the hook starts, so "is it working?" is
+            // answerable from the log rather than by inference.
+            var count = AssistCount();
+            if (count > _upgradesQueued)
             {
-                _assistHookInstalled = false;
-                _assistSignature = null;
-            }
-
-            if (_assistHookInstalled)
-            {
-                // Report each upgrade the hook starts, so "is it working?" is
-                // answerable from the log rather than by inference.
-                var raw = GetLuaGlobal("__SdbAssistUpgradeCount");
-                if (int.TryParse(raw, out var count) && count > _upgradesQueued)
-                {
-                    _upgradesQueued = count;
-                    Logger.LogInfo($"Assist started an extractor upgrade ({count} this match).");
-                }
-                return;
-            }
-
-            if (!LuaReady) return;
-            try
-            {
-                var chunk = InstallChunk
-                    .Replace("__PAUSE__", _cfgAssistPauses.Value ? "true" : "false")
-                    .Replace("__DELAY__", Math.Max(0f, _cfgAssistPauseDelay.Value).ToString(CultureInfo.InvariantCulture));
-                if (!RunLua(chunk)) return;
-                _assistHookInstalled = true;
-                _assistSignature = AssistSignature();
-                _upgradesQueued = 0;
-                Logger.LogInfo("Assist-starts-upgrade hook installed for this match" +
-                               (_cfgAssistPauses.Value ? " (upgrades held paused until an engineer starts building them)." : "."));
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning($"Assist-starts-upgrade hook could not be installed: {e.Message}");
+                _upgradesQueued = count;
+                Logger.LogInfo($"Assist started an extractor upgrade ({count} this match).");
             }
         }
     }
