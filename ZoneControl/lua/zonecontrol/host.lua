@@ -247,7 +247,7 @@ end
 local function SetSpeed(unit, fn)
     local ok, err, speed = pcall(Engine.GetMovementMaxSpeed, unit.id)
     if ok and type(speed) == "number" then
-        pcall(Engine.SetMovementMaxSpeed, unit.id, fn(speed))
+        pcall(Engine.SetMovementMaxSpeed, unit.id, fn(speed)) -- lua-check: ok
     end
 end
 

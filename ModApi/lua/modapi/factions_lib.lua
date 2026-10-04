@@ -1,6 +1,8 @@
 -- The rest of modapi/factions.lua: what the framework's hooks and a mod's
 -- own Lua ask about the factions above. Every faction number here is the
 -- game's: FactionsData's index, which is the lobby's faction value + 1.
+-- Its functions are the library faction mods call, not read by our own Lua:
+-- lua-check: globals Find, TagsByIndex
 
 local stockLetters = { EDA = "ue", CHOSEN = "uc", GUARD = "ug" }
 

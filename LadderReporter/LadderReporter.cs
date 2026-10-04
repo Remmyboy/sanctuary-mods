@@ -94,7 +94,7 @@ namespace SanctuaryHud
         // starts sending it.
         private const string ArmyCountChunk =
             "__SdbLadderArmyCount = '' " +
-            "pcall(function() " +
+            "pcall(function() " + // lua-check: ok
             "  local n = 0 " +
             "  for _ in pairs(GameInfo.MapData.armies) do n = n + 1 end " +
             "  __SdbLadderArmyCount = tostring(n) " +
@@ -111,7 +111,7 @@ namespace SanctuaryHud
             "  local m = Import('client/winCondition.lua') " +
             "  __SdbLadderOrig = m.WinConditionUpdate " +
             "  m.WinConditionUpdate = function(data) " +
-            "    pcall(function() " +
+            "    pcall(function() " + // lua-check: ok
             "      __SdbLadderWCU = __SdbLadderWCU .. tostring(data.armyID) .. ':' .. tostring(data.condition) .. ';' " +
             "    end) " +
             // The game's own handling always runs, hook or no hook.

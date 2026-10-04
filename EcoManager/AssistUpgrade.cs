@@ -50,6 +50,8 @@ namespace SanctuaryHud
         private bool _assistChunkPauses;
         private float _assistChunkDelay;
 
+        // IssueAssistOrder is wrapped where the game's input code looks it up
+        // as well as on its module. lua-check: globals IssueAssistOrder
         // Everything lives on one table, __SdbAssist, so taking the hook out
         // leaves nothing behind but the count, which Remove clears too.
         private const string InstallChunk =
@@ -200,7 +202,7 @@ namespace SanctuaryHud
             // would be the worst way to unload.
             "  S.Remove = function() " +
             "    for _, e in pairs(S.pending) do " +
-            "      if e.paused and e.u and e.u.id then pcall(S.Toggle, e.u, false) end " +
+            "      if e.paused and e.u and e.u.id then pcall(S.Toggle, e.u, false) end " + // lua-check: ok
             "    end " +
             "    S.pending = {} " +
             "    if m.IssueAssistOrder == wrapped then m.IssueAssistOrder = orig end " +

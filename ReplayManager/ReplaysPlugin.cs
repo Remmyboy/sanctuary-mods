@@ -201,7 +201,7 @@ do
   __SdbReplayPlayers = __SdbReplayPlayers or ''
   __SdbReplayHookErr = ''
   S.ecoDirty = true
-  pcall(function() SetObserver(true) end)
+  pcall(function() SetObserver(true) end) -- lua-check: ok
   local ok, err = pcall(function()
     local E = Import('common/commands/definitions/economy.lua')
     local cmd = E.UpdateEconomyTotals
@@ -232,7 +232,7 @@ do
     if type(origRecv) ~= 'function' then error('ReceiveDataClient is not a global') end
     local mine = function(name, data)
       if name == 'InitClient' and not S.off then
-        pcall(function()
+        pcall(function() -- lua-check: ok
           local parts = {}
           for _, p in ipairs(data.playersInformation or {}) do
             parts[#parts + 1] = string.format('%s|%s|%s|%s', tostring(p.clientID), tostring(p.nickname), tostring(p.armyID), tostring(p.playerType))
@@ -268,7 +268,7 @@ do
       local cond, shown = {}, false
       local mine = function(data, ...)
         if S.off then return inner(data, ...) end
-        pcall(function() cond[data.armyID] = data.condition end)
+        pcall(function() cond[data.armyID] = data.condition end) -- lua-check: ok
         local vis, txt = Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues
         Engine.UI_SetPanelVisibility = function(t, v) if t ~= GR then return vis(t, v) end end
         Engine.UI_SetGameResultValues = function() end
@@ -322,7 +322,7 @@ do
 
   S.Remove = function()
     S.off = true
-    for _, f in ipairs(undo) do pcall(f) end
+    for _, f in ipairs(undo) do pcall(f) end -- lua-check: ok
     __SdbReplay = nil
   end
   __SdbReplay = S

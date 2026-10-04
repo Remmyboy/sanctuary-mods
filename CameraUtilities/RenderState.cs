@@ -207,7 +207,7 @@ namespace SanctuaryHud.CameraUtils
                    $"S.bars = {Lua(HideHealthBars)} S.ui = {Lua(HideGameUi)} " +
                    // Apply straight away rather than waiting for the next
                    // sweep, so a click in the panel reads as instant.
-                   "pcall(S.sweep) end";
+                   "pcall(S.sweep) end"; // lua-check: ok
         }
 
         // Installed once per VM. `S` is the shared state C# writes into,
@@ -393,8 +393,8 @@ namespace SanctuaryHud.CameraUtils
             "    if not ok2 then _G." + ErrorGlobal + " = tostring(err2) end " +
             "  end " +
             "  S.restore = function() " +
-            "    pcall(function() Import('client/rendering/rendering.lua').RenderUpdate = S.origRenderUpdate end) " +
-            "    pcall(function() " +
+            "    pcall(function() Import('client/rendering/rendering.lua').RenderUpdate = S.origRenderUpdate end) " + // lua-check: ok
+            "    pcall(function() " + // lua-check: ok
             "      local om = Import('client/managers/orders/clientOrderManager.lua') " +
             "      om.DebugDraw = S.origDebugDraw " +
             "      om.SetOrderDraw = S.origSetOrderDraw " +
@@ -402,7 +402,7 @@ namespace SanctuaryHud.CameraUtils
             "    end) " +
             "    S.icons = 0 S.intel = false S.attack = false S.build = false " +
             "    S.orders = false S.ghosts = false S.spots = false S.bars = false S.ui = false " +
-            "    pcall(S.sweep) " +
+            "    pcall(S.sweep) " + // lua-check: ok
             "    _G.__CameraUtils = nil " +
             "  end " +
             "  _G." + ErrorGlobal + " = '' " +

@@ -560,7 +560,7 @@ function Events.Report(what, err)
     if #text > 400 then text = string.sub(text, 1, 400) .. "..." end
     local line = what .. ": " .. text
     if Warn then Warn(line) elseif Log then Log(line) end
-    if side == "host" then pcall(function() session().AddLog.Send(line) end) end
+    if side == "host" then pcall(function() session().AddLog.Send(line) end) end -- lua-check: ok
 end
 
 --- Runs fn(...) and returns true; if it errors, reports it (Events.Report)

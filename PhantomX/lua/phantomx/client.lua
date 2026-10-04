@@ -62,12 +62,12 @@ do
             if unit.RecalculateIntel then
                 -- Forced: OnIntelVision also decides the range rings by whether
                 -- the unit is now ours or an ally's.
-                pcall(unit.RecalculateIntel, unit, true)
-                if unit.RecalculateBeamsIntel then pcall(unit.RecalculateBeamsIntel, unit) end
+                pcall(unit.RecalculateIntel, unit, true) -- lua-check: ok
+                if unit.RecalculateBeamsIntel then pcall(unit.RecalculateBeamsIntel, unit) end -- lua-check: ok
             end
         end
         for _, shield in pairs(__Entities.Shields) do
-            if shield.RecalculateIntel then pcall(shield.RecalculateIntel, shield) end
+            if shield.RecalculateIntel then pcall(shield.RecalculateIntel, shield) end -- lua-check: ok
         end
     end)
 end
@@ -289,7 +289,7 @@ local function RenderStory(story)
         row[#row + 1] = Fill()
         if p.id ~= focus then
             row[#row + 1] = UI.Button("View", function()
-                pcall(function() _G.SetFocusArmy(p.id) end)
+                pcall(function() _G.SetFocusArmy(p.id) end) -- lua-check: ok
             end, { size = 18 })
         end
         items[#items + 1] = UI.Row(row, { spacing = 8 })
@@ -313,7 +313,7 @@ if Replay.Playing() then
     if type(setFocus) == "function" then
         _G.SetFocusArmy = function(...)
             local r = setFocus(...)
-            pcall(ReplayTick)
+            pcall(ReplayTick) -- lua-check: ok
             return r
         end
     end
