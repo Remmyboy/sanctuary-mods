@@ -103,6 +103,12 @@ namespace SanctuaryHud
         /// dropped) and the panel should show the mods again.
         private bool FillUnitPicker()
         {
+            try { return FillUnitPickerRows(); }
+            finally { ReleaseAtlasCopies(); } // only needed while symbols load
+        }
+
+        private bool FillUnitPickerRows()
+        {
             var s = Lobby.Selection.FirstOrDefault(x => x.Id == _pickerMod);
             var o = s?.OptionDefinitions.FirstOrDefault(x => x.Key == _pickerKey && x.Type == ModOptionType.Units);
             if (o == null)
@@ -381,9 +387,50 @@ namespace SanctuaryHud
             return art;
         }
 
+        // The game packs its sprites into atlases, so most symbols share one
+        // texture: it is copied to a render texture once per picker build and
+        // each symbol read from that copy, rather than the whole atlas
+        // blitted again for every symbol.
+        private readonly Dictionary<Texture, RenderTexture> _atlasCopies = new Dictionary<Texture, RenderTexture>();
+
+        private RenderTexture AtlasCopy(Texture tex)
+        {
+            if (_atlasCopies.TryGetValue(tex, out var rt) && rt != null) return rt;
+            rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            Graphics.Blit(tex, rt);
+            _atlasCopies[tex] = rt;
+            return rt;
+        }
+
+        private void ReleaseAtlasCopies()
+        {
+            foreach (var rt in _atlasCopies.Values)
+                if (rt != null) RenderTexture.ReleaseTemporary(rt);
+            _atlasCopies.Clear();
+        }
+
+        /// The symbols' masks are ours: they go with the page.
+        private void DestroySymbolArt()
+        {
+            void Free(Sprite s)
+            {
+                if (s == null) return;
+                if (s.texture != null) UnityEngine.Object.Destroy(s.texture);
+                UnityEngine.Object.Destroy(s);
+            }
+            foreach (var art in _symbolArt.Values)
+            {
+                if (art == null) continue;
+                Free(art.Symbol);
+                Free(art.Glow);
+            }
+            _symbolArt.Clear();
+            ReleaseAtlasCopies();
+        }
+
         /// Reads the sprite back through a render texture (the game's copy
         /// isn't CPU-readable) and makes a white mask of each channel.
-        private static SymbolArt Split(Sprite sprite)
+        private SymbolArt Split(Sprite sprite)
         {
             var tex = sprite.texture;
             var r = sprite.textureRect;
@@ -393,13 +440,11 @@ namespace SanctuaryHud
             int w = Mathf.RoundToInt(Mathf.Abs(r.width)), h = Mathf.RoundToInt(Mathf.Abs(r.height));
             float x0 = Mathf.Min(r.x, r.x + r.width), y0 = Mathf.Min(r.y, r.y + r.height);
             if (w <= 0 || h <= 0) return null;
-            var rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             var was = RenderTexture.active;
             Color32[] pixels;
             try
             {
-                Graphics.Blit(tex, rt);
-                RenderTexture.active = rt;
+                RenderTexture.active = AtlasCopy(tex);
                 var read = new Texture2D(w, h, TextureFormat.RGBA32, false, true);
                 read.ReadPixels(new Rect(x0, y0, w, h), 0, 0);
                 read.Apply();
@@ -415,7 +460,6 @@ namespace SanctuaryHud
             finally
             {
                 RenderTexture.active = was;
-                RenderTexture.ReleaseTemporary(rt);
             }
 
             Sprite Mask(Func<Color32, byte> channel)
