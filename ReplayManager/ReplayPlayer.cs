@@ -103,8 +103,24 @@ namespace SanctuaryHud.Replays
         private static bool ReceivePrefix(object __instance)
         {
             if (!Paused || !ReferenceEquals(__instance, _socket)) return true;
-            try { if (!_launchSentRef(__instance)) return true; } catch { return true; }
+            try { if (!_launchSentRef(__instance)) return true; }
+            catch (Exception e)
+            {
+                WarnOnce(ref _warnedLaunch, "can't tell whether the replay has launched, so pause does nothing", e);
+                return true;
+            }
             return false;
+        }
+
+        // These run every frame (or every socket read), so each failure is
+        // logged the first time only.
+        private static bool _warnedLaunch, _warnedBuffered, _warnedState;
+
+        private static void WarnOnce(ref bool warned, string what, Exception e)
+        {
+            if (warned) return;
+            warned = true;
+            _log?.LogWarning($"Replay: {what} ({e.Message}).");
         }
 
         private static void TryReadFramePostfix(object __instance, bool __result)
@@ -128,7 +144,11 @@ namespace SanctuaryHud.Replays
                     ref var net = ref NetworkManager.ClientData.Data;
                     return net.isCreated ? net.receivedHostData.bufferedCommunicatorDatas.Length : 0;
                 }
-                catch { return 0; }
+                catch (Exception e)
+                {
+                    WarnOnce(ref _warnedBuffered, "can't read the client's receive buffer, so the clock runs ahead", e);
+                    return 0;
+                }
             }
         }
 
@@ -159,7 +179,10 @@ namespace SanctuaryHud.Replays
                 loaded = _loadedRef(_socket);
                 ended = _endRef(_socket);
             }
-            catch { }
+            catch (Exception e)
+            {
+                WarnOnce(ref _warnedState, "can't read the replay socket's state, so the panel may not leave loading", e);
+            }
 
             if (Current == Stage.Loading && loaded) Current = Stage.Running;
             if (Current == Stage.Running)
