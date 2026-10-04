@@ -28,7 +28,7 @@ namespace SanctuaryHud.CameraUtils
     // the hotkey and the panel. The panel is on a canvas of the mod's own,
     // not the game's HUD canvas: hiding the game's UI switches that canvas
     // off, and the panel is how it comes back.
-    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.2.1")]
     public class CameraUtilitiesPlugin : BaseUnityPlugin
     {
         private ConfigEntry<KeyCode> _cfgToggleKey;
