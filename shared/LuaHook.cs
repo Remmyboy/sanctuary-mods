@@ -38,7 +38,7 @@ namespace SanctuaryHud
         internal bool LogInstalls = true;
 
         /// Runs after each install: reset anything pushed into the old VM.
-        internal Action Installed;
+        internal Action Installed = null; // set by the hooks that want it
 
         private float _nextCheck;
         private float _retryAt;
