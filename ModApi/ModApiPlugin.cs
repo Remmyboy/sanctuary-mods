@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.7.0";
+        public const string Version = "1.8.0";
 
         private static ManualLogSource _log;
 
@@ -36,6 +36,8 @@ namespace Sanctuary.ModApi
 
         private Harmony _harmony;
         private float _scanAccum;
+        private float _sinceScan;
+        private const float FallbackRescan = 30f;
 
         internal static bool ValidId(string id) => ModManifest.IsValidId(id);
 
@@ -44,21 +46,43 @@ namespace Sanctuary.ModApi
         /// The option values this player last hosted a mod with, or null.
         internal static IReadOnlyDictionary<string, string> RememberedOptions(string modId)
         {
-            try
+            var all = ReadOptions();
+            return all != null && all.TryGetValue(modId, out var v) ? v : null;
+        }
+
+        private static string _badOptions;
+
+        /// Every remembered option, or null when there are none or the setting
+        /// can't be read. Unreadable (hand-edited, say), the setting is kept
+        /// in a .bad copy of the config file before anything replaces it:
+        /// the next save writes only the mod being saved, and every other
+        /// mod's remembered values would otherwise be gone for good.
+        private static Dictionary<string, Dictionary<string, string>> ReadOptions()
+        {
+            var text = _cfgOptions?.Value ?? "";
+            try { return Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(text); }
+            catch (Exception e)
             {
-                var all = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(_cfgOptions?.Value ?? "");
-                return all != null && all.TryGetValue(modId, out var v) ? v : null;
+                if (text == _badOptions) return null;
+                _badOptions = text;
+                var path = _cfgOptions.ConfigFile.ConfigFilePath + ".bad";
+                try
+                {
+                    System.IO.File.WriteAllText(path, text);
+                    Log.LogWarning($"Lobby.Options isn't readable JSON ({e.Message}); remembered mod options start afresh. The old value is in {path}.");
+                }
+                catch (Exception w)
+                {
+                    Log.LogWarning($"Lobby.Options isn't readable JSON ({e.Message}) and couldn't be backed up ({w.Message}); remembered mod options start afresh.");
+                }
+                return null;
             }
-            catch { return null; }
         }
 
         internal static void RememberOptions(string modId, IReadOnlyDictionary<string, string> values)
         {
             if (_cfgOptions == null || !ValidId(modId)) return;
-            Dictionary<string, Dictionary<string, string>> all = null;
-            try { all = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, string>>>(_cfgOptions.Value ?? ""); }
-            catch { }
-            all = all ?? new Dictionary<string, Dictionary<string, string>>();
+            var all = ReadOptions() ?? new Dictionary<string, Dictionary<string, string>>();
             all[modId] = values.ToDictionary(kv => kv.Key, kv => kv.Value);
             // Sorted, so unchanged values make an unchanged string and the
             // config file isn't rewritten for nothing.
@@ -86,6 +110,7 @@ namespace Sanctuary.ModApi
 
             try { System.IO.Directory.CreateDirectory(ModCatalog.ModsRoot); }
             catch (Exception e) { Log.LogWarning($"Could not create {ModCatalog.ModsRoot}: {e.Message}"); }
+            ModCatalog.Watch();
             ModCatalog.Rescan();
 
             _harmony = new Harmony(Guid);
@@ -104,6 +129,7 @@ namespace Sanctuary.ModApi
             // Only at game exit: the API never hot-reloads.
             LobbyManager.OnLobbyStatusChanged -= OnLobbyStatusChanged;
             _harmony?.UnpatchSelf();
+            ModCatalog.Unwatch();
         }
 
         private static void OnLobbyStatusChanged(LobbyManager.LobbyGameStatus status)
@@ -139,12 +165,20 @@ namespace Sanctuary.ModApi
             // In a match the files it started with are the ones it keeps, so
             // the catalog only feeds the Mods page there: looked at far less
             // often than in the menus, where a new mod should show at once.
+            // A rescan happens only once the folder watcher has seen a change;
+            // in the menus a slow rescan regardless covers a change it missed.
+            // Without a watcher it rescans every time, as before.
             _scanAccum += UnityEngine.Time.unscaledDeltaTime;
+            _sinceScan += UnityEngine.Time.unscaledDeltaTime;
             if (_scanAccum >= (ModLua.Ready ? 15f : 2f))
             {
                 _scanAccum = 0f;
-                try { ModCatalog.Rescan(); }
-                catch (Exception e) { Log.LogWarning($"Mod rescan failed: {e.Message}"); }
+                if (ModCatalog.Dirty || !ModLua.Ready && _sinceScan >= FallbackRescan)
+                {
+                    _sinceScan = 0f;
+                    try { ModCatalog.Rescan(); }
+                    catch (Exception e) { Log.LogWarning($"Mod rescan failed: {e.Message}"); }
+                }
             }
 
             try { Lobby.Tick(); }

@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using EM.Map;
 using UnityEngine;
 
@@ -82,7 +80,8 @@ namespace SanctuaryHud
             FrameW = sizeX;
             FrameL = sizeZ;
             _frameFromArea = true;
-            HudCore._log?.LogInfo($"MiniMap: {MapName} framed on its playable area {sizeX:0}x{sizeZ:0} at ({x:0}, {z:0}) of {Width:0}x{Length:0}.");
+            HudCore._log?.LogInfo(FormattableString.Invariant(
+                $"MiniMap: {MapName} framed on its playable area {sizeX:0}x{sizeZ:0} at ({x:0}, {z:0}) of {Width:0}x{Length:0}."));
         }
 
         private static void ResetFrame()
@@ -135,9 +134,8 @@ namespace SanctuaryHud
             var dataName = Path.GetFileNameWithoutExtension(path) ?? "";
             ResetFrame();
             LoadBackdrop(path);
-            HudCore._log?.LogInfo(
-                $"MiniMap: {MapName} ({dataName}) {Width}x{Length}, " +
-                $"backdrop {(Backdrop != null ? "loaded" : "missing")}.");
+            HudCore._log?.LogInfo(FormattableString.Invariant(
+                $"MiniMap: {MapName} ({dataName}) {Width}x{Length}, backdrop {(Backdrop != null ? "loaded" : "missing")}."));
         }
 
         // Every map folder ships a preview.png beside its .sanmap, and the
@@ -175,17 +173,13 @@ namespace SanctuaryHud
                     return;
                 }
 
-                var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+                var texture = Generated.DecodePng(File.ReadAllBytes(preview), "map preview");
+                if (texture == null)
                 {
-                    hideFlags = HideFlags.HideAndDontSave,
-                    wrapMode = TextureWrapMode.Clamp,
-                };
-                if (!LoadPng(texture, File.ReadAllBytes(preview)))
-                {
-                    UnityEngine.Object.Destroy(texture);
                     HudCore._log?.LogWarning("MiniMap: could not decode the map preview; drawing a flat backdrop.");
                     return;
                 }
+                texture.wrapMode = TextureWrapMode.Clamp;
                 Backdrop = texture;
                 _backdropTexture = texture;
             }
@@ -196,36 +190,6 @@ namespace SanctuaryHud
                 _backdropTexture = null;
             }
         }
-
-        private static MethodInfo _loadImage;
-        private static bool _loadImageResolved;
-
-        /// Decodes a PNG into a texture.
-        ///
-        /// Texture2D.LoadImage lives in UnityEngine.ImageConversionModule,
-        /// which is built against netstandard 2.1 — the same wall the HUD's
-        /// alert sounds hit with the audio module — so it is reached by
-        /// reflection rather than referenced.
-        private static bool LoadPng(Texture2D texture, byte[] bytes)
-        {
-            if (!_loadImageResolved)
-            {
-                _loadImageResolved = true;
-                var type = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic)
-                    .SelectMany(HudCore.GetTypesSafe)
-                    .FirstOrDefault(t => t.FullName == "UnityEngine.ImageConversion");
-                _loadImage = type?.GetMethod("LoadImage", BindingFlags.Public | BindingFlags.Static, null,
-                    new[] { typeof(Texture2D), typeof(byte[]), typeof(bool) }, null);
-                if (_loadImage == null)
-                    HudCore._log?.LogWarning("MiniMap: ImageConversion.LoadImage not found; the backdrop stays flat.");
-            }
-            return _loadImage != null && _loadImage.Invoke(null, new object[] { texture, bytes, false }) is bool ok && ok;
-        }
-
-        /// Where the preview image belongs inside the map area: all of it, now
-        /// that the panel is framed on the same playable area the preview was
-        /// rendered of.
-        internal static Rect BackdropRect(Rect map) => map;
 
         internal static void Clear()
         {

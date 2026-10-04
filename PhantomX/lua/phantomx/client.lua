@@ -46,7 +46,6 @@ end
 -- unit, its beams, and every shield go through the game's own intel check
 -- again, on the next tick (a change arrives as two commands, one each way).
 do
-    local Events = Import("modapi/events.lua").Events
     local ClientArmy = Import("client/army.lua")
     local stale = false
 
@@ -63,12 +62,12 @@ do
             if unit.RecalculateIntel then
                 -- Forced: OnIntelVision also decides the range rings by whether
                 -- the unit is now ours or an ally's.
-                pcall(unit.RecalculateIntel, unit, true)
-                if unit.RecalculateBeamsIntel then pcall(unit.RecalculateBeamsIntel, unit) end
+                pcall(unit.RecalculateIntel, unit, true) -- lua-check: ok
+                if unit.RecalculateBeamsIntel then pcall(unit.RecalculateBeamsIntel, unit) end -- lua-check: ok
             end
         end
         for _, shield in pairs(__Entities.Shields) do
-            if shield.RecalculateIntel then pcall(shield.RecalculateIntel, shield) end
+            if shield.RecalculateIntel then pcall(shield.RecalculateIntel, shield) end -- lua-check: ok
         end
     end)
 end
@@ -269,7 +268,7 @@ local function RenderStory(story)
     end
     items[#items + 1] = UI.Row({
         UI.Text(showAll and "Showing every role" or "Showing what they knew", { size = 18, color = Grey }),
-        UI.Fill and UI.Fill() or UI.Space(8),
+        Fill(),
         UI.Button(showAll and "Hide spoilers" or "Show all", function()
             showAll = not showAll
             RenderStory(story)
@@ -287,10 +286,10 @@ local function RenderStory(story)
         end
         if at.marked[p.id] then row[#row + 1] = UI.Text("marked", { size = 18, color = Colours.paladin }) end
         if not alive then row[#row + 1] = UI.Text("out", { size = 18, color = Grey }) end
-        row[#row + 1] = UI.Fill and UI.Fill() or UI.Space(8)
+        row[#row + 1] = Fill()
         if p.id ~= focus then
             row[#row + 1] = UI.Button("View", function()
-                pcall(function() _G.SetFocusArmy(p.id) end)
+                pcall(function() _G.SetFocusArmy(p.id) end) -- lua-check: ok
             end, { size = 18 })
         end
         items[#items + 1] = UI.Row(row, { spacing = 8 })
@@ -314,7 +313,7 @@ if Replay.Playing() then
     if type(setFocus) == "function" then
         _G.SetFocusArmy = function(...)
             local r = setFocus(...)
-            pcall(ReplayTick)
+            pcall(ReplayTick) -- lua-check: ok
             return r
         end
     end

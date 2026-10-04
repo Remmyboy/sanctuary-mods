@@ -25,7 +25,7 @@ namespace SanctuaryHud
     //
     // This plugin hot-reloads like any mod; the gameplay files a running
     // match reads live in the API, so reloading it mid-match is harmless.
-    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.12.0")]
+    [BepInPlugin("com.sanctuarydb.modmanager", "Sanctuary Mod Manager", "0.13.0")]
     [BepInDependency(ModApiPlugin.Guid)]
     public class ModManagerPlugin : BaseUnityPlugin
     {
@@ -83,8 +83,22 @@ namespace SanctuaryHud
 
         private readonly List<PluginEntry> _plugins = new List<PluginEntry>();
 
+        /// Bumped whenever the list above is refreshed or a plugin switched,
+        /// so the page only looks for differences after one of those.
+        internal int PluginsVersion { get; private set; }
+
         private ConfigEntry<string> _cfgDisabledPlugins;
         private float _pluginScanAccum = 999f; // scan on the first Update
+
+        // What the last scan saw: the loader's plugin types and the plugin
+        // components on the manager object, compared by identity. While the
+        // page is closed the list is only rebuilt when one of them moves.
+        private Type[] _lastTypes;
+        private readonly List<BaseUnityPlugin> _components = new List<BaseUnityPlugin>();
+        private readonly List<BaseUnityPlugin> _lastComponents = new List<BaseUnityPlugin>();
+
+        // [BepInPlugin] per type, read once: a type's attributes never change.
+        private readonly Dictionary<Type, BepInPlugin> _metaCache = new Dictionary<Type, BepInPlugin>();
 
         private ConfigEntry<KeyCode> _cfgToggleKey;
 
@@ -186,6 +200,42 @@ namespace SanctuaryHud
             // memory. Anything else stays only while this page has it switched
             // off; otherwise it was destroyed from outside.
             _plugins.RemoveAll(p => !seen.Contains(p.Guid) && (p.FromLoader || !p.SwitchedOff));
+            PluginsVersion++;
+        }
+
+        /// The page is opening: its list should be the state right now.
+        internal void RefreshPluginsNow() => RefreshPlugins(applyDisabled: true);
+
+        /// True when the loader's plugin types or the plugin components on
+        /// this object differ, by identity, from the last look. Cheap enough
+        /// for every couple of seconds: no attribute reads, no strings.
+        private bool LoadSetChanged()
+        {
+            var changed = false;
+            var registry = LoaderRegistry.Resolve(_log);
+            if (registry != null)
+            {
+                var types = registry.PluginTypes();
+                if (_lastTypes == null || types.Length != _lastTypes.Length) changed = true;
+                else
+                {
+                    for (var i = 0; i < types.Length && !changed; i++)
+                        if (types[i] != _lastTypes[i]) changed = true;
+                }
+                _lastTypes = types;
+            }
+            // Components cover starts and stops too: every running plugin is
+            // one, on this same object.
+            GetComponents(_components);
+            if (_components.Count != _lastComponents.Count) changed = true;
+            else
+            {
+                for (var i = 0; i < _components.Count && !changed; i++)
+                    if (!ReferenceEquals(_components[i], _lastComponents[i])) changed = true;
+            }
+            _lastComponents.Clear();
+            _lastComponents.AddRange(_components);
+            return changed;
         }
 
         /// The entry for a plugin type, created on first sight and marked
@@ -194,7 +244,7 @@ namespace SanctuaryHud
         /// [BepInPlugin], and for a GUID already seen this pass.
         private PluginEntry Track(Type type, HashSet<string> seen)
         {
-            var meta = type.GetCustomAttribute<BepInPlugin>();
+            if (!_metaCache.TryGetValue(type, out var meta)) _metaCache[type] = meta = type.GetCustomAttribute<BepInPlugin>();
             if (meta == null) return null;
             if (meta.GUID == "com.sanctuarydb.modloader" || meta.GUID == "com.sanctuarydb.modmanager" || meta.GUID == ModApiPlugin.Guid) return null;
             if (!seen.Add(meta.GUID)) return null;
@@ -218,7 +268,8 @@ namespace SanctuaryHud
         internal static ConfigEntryBase[] ConfigEntriesOf(PluginEntry plugin)
         {
 #pragma warning disable CS0618 // GetConfigEntries is obsolete, but the Values replacement is not in this BepInEx.
-            return (plugin.Instance?.Config ?? plugin.Config)?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
+            var config = plugin.Instance != null && plugin.Instance.Config != null ? plugin.Instance.Config : plugin.Config;
+            return config?.GetConfigEntries() ?? Array.Empty<ConfigEntryBase>();
 #pragma warning restore CS0618
         }
 
@@ -257,6 +308,7 @@ namespace SanctuaryHud
                 _log.LogInfo($"Plugin '{entry.Name}' stopped.");
             }
             entry.SwitchedOff = entry.Instance == null;
+            PluginsVersion++;
             if (persist)
             {
                 // A GUID switched off here whose DLL is away for now stays
@@ -352,12 +404,15 @@ namespace SanctuaryHud
             // ModLoader 1.3+ the loader holds switched-off plugins back itself;
             // under an older loader a reload re-adds them and this scan stops
             // them again. (Deferred off Awake anyway: the loader adds
-            // components in one pass and ours can run first.)
+            // components in one pass and ours can run first.) The list itself
+            // is only rebuilt when the plugins on hand changed, or while the
+            // page is up to show it.
             _pluginScanAccum += Time.unscaledDeltaTime;
             if (_pluginScanAccum >= 2f)
             {
                 _pluginScanAccum = 0f;
-                RefreshPlugins(applyDisabled: true);
+                var changed = LoadSetChanged();
+                if (changed || (_page != null && _page.IsOpen)) RefreshPlugins(applyDisabled: true);
             }
         }
 

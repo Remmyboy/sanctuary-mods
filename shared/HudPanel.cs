@@ -70,7 +70,9 @@ namespace SanctuaryHud
         internal void Show(bool showing)
         {
             if (_rect == null) return;
-            if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+            if (_rect.gameObject.activeSelf == showing) return;
+            _rect.gameObject.SetActive(showing);
+            HudCanvas.LayoutVersion++;
         }
 
         internal void Destroy()
@@ -82,6 +84,9 @@ namespace SanctuaryHud
         /// The panel's own size on top of the canvas's. Ignored while the
         /// player is resizing it, so a caller can pass its saved size every
         /// frame.
+        private int _laidOutAt = -1;
+        private float _laidOutScale = -1f;
+
         internal void SetScale(float scale)
         {
             if (_rect == null || Resizing) return;
@@ -118,7 +123,10 @@ namespace SanctuaryHud
 
         // In the bottom corner on the side away from the edge the panel
         // hangs from, so dragging it outwards grows the panel towards it.
-        private void PlaceGrip() => _grip?.Place(new Vector2(_rightAligned ? 0f : 1f, 0f));
+        private void PlaceGrip()
+        {
+            if (_grip != null) _grip.Place(new Vector2(_rightAligned ? 0f : 1f, 0f));
+        }
 
         /// A row of the panel's column: a horizontal group, created once.
         internal RectTransform Row(string name, float spacing, TextAnchor alignment = TextAnchor.UpperLeft)
@@ -143,7 +151,15 @@ namespace SanctuaryHud
         internal Vector2 Place(Vector2 logical)
         {
             if (_rect == null) return logical;
-            LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+            // The canvas lays out whatever changed at the end of the frame
+            // anyway; this is only so the size below is this frame's, on the
+            // frames something changed it.
+            if (_laidOutAt != HudCanvas.LayoutVersion || _laidOutScale != _rect.localScale.x)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                _laidOutAt = HudCanvas.LayoutVersion;
+                _laidOutScale = _rect.localScale.x;
+            }
             var k = HudCanvas.UnitsPerLogical;
             var size = HudCanvas.Size;
             var width = _rect.rect.width * _rect.localScale.x;
@@ -391,6 +407,8 @@ namespace SanctuaryHud
         private Image _hover, _plate, _icon, _track, _fill, _pauseA, _pauseB;
         private TMP_Text _fallback, _rate, _count, _tag;
         private GameObject _rateBox, _countBox, _tagBox;
+        private int _countShown = int.MinValue;
+        private string _countText;
         private TooltipTrigger _tooltip;
 
         internal Action<PointerEventData.InputButton> OnClick = null;   // set by the mods that click tiles
@@ -507,7 +525,9 @@ namespace SanctuaryHud
 
         internal void Show(bool showing)
         {
-            if (gameObject.activeSelf != showing) gameObject.SetActive(showing);
+            if (gameObject.activeSelf == showing) return;
+            gameObject.SetActive(showing);
+            HudCanvas.LayoutVersion++;
         }
 
         /// The tile's look for this frame.
@@ -539,7 +559,12 @@ namespace SanctuaryHud
             if (showBar) _fill.fillAmount = Mathf.Clamp01(progress);
 
             Corner(_rateBox, _rate, rate, rateDim);
-            Corner(_countBox, _count, count >= 0 ? count.ToString() : null, countDim);
+            if (count != _countShown)
+            {
+                _countShown = count;
+                _countText = count >= 0 ? count.ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
+            }
+            Corner(_countBox, _count, _countText, countDim);
             Corner(_tagBox, _tag, tag, true);
 
             if (_pauseA.gameObject.activeSelf != paused)
@@ -566,7 +591,11 @@ namespace SanctuaryHud
         private static void Corner(GameObject box, TMP_Text text, string value, bool dim)
         {
             var on = !string.IsNullOrEmpty(value);
-            if (box.activeSelf != on) box.SetActive(on);
+            if (box.activeSelf != on)
+            {
+                box.SetActive(on);
+                HudCanvas.LayoutVersion++;
+            }
             if (!on) return;
             HudCanvas.SetText(text, value);
             text.color = dim ? Dim : Color.white;
@@ -656,7 +685,7 @@ namespace SanctuaryHud
                 _tiles.Add(tile);
             }
             _taken++;
-            tile.transform.SetSiblingIndex(_taken - 1);
+            if (tile.transform.GetSiblingIndex() != _taken - 1) tile.transform.SetSiblingIndex(_taken - 1);
             tile.Show(true);
             return tile;
         }

@@ -132,19 +132,52 @@ namespace Sanctuary.ModApi
                 // a mod calling RequestStartGame), the host's own StartGame
                 // goes no further while anyone lacks the mods.
                 if (type == (byte)LobbyMessageType.StartGame && LobbyManager.hostState != null && sender == LobbyManager.hostState.hostID)
-                {
-                    if (!Lobby.HostStartGame(out var reason))
-                    {
-                        ModApiPlugin.Log.LogWarning($"Start refused: {reason}");
-                        ShowError(reason);
-                        return false;
-                    }
-                    // The host's world loads next, and reads unit meshes.
-                    Packs.Sync(Overlay.Applied);
-                }
+                    return HostStartGate();
             }
             catch (Exception e) { ModApiPlugin.Log.LogError($"Mod message on host: {e}"); }
             return true;
+        }
+
+        private static bool HostStartGate()
+        {
+            try
+            {
+                if (!Lobby.HostStartGame(out var reason))
+                {
+                    ModApiPlugin.Log.LogWarning($"Start refused: {reason}");
+                    ShowError(reason);
+                    return false;
+                }
+            }
+            catch (Exception e)
+            {
+                if (!GateFailed(e, "the host's start check")) return true;
+                Lobby.HostStartFailed();
+                return false;
+            }
+            // The host's world loads next, and reads unit meshes. Art only:
+            // a failure here costs looks, not sync, so the match still goes.
+            try { Packs.Sync(Overlay.Applied); }
+            catch (Exception e) { ModApiPlugin.Log.LogError($"Mounting gameplay mods' art packs: {e}"); }
+            return true;
+        }
+
+        // The gate's own code threw. With gameplay mods picked the match
+        // could start with someone lacking them, so the start is refused and
+        // the host told why; with none picked it is a vanilla lobby, which a
+        // bug in this API must never stop. True when the start is refused.
+        private static bool _gateErrorLogged;
+
+        private static bool GateFailed(Exception e, string where)
+        {
+            var refuse = Lobby.HostHasPicks;
+            if (!_gateErrorLogged)
+            {
+                _gateErrorLogged = true;
+                ModApiPlugin.Log.LogError($"Mod API error in {where} ({(refuse ? "start refused: gameplay mods are picked" : "start allowed: no gameplay mods picked")}): {e}");
+            }
+            if (refuse) ShowError("Gameplay mods: the Mod API's start check failed (see the log), so the match can't start with mods. Untick the gameplay mods to play vanilla.");
+            return refuse;
         }
 
         private static bool ClientMessagePrefix(NativeArray<byte> payload)
@@ -171,7 +204,17 @@ namespace Sanctuary.ModApi
             {
                 if (__result && LobbyManager.isHostRunning && !Lobby.GateOpen(out _)) __result = false;
             }
-            catch { }
+            catch (Exception e)
+            {
+                // The game asks this often; GateFailed logs once. No message
+                // here: the press itself (StartPressedPrefix) says why.
+                if (Lobby.HostHasPicks) __result = false;
+                if (!_gateErrorLogged)
+                {
+                    _gateErrorLogged = true;
+                    ModApiPlugin.Log.LogError($"Mod API error in the lobby's can-start check: {e}");
+                }
+            }
         }
 
         // Before the game's own check, whose message ("everyone must be
@@ -187,7 +230,7 @@ namespace Sanctuary.ModApi
                 ShowError(reason);
                 return false;
             }
-            catch { return true; }
+            catch (Exception e) { return !GateFailed(e, "the Start button's check"); }
         }
 
         private static void LobbyUiPostfix()
@@ -197,8 +240,14 @@ namespace Sanctuary.ModApi
 
         internal static void ShowError(string message)
         {
-            try { EM.UI.LobbyInterface.Instance?.AddErrorChatMessage(message); }
-            catch { }
+            try
+            {
+                var ui = EM.UI.LobbyInterface.Instance;
+                if (ui != null) ui.AddErrorChatMessage(message);
+            }
+            // The lobby screen going as the message comes: there is nothing
+            // left to show it on.
+            catch { /* ignored, see above */ }
         }
     }
 }

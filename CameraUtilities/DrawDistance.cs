@@ -27,8 +27,10 @@ namespace SanctuaryHud.CameraUtils
     // entry points the generator leaves managed: ClientLuaInterface.CreatePrefab
     // is bound as a plain delegate rather than through
     // BurstCompiler.CompileFunctionPointer (most of its neighbours in
-    // GeneratedDelegates are), so the managed method really does run and a
-    // Harmony patch on it really does fire.
+    // GeneratedDelegates are), so the managed method really does run. It
+    // builds each template's local part in LuaInterface.CreateLocalPrefabTemplates
+    // (which nothing else calls), and that is what is patched: the postfix sees the
+    // finished LOD templates before CreatePrefab hands them to the engine.
     //
     // Only chains with a single level are touched. That is what a unit or
     // structure has, and its one distance is purely a cull distance with
@@ -91,7 +93,7 @@ namespace SanctuaryHud.CameraUtils
                 if (Applied != floor)
                 {
                     Applied = floor;
-                    _log?.LogInfo($"Camera Utilities: unit draw distance raised to {floor:0} world units.");
+                    _log?.LogInfo(FormattableString.Invariant($"Camera Utilities: unit draw distance raised to {floor:0} world units."));
                 }
             }
             catch (Exception e)

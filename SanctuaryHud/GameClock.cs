@@ -34,6 +34,13 @@ namespace SanctuaryHud
                 "(where the game's version line is). The game has no clock of its own.");
         }
 
+        // The caption as last made, and what it was made from: the strip
+        // asks every frame, and it changes a few times a second at most.
+        private static int _textSeconds = -1;
+        private static bool _textPaused;
+        private static float _textSpeed;
+        private static string _text;
+
         /// The caption to show, or null when the clock is off or unknown.
         internal static string Text
         {
@@ -41,12 +48,18 @@ namespace SanctuaryHud
             {
                 if (Enabled == null || !Enabled.Value || !InMatch || _simTime < 0) return null;
                 var t = (int)Math.Floor(_simTime);
-                var clock = t >= 3600
-                    ? $"{t / 3600}:{t / 60 % 60:00}:{t % 60:00}"
-                    : $"{t / 60}:{t % 60:00}";
-                if (Paused) return clock + "   PAUSED";
+                var paused = Paused;
                 var speed = _announcedSpeed > 0f ? _announcedSpeed : _engineSpeed;
-                return clock + "   " + speed.ToString("0.#", CultureInfo.InvariantCulture) + "×";
+                if (_text != null && t == _textSeconds && paused == _textPaused && (paused || speed == _textSpeed)) return _text;
+                _textSeconds = t;
+                _textPaused = paused;
+                _textSpeed = speed;
+                var clock = t >= 3600
+                    ? FormattableString.Invariant($"{t / 3600}:{t / 60 % 60:00}:{t % 60:00}")
+                    : FormattableString.Invariant($"{t / 60}:{t % 60:00}");
+                return _text = paused
+                    ? clock + "   PAUSED"
+                    : clock + "   " + speed.ToString("0.#", CultureInfo.InvariantCulture) + "×";
             }
         }
 

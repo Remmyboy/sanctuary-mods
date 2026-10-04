@@ -13,10 +13,16 @@ namespace SanctuaryHud
     // live buttons in order for a TileRow to stand in for them.
     internal static class UnitRow
     {
-        internal sealed class Entry
+        /// A struct, so a row read every frame allocates nothing.
+        internal struct Entry
         {
             public UnitButtonElement Element;   // null for a separator
         }
+
+        /// What each panel's buttons carry, looked up once per button: the
+        /// panels pool their buttons, so they are the same objects frame
+        /// after frame.
+        private static readonly PanelChildren<UnitButtonElement, Button> _children = new PanelChildren<UnitButtonElement, Button>();
 
         /// The panel's buttons that are on, in order, with a separator entry
         /// where the game put one; the ones the game has greyed out (a
@@ -31,7 +37,7 @@ namespace SanctuaryHud
                 var child = container.GetChild(i);
                 // The panel pools what it isn't using by scaling it to nothing.
                 if (!child.gameObject.activeInHierarchy || child.localScale.x < 0.5f) continue;
-                var element = child.GetComponent<UnitButtonElement>();
+                var (element, button) = _children.Get(container, child);
                 if (element == null)
                 {
                     if (row.Count > 0 && row[row.Count - 1].Element != null) row.Add(new Entry());
@@ -39,7 +45,6 @@ namespace SanctuaryHud
                 }
                 if (liveOnly)
                 {
-                    var button = child.GetComponent<Button>();
                     if (button != null && !button.interactable) continue;
                     // A "coming soon" placeholder: the Lua adds it with click
                     // and hover events off (constructionPanel.lua's demo units).
@@ -57,6 +62,30 @@ namespace SanctuaryHud
             }
             while (row.Count > 0 && row[row.Count - 1].Element == null) row.RemoveAt(row.Count - 1);
         }
+    }
 
+    /// Two GetComponent answers per child of a game panel's container, kept
+    /// rather than asked again every frame. Several containers share one (the
+    /// selection list, the build options and the queue are each read every
+    /// frame); a container's children are pooled, and the whole lot is
+    /// dropped when it grows well past what the containers hold, which
+    /// clears out buttons destroyed with an old match.
+    internal sealed class PanelChildren<T1, T2> where T1 : Component where T2 : Component
+    {
+        private readonly Dictionary<Transform, (T1, T2)> _found = new Dictionary<Transform, (T1, T2)>();
+        private int _limit = 256;
+
+        internal (T1, T2) Get(Transform container, Transform child)
+        {
+            if (_found.TryGetValue(child, out var found)) return found;
+            if (_found.Count >= _limit)
+            {
+                _found.Clear();
+                _limit = Mathf.Max(256, container.childCount * 8);
+            }
+            found = (child.GetComponent<T1>(), child.GetComponent<T2>());
+            _found[child] = found;
+            return found;
+        }
     }
 }

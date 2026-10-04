@@ -35,7 +35,7 @@ namespace SanctuaryHud
     // HUD canvas (HudCanvas, HudPanel): dragged as uGUI, so nothing of a
     // drag or a click reaches the map, with the game's font, its UI Scale
     // and its tooltip.
-    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.9.0")]
+    [BepInPlugin("com.sanctuarydb.ecomanager", "Eco Manager", "0.9.1")]
     public partial class EcoManagerPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -105,10 +105,11 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
-            // Unloading via the mod manager must also undo the Lua-side hook,
+            // Unloading via the mod manager must also undo the Lua-side hooks,
             // and let go of anything a tile is holding paused.
-            RemoveAssistHook();
+            _assistHook?.Remove();
             ReleaseAllPaused();
+            _sweepHook.Remove();
             _build?.Destroy();
             _extractors?.Destroy();
             HudCanvas.Destroy();
@@ -224,7 +225,7 @@ namespace SanctuaryHud
             var heads = _build.Row("Headings", 6f);
             _alloyHead = MakeHead(heads, "alloy", "ALLOY", AlloyColour);
             _energyHead = MakeHead(heads, "energy", "ENERGY", EnergyColour);
-            _buildRowsBox = Column(_build.Rect, "Rows");
+            _buildRowsBox = HudControls.Column(_build.Rect, "Rows", 6f);
 
             _extractors = HudPanel.Create(root, "Eco manager: alloy", () => _cfgLocked.Value);
             _extractors.EnableResize(0.5f, 2.5f);
@@ -238,22 +239,15 @@ namespace SanctuaryHud
                 HudCanvas.SetText(label, "ALLOY");
             }
             _extractorStatus = HudCanvas.Text(head, "Status", 18f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.MidlineLeft);
-            _extractorRowsBox = Column(_extractors.Rect, "Rows");
+            _extractorRowsBox = HudControls.Column(_extractors.Rect, "Rows", 6f);
         }
 
         /// A resource's mark (the game's own icon) in its colour over its
         /// total demand, as wide as the tile column beneath it.
         private static ColumnHead MakeHead(Transform parent, string key, string fallback, Color colour)
         {
-            var go = new GameObject(fallback, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var column = go.AddComponent<VerticalLayoutGroup>();
-            column.spacing = 0f;
-            column.childAlignment = TextAnchor.UpperCenter;
-            column.childControlWidth = true;
-            column.childControlHeight = true;
-            column.childForceExpandWidth = false;
-            column.childForceExpandHeight = false;
+            var go = HudControls.Column(parent, fallback, 0f).gameObject;
+            go.GetComponent<VerticalLayoutGroup>().childAlignment = TextAnchor.UpperCenter;
             var layout = go.AddComponent<LayoutElement>();
             layout.preferredWidth = PanelTile.Width;
             layout.minWidth = PanelTile.Width;
@@ -267,47 +261,33 @@ namespace SanctuaryHud
             return head;
         }
 
-        private static RectTransform Column(Transform parent, string name)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var column = go.AddComponent<VerticalLayoutGroup>();
-            column.spacing = 6f;
-            column.childAlignment = TextAnchor.UpperLeft;
-            column.childControlWidth = true;
-            column.childControlHeight = true;
-            column.childForceExpandWidth = false;
-            column.childForceExpandHeight = false;
-            return (RectTransform)go.transform;
-        }
-
         /// The i-th row of a panel, made on demand: a horizontal group with
         /// its own pool of tiles.
         private static TileRowSlot RowAt(List<TileRowSlot> rows, RectTransform box, int index)
         {
             while (rows.Count <= index)
             {
-                var go = new GameObject("Row", typeof(RectTransform));
-                go.transform.SetParent(box, false);
-                var group = go.AddComponent<HorizontalLayoutGroup>();
-                group.spacing = 6f;
-                group.childAlignment = TextAnchor.UpperLeft;
-                group.childControlWidth = true;
-                group.childControlHeight = true;
-                group.childForceExpandWidth = false;
-                group.childForceExpandHeight = false;
-                var row = (RectTransform)go.transform;
+                var row = HudControls.Row(box, "Row", 6f, TextAnchor.UpperLeft);
                 rows.Add(new TileRowSlot { Row = row, Pool = new TilePool(row, "Tile") });
             }
             var slot = rows[index];
-            if (!slot.Row.gameObject.activeSelf) slot.Row.gameObject.SetActive(true);
+            Activate(slot.Row.gameObject, true);
             return slot;
         }
 
         private static void HideRowsFrom(List<TileRowSlot> rows, int index)
         {
             for (var i = index; i < rows.Count; i++)
-                if (rows[i].Row != null && rows[i].Row.gameObject.activeSelf) rows[i].Row.gameObject.SetActive(false);
+                if (rows[i].Row != null) Activate(rows[i].Row.gameObject, false);
+        }
+
+        /// Shows or hides a part of a panel, and tells the panel its size may
+        /// have changed (HudPanel.Place only lays out again when told).
+        private static void Activate(GameObject go, bool on)
+        {
+            if (go.activeSelf == on) return;
+            go.SetActive(on);
+            HudCanvas.LayoutVersion++;
         }
 
         // ---- the BUILD panel ------------------------------------------------
@@ -402,7 +382,7 @@ namespace SanctuaryHud
             _filledExtractors = key;
             var status = _pollStatus != "ok" ? _pollStatus : "";
             HudCanvas.SetText(_extractorStatus, status);
-            if (_extractorStatus.gameObject.activeSelf != status.Length > 0) _extractorStatus.gameObject.SetActive(status.Length > 0);
+            Activate(_extractorStatus.gameObject, status.Length > 0);
 
             // A row per tier: the ones sitting at that tier on the left, and
             // on the right — only while any are — the ones upgrading away from

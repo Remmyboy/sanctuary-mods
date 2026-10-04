@@ -24,7 +24,7 @@ namespace SanctuaryHud.Replays
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.5.0")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.5.1")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -46,7 +46,8 @@ namespace SanctuaryHud.Replays
 
         // Lua-side state, polled.
         private float _luaAccum;
-        private bool _luaHooked;
+        // The last texts parsed, so an unchanged poll is not parsed again.
+        private string _lastArmiesRaw, _lastEcoRaw;
         private List<ArmyRow> _armies = new List<ArmyRow>();
         private Dictionary<int, EcoRow> _eco = new Dictionary<int, EcoRow>();
         private Dictionary<int, string> _seatNames = new Dictionary<int, string>();   // armyId -> nickname
@@ -68,8 +69,6 @@ namespace SanctuaryHud.Replays
         {
             public int Id;
             public string Name;
-            public string Faction;
-            public bool Human;
             public Color Colour;
         }
 
@@ -123,6 +122,7 @@ namespace SanctuaryHud.Replays
         private void OnDestroy()
         {
             ReplayPlayer.OnLuaStartup -= InstallEarlyHooks;
+            Hook.Remove();
             ReplayPlayer.Stop();
             _harmony?.UnpatchSelf();
             // A hot reload leaves the old assembly loaded; its panel goes.
@@ -150,9 +150,11 @@ namespace SanctuaryHud.Replays
                 // A rewind carries its view over; one that failed must not
                 // hand it to the next replay opened from the menu.
                 if (!ReplayPlayer.Restarting) _pendingFocus = int.MinValue;
-                if (_luaHooked || _armies.Count > 0 || _seatNames.Count > 0)
+                if (_lastArmiesRaw != null || _armies.Count > 0 || _seatNames.Count > 0)
                 {
-                    _luaHooked = false;
+                    _lastArmiesRaw = null;
+                    _lastEcoRaw = null;
+                    _tableDirty = true;
                     _armies = new List<ArmyRow>();
                     _eco = new Dictionary<int, EcoRow>();
                     _seatNames = new Dictionary<int, string>();
@@ -168,165 +170,196 @@ namespace SanctuaryHud.Replays
         // ---- Lua side ------------------------------------------------------
 
         // Installed as soon as the client VM exists, before the first host
-        // packet, so the lobby roster (InitClient) is seen. Guarded by a
-        // global, so running it again later is harmless.
+        // packet, so the lobby roster (InitClient) is seen; the hook puts it
+        // back in a VM that turns up without that (a hot reload mid-replay)
+        // and takes it out again when the mod goes.
         //
         // - Every army's economy: the registry calls `command.Receive` through
         //   the command table each time, so swapping the field catches it, and
-        //   the payload arrives already decoded.
+        //   the payload arrives already decoded. The wrapper only keeps each
+        //   army's latest totals and the running sums; the poll turns them
+        //   into text, twice a second, rather than every update doing it for
+        //   every army (which, at 16x, was most of the hook's cost).
         // - The roster: `ReceiveDataClient` is a plain global (networking.lua
         //   is `require`d), and InitClient's data carries every seat's
         //   nickname, army and client id.
         // - Observer: so clicks can't issue orders into the void.
-        private const string InstallChunk =
-            "if not __SdbReplayHook then " +
-            "  __SdbReplayHook = true " +
-            "  __SdbReplayEco = '' " +
-            "  __SdbReplayPlayers = '' " +
-            "  __SdbReplayHookErr = '' " +
-            "  pcall(function() SetObserver(true) end) " +
-            "  local ok, err = pcall(function() " +
-            "    local E = Import('common/commands/definitions/economy.lua') " +
-            "    local cmd = E.UpdateEconomyTotals " +
-            "    local orig = cmd.Receive " +
-            "    local eco, sum = {}, {} " +
-            "    cmd.Receive = function(data, commandData) " +
-            "      local ok2, err2 = pcall(function() " +
-            "        eco[data.armyId] = data.totals " +
-            "        local a, e = data.totals.alloys or {}, data.totals.energy or {} " +
-            "        local s = sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0 } " +
-            "        s.ai = s.ai + (a.income or 0) " +
-            "        s.ao = s.ao + (a.outcome or 0) " +
-            "        s.ei = s.ei + (e.income or 0) " +
-            "        s.eo = s.eo + (e.outcome or 0) " +
-            "        sum[data.armyId] = s " +
-            "        local parts = {} " +
-            "        for id, t in pairs(eco) do " +
-            "          local a, e = t.alloys or {}, t.energy or {} " +
-            "          local s = sum[id] or { ai = 0, ao = 0, ei = 0, eo = 0 } " +
-            "          parts[#parts+1] = string.format('%d|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.1f|%.1f|%.1f|%.1f', " +
-            "            id, a.current or 0, a.storage or 0, a.income or 0, a.harvest or 0, a.outcome or 0, a.request or 0, " +
-            "            e.current or 0, e.storage or 0, e.income or 0, e.harvest or 0, e.outcome or 0, e.request or 0, " +
-            "            s.ai, s.ao, s.ei, s.eo) " +
-            "        end " +
-            "        __SdbReplayEco = table.concat(parts, ';') " +
-            "      end) " +
-            "      if not ok2 then __SdbReplayHookErr = 'eco: ' .. tostring(err2) end " +
-            "      return orig(data, commandData) " +
-            "    end " +
-            "  end) " +
-            "  if not ok then __SdbReplayHookErr = 'install eco: ' .. tostring(err) end " +
-            "  local ok3, err3 = pcall(function() " +
-            "    local origRecv = _G.ReceiveDataClient " +
-            "    if type(origRecv) ~= 'function' then error('ReceiveDataClient is not a global') end " +
-            "    _G.ReceiveDataClient = function(name, data) " +
-            "      if name == 'InitClient' then " +
-            "        pcall(function() " +
-            "          local parts = {} " +
-            "          for _, p in ipairs(data.playersInformation or {}) do " +
-            "            parts[#parts+1] = string.format('%s|%s|%s|%s', tostring(p.clientID), tostring(p.nickname), tostring(p.armyID), tostring(p.playerType)) " +
-            "          end " +
-            "          __SdbReplayPlayers = table.concat(parts, ';') " +
-            "        end) " +
-            "      end " +
-            "      return origRecv(name, data) " +
-            "    end " +
-            "  end) " +
-            "  if not ok3 then __SdbReplayHookErr = __SdbReplayHookErr .. ' roster: ' .. tostring(err3) end " +
-            "end";
-
-        private const string QueryChunk =
-            "pcall(function() " +
-            "  local out = {} " +
-            "  for id, a in pairs(Armies or {}) do " +
-            "    if not a.civilian then " +
-            "      local c = a.color or { x = 0.5, y = 0.5, z = 0.5 } " +
-            "      out[#out+1] = string.format('%d|%s|%s|%s|%.3f|%.3f|%.3f', id, tostring(a.name), tostring(a.factionId), tostring(a.human), c.x, c.y, c.z) " +
-            "    end " +
-            "  end " +
-            "  __SdbReplayArmies = table.concat(out, ';') " +
-            "  __SdbReplayFocus = tostring(GetFocusArmy()) " +
-            "end)";
-
-        // The game's result panel. The client shows VICTORY or DEFEAT the
-        // first time the focused army's result comes in, and in the all-armies
-        // view every army counts as focused, so in a replay it came up the
-        // moment the first player was wiped out. A replay has no "us": hold
-        // the panel back until the match is decided — some army has won, i.e.
-        // all its enemies are out — then show it for whichever view is being
-        // watched (GAME OVER in the all-armies view).
+        // - The game's result panel, once the armies are registered (see
+        //   S.Result below), so nothing here is the first to Import its module.
         //
-        // The game's handler still runs for every update, with the panel
-        // calls muted, so anything else wrapping it (MatchStats records each
-        // army's result there) sees them all whichever order the wrappers
-        // went on in. Installed once the armies are registered, so nothing
-        // here is the first to Import the module.
-        private const string ResultChunk =
-            "if not __SdbReplayResult and type(Armies) == 'table' and next(Armies) ~= nil then " +
-            "  __SdbReplayResult = true " +
-            "  local ok, err = pcall(function() " +
-            "    local W = Import('client/winCondition.lua') " +
-            "    local inner = W.WinConditionUpdate " +
-            "    if type(inner) ~= 'function' then error('WinConditionUpdate is missing') end " +
-            "    local GR = (UIPanelType and UIPanelType.GameResult) or 9 " +
-            "    local cond, shown = {}, false " +
-            "    W.WinConditionUpdate = function(data, ...) " +
-            "      pcall(function() cond[data.armyID] = data.condition end) " +
-            "      local vis, txt = Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues " +
-            "      Engine.UI_SetPanelVisibility = function(t, v) if t ~= GR then return vis(t, v) end end " +
-            "      Engine.UI_SetGameResultValues = function() end " +
-            "      local ok2, err2 = pcall(inner, data, ...) " +
-            "      Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues = vis, txt " +
-            "      if not ok2 then error(err2, 0) end " +
-            "      if shown then return end " +
-            "      local over = false " +
-            "      for _, c in pairs(cond) do if c == 1 then over = true end end " +
-            "      if not over then return end " +
-            "      shown = true " +
-            "      local c = cond[GetFocusArmy()] " +
-            "      local text = (c == 1 and 'VICTORY!') or (c == 2 and 'DEFEAT!') or 'GAME OVER!' " +
-            "      local ok3, err3 = pcall(function() txt(EngineClasses.UIGameResultValues(text)) end) " +
-            "      if not ok3 then __SdbReplayHookErr = 'result text: ' .. tostring(err3) end " +
-            "      vis(GR, true) " +
-            "    end " +
-            "  end) " +
-            "  if not ok then __SdbReplayHookErr = (__SdbReplayHookErr or '') .. ' result: ' .. tostring(err) end " +
-            "end";
+        // The totals and the roster live in globals of their own, so a
+        // reinstall in the same VM picks them up rather than starting the
+        // whole-game sums again. Each wrapper is put back on Remove when it is
+        // still the outermost one, and otherwise (another mod wrapped it
+        // since) passes straight through.
+        private const string InstallChunk = @"
+do
+  local S, undo = {}, {}
+  local D = __SdbReplayData or { eco = {}, sum = {} }
+  __SdbReplayData = D
+  __SdbReplayEco = __SdbReplayEco or ''
+  __SdbReplayPlayers = __SdbReplayPlayers or ''
+  __SdbReplayHookErr = ''
+  S.ecoDirty = true
+  pcall(function() SetObserver(true) end) -- lua-check: ok
+  local ok, err = pcall(function()
+    local E = Import('common/commands/definitions/economy.lua')
+    local cmd = E.UpdateEconomyTotals
+    local orig = cmd.Receive
+    local mine = function(data, commandData)
+      if not S.off then
+        local ok2, err2 = pcall(function()
+          D.eco[data.armyId] = data.totals
+          local a, e = data.totals.alloys or {}, data.totals.energy or {}
+          local s = D.sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0 }
+          s.ai = s.ai + (a.income or 0)
+          s.ao = s.ao + (a.outcome or 0)
+          s.ei = s.ei + (e.income or 0)
+          s.eo = s.eo + (e.outcome or 0)
+          D.sum[data.armyId] = s
+          S.ecoDirty = true
+        end)
+        if not ok2 then __SdbReplayHookErr = 'eco: ' .. tostring(err2) end
+      end
+      return orig(data, commandData)
+    end
+    cmd.Receive = mine
+    undo[#undo + 1] = function() if cmd.Receive == mine then cmd.Receive = orig end end
+  end)
+  if not ok then __SdbReplayHookErr = 'install eco: ' .. tostring(err) end
+  local ok3, err3 = pcall(function()
+    local origRecv = _G.ReceiveDataClient
+    if type(origRecv) ~= 'function' then error('ReceiveDataClient is not a global') end
+    local mine = function(name, data)
+      if name == 'InitClient' and not S.off then
+        pcall(function() -- lua-check: ok
+          local parts = {}
+          for _, p in ipairs(data.playersInformation or {}) do
+            parts[#parts + 1] = string.format('%s|%s|%s|%s', tostring(p.clientID), tostring(p.nickname), tostring(p.armyID), tostring(p.playerType))
+          end
+          __SdbReplayPlayers = table.concat(parts, ';')
+        end)
+      end
+      return origRecv(name, data)
+    end
+    _G.ReceiveDataClient = mine
+    undo[#undo + 1] = function() if _G.ReceiveDataClient == mine then _G.ReceiveDataClient = origRecv end end
+  end)
+  if not ok3 then __SdbReplayHookErr = __SdbReplayHookErr .. ' roster: ' .. tostring(err3) end
+
+  -- The game's result panel. The client shows VICTORY or DEFEAT the first
+  -- time the focused army's result comes in, and in the all-armies view
+  -- every army counts as focused, so in a replay it came up the moment the
+  -- first player was wiped out. A replay has no 'us': hold the panel back
+  -- until the match is decided (some army has won, i.e. all its enemies are
+  -- out), then show it for whichever view is being watched (GAME OVER in the
+  -- all-armies view). The game's handler still runs for every update, with
+  -- the panel calls muted, so anything else wrapping it (MatchStats records
+  -- each army's result there) sees them all whichever order the wrappers
+  -- went on in.
+  S.Result = function()
+    if S.resultDone or type(Armies) ~= 'table' or next(Armies) == nil then return end
+    S.resultDone = true
+    local ok4, err4 = pcall(function()
+      local W = Import('client/winCondition.lua')
+      local inner = W.WinConditionUpdate
+      if type(inner) ~= 'function' then error('WinConditionUpdate is missing') end
+      local GR = (UIPanelType and UIPanelType.GameResult) or 9
+      local cond, shown = {}, false
+      local mine = function(data, ...)
+        if S.off then return inner(data, ...) end
+        pcall(function() cond[data.armyID] = data.condition end) -- lua-check: ok
+        local vis, txt = Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues
+        Engine.UI_SetPanelVisibility = function(t, v) if t ~= GR then return vis(t, v) end end
+        Engine.UI_SetGameResultValues = function() end
+        local ok2, err2 = pcall(inner, data, ...)
+        Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues = vis, txt
+        if not ok2 then error(err2, 0) end
+        if shown then return end
+        local over = false
+        for _, c in pairs(cond) do if c == 1 then over = true end end
+        if not over then return end
+        shown = true
+        local c = cond[GetFocusArmy()]
+        local text = (c == 1 and 'VICTORY!') or (c == 2 and 'DEFEAT!') or 'GAME OVER!'
+        local ok3, err3 = pcall(function() txt(EngineClasses.UIGameResultValues(text)) end)
+        if not ok3 then __SdbReplayHookErr = 'result text: ' .. tostring(err3) end
+        vis(GR, true)
+      end
+      W.WinConditionUpdate = mine
+      undo[#undo + 1] = function() if W.WinConditionUpdate == mine then W.WinConditionUpdate = inner end end
+    end)
+    if not ok4 then __SdbReplayHookErr = (__SdbReplayHookErr or '') .. ' result: ' .. tostring(err4) end
+  end
+
+  -- Twice a second from C#: the armies, the view, and the economy as text
+  -- ('id|alloy cur|store|in|harvest|out|request|energy x6|alloy in total|
+  -- out total|energy in total|out total;...').
+  S.Poll = function()
+    S.Result()
+    local out = {}
+    for id, a in pairs(Armies or {}) do
+      if not a.civilian then
+        local c = a.color or { x = 0.5, y = 0.5, z = 0.5 }
+        out[#out + 1] = string.format('%d|%s|%.3f|%.3f|%.3f', id, tostring(a.name), c.x, c.y, c.z)
+      end
+    end
+    __SdbReplayArmies = table.concat(out, ';')
+    __SdbReplayFocus = tostring(GetFocusArmy())
+    if not S.ecoDirty then return end
+    S.ecoDirty = false
+    local parts = {}
+    for id, t in pairs(D.eco) do
+      local a, e = t.alloys or {}, t.energy or {}
+      local s = D.sum[id] or { ai = 0, ao = 0, ei = 0, eo = 0 }
+      parts[#parts + 1] = string.format('%d|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.1f|%.1f|%.1f|%.1f',
+        id, a.current or 0, a.storage or 0, a.income or 0, a.harvest or 0, a.outcome or 0, a.request or 0,
+        e.current or 0, e.storage or 0, e.income or 0, e.harvest or 0, e.outcome or 0, e.request or 0,
+        s.ai, s.ao, s.ei, s.eo)
+    end
+    __SdbReplayEco = table.concat(parts, ';')
+  end
+
+  S.Remove = function()
+    S.off = true
+    for _, f in ipairs(undo) do pcall(f) end -- lua-check: ok
+    __SdbReplay = nil
+  end
+  __SdbReplay = S
+end";
+
+        private static readonly LuaHook Hook = new LuaHook("__SdbReplay", "replay hooks", InstallChunk);
 
         private void InstallEarlyHooks()
         {
-            EnsureLuaBridge();
-            if (!LuaReady) return;
-            if (RunLua(InstallChunk))
-            {
-                _luaHooked = true;
-                Logger.LogInfo("Replays: hooks installed at Lua start-up.");
-            }
+            Hook.CheckNow();
+            Hook.Tick();
         }
 
         private void PollLua(float dt)
         {
+            // Normally already in from start-up; this is the fallback, and
+            // what notices the VM a rewind brings.
+            Hook.Tick();
+
             _luaAccum += dt;
             if (_luaAccum < 0.5f) return;
             _luaAccum = 0f;
 
-            EnsureLuaBridge();
-            if (!LuaReady) return;
-
-            // Normally already done at start-up; this is the fallback.
-            if (!_luaHooked && RunLua(InstallChunk)) _luaHooked = true;
-            RunLua(ResultChunk);
-            if (!RunLua(QueryChunk)) return;
+            // Errors inside the poll are ignored as they always were: the
+            // globals keep their last values and the table holds still.
+            if (!Hook.Call("pcall(__SdbReplay.Poll)")) return;
 
             ParseArmies(GetLuaGlobal("__SdbReplayArmies"));
             ParseEco(GetLuaGlobal("__SdbReplayEco"));
-            ParseSeats(GetLuaGlobal("__SdbReplayPlayers"));
+            if (_seatNames.Count == 0) ParseSeats(GetLuaGlobal("__SdbReplayPlayers"));
             var focus = GetLuaGlobal("__SdbReplayFocus");
             if (int.TryParse(focus, out var f)) _focus = f;
+            _tableDirty = true;
 
             // After a rewind the client is brand new and back on the
             // recorder's own army; restore the view that was being watched.
-            if (_pendingFocus != int.MinValue && _luaHooked && _focus != int.MinValue && _armies.Count > 0)
+            if (_pendingFocus != int.MinValue && _focus != int.MinValue && _armies.Count > 0)
             {
                 if (_pendingFocus != _focus) SetFocus(_pendingFocus);
                 _pendingFocus = int.MinValue;
@@ -348,21 +381,23 @@ namespace SanctuaryHud.Replays
             }
         }
 
+        // "id|name|r|g|b;..." for every army that isn't civilian.
         private void ParseArmies(string raw)
         {
-            if (raw == null) return;
+            if (raw == null || raw == _lastArmiesRaw) return;
+            _lastArmiesRaw = raw;
             var rows = new List<ArmyRow>();
             foreach (var part in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
                 var f = part.Split('|');
-                if (f.Length < 4 || !int.TryParse(f[0], out var id)) continue;
-                var row = new ArmyRow { Id = id, Name = f[1], Faction = FactionName(f[2]), Human = f[3] == "true", Colour = AccentColour };
-                if (f.Length >= 7)
+                if (f.Length < 2 || !int.TryParse(f[0], out var id)) continue;
+                var row = new ArmyRow { Id = id, Name = f[1], Colour = AccentColour };
+                if (f.Length >= 5)
                 {
                     var inv = CultureInfo.InvariantCulture;
-                    float.TryParse(f[4], NumberStyles.Float, inv, out var r);
-                    float.TryParse(f[5], NumberStyles.Float, inv, out var g);
-                    float.TryParse(f[6], NumberStyles.Float, inv, out var b);
+                    float.TryParse(f[2], NumberStyles.Float, inv, out var r);
+                    float.TryParse(f[3], NumberStyles.Float, inv, out var g);
+                    float.TryParse(f[4], NumberStyles.Float, inv, out var b);
                     // Army colours are picked for unit meshes and can be dark;
                     // lift them so a button in that colour still reads.
                     var lift = Mathf.Max(0.35f, Mathf.Max(r, Mathf.Max(g, b)));
@@ -376,7 +411,8 @@ namespace SanctuaryHud.Replays
 
         private void ParseEco(string raw)
         {
-            if (raw == null) return;
+            if (raw == null || raw == _lastEcoRaw) return;
+            _lastEcoRaw = raw;
             var inv = CultureInfo.InvariantCulture;
             foreach (var part in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
@@ -417,17 +453,6 @@ namespace SanctuaryHud.Replays
                 if (armyId > 0 && !string.IsNullOrEmpty(f[1]) && !seats.ContainsKey(armyId)) seats[armyId] = f[1];
             }
             if (seats.Count > 0) _seatNames = seats;
-        }
-
-        private static string FactionName(string factionId)
-        {
-            switch (factionId)
-            {
-                case "0": return "EDA";
-                case "1": return "Chosen";
-                case "2": return "Guard";
-                default: return factionId;
-            }
         }
 
         // The client only knows armies by slot ("Army_1"); the recorded
@@ -512,9 +537,16 @@ namespace SanctuaryHud.Replays
             if (!showing) return;
 
             var restarting = ReplayPlayer.Restarting;
-            if (_rewind.gameObject.activeSelf != restarting) _rewind.gameObject.SetActive(restarting);
-            if (_body.gameObject.activeSelf == restarting) _body.gameObject.SetActive(!restarting);
-            if (restarting) HudCanvas.SetText(_rewindText, $"Rewinding to {Clock(ReplayPlayer.SeekTarget)}, restarting playback...");
+            Activate(_rewind, restarting);
+            Activate(_body, !restarting);
+            if (restarting)
+            {
+                if (_rewindShown != ReplayPlayer.SeekTarget)
+                {
+                    _rewindShown = ReplayPlayer.SeekTarget;
+                    HudCanvas.SetText(_rewindText, $"Rewinding to {Clock(_rewindShown)}, restarting playback...");
+                }
+            }
             else Refresh();
 
             var resized = _panel.TakeResized();
@@ -528,19 +560,40 @@ namespace SanctuaryHud.Replays
             }
         }
 
+        // What the clock, speed and rewind texts were last made from: they are
+        // formatted when that changes, not every frame.
+        private int _clockTick = -1, _clockTotal, _clockSeek, _rewindShown = int.MinValue;
+        private bool _clockFinished, _clockTimeline;
+        private float _shownSpeed = float.NaN;
+        // The economy table only changes with a poll (twice a second) or a
+        // sort click, so it is redrawn then rather than every frame.
+        private bool _tableDirty = true;
+
         private void Refresh()
         {
             var tick = ReplayPlayer.CurrentTick;
             var total = ReplayPlayer.TotalTicks;
             var finished = ReplayPlayer.Current == ReplayPlayer.Stage.Finished;
-            var seeking = ReplayPlayer.SeekTarget >= 0;
+            var seek = ReplayPlayer.SeekTarget;
             var timeline = _cfgTimeline.Value;
 
-            var status = finished ? " end" : seeking ? $" > {Clock(ReplayPlayer.SeekTarget)}" : "";
-            HudCanvas.SetText(_clock, (timeline ? $"{Clock(tick)} / {Clock(total)}" : Clock(tick)) + status);
+            if (tick != _clockTick || total != _clockTotal || seek != _clockSeek || finished != _clockFinished || timeline != _clockTimeline)
+            {
+                _clockTick = tick;
+                _clockTotal = total;
+                _clockSeek = seek;
+                _clockFinished = finished;
+                _clockTimeline = timeline;
+                var status = finished ? " end" : seek >= 0 ? $" > {Clock(seek)}" : "";
+                HudCanvas.SetText(_clock, (timeline ? $"{Clock(tick)} / {Clock(total)}" : Clock(tick)) + status);
+            }
             _play.SetLabel(ReplayPlayer.Paused ? "PLAY" : "PAUSE");
             _speed.Set((Mathf.Log(Mathf.Max(0.1f, ReplayPlayer.Speed), 2f) + 2f) / 6f);
-            HudCanvas.SetText(_speedText, ReplayPlayer.Speed.ToString("0.##", CultureInfo.InvariantCulture) + "x");
+            if (ReplayPlayer.Speed != _shownSpeed)
+            {
+                _shownSpeed = ReplayPlayer.Speed;
+                HudCanvas.SetText(_speedText, _shownSpeed.ToString("0.##", CultureInfo.InvariantCulture) + "x");
+            }
             _fog.SetOn(_fogOverlay);
             _timeline.SetOn(timeline);
 
@@ -550,26 +603,37 @@ namespace SanctuaryHud.Replays
             _seekGroup.blocksRaycasts = timeline;
             _seek.Set(total > 1 ? tick / (float)(total - 1) : 0f);
 
+            if (!_tableDirty) return;
+            _tableDirty = false;
+
             // Economy: one row per army, the name being the view button.
             var shown = 0;
             foreach (var a in SortedArmies())
             {
                 if (shown == _rows.Count) _rows.Add(NewArmyRow());
                 var row = _rows[shown++];
-                if (!row.Row.gameObject.activeSelf) row.Row.gameObject.SetActive(true);
+                Activate(row.Row, true);
                 row.Id = a.Id;
                 row.Name.SetLabel(DisplayName(a));
                 row.Name.SetOn(_focus == a.Id, a.Colour);
                 var known = _eco.TryGetValue(a.Id, out var e);
-                if (row.Cells.gameObject.activeSelf != known) row.Cells.gameObject.SetActive(known);
-                if (row.Waiting.gameObject.activeSelf == known) row.Waiting.gameObject.SetActive(!known);
+                Activate(row.Cells, known);
+                Activate(row.Waiting.rectTransform, !known);
                 if (!known) continue;
                 Resource(row.Alloy, AlloyColour, e.ACur, e.AStore, e.AIn, e.AReq, e.AOut, e.ATotalOut);
                 Resource(row.Energy, EnergyColour, e.ECur, e.EStore, e.EIn, e.EReq, e.EOut, e.ETotalOut);
             }
-            for (var i = shown; i < _rows.Count; i++)
-                if (_rows[i].Row.gameObject.activeSelf) _rows[i].Row.gameObject.SetActive(false);
+            for (var i = shown; i < _rows.Count; i++) Activate(_rows[i].Row, false);
             _all.SetOn(_focus == -1);
+        }
+
+        /// SetActive for something inside the panel: the panel only lays
+        /// itself out again when told something in it moved.
+        private static void Activate(RectTransform rt, bool on)
+        {
+            if (rt.gameObject.activeSelf == on) return;
+            rt.gameObject.SetActive(on);
+            HudCanvas.LayoutVersion++;
         }
 
         // Per-tick values become per-second; out is what the queue asks for,
@@ -590,6 +654,10 @@ namespace SanctuaryHud.Replays
         private void Build(RectTransform root)
         {
             _rows.Clear();
+            _tableDirty = true;
+            _clockTick = -1;
+            _rewindShown = int.MinValue;
+            _shownSpeed = float.NaN;
             _panel = HudPanel.Create(root, "Replay controls", () => _cfgLocked.Value);
             _panel.HangLeft = true;
             _panel.EnableResize(MinScale, MaxScale);
@@ -645,7 +713,9 @@ namespace SanctuaryHud.Replays
             {
                 if (_dragValue > ReplayPlayer.CurrentTick) ReplayPlayer.SeekTo((int)_dragValue);
             };
-            if (_restartIcon == null) _restartIcon = SkipToStartIcon(32);
+            // Kept with the mod's canvas, so a hot reload frees it; a cache
+            // left holding the destroyed one sees null and draws it again.
+            if (_restartIcon == null) _restartIcon = Generated.Keep(SkipToStartIcon(32));
             HudButton.Create(seekRow, "Restart", null, 52f, ButtonH).WithIcon(_restartIcon, 26f).OnClick = Restart;
 
             // The economy table: headings, a rule, a row per army, and ALL.
@@ -716,6 +786,7 @@ namespace SanctuaryHud.Replays
             var head = HudButton.Create(row, name, name, width, HeadH, HeadSize).Plain(alignment, colour);
             head.OnClick = () =>
             {
+                _tableDirty = true;
                 if (column == 0) _sortBy = 0;
                 else if (_sortBy == column) _sortUp = !_sortUp;
                 else
@@ -756,15 +827,18 @@ namespace SanctuaryHud.Replays
                 var c = SortValue(ex, _sortBy).CompareTo(SortValue(ey, _sortBy));
                 if (c != 0) return _sortUp ? c : -c;
             }
-            return _armies.IndexOf(x).CompareTo(_armies.IndexOf(y));
+            // Seat order: _armies is kept sorted by id.
+            return x.Id.CompareTo(y.Id);
         }
+
+        private Comparison<ArmyRow> _compareArmies;
 
         /// The armies with a row, in the table's order.
         private List<ArmyRow> SortedArmies()
         {
             _sorted.Clear();
             foreach (var a in _armies) if (Playing(a)) _sorted.Add(a);
-            if (_sortBy > 0) _sorted.Sort(CompareArmies);
+            if (_sortBy > 0) _sorted.Sort(_compareArmies ??= CompareArmies);
             for (var i = 0; i < Columns; i++)
             {
                 var head = _sortHeads[i];
@@ -812,7 +886,7 @@ namespace SanctuaryHud.Replays
         /// edges - there's no per-pixel AA in this rasterizer.
         private static Texture2D SkipToStartIcon(int size)
         {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear };
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear };
             var px = new Color[size * size];
             var cy = size / 2f;
             var barW = size * 0.11f;

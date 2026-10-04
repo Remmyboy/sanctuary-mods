@@ -22,7 +22,7 @@ namespace SanctuaryHud
     // Standalone mod — the ECS poll, Lua selection bridge and canvas
     // helpers come from shared\, compiled into this assembly, so it works
     // with or without the HUD mod loaded.
-    [BepInPlugin("com.sanctuarydb.idleengineers", "Idle Engineers", "0.7.0")]
+    [BepInPlugin("com.sanctuarydb.idleengineers", "Idle Engineers", "0.7.1")]
     public class IdleEngineersPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -129,11 +129,25 @@ namespace SanctuaryHud
             _panel.SetScale(Mathf.Clamp(_cfgScale.Value, 0.7f, 1.6f));
             var at = _panel.Place(new Vector2(_cfgPosX.Value, _cfgPosY.Value));
             // Persist the panel position once the drag is over.
-            if (!_panel.Dragging && (Math.Abs(_cfgPosX.Value - at.x) > 0.5f || Math.Abs(_cfgPosY.Value - at.y) > 0.5f))
+            if (!_panel.Dragging) Persist(_cfgPosX, _cfgPosY, at);
+        }
+
+        private static void Persist(ConfigEntry<float> x, ConfigEntry<float> y, Vector2 at)
+        {
+            if (Math.Abs(x.Value - at.x) > 0.5f || Math.Abs(y.Value - at.y) > 0.5f)
             {
-                _cfgPosX.Value = at.x;
-                _cfgPosY.Value = at.y;
+                x.Value = at.x;
+                y.Value = at.y;
             }
+        }
+
+        /// Shows or hides a part of the panel, and tells the panel its size
+        /// may have changed (HudPanel.Place only lays out again when told).
+        private static void Activate(GameObject go, bool on)
+        {
+            if (go.activeSelf == on) return;
+            go.SetActive(on);
+            HudCanvas.LayoutVersion++;
         }
 
         private void BuildPanel(RectTransform root)
@@ -150,16 +164,7 @@ namespace SanctuaryHud
 
             // The commander on a line of its own, then the engineers, a tile
             // per tier, down one column.
-            var column = new GameObject("Engineers", typeof(RectTransform));
-            column.transform.SetParent(_panel.Rect, false);
-            var group = column.AddComponent<VerticalLayoutGroup>();
-            group.spacing = 6f;
-            group.childAlignment = TextAnchor.UpperLeft;
-            group.childControlWidth = true;
-            group.childControlHeight = true;
-            group.childForceExpandWidth = false;
-            group.childForceExpandHeight = false;
-            _engineerColumn = (RectTransform)column.transform;
+            _engineerColumn = HudControls.Column(_panel.Rect, "Engineers", 6f);
             _engineerTiles = new TilePool(_engineerColumn, "Engineers");
 
             // Factories: a rule, one heading which selects every idle
@@ -199,7 +204,7 @@ namespace SanctuaryHud
 
             var status = _pollStatus != "ok" ? _pollStatus : "";
             HudCanvas.SetText(_status, status);
-            if (_status.gameObject.activeSelf != status.Length > 0) _status.gameObject.SetActive(status.Length > 0);
+            Activate(_status.gameObject, status.Length > 0);
 
             _engineerTiles.Begin();
             var commander = groups.FirstOrDefault(g => g.Tier == 0);
@@ -207,13 +212,12 @@ namespace SanctuaryHud
             if (commander != null) Tile(_engineerTiles.Take(), commander, -1);
             foreach (var group in groups.Where(g => g.Tier != 0)) Tile(_engineerTiles.Take(), group, group.Count);
             _engineerTiles.End();
-            if (_engineerColumn.gameObject.activeSelf != groups.Count > 0) _engineerColumn.gameObject.SetActive(groups.Count > 0);
+            Activate(_engineerColumn.gameObject, groups.Count > 0);
 
             var showFactories = factories.Count > 0;
-            var showRule = showFactories && groups.Count > 0;
-            if (_rule.gameObject.activeSelf != showRule) _rule.gameObject.SetActive(showRule);
-            if (_factoryHeading.gameObject.activeSelf != showFactories) _factoryHeading.gameObject.SetActive(showFactories);
-            if (_factoryRow.gameObject.activeSelf != showFactories) _factoryRow.gameObject.SetActive(showFactories);
+            Activate(_rule.gameObject, showFactories && groups.Count > 0);
+            Activate(_factoryHeading.gameObject, showFactories);
+            Activate(_factoryRow.gameObject, showFactories);
             if (showFactories)
             {
                 var all = factories.SelectMany(g => g.UnitIds).ToList();

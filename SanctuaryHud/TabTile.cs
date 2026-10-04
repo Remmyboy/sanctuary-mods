@@ -26,8 +26,6 @@ namespace SanctuaryHud
         private bool _haveColours;
         private Vector2 _native = new Vector2(80f, 44f);
 
-        internal ConstructionFilterToggleElement Source => _source;
-
         /// A clone of the panel's toggle prefab, stripped and ready, under
         /// parent and active. Null when the prefab can't be cloned.
         internal static TabTile Create(SanctuaryPanelUI panel, Transform parent)
@@ -90,11 +88,18 @@ namespace SanctuaryHud
 
         private static bool _createLogged;
 
+        /// The source's toggle, looked up when the source changes.
+        private Toggle _sourceToggle;
+
         internal void Mirror(ConstructionFilterToggleElement source)
         {
-            _source = source;
+            if (source != _source || _sourceToggle == null)
+            {
+                _source = source;
+                _sourceToggle = source.toggle != null ? source.toggle : source.GetComponent<Toggle>();
+            }
             if (_text != null && source.displayText != null) _text.text = source.displayText.text;
-            var sourceToggle = source.toggle != null ? source.toggle : source.GetComponent<Toggle>();
+            var sourceToggle = _sourceToggle;
             if (_toggle != null && sourceToggle != null)
             {
                 var on = sourceToggle.isOn;
@@ -107,8 +112,28 @@ namespace SanctuaryHud
         public void OnPointerDown(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerDownHandler);
         public void OnPointerUp(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerUpHandler);
         public void OnPointerClick(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerClickHandler);
-        public void OnPointerEnter(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerEnterHandler);
-        public void OnPointerExit(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerExitHandler);
+        private bool _hover;
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            _hover = true;
+            Forward(eventData, ExecuteEvents.pointerEnterHandler);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            _hover = false;
+            Forward(eventData, ExecuteEvents.pointerExitHandler);
+        }
+
+        private void OnDisable()
+        {
+            // A row taken down under the mouse still owes the game's tab
+            // its leave, or its tooltip and hover state stay up.
+            if (!_hover) return;
+            _hover = false;
+            Forward(new PointerEventData(EventSystem.current) { position = Input.mousePosition }, ExecuteEvents.pointerExitHandler);
+        }
 
         private static bool _forwardLogged;
 

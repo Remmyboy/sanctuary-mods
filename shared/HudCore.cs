@@ -33,7 +33,6 @@ namespace SanctuaryHud
         private static FieldInfo[] _ecoFields;
 
         // ---- idle-builder polling ----
-        private const int IdleIconIndex = 2;
         internal static int _idleCount;
         internal static string _pollStatus = "starting";
         private static float _pollAccum;
@@ -81,7 +80,6 @@ namespace SanctuaryHud
         /// The subset currently upgrading, same tier keys.
         internal static List<IdleGroup> _alloyUpgradingGroups = new List<IdleGroup>();
         internal static int _alloyCount;
-        internal static int _alloyUpgradingCount;
 
         // ---- commander ----
         // "bot2_t1_direct" is the commander icon for all three factions and is
@@ -127,10 +125,8 @@ namespace SanctuaryHud
             _spriteBridgeTried = true;
             try
             {
-                var types = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic).SelectMany(GetTypesSafe).ToList();
-                _assetIdType = types.FirstOrDefault(t => t.FullName == "EM.Core.AssetID");
-                _tryGetSprite = types.FirstOrDefault(t => t.FullName == "SanctuaryUI.Utils")
+                _assetIdType = TypeIndex.ByFullName("EM.Core.AssetID");
+                _tryGetSprite = TypeIndex.ByFullName("SanctuaryUI.Utils")
                     ?.GetMethod("TryGetLoadedSprite", BindingFlags.Public | BindingFlags.Static);
                 if (_tryGetSprite == null || _assetIdType == null)
                     _log?.LogWarning("Unit sprite lookup unavailable; callers fall back to text.");
@@ -193,25 +189,14 @@ namespace SanctuaryHud
         /// The sprite itself, for a uGUI Image; null when it isn't loaded.
         internal static Sprite SpriteFor(uint index) => ResolveSprite(index);
 
-        /// Draws one in IMGUI. A Sprite's pixels are a window into a packed
-        /// atlas, so the draw has to be told which corner of the texture.
-        /// `fraction` clips it horizontally, for showing one running off an edge.
-        internal static void DrawSprite(Rect rect, uint index, float fraction = 1f)
-        {
-            var sprite = ResolveSprite(index);
-            var tex = sprite == null ? null : sprite.texture;
-            if (tex == null) return;
-            var tr = sprite.textureRect;
-            GUI.DrawTextureWithTexCoords(rect, tex,
-                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width * fraction / tex.width, tr.height / tex.height));
-        }
+        private static readonly int IconAtlasId = Shader.PropertyToID("_StrategicIconAtlas");
 
         private static void ResolveIconAtlas()
         {
             try
             {
                 if (_iconLoaderType == null) return;
-                _iconAtlas = Shader.GetGlobalTexture(Shader.PropertyToID("_StrategicIconAtlas"));
+                _iconAtlas = Shader.GetGlobalTexture(IconAtlasId);
                 if (_iconAtlas == null)
                 {
                     if (!_loggedAtlasWait)
@@ -275,10 +260,7 @@ namespace SanctuaryHud
         // the same snapshot — and each mod unpatches only its own instance.
         internal static void ApplyEconomyPatch(Harmony harmony)
         {
-            var types = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !a.IsDynamic)
-                .SelectMany(GetTypesSafe)
-                .Where(t => t.Name == "EconomyPanelUI");
+            var types = TypeIndex.All.Where(t => t.Name == "EconomyPanelUI").ToList();
 
             var postfix = new HarmonyMethod(typeof(HudCore), nameof(EconomyValuesPostfix));
             var patched = 0;
@@ -297,42 +279,55 @@ namespace SanctuaryHud
             _log?.LogInfo($"Economy hook: patched {patched} method(s).");
         }
 
+        private static float[] _ecoValues;
+
         internal static void EconomyValuesPostfix(object __instance, object[] __args)
         {
-            var box = __args?.FirstOrDefault(a => a != null && a.GetType().Name.Contains("UIEconomyValues"));
+            object box = null;
+            if (__args != null)
+            {
+                foreach (var arg in __args)
+                {
+                    if (arg != null && arg.GetType().Name.Contains("UIEconomyValues"))
+                    {
+                        box = arg;
+                        break;
+                    }
+                }
+            }
             if (box == null) return;
 
             _ecoFields ??= box.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            _ecoValues ??= new float[_ecoFields.Length];
 
-            var snapshot = new Dictionary<string, float>(_ecoFields.Length);
-            foreach (var f in _ecoFields)
+            // The patch lands on both SetAlloyValues and SetEnergyValues,
+            // which the game calls back to back with the same struct, so
+            // every Lua update arrives here twice. Count it once, so a
+            // consumer smoothing per update runs at the real data rate, and
+            // only make a new snapshot (consumers keep the old one) when a
+            // value moved.
+            var changed = false;
+            for (var i = 0; i < _ecoFields.Length; i++)
             {
-                var v = f.GetValue(box);
-                snapshot[f.Name] = v is IConvertible c ? Convert.ToSingle(c) : 0f;
+                var v = _ecoFields[i].GetValue(box);
+                var f = v is IConvertible c ? Convert.ToSingle(c, CultureInfo.InvariantCulture) : 0f;
+                if (f != _ecoValues[i]) changed = true;
+                _ecoValues[i] = f;
             }
             lock (_ecoLock)
             {
-                // The patch lands on both SetAlloyValues and SetEnergyValues,
-                // which the game calls back to back with the same struct, so
-                // every Lua update arrives here twice. Count it once, so a
-                // consumer smoothing per update runs at the real data rate.
-                if (!SameSnapshot(_eco, snapshot)) _ecoSequence++;
-                _eco = snapshot;
+                if (changed || _eco == null)
+                {
+                    var snapshot = new Dictionary<string, float>(_ecoFields.Length);
+                    for (var i = 0; i < _ecoFields.Length; i++) snapshot[_ecoFields[i].Name] = _ecoValues[i];
+                    _ecoSequence++;
+                    _eco = snapshot;
+                }
             }
             if (__instance is Component panel) _ecoPanel = panel;
             // The host streams economy continuously during a match and never
             // outside one, so this doubles as the "am I in a game?" signal.
             _lastEcoRealtime = Time.realtimeSinceStartup;
-        }
-
-        private static bool SameSnapshot(Dictionary<string, float> a, Dictionary<string, float> b)
-        {
-            if (a == null || b == null || a.Count != b.Count) return false;
-            foreach (var kv in a)
-            {
-                if (!b.TryGetValue(kv.Key, out var v) || v != kv.Value) return false;
-            }
-            return true;
         }
 
         private static float _lastEcoRealtime = -999f;
@@ -408,8 +403,6 @@ namespace SanctuaryHud
         private static bool _loggedIdleIndexWait;
         // Cached for the late-resolve retries (see PollIdleBuilders).
         private static Type _iconLoaderType;
-        private static int _idleAllCount;
-        private static int _idleBuilderCount;
 
         // ---- ownership filter: local army colour matching ----
         // Render entities carry no army id, but every unit's renderer tint is
@@ -429,7 +422,7 @@ namespace SanctuaryHud
 
         private static void ResolveOwnership(List<Assembly> assemblies, Type emType)
         {
-            var rendererType = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Components.RendererComponent");
+            var rendererType = NeedType(TypeIndex.ByFullName("EM.Components.RendererComponent"), "EM.Components.RendererComponent");
             _getRendererMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                 .MakeGenericMethod(rendererType);
@@ -441,10 +434,9 @@ namespace SanctuaryHud
 
             // ownClientID lives in a Burst SharedStatic, but the Lua-facing
             // getter is a plain managed method we can just call.
-            _getClientIdMi = assemblies.SelectMany(GetTypesSafe)
-                .FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface")
+            _getClientIdMi = TypeIndex.ByFullName("EM.Lua.Client.ClientLuaInterface")
                 ?.GetMethod("GetClientID", BindingFlags.Public | BindingFlags.Static);
-            _lobbyInfoType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "LobbyInformationManaged");
+            _lobbyInfoType = TypeIndex.ByName("LobbyInformationManaged");
 
             var colorsPath = System.IO.Path.Combine(Paths.GameRootPath, "LJ", "lua", "common", "colors.lua");
             _armyColours = ParseArmyColours(colorsPath);
@@ -502,10 +494,9 @@ namespace SanctuaryHud
         /// idle list. Ask the game instead of inferring.
         private static Vector4? FocusedArmyColourFromLua()
         {
-            if (_getLuaGlobal == null) return null;
-            // Guards the read-back below too: _getLuaGlobal goes straight into
-            // LuaJIT with the same null-able state handle that RunLua checks.
-            if (_luaStateReady == null || !_luaStateReady()) return null;
+            // Guards the read-back below too: it goes straight into LuaJIT
+            // with the same null-able state handle that RunLua checks.
+            if (!LuaReady) return null;
             try
             {
                 // Exactly one focused army is a player; a replay's all-armies
@@ -523,7 +514,7 @@ namespace SanctuaryHud
                     "  __SdbOwn = string.format('%f,%f,%f', own.color.x, own.color.y, own.color.z) " +
                     "end");
 
-                var raw = _getLuaGlobal("__SdbOwn");
+                var raw = GetLuaGlobal("__SdbOwn");
                 // The client answered (possibly "nobody"): that answer stands,
                 // and the lobby-derived guess below must not overrule it.
                 _luaOwnerAnswered = raw != null;
@@ -538,7 +529,7 @@ namespace SanctuaryHud
                 if (!_loggedOwnColour)
                 {
                     _loggedOwnColour = true;
-                    _log.LogInfo($"Ownership: focused army colour {colour.x:0.###},{colour.y:0.###},{colour.z:0.###} (from client Lua).");
+                    _log.LogInfo(FormattableString.Invariant($"Ownership: focused army colour {colour.x:0.###},{colour.y:0.###},{colour.z:0.###} (from client Lua)."));
                 }
 
                 var lift = Mathf.Max(0.35f, Mathf.Max(colour.x, Mathf.Max(colour.y, colour.z)));
@@ -610,11 +601,21 @@ namespace SanctuaryHud
             return null;
         }
 
+        private static readonly object[] _entityArg = new object[1];
+
+        /// The argument array for a GetComponentData(entity) call, reused:
+        /// the unit scan makes several per unit. Main thread only.
+        private static object[] EntityArg(object entity)
+        {
+            _entityArg[0] = entity;
+            return _entityArg;
+        }
+
         private static bool ColourMatches(object em, object entity, Vector4 target)
         {
             try
             {
-                var renderer = _getRendererMi.Invoke(em, new[] { entity });
+                var renderer = _getRendererMi.Invoke(em, EntityArg(entity));
                 var instance = _instanceData0Field.GetValue(_renderInstanceDataField.GetValue(renderer));
                 var dx = Convert.ToSingle(_f4x.GetValue(instance)) - target.x;
                 var dy = Convert.ToSingle(_f4y.GetValue(instance)) - target.y;
@@ -748,12 +749,28 @@ namespace SanctuaryHud
         // Selection lives in client Lua and needs live entity objects, so
         // rather than marshalling them we ask the client VM to do the work.
         // Client-side only: no sim state, no hashed files touched.
-        private static Func<string, int> _runLuaChunk;
-        private static Func<string, string> _getLuaGlobal;
+        private static LuaBridge.Calls _lua;
         private static float _nextLuaBridgeTry;
+        private static string _lastLuaError;
 
-        /// True once the client VM exists and can be called into.
-        internal static bool LuaReady => _luaStateReady != null && _luaStateReady();
+        /// True once the client VM exists and can be called into. Outside a
+        /// match ClientLuaInterface.Data.luaState is a null handle, and handing
+        /// that to luaL_dostring dereferences null inside LuaJIT - a native
+        /// access violation that no managed try/catch can stop, so the process
+        /// dies. Everything that reaches into Lua has to check this first.
+        ///
+        /// Resolves the bridge itself if nothing has yet: a mod that skips
+        /// the unit scan (LadderReporter) used to be left with no bridge, so
+        /// this read false all match and its result hook never went in.
+        internal static bool LuaReady
+        {
+            get
+            {
+                if (_lua == null) EnsureLuaBridge();
+                try { return _lua != null && _lua.Ready(); }
+                catch { return false; }
+            }
+        }
 
         /// Resolves the Lua bridge on demand, outside the in-match poll that
         /// normally does it. Replay playback needs to talk to the client VM
@@ -761,7 +778,7 @@ namespace SanctuaryHud
         /// that never polls the ECS still wants RunLua to work.
         internal static void EnsureLuaBridge()
         {
-            if (_runLuaChunk != null) return;
+            if (_lua != null) return;
             // Callers poll this every frame; a bridge that won't resolve (a
             // game update renamed something) would rescan every assembly and
             // log a warning each time.
@@ -769,8 +786,9 @@ namespace SanctuaryHud
             _nextLuaBridgeTry = Time.realtimeSinceStartup + 5f;
             try
             {
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
-                ResolveLuaBridge(assemblies);
+                _lua = LuaBridge.Emit(typeof(HudCore), out var missing);
+                if (_lua == null) _log?.LogWarning($"Lua bridge unavailable, missing: {missing}.");
+                else _log?.LogInfo("Lua bridge: ready (emitted).");
             }
             catch (Exception e)
             {
@@ -778,137 +796,38 @@ namespace SanctuaryHud
             }
         }
 
-        /// Reads a global out of the client VM as a string, or null.
+        /// Reads a global out of the client VM as a string, or null. Booleans
+        /// read as null: expose a number or a string to read something back.
         internal static string GetLuaGlobal(string name)
         {
-            if (_getLuaGlobal == null || !LuaReady) return null;
-            try { return _getLuaGlobal(name); }
+            if (!LuaReady) return null;
+            try { return _lua.GetGlobal(name); }
             catch { return null; }
         }
 
-        /// True once the client VM actually exists. Outside a match
-        /// ClientLuaInterface.Data.luaState is a null handle, and handing that
-        /// to luaL_dostring dereferences null inside LuaJIT — a native access
-        /// violation that no managed try/catch can stop, so the process dies.
-        /// Everything that reaches into Lua has to check this first.
-        private static Func<bool> _luaStateReady;
-
-        // ClientLuaInterface.Data is `ref Unmanaged` over a Burst SharedStatic,
-        // and reflection refuses to invoke ByRef-returning getters. Emit a tiny
-        // method that does it in IL instead: get the ref, load .luaState off it,
-        // and call luaL_dostring.
-        private static void ResolveLuaBridge(List<Assembly> assemblies)
-        {
-            var luaJit = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "LuaJIT");
-            var doString = luaJit?.GetMethod("luaL_dostring", BindingFlags.Public | BindingFlags.Static);
-
-            var cli = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
-            var dataGetter = cli?.GetProperty("Data", BindingFlags.Public | BindingFlags.Static)?.GetGetMethod();
-
-            var unmanagedType = dataGetter?.ReturnType;
-            if (unmanagedType != null && unmanagedType.IsByRef) unmanagedType = unmanagedType.GetElementType();
-            var stateField = unmanagedType?.GetField("luaState", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-            if (doString == null || dataGetter == null || stateField == null)
-            {
-                _log.LogWarning($"Lua bridge unavailable: dostring {(doString != null ? "ok" : "missing")}, " +
-                                $"getter {(dataGetter != null ? "ok" : "missing")}, state {(stateField != null ? "ok" : "missing")}.");
-                return;
-            }
-
-            var dm = new System.Reflection.Emit.DynamicMethod(
-                "SanctuaryHud_RunLua", typeof(int), new[] { typeof(string) }, typeof(HudCore), skipVisibility: true);
-            var il = dm.GetILGenerator();
-            il.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);      // ref Unmanaged
-            il.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);     // lua_State
-            il.Emit(System.Reflection.Emit.OpCodes.Ldarg_0);               // chunk
-            il.Emit(System.Reflection.Emit.OpCodes.Call, doString);
-            il.Emit(System.Reflection.Emit.OpCodes.Ret);
-
-            _runLuaChunk = (Func<string, int>)dm.CreateDelegate(typeof(Func<string, int>));
-
-            // lua_State is a struct wrapping a single nuint Handle, so the
-            // readiness check is Data.luaState.Handle != 0.
-            var handleField = stateField.FieldType.GetField("Handle", BindingFlags.Public | BindingFlags.Instance);
-            if (handleField != null)
-            {
-                var rm = new System.Reflection.Emit.DynamicMethod(
-                    "SanctuaryHud_LuaStateReady", typeof(bool), Type.EmptyTypes, typeof(HudCore), skipVisibility: true);
-                var ril = rm.GetILGenerator();
-                ril.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);   // ref Unmanaged
-                ril.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);  // lua_State
-                ril.Emit(System.Reflection.Emit.OpCodes.Ldfld, handleField); // nuint
-                ril.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_0);
-                ril.Emit(System.Reflection.Emit.OpCodes.Conv_U);
-                ril.Emit(System.Reflection.Emit.OpCodes.Cgt_Un);             // handle != 0
-                ril.Emit(System.Reflection.Emit.OpCodes.Ret);
-                _luaStateReady = (Func<bool>)rm.CreateDelegate(typeof(Func<bool>));
-            }
-            else
-            {
-                // Without a way to test the handle, calling in is a coin flip
-                // between working and killing the process. Stay out.
-                _log.LogWarning("Lua bridge disabled: lua_State.Handle not found, so the null-state guard " +
-                                "can't be emitted. Selection and camera jumps will be inert.");
-                _runLuaChunk = null;
-                return;
-            }
-
-            // Reading back out of Lua: push a global, convert to string, pop.
-            var getGlobal = luaJit.GetMethod("lua_getglobal", BindingFlags.Public | BindingFlags.Static);
-            var toString = luaJit.GetMethod("lua_tostring", BindingFlags.Public | BindingFlags.Static);
-            var setTop = luaJit.GetMethod("lua_settop", BindingFlags.Public | BindingFlags.Static);
-            if (getGlobal != null && toString != null && setTop != null)
-            {
-                var gm = new System.Reflection.Emit.DynamicMethod(
-                    "SanctuaryHud_GetLuaGlobal", typeof(string), new[] { typeof(string) }, typeof(HudCore), skipVisibility: true);
-                var gil = gm.GetILGenerator();
-                var stateLocal = gil.DeclareLocal(stateField.FieldType);
-                var resultLocal = gil.DeclareLocal(typeof(string));
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);
-                gil.Emit(System.Reflection.Emit.OpCodes.Stloc, stateLocal);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, stateLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldarg_0);
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, getGlobal);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, stateLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_M1);
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, toString);
-                gil.Emit(System.Reflection.Emit.OpCodes.Stloc, resultLocal);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, stateLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)-2);
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, setTop);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, resultLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ret);
-
-                _getLuaGlobal = (Func<string, string>)gm.CreateDelegate(typeof(Func<string, string>));
-            }
-
-            _log.LogInfo($"Lua bridge: ready (emitted), read-back {(_getLuaGlobal != null ? "ok" : "missing")}.");
-        }
-
         /// Runs a chunk in the client's own VM. Returns false (rather than
-        /// throwing) when there is no VM yet, so callers can simply retry.
+        /// throwing) when there is no VM yet or the chunk raised an error, so
+        /// callers can simply retry. The same error twice running is logged
+        /// once.
         internal static bool RunLua(string chunk)
         {
             try
             {
-                if (_runLuaChunk == null) return false;
-                // No VM yet (menu, loading, or after a match) — calling in
+                // No VM yet (menu, loading, or after a match): calling in
                 // would segfault the process rather than throw.
-                if (_luaStateReady == null || !_luaStateReady()) return false;
-                var code = _runLuaChunk(chunk);
-                if (code != 0) _log.LogWarning($"Lua chunk failed (code {code}): {chunk}");
-                return code == 0;
+                if (!LuaReady) return false;
+                var err = _lua.Run(chunk);
+                if (err == null) return true;
+                if (err != _lastLuaError)
+                {
+                    _lastLuaError = err;
+                    _log?.LogWarning($"Lua chunk failed: {err} (in: {LuaBridge.Trim(chunk)})");
+                }
+                return false;
             }
             catch (Exception e)
             {
-                _log.LogWarning($"Lua bridge call failed: {e.Message}");
+                _log?.LogWarning($"Lua bridge call failed: {e.Message}");
                 return false;
             }
         }
@@ -949,14 +868,14 @@ namespace SanctuaryHud
             {
                 if (_localIdField != null && _getLocalIdMi != null)
                 {
-                    var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var localComponent = _getLocalIdMi.Invoke(em, EntityArg(entity));
                     var localId = _localIdField.GetValue(localComponent);
                     var indexField = IndexField(localId);
                     if (indexField != null) _commanderLocalIndex = Convert.ToInt32(indexField.GetValue(localId));
                 }
 
                 if (_getPairedGlobalMi == null || _getHealthMi == null) return;
-                var pairedComponent = _getPairedGlobalMi.Invoke(em, new[] { entity });
+                var pairedComponent = _getPairedGlobalMi.Invoke(em, EntityArg(entity));
                 var globalId = _pairedGlobalField.GetValue(pairedComponent);
                 // A commander that has died can still be drawn for a while;
                 // its id is known to be gone, so don't ask about it again.
@@ -1109,7 +1028,7 @@ namespace SanctuaryHud
                 // LocalID index is the key the selection system uses.
                 if (_localIdField != null && _getLocalIdMi != null)
                 {
-                    var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
                     var localId = _localIdField.GetValue(component);
                     var indexField = IndexField(localId);
                     if (indexField != null) group.UnitIds.Add(Convert.ToInt32(indexField.GetValue(localId)));
@@ -1179,7 +1098,7 @@ namespace SanctuaryHud
             // last poll's (or, local ids being reused, last match's).
             _factoryKindsValid = false;
             _extractorIdsValid = false;
-            if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
+            if (!LuaReady) return;
             try
             {
                 if (!RunLua(
@@ -1255,7 +1174,7 @@ namespace SanctuaryHud
                         "end)"))
                     return;
 
-                var raw = _getLuaGlobal("__SdbExtractors");
+                var raw = GetLuaGlobal("__SdbExtractors");
                 if (raw == null) return;
 
                 _extractorLocalIds.Clear();
@@ -1268,7 +1187,7 @@ namespace SanctuaryHud
 
                 if (_trackIdleFactories)
                 {
-                    var factoriesRaw = _getLuaGlobal("__SdbFactories");
+                    var factoriesRaw = GetLuaGlobal("__SdbFactories");
                     if (factoriesRaw != null)
                     {
                         _factoryKinds.Clear();
@@ -1287,7 +1206,7 @@ namespace SanctuaryHud
                 }
 
                 // Art is a nicety: without it the rows stay labelled.
-                var iconsRaw = _getLuaGlobal("__SdbRowIcons");
+                var iconsRaw = GetLuaGlobal("__SdbRowIcons");
                 if (iconsRaw == null) return;
                 // What Lua found. The per-id sprite line says what the registry
                 // made of it, so a blank row can be pinned on one or the other.
@@ -1326,7 +1245,7 @@ namespace SanctuaryHud
             try
             {
                 if (_localIdField == null || _getLocalIdMi == null) return;
-                var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
                 var localId = _localIdField.GetValue(component);
                 var indexField = IndexField(localId);
                 if (indexField == null) return;
@@ -1379,7 +1298,7 @@ namespace SanctuaryHud
                 var localIndex = -1;
                 if (_localIdField != null && _getLocalIdMi != null)
                 {
-                    var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
                     var localId = _localIdField.GetValue(component);
                     var indexField = IndexField(localId);
                     if (indexField != null) localIndex = Convert.ToInt32(indexField.GetValue(localId));
@@ -1428,7 +1347,7 @@ namespace SanctuaryHud
             try
             {
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
-                _iconElemType = assemblies.SelectMany(GetTypesSafe).First(t => t.Name == "IconEntityElementComponent");
+                _iconElemType = NeedType(TypeIndex.ByName("IconEntityElementComponent"), "IconEntityElementComponent");
                 _iconEnabledField = _iconElemType.GetField("Enabled", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     ?? throw new MissingFieldException("IconEntityElementComponent.Enabled");
                 _iconIndexField = _iconElemType.GetField("IconIndex", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -1439,7 +1358,7 @@ namespace SanctuaryHud
                 // alone overcounts badly. Registration happens during match
                 // load, so this (and the other icon lookups below) may not
                 // succeed yet — PollIdleBuilders keeps retrying them.
-                _iconLoaderType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
+                _iconLoaderType = TypeIndex.ByName("IconLoader");
                 TryResolveIdleImageIndex();
                 TryResolveUpgradeImageIndex();
 
@@ -1473,24 +1392,25 @@ namespace SanctuaryHud
 
                 try
                 {
-                    var localIdComponent = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Components.LocalIDComponent");
+                    var localIdComponent = NeedType(TypeIndex.ByFullName("EM.Components.LocalIDComponent"), "EM.Components.LocalIDComponent");
                     _getLocalIdMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                         .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                         .MakeGenericMethod(localIdComponent);
                     _localIdField = localIdComponent.GetFields(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
 
-                    var pairedType = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Components.LocalPairedGlobalIDComponent");
+                    var pairedType = NeedType(TypeIndex.ByFullName("EM.Components.LocalPairedGlobalIDComponent"), "EM.Components.LocalPairedGlobalIDComponent");
                     _getPairedGlobalMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                         .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                         .MakeGenericMethod(pairedType);
                     _pairedGlobalField = pairedType.GetField("Value");
 
-                    var cli = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
+                    var cli = NeedType(TypeIndex.ByFullName("EM.Lua.Client.ClientLuaInterface"), "EM.Lua.Client.ClientLuaInterface");
                     _getHealthMi = cli.GetMethod("GetHealth", BindingFlags.Public | BindingFlags.Static);
                     _getMaxHealthMi = cli.GetMethod("GetMaxHealth", BindingFlags.Public | BindingFlags.Static);
                     _log.LogInfo($"Commander tracking: health {(_getHealthMi != null ? "ok" : "missing")}, paired-id {(_pairedGlobalField != null ? "ok" : "missing")}.");
 
-                    ResolveLuaBridge(assemblies);
+                    _nextLuaBridgeTry = 0f;
+                    EnsureLuaBridge();
                 }
                 catch (Exception e)
                 {
@@ -1591,7 +1511,7 @@ namespace SanctuaryHud
             try
             {
                 if (_localIdField == null || _getLocalIdMi == null) return -1;
-                var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
+                var localComponent = _getLocalIdMi.Invoke(em, EntityArg(entity));
                 var localId = _localIdField.GetValue(localComponent);
                 var indexField = IndexField(localId);
                 return indexField != null ? Convert.ToInt32(indexField.GetValue(localId)) : -1;
@@ -1661,8 +1581,6 @@ namespace SanctuaryHud
 
             try
             {
-                var count = 0;
-                var allCount = 0;
                 var ownColour = LocalArmyColour();
                 RefreshArmyLookups();
                 var groups = new Dictionary<int, IdleGroup>();
@@ -1678,7 +1596,6 @@ namespace SanctuaryHud
                     _idleCount = 0;
                     _idleFactoryCount = 0;
                     _alloyCount = 0;
-                    _alloyUpgradingCount = 0;
                     _commanderLocalIndex = -1;
                     lock (_groupLock)
                     {
@@ -1763,10 +1680,8 @@ namespace SanctuaryHud
 
                                     if (idle)
                                     {
-                                        allCount++;
                                         if (ColourMatches(em, entity, ownColour.Value))
                                         {
-                                            count++;
                                             RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
                                         }
 
@@ -1785,11 +1700,6 @@ namespace SanctuaryHud
                                         RecordAlloy(em, entity, alloyTier, upgrading, alloyGroups, alloyUpgrading);
                                     }
                                 }
-                                else if (bufLength > IdleIconIndex)
-                                {
-                                    var element = ItemAt(itemGetter, buffer, IdleIconIndex);
-                                    if ((bool)_iconEnabledField.GetValue(element)) count++;
-                                }
                             }
                         }
                         finally
@@ -1804,16 +1714,13 @@ namespace SanctuaryHud
                 }
 
                 var ordered = groups.Values.OrderBy(g => g.Tier).ToList();
-                // The headline number is idle *engineers*; `count` also covers
-                // factories and the commander, which the rows deliberately skip.
+                // The headline number is idle *engineers*: factories and the
+                // commander are left out of the rows on purpose.
                 _idleCount = ordered.Sum(g => g.Count);
-                _idleBuilderCount = count;
-                _idleAllCount = allCount;
 
                 var alloyOrdered = alloyGroups.Values.OrderBy(g => g.Tier).ToList();
                 var alloyUpgradingOrdered = alloyUpgrading.Values.OrderBy(g => g.Tier).ToList();
                 _alloyCount = alloyOrdered.Sum(g => g.Count);
-                _alloyUpgradingCount = alloyUpgradingOrdered.Sum(g => g.Count);
 
                 // The key is domain * 10 + tier, so it sorts land, air, naval.
                 var factoryOrdered = factoryGroups.OrderBy(kv => kv.Key).Select(kv => kv.Value).ToList();
@@ -1845,7 +1752,19 @@ namespace SanctuaryHud
         /// The army the client is looking through: an army id, -1 for the
         /// all-armies view a replay can sit in, and int.MinValue before it has
         /// been read.
-        internal static int FocusedArmy = int.MinValue;
+        internal static int FocusedArmy
+        {
+            get
+            {
+                // Polled only for a mod that reads it (two of the mods that
+                // run this tick do; the rest needn't ask Lua every second).
+                _focusWanted = true;
+                return _focusedArmy;
+            }
+        }
+
+        private static int _focusedArmy = int.MinValue;
+        private static bool _focusWanted;
 
         /// Whether the client is looking through one army's eyes.
         ///
@@ -1862,9 +1781,40 @@ namespace SanctuaryHud
             if (!LuaReady) return;
             if (!RunLua("__SdbFocusArmy = tostring(GetFocusArmy())")) return;
             var raw = GetLuaGlobal("__SdbFocusArmy");
-            FocusedArmy = int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
+            _focusedArmy = int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
                 ? id
                 : int.MinValue;
+        }
+
+        private static bool _wasInMatch;
+
+        // How long the unit scan takes, for the log at the end of a match:
+        // it reads every unit through reflection once a second, in each mod
+        // that runs it, so it is the first thing to measure if the HUD mods
+        // ever show up as a hitch.
+        private static readonly System.Diagnostics.Stopwatch _scanWatch = new System.Diagnostics.Stopwatch();
+        private static int _scans;
+        private static double _scanTotalMs, _scanMaxMs;
+
+        private static void TimedScan()
+        {
+            _scanWatch.Restart();
+            PollIdleBuilders();
+            _scanWatch.Stop();
+            var ms = _scanWatch.Elapsed.TotalMilliseconds;
+            _scans++;
+            _scanTotalMs += ms;
+            if (ms > _scanMaxMs) _scanMaxMs = ms;
+        }
+
+        private static void LogScanTimes()
+        {
+            if (_scans == 0) return;
+            _log?.LogInfo(FormattableString.Invariant(
+                $"Unit scan: {_scans} scans this match, {_scanTotalMs / _scans:0.00} ms on average, {_scanMaxMs:0.00} ms at most."));
+            _scans = 0;
+            _scanTotalMs = 0;
+            _scanMaxMs = 0;
         }
 
         internal static void SharedTick()
@@ -1879,18 +1829,21 @@ namespace SanctuaryHud
                 // reused between matches, so a refused one is forgotten too.
                 _commanderGlobalId = null;
                 _refusedCommanderId = null;
-                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _idleFactoryCount > 0 || _alloyCount > 0 ||
-                    _rowIcons.Count > 0)
+                // Once per match left, whatever it counted: an observer or a
+                // replay's all-armies view counts nothing, and its icon table
+                // and seat must not carry into the next match either.
+                if (_wasInMatch)
                 {
+                    _wasInMatch = false;
+                    LogScanTimes();
                     _commanderLocalIndex = -1;
                     _commanderIconIndex = -1;
                     _idleCount = 0;
                     _idleFactoryCount = 0;
                     _alloyCount = 0;
-                    _alloyUpgradingCount = 0;
                     // Unread again, so the next match starts by showing rather
                     // than by carrying the last one's seat over.
-                    FocusedArmy = int.MinValue;
+                    _focusedArmy = int.MinValue;
                     // Each match reloads its sprites through Engine.LoadSprite,
                     // so a reused id could otherwise draw last game's art.
                     ClearSpriteCache();
@@ -1915,12 +1868,13 @@ namespace SanctuaryHud
                 return;
             }
 
+            _wasInMatch = true;
             _pollAccum += Time.unscaledDeltaTime;
             if (_pollAccum >= 1f)
             {
                 _pollAccum = 0f;
-                if (UnitScan) PollIdleBuilders();
-                PollFocusArmy();
+                if (UnitScan) TimedScan();
+                if (_focusWanted) PollFocusArmy();
             }
 
             // Deferred selection: wait for the mouse to come up, then let two
@@ -1953,7 +1907,7 @@ namespace SanctuaryHud
         // Only the textures are left in use: the panels, strip and rows that
         // had IMGUI styles here are all on the game's canvas now.
         private static bool _stylesReady;
-        internal static Texture2D _texPanel, _texWhite, _texRowHover;
+        internal static Texture2D _texWhite;
 
         /// The game's own panel colour and accent (its front menu's
         /// near-black blue and accent blue), for anything drawn in its shape.
@@ -1968,30 +1922,30 @@ namespace SanctuaryHud
         /// alloy teal and the idle orange so the two panels never read alike.
         internal static readonly Color UpgradeColour = new Color(0.55f, 0.78f, 1f);
 
+        /// After Generated.DestroyAll.
+        internal static void ReleasedStyles() => _stylesReady = false;
+
         internal static void EnsureStyles()
         {
             if (_stylesReady) return;
             _stylesReady = true;
 
-            _texPanel = MakeTex(new Color(0.04f, 0.06f, 0.08f, 0.82f));
             _texWhite = MakeTex(Color.white);
-            _texRowHover = MakeTex(new Color(1f, 1f, 1f, 0.12f));
         }
 
         private static Texture2D MakeTex(Color color)
         {
-            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            var tex = Generated.Keep(new Texture2D(1, 1, TextureFormat.RGBA32, false));
             tex.SetPixel(0, 0, color);
             tex.Apply();
-            tex.hideFlags = HideFlags.HideAndDontSave;
             return tex;
         }
 
-        internal static IEnumerable<Type> GetTypesSafe(Assembly assembly)
-        {
-            try { return assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t != null); }
-        }
+        internal static IEnumerable<Type> GetTypesSafe(Assembly assembly) => TypeIndex.Types(assembly);
+
+        /// A type the resolve can't go on without: missing throws, as the
+        /// linear scan's First() did, naming what moved.
+        private static Type NeedType(Type found, string name) => found ?? throw new TypeLoadException($"{name} not found");
 
         // ---- strategic icons, by name ---------------------------------------
         //
@@ -2018,8 +1972,7 @@ namespace SanctuaryHud
             {
                 if (_iconLoaderType == null)
                 {
-                    _iconLoaderType = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic)
-                        .SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
+                    _iconLoaderType = TypeIndex.ByName("IconLoader");
                 }
                 if (_iconNamesByIndex == null) ResolveIconNames();
                 if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();

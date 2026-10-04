@@ -145,7 +145,7 @@ namespace Sanctuary.ModApi
                 var ui = LobbyInterface.Instance;
                 if (ui != null && LobbyManager.CurrentState != null && LobbyManager.IsInLobby) ui.UpdateData(LobbyManager.CurrentState);
             }
-            catch { }
+            catch (Exception e) { ModApiPlugin.Log.LogWarning($"Redrawing the lobby after an AI seat change: {e.Message}"); }
         }
     }
 }

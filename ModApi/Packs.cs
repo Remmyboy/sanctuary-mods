@@ -135,7 +135,8 @@ namespace Sanctuary.ModApi
                 }
                 catch (Exception e)
                 {
-                    try { zip?.Close(); } catch { }
+                    try { zip?.Close(); }
+                    catch { /* the read failure is logged below; closing is tidying up */ }
                     ModApiPlugin.Log.LogError($"Art pack {Rel(path)} couldn't be read, so its art is missing: {e.Message}");
                 }
             }
@@ -163,7 +164,8 @@ namespace Sanctuary.ModApi
             }
             foreach (var zip in Open)
             {
-                try { zip.Close(); } catch { }
+                try { zip.Close(); }
+                catch (Exception e) { ModApiPlugin.Log.LogWarning($"Closing an art pack: {e.Message}"); }
             }
             ModApiPlugin.Log.LogInfo($"Art packs: {_mounted.Count} unmounted.");
             Undo.Clear();

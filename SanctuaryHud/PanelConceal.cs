@@ -59,7 +59,11 @@ namespace SanctuaryHud
                 group.alpha = visible ? 1f : 0f;
                 group.blocksRaycasts = visible;
             }
-            catch { /* the panel is on its way out */ }
+            catch
+            {
+                // Ignored on purpose: only a panel being torn down with its
+                // scene throws here, and there is nothing left to give back.
+            }
         }
 
         private static void Hide(SanctuaryPanelUI panel)
@@ -87,16 +91,19 @@ namespace SanctuaryHud
             }
         }
 
-        /// The panel's tree, once, into the log: what it holds and where,
-        /// so the next tweak to a stand-in has something to go on.
+        /// The panel's tree, once, into the log (at Debug: it is for the next
+        /// tweak to a stand-in, not for every player's log): what it holds
+        /// and where.
         internal static void DumpSubtree(Transform node, int depth, BepInEx.Logging.ManualLogSource log, int maxDepth = 5)
         {
             if (node == null || depth > maxDepth) return;
             var components = string.Join(",", System.Linq.Enumerable.Where(
                 System.Linq.Enumerable.Select(node.GetComponents<Component>(), c => c == null ? null : c.GetType().Name),
                 n => n != null && n != "RectTransform" && n != "CanvasRenderer"));
-            var size = node is RectTransform rt ? $" [{rt.rect.width:F0}x{rt.rect.height:F0} @ {rt.anchoredPosition.x:F0},{rt.anchoredPosition.y:F0}]" : "";
-            log?.LogInfo($"  {new string(' ', depth * 2)}{node.name}{(node.gameObject.activeSelf ? "" : " (inactive)")}{size} {{{components}}}");
+            var size = node is RectTransform rt
+                ? System.FormattableString.Invariant($" [{rt.rect.width:F0}x{rt.rect.height:F0} @ {rt.anchoredPosition.x:F0},{rt.anchoredPosition.y:F0}]")
+                : "";
+            log?.LogDebug($"  {new string(' ', depth * 2)}{node.name}{(node.gameObject.activeSelf ? "" : " (inactive)")}{size} {{{components}}}");
             for (var i = 0; i < node.childCount; i++) DumpSubtree(node.GetChild(i), depth + 1, log, maxDepth);
         }
     }

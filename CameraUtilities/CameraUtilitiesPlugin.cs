@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -27,7 +28,7 @@ namespace SanctuaryHud.CameraUtils
     // the hotkey and the panel. The panel is on a canvas of the mod's own,
     // not the game's HUD canvas: hiding the game's UI switches that canvas
     // off, and the panel is how it comes back.
-    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.camerautilities", "Camera Utilities", "0.2.1")]
     public class CameraUtilitiesPlugin : BaseUnityPlugin
     {
         private ConfigEntry<KeyCode> _cfgToggleKey;
@@ -145,6 +146,8 @@ namespace SanctuaryHud.CameraUtils
         private HudPanel _panel;
         private TMP_Text _camHeight, _threshold, _distance, _nextMatch;
         private RectTransform _thresholdRow;
+        // What the three number labels last showed; NaN until first drawn.
+        private float _shownHeight = float.NaN, _shownThreshold = float.NaN, _shownDistance = float.NaN;
         private HudButton _show, _far, _never;
         private HudButton _intel, _attack, _build, _orderLines, _plannedBuilds, _alloySpots, _healthBars, _gameUi;
 
@@ -161,8 +164,14 @@ namespace SanctuaryHud.CameraUtils
             _panel.Show(showing);
             if (!showing) return;
 
+            // The three numbers are formatted only when they change, not on
+            // every frame the panel is up.
             var height = RenderState.CameraHeight;
-            HudCanvas.SetText(_camHeight, height < 0 ? "" : $"cam {height:0}");
+            if (height != _shownHeight)
+            {
+                _shownHeight = height;
+                HudCanvas.SetText(_camHeight, height < 0 ? "" : "cam " + height.ToString("0", CultureInfo.InvariantCulture));
+            }
 
             var mode = _cfgIcons.Value;
             _show.SetOn(mode == IconMode.Show);
@@ -170,7 +179,11 @@ namespace SanctuaryHud.CameraUtils
             _never.SetOn(mode == IconMode.Hide);
             var far = mode == IconMode.HideWhenClose;
             if (_thresholdRow.gameObject.activeSelf != far) _thresholdRow.gameObject.SetActive(far);
-            HudCanvas.SetText(_threshold, $"{_cfgIconHeight.Value:0}");
+            if (_cfgIconHeight.Value != _shownThreshold)
+            {
+                _shownThreshold = _cfgIconHeight.Value;
+                HudCanvas.SetText(_threshold, _shownThreshold.ToString("0", CultureInfo.InvariantCulture));
+            }
 
             _intel.SetOn(_cfgIntel.Value);
             _attack.SetOn(_cfgAttack.Value);
@@ -182,7 +195,11 @@ namespace SanctuaryHud.CameraUtils
             _gameUi.SetOn(_cfgGameUi.Value);
 
             var distance = _cfgDrawDistance.Value;
-            HudCanvas.SetText(_distance, distance <= 0f ? "game default" : $"{distance:0}");
+            if (distance != _shownDistance)
+            {
+                _shownDistance = distance;
+                HudCanvas.SetText(_distance, distance <= 0f ? "game default" : distance.ToString("0", CultureInfo.InvariantCulture));
+            }
             // The distances are baked into the render prefabs as a match's
             // templates load, so a change here is not live — say so rather
             // than letting the button look broken.
@@ -201,6 +218,7 @@ namespace SanctuaryHud.CameraUtils
         {
             _panel = HudPanel.Create(root, "Camera utilities", () => false);
             var rect = _panel.Rect;
+            _shownHeight = _shownThreshold = _shownDistance = float.NaN;
 
             var title = HudControls.Row(rect, "Title", 8f);
             HudControls.Size(title.gameObject, Inner, -1f);

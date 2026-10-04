@@ -66,11 +66,23 @@ namespace SanctuaryHud
         /// rather than at the next poll.
         private int _pauseVersion;
 
+        /// The sweep's last answer. It is sorted, so the same string means
+        /// the same tiles, and the panel is left alone.
+        private string _lastBuildRaw;
+
+        /// The sweep lives in the VM as __SdbEcoSweep.Run, so each poll
+        /// compiles a one-line call rather than the whole sweep.
+        private readonly LuaHook _sweepHook = new LuaHook("__SdbEcoSweep", "construction sweep", SweepChunk)
+        {
+            LogInstalls = false,
+        };
+
         // Placement ghosts (progress 0) are queued, not started, so they are
         // left out; the demand is zero and the tile would only be noise.
         private const string SweepChunk =
-            "__SdbBuild = '' " +
-            "local ok, err = pcall(function() " +
+            "do " +
+            "local S = {} " +
+            "local function sweep() " +
             "  local mine = {} " +
             "  for _, a in pairs(Armies or {}) do " +
             "    if a.focused then " +
@@ -130,8 +142,16 @@ namespace SanctuaryHud
             // changes when the answer does.
             "  table.sort(out) " +
             "  __SdbBuild = table.concat(out, '|') " +
-            "end) " +
-            "if not ok then Warn('SanctuaryHud eco sweep: ' .. tostring(err)) end";
+            "end " +
+            // Said once per match: a sweep that fails once fails every second.
+            "S.Run = function() " +
+            "  __SdbBuild = '' " +
+            "  local ok, err = pcall(sweep) " +
+            "  if not ok and not S.warned then S.warned = true Warn('EcoManager construction sweep: ' .. tostring(err)) end " +
+            "end " +
+            "S.Remove = function() __SdbBuild = nil end " +
+            "__SdbEcoSweep = S " +
+            "end";
 
         /// Called each frame from Update. One sweep a second, like the ECS poll.
         private void UpdateConstruction(float deltaTime)
@@ -139,22 +159,29 @@ namespace SanctuaryHud
             if (!InMatch)
             {
                 if (_buildGroups.Count > 0) _buildGroups = new List<BuildGroup>();
+                _lastBuildRaw = null;
                 // The VM goes with the match, and the builders with it.
                 _pausedByTile.Clear();
                 _pauseVersion++;
                 return;
             }
 
+            // Every frame: it checks on its own interval, and puts the sweep
+            // back as soon as a new match's VM is up.
+            _sweepHook.Tick();
+
             _buildPollAccum += deltaTime;
             if (_buildPollAccum < 1f) return;
             _buildPollAccum = 0f;
-            if (!LuaReady) return;
 
             try
             {
-                if (!RunLua(SweepChunk)) return;
+                if (!_sweepHook.Call("__SdbEcoSweep.Run()")) return;
                 var raw = GetLuaGlobal("__SdbBuild");
-                if (raw == null) return;
+                // Unchanged: the tiles, their tooltips and what is paused all
+                // still stand, so there is nothing to parse or refill.
+                if (raw == null || raw == _lastBuildRaw) return;
+                _lastBuildRaw = raw;
                 var groups = Parse(raw);
                 _buildGroups = groups;
                 ReleaseVanished(groups);
@@ -273,6 +300,15 @@ namespace SanctuaryHud
             if (LuaReady) SetPause(all, false);
         }
 
+        /// The game's own Pause toggle for a list of GlobalIDs, sent the way
+        /// the orders panel sends it: a local function, for any chunk here
+        /// that pauses (a tile's builders, or an upgrade the assist hook holds).
+        private const string PauseLua =
+            "local function sdbPause(ids, on) " +
+            "  Import('common/commands/definitions/toggles.lua').RequestUnitsToggle.Send( " +
+            "    ids, Import('common/toggles.lua').ToggleNameToToggleType('Pause'), on) " +
+            "end ";
+
         /// Sends the Pause toggle for a set of LocalID indices. The command
         /// wants GlobalIDs, so the chunk walks the unit table for them, and
         /// asks only units that actually carry the toggle.
@@ -283,18 +319,16 @@ namespace SanctuaryHud
             var flag = on ? "true" : "false";
             RunLua(
                 "local ok, err = pcall(function() " +
+                PauseLua +
                 $"  local want = {{{want}}} " +
                 "  local ids = {} " +
                 "  for _, u in pairs(__Entities.Units) do " +
                 "    local li = u.localId and u.localId.index " +
                 "    if li and want[li] and u.id and u.HasToggle and u:HasToggle('Pause') then ids[#ids+1] = u.id end " +
                 "  end " +
-                "  if #ids > 0 then " +
-                "    Import('common/commands/definitions/toggles.lua').RequestUnitsToggle.Send( " +
-                $"      ids, Import('common/toggles.lua').ToggleNameToToggleType('Pause'), {flag}) " +
-                "  end " +
+                $"  if #ids > 0 then sdbPause(ids, {flag}) end " +
                 "end) " +
-                "if not ok then Warn('SanctuaryHud eco pause: ' .. tostring(err)) end");
+                "if not ok then Warn('EcoManager pause: ' .. tostring(err)) end");
         }
     }
 }

@@ -52,6 +52,8 @@ namespace SanctuaryHud
 
         internal static List<Contact> Live = new List<Contact>();
         internal static readonly Dictionary<int, Color> ArmyColours = new Dictionary<int, Color>();
+        /// Bumped each time the colours are read again, for whoever draws in them.
+        internal static int ColoursVersion { get; private set; }
         /// Unclaimed alloy deposits, as world x/z.
         internal static List<Vector2> AlloySpots = new List<Vector2>();
 
@@ -80,7 +82,7 @@ namespace SanctuaryHud
         // deliberately not told them that. Both names come off the template,
         // which is where the game put them, and are cached per template since
         // neither ever changes.
-        private const string ContactsChunk =
+        private const string ContactsBody =
             "__SdbMmData = '' __SdbMmIcons = '' " +
             "local ok, err = pcall(function() " +
             "  local cache = __SdbMmIconCache " +
@@ -132,7 +134,8 @@ namespace SanctuaryHud
             "    end " +
             "  end " +
             "  __SdbMmIcons = table.concat(names, ';') " +
-            "  __SdbMmData = table.concat(out, ';') " +            "end) " +
+            "  __SdbMmData = table.concat(out, ';') " +
+            "end) " +
             "if not ok then __SdbMmErr = tostring(err) else __SdbMmErr = '' end";
 
         // Colours and the deposits, both of which change rarely enough to sit
@@ -149,7 +152,7 @@ namespace SanctuaryHud
         // are repeated here rather than reading the marker's own flag, because
         // CameraUtilities' "hide alloy spot markers" switch writes that flag —
         // and running both mods should not silently empty this layer.
-        private const string SlowChunk =
+        private const string SlowBody =
             "__SdbMmArmies = '' __SdbMmSpots = '' " +
             "local ok, err = pcall(function() " +
             "  local out, n = {}, 0 " +
@@ -179,7 +182,7 @@ namespace SanctuaryHud
             // image was rendered of. Last, and in a pcall of its own, so a
             // failure here can never cost the colours or the deposits.
             "  __SdbMmArea = '' " +
-            "  pcall(function() " +
+            "  pcall(function() " + // lua-check: ok
             "    local area = Import('common/mapUtils.lua').GetDefaultPlayableArea() " +
             "    if area and area.position and area.size then " +
             "      __SdbMmArea = string.format('%.2f,%.2f,%.2f,%.2f', area.position.x, area.position.y, area.size.x, area.size.y) " +
@@ -188,11 +191,20 @@ namespace SanctuaryHud
             "end) " +
             "if not ok then __SdbMmSlowErr = tostring(err) else __SdbMmSlowErr = '' end";
 
+        // Both polls as functions, installed once per VM: the contact poll
+        // runs eight times a second, and recompiling three kilobytes of Lua
+        // each time was work thrown away.
+        private static readonly LuaHook Polls = new LuaHook("__SdbMmPoll", "mini-map polls",
+            "__SdbMmPoll = { Contacts = function() " + ContactsBody + " end, Slow = function() " + SlowBody + " end }")
+        {
+            LogInstalls = false,
+        };
+
         /// Drives both polls. `hz` is how often contacts are refreshed; the
         /// colours and deposits go at a fixed slow rate underneath.
         internal static void Poll(float deltaTime, float hz, bool wantSpots)
         {
-            EnsureLuaBridge();
+            Polls.Tick();
             if (!LuaReady) return;
             EnsureIconRegistry();
 
@@ -215,7 +227,7 @@ namespace SanctuaryHud
 
         private static void PollContacts()
         {
-            if (!RunLua(ContactsChunk)) return;
+            if (!Polls.Call("__SdbMmPoll.Contacts()")) return;
 
             var err = GetLuaGlobal("__SdbMmErr");
             if (!string.IsNullOrEmpty(err) && !_loggedContactErr)
@@ -261,7 +273,7 @@ namespace SanctuaryHud
         }
 
         /// A whole number at s[i], moving i past it.
-        private static bool NextInt(string s, ref int i, out int value)
+        internal static bool NextInt(string s, ref int i, out int value)
         {
             value = 0;
             var negative = i < s.Length && s[i] == '-';
@@ -272,7 +284,33 @@ namespace SanctuaryHud
             return i > start;
         }
 
-        private static bool Comma(string s, ref int i)
+        /// A plain decimal at s[i] ("-12.5", as Lua's %.1f writes one),
+        /// moving i past it. No exponent: %f never writes one.
+        internal static bool NextFloat(string s, ref int i, out float value)
+        {
+            value = 0f;
+            var negative = i < s.Length && s[i] == '-';
+            if (negative) i++;
+            var start = i;
+            double whole = 0;
+            while (i < s.Length && s[i] >= '0' && s[i] <= '9') whole = whole * 10 + (s[i++] - '0');
+            var digits = i > start;
+            if (i < s.Length && s[i] == '.')
+            {
+                i++;
+                var scale = 0.1;
+                while (i < s.Length && s[i] >= '0' && s[i] <= '9')
+                {
+                    whole += (s[i++] - '0') * scale;
+                    scale *= 0.1;
+                    digits = true;
+                }
+            }
+            value = (float)(negative ? -whole : whole);
+            return digits;
+        }
+
+        internal static bool Comma(string s, ref int i)
         {
             if (i >= s.Length || s[i] != ',') return false;
             i++;
@@ -303,7 +341,7 @@ namespace SanctuaryHud
 
         private static void PollSlow(bool wantSpots)
         {
-            if (!RunLua(SlowChunk)) return;
+            if (!Polls.Call("__SdbMmPoll.Slow()")) return;
 
             var err = GetLuaGlobal("__SdbMmSlowErr");
             if (!string.IsNullOrEmpty(err) && !_loggedSlowErr)
@@ -315,6 +353,7 @@ namespace SanctuaryHud
             var armies = GetLuaGlobal("__SdbMmArmies");
             if (armies != null)
             {
+                ColoursVersion++;
                 ArmyColours.Clear();
                 foreach (var entry in armies.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                 {
@@ -368,6 +407,13 @@ namespace SanctuaryHud
         internal static Color ColourFor(int army)
             => ArmyColours.TryGetValue(army, out var c) ? c : new Color(0.7f, 0.7f, 0.7f, 1f);
 
+        /// For unload: the polls come out of the VM too.
+        internal static void Shutdown()
+        {
+            Polls.Remove();
+            Clear();
+        }
+
         /// Between matches. The icon registry and the Lua-side template cache
         /// are both per-match, so neither is carried over.
         internal static void Clear()
@@ -375,6 +421,7 @@ namespace SanctuaryHud
             Live = new List<Contact>();
             AlloySpots = new List<Vector2>();
             ArmyColours.Clear();
+            ColoursVersion++;
             _iconIndexCache.Clear();
             _contactAccum = 999f;
             _slowAccum = 999f;

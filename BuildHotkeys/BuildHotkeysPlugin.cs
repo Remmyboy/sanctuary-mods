@@ -31,7 +31,7 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.5.0")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.5.1")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
@@ -63,10 +63,20 @@ namespace SanctuaryHud
         private ConfigEntry<int> _cfgOverlayMax;
         private ConfigEntry<bool> _cfgOverlayNames;
 
-        private bool _installed;
+        // The install chunk is built from the settings, so it is made again
+        // only when one changes; the hook reinstalls when the text differs
+        // from what is in the VM (a rebind from the mod manager mid-match),
+        // and puts it back in each new VM, including one swapped in between
+        // two checks.
+        private LuaHook _hook;
+        private string _chunk;
+        private bool _chunkDirty = true;
+        // What the last chunk binds, logged when it goes in.
+        private readonly List<string> _installLog = new List<string>();
+        private string _installSummary;
+
         private float _accum;
         private float _cyclePoll;
-        private string _installedSignature;
         private int _builds;
         // Whether a live action table has been read for hotkeys the catalogue
         // lacks. Once a session is enough: the table is the game's own file.
@@ -119,6 +129,17 @@ namespace SanctuaryHud
         private void Awake()
         {
             _log ??= Logger;
+
+            _hook = new LuaHook("__SdbBuildHotkeys", "build hotkeys", () => _chunk, RemoveChunk)
+            {
+                // Retried as often as it is checked: an install too early in
+                // the match (no action map yet) must not leave the keys dead
+                // for a long back-off.
+                RetryAfter = 1f,
+                // Installed() says what went in, in more detail.
+                LogInstalls = false,
+                Installed = Installed,
+            };
 
             // The mod manager lists sections in the order they are first bound
             // and settings as bound, so this order is the page's: every key
@@ -190,12 +211,22 @@ namespace SanctuaryHud
                 "Overlay's distance from the top of the screen, in 1080p-logical pixels, sitting just clear of " +
                 "the build panel. It is always centred horizontally.");
 
+            Config.SettingChanged += OnSettingChanged;
+            Config.ConfigReloaded += OnConfigReloaded;
+
             Logger.LogInfo($"Build Hotkeys loaded with {Roles.All.Count} roles (configure them from the F8 mod manager).");
         }
 
+        // Any setting at all: rebuilding is cheap, and the hook only
+        // reinstalls when the chunk comes out different.
+        private void OnSettingChanged(object sender, SettingChangedEventArgs e) => _chunkDirty = true;
+        private void OnConfigReloaded(object sender, EventArgs e) => _chunkDirty = true;
+
         private void OnDestroy()
         {
-            Remove();
+            Config.SettingChanged -= OnSettingChanged;
+            Config.ConfigReloaded -= OnConfigReloaded;
+            _hook?.Remove();
             // A hot reload leaves the old assembly loaded; its strip and canvas
             // root go with it.
             _strip.Destroy();
@@ -222,32 +253,9 @@ namespace SanctuaryHud
             Rebind(oldSection, oldKey, section, key, defaultValue, new ConfigDescription(description));
 
         /// Binds a setting that used to live under another section or name,
-        /// carrying across a value saved there. BepInEx keeps a saved value
-        /// that nothing binds as an orphan, which a Bind under the new name
-        /// never looks at; taking it out of the orphans and saving drops the
-        /// old line from the file, so this happens once.
-        private ConfigEntry<T> Rebind<T>(string oldSection, string oldKey, string section, string key, T defaultValue, ConfigDescription description)
-        {
-            var entry = Config.Bind(section, key, defaultValue, description);
-            try
-            {
-                var orphans = HarmonyLib.AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(Config, null)
-                    as Dictionary<ConfigDefinition, string>;
-                var old = new ConfigDefinition(oldSection, oldKey);
-                if (orphans != null && orphans.TryGetValue(old, out var saved))
-                {
-                    entry.Value = (T)TomlTypeConverter.ConvertToValue(saved, typeof(T));
-                    orphans.Remove(old);
-                    Config.Save();
-                    Logger.LogInfo($"Build hotkeys: moved setting {oldSection}.{oldKey} = '{saved}' to {section}.{key}.");
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning($"Build hotkeys: could not carry {oldSection}.{oldKey} over to {section}.{key} ({e.Message}); it is back at its default.");
-            }
-            return entry;
-        }
+        /// carrying across a value saved there, once.
+        private ConfigEntry<T> Rebind<T>(string oldSection, string oldKey, string section, string key, T defaultValue, ConfigDescription description) =>
+            ConfigMigrate.Rebind(Config, oldSection, oldKey, section, key, defaultValue, description, Logger);
 
         /// The keys an action should move to, or false when it stays where the
         /// game put it: left at its default, or set to something that does not
@@ -361,7 +369,7 @@ namespace SanctuaryHud
             // The overlay has to keep up with keypresses, so it polls far more
             // often than the once-a-second install upkeep below. Both are a
             // lua_getglobal, which is cheap; parsing only happens on a change.
-            if (_installed && _cfgOverlay.Value)
+            if (_hook.Live && _cfgOverlay.Value)
             {
                 _cyclePoll += Time.unscaledDeltaTime;
                 if (_cyclePoll >= 0.05f)
@@ -371,62 +379,45 @@ namespace SanctuaryHud
                 }
             }
 
-            _accum += Time.unscaledDeltaTime;
-            if (_accum < 1f) return;
-            _accum = 0f;
-
             // The client VM exists exactly while a match or replay is running,
-            // so it is the whole gate: no VM means nothing to bind into, and a
-            // new match builds a fresh one that needs reinstalling.
+            // so it is the whole gate (the hook checks it): no VM means nothing
+            // to bind into, and a new match builds a fresh one that needs
+            // reinstalling.
             //
             // Deliberately not InMatch — that rides on the economy Harmony
             // patch, and HudCore is compiled into each assembly, so its statics
             // are per-mod: InMatch would be permanently false here unless this
             // mod applied a patch it has no other reason to want.
-            EnsureLuaBridge();
-            if (!LuaReady)
-            {
-                _installed = false;
-                _installedSignature = null;
-                return;
-            }
+            if (_chunkDirty) BuildChunk();
+            _hook.Tick(_chunk != null);
 
-            var signature = Signature();
-            if (_installed)
-            {
-                // Rebound from the mod manager mid-match: swap the layout over.
-                if (signature != _installedSignature) Remove();
-                else if (StillInstalled()) { LogUnstuck(); return; }
-                else _installed = false;   // VM swapped under us; rebind below.
-            }
-
-            Install(signature);
+            _accum += Time.unscaledDeltaTime;
+            if (_accum < 1f) return;
+            _accum = 0f;
+            if (!_hook.Live) return;
+            PollBuildCount();
+            LogUnstuck();
         }
 
+        // Each change is one of two fixed chunks, so nothing is built per push.
+        private const string MenuOpenChunk = "if __SdbBuildHotkeys then __SdbBuildHotkeys.menuOpen = true end";
+        private const string MenuClosedChunk = "if __SdbBuildHotkeys then __SdbBuildHotkeys.menuOpen = false end";
         private int _menuPushed = -1;
-        private static readonly HarmonyLib.AccessTools.FieldRef<EM.UI.InterfaceManager, EM.UI.InterfaceManager.Window> CurrentWindow =
-            HarmonyLib.AccessTools.FieldRefAccess<EM.UI.InterfaceManager, EM.UI.InterfaceManager.Window>("currentWindow");
 
         /// Mirrors "a menu screen is over the match" into BH.menuOpen, every
         /// frame but only running Lua on a change. A match runs under the
         /// None screen; the pause menu, and Settings opened from it, are any
-        /// other — the same test the game's own escape toggle makes.
+        /// other, and every screen but None has the menu backdrop up — the
+        /// test HudCore.MenuOpen makes, and the same one as the game's own
+        /// escape toggle. (Read through the backdrop rather than the private
+        /// currentWindow field, which a rename would have turned into a type
+        /// initialiser error on every key.)
         private void PushMenuOpen()
         {
-            if (!_installed) return;
-            try
-            {
-                var im = EM.UI.InterfaceManager.Instance;
-                var open = im != null && CurrentWindow(im) != EM.UI.InterfaceManager.Window.None ? 1 : 0;
-                if (open == _menuPushed || !LuaReady) return;
-                if (RunLua("if __SdbBuildHotkeys then __SdbBuildHotkeys.menuOpen = " + (open == 1 ? "true" : "false") + " end"))
-                    _menuPushed = open;
-            }
-            catch (Exception e)
-            {
-                if (_menuPushed != -2) Logger.LogWarning($"Build hotkeys: can't read the pause menu ({e.Message}); escape keeps the game's binding.");
-                _menuPushed = -2;
-            }
+            if (!_hook.Live) return;
+            var open = MenuOpen(countResult: false) ? 1 : 0;
+            if (open == _menuPushed || !LuaReady) return;
+            if (RunLua(open == 1 ? MenuOpenChunk : MenuClosedChunk)) _menuPushed = open;
         }
 
         private float _modPoll;
@@ -469,7 +460,7 @@ namespace SanctuaryHud
         /// and nothing was let go.
         private void ReleaseStuckModifiers()
         {
-            if (!_installed || !Application.isFocused) return;
+            if (!_hook.Live || !Application.isFocused) return;
             _modPoll += Time.unscaledDeltaTime;
             if (_modPoll < 0.1f) return;
             _modPoll = 0f;
@@ -492,14 +483,24 @@ namespace SanctuaryHud
             }
             if (ctrl && shift && alt) return;
 
-            string Up(bool held) => held ? "false" : "true";
-            try
-            {
-                if (LuaReady)
-                    RunLua("if __SdbBuildHotkeys and __SdbBuildHotkeys.ReleaseMods then __SdbBuildHotkeys.ReleaseMods(" +
-                           Up(ctrl) + "," + Up(shift) + "," + Up(alt) + ") end");
-            }
-            catch { /* next poll tries again */ }
+            // It has to keep being sent rather than only on a change: the
+            // stranded key-down can land after the keys were last let go.
+            // But it is one of eight fixed chunks, so nothing is built for it.
+            if (LuaReady) RunLua(ReleaseChunks[(ctrl ? 0 : 1) | (shift ? 0 : 2) | (alt ? 0 : 4)]);
+        }
+
+        /// The ReleaseMods call for each combination of Ctrl, Shift and Alt
+        /// being up (bits 1, 2 and 4).
+        private static readonly string[] ReleaseChunks = BuildReleaseChunks();
+
+        private static string[] BuildReleaseChunks()
+        {
+            var chunks = new string[8];
+            for (var i = 0; i < 8; i++)
+                chunks[i] = "if __SdbBuildHotkeys and __SdbBuildHotkeys.ReleaseMods then __SdbBuildHotkeys.ReleaseMods(" +
+                            ((i & 1) != 0 ? "true" : "false") + "," + ((i & 2) != 0 ? "true" : "false") + "," +
+                            ((i & 4) != 0 ? "true" : "false") + ") end";
+            return chunks;
         }
 
         /// Says so in the log when a stuck modifier had to be cleared, so a
@@ -512,23 +513,20 @@ namespace SanctuaryHud
             Logger.LogInfo($"Build hotkeys: released a modifier the game still had held after the key was let go ({n} this match).");
         }
 
-        private string Signature() =>
-            string.Join("|", Roles.All.Select(r => r.Name + "=" + _cfgKeys[r.Name].Value).ToArray()) + "|cycle=" + _cfgCycleSeconds.Value + "|cancel=" + _cfgCancelKey.Value + "|menu=" + _cfgMenuKey.Value + "|snap=" + _cfgSnapDistance.Value + "|repeat=" + _cfgRepeatKey.Value +
-            "|" + string.Join("|", _cfgRemaps.Select(p => p.Key + "=" + p.Value.Value).ToArray());
-
         /// Reads the cycle the last press landed in: press counter, key, live
         /// index, then every option in order. The counter leads so two presses
         /// that resolve to the same entry still register as separate events —
         /// otherwise an identical string would look like nothing had happened
-        /// and the overlay would not come back.
+        /// and the overlay would not come back. Only the counter is read
+        /// until it moves, so an unchanged cycle is not split twenty times a
+        /// second.
         private void PollCycle()
         {
             var raw = GetLuaGlobal("__SdbBuildHotkeysCycle");
-            if (raw == null) return;
+            if (raw == null || !LeadingInt(raw, out var seq) || seq == _cycleSeq) return;
 
             var parts = raw.Split('|');
             if (parts.Length < 4) return;
-            if (!int.TryParse(parts[0], out var seq) || seq == _cycleSeq) return;
 
             _cycleSeq = seq;
             int.TryParse(parts[2], out _cycleIndex);
@@ -555,25 +553,27 @@ namespace SanctuaryHud
             _cycleAt = Time.unscaledTime;
         }
 
+        /// The digits before the first '|', without splitting the string.
+        private static bool LeadingInt(string raw, out int value)
+        {
+            value = 0;
+            var i = 0;
+            for (; i < raw.Length && raw[i] >= '0' && raw[i] <= '9'; i++) value = value * 10 + (raw[i] - '0');
+            return i > 0 && i < raw.Length && raw[i] == '|';
+        }
 
-        /// True while our binding is still live in the VM the game is running.
-        /// Polling a global rather than trusting the flag means a match that
-        /// starts and ends between two ticks — swapping the VM without
-        /// LuaReady ever reading false — still gets rebound rather than
-        /// silently leaving the hotkeys dead for the rest of the session.
-        /// Doubles as the build counter.
-        private bool StillInstalled()
+        /// Once a second while the hook is in: says in the log when builds
+        /// have been issued since.
+        private void PollBuildCount()
         {
             // A flat global, not a field on the state table: the read-back
             // bridge is lua_getglobal, so it can only resolve a bare name.
             var raw = GetLuaGlobal("__SdbBuildHotkeysCount");
-            if (raw == null) return false;
-            if (int.TryParse(raw, out var count) && count > _builds)
+            if (raw != null && int.TryParse(raw, out var count) && count > _builds)
             {
                 _builds = count;
                 Logger.LogInfo($"Build hotkeys: {count} build(s) issued this match.");
             }
-            return true;
         }
 
         /// A configured key, split into the form the input system indexes by.
@@ -643,8 +643,12 @@ namespace SanctuaryHud
             return true;
         }
 
-        private void Install(string signature)
+        /// Makes the install chunk from the settings, or null when there is
+        /// nothing to bind. Also what Installed() logs about it.
+        private void BuildChunk()
         {
+            _chunkDirty = false;
+            _installLog.Clear();
             var roleEntries = new List<string>();
             var bindings = new Dictionary<string, Binding>(StringComparer.Ordinal);
             var layout = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -706,8 +710,7 @@ namespace SanctuaryHud
                 && remapEntries.Count == 0 && _discovered)
             {
                 Logger.LogWarning("Build hotkeys: nothing bound — every role's key is blank or invalid.");
-                _installed = true;
-                _installedSignature = signature;
+                _chunk = null;
                 return;
             }
 
@@ -724,58 +727,53 @@ namespace SanctuaryHud
                 .Replace("__REPEATKEY__", Quote(repeatKey))
                 .Replace("__MENUKEY__", Quote(menuKey))
                 .Replace("__REMAPS__", string.Join(",", remapEntries.ToArray()));
+            // Same text as what is in: keep the old string, so the hook
+            // doesn't even hash it again.
+            if (chunk != _chunk) _chunk = chunk;
 
-            try
+            foreach (var pair in layout.OrderBy(p => p.Key, StringComparer.Ordinal))
+                _installLog.Add($"{pair.Key} -> {string.Join(", ", pair.Value.ToArray())}");
+            if (cancelKey.Length > 0) _installLog.Add($"{cancelKey} -> stop selected factories");
+            if (repeatKey.Length > 0) _installLog.Add($"{repeatKey} -> repeat build on/off");
+            if (menuKey.Length > 0) _installLog.Add($"{menuKey} -> pause menu (escape only closes it)");
+            _installLog.AddRange(remapLog);
+            _installSummary = $"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys, " +
+                              $"{remapEntries.Count} game hotkey(s) moved.";
+        }
+
+        /// After each install (a new VM, or new settings).
+        private void Installed()
+        {
+            _builds = 0;
+            _unstuck = 0;
+            _unityDisagreed = false;
+            // The new install starts from the chunk's own snap and a fresh
+            // press counter, so last install's readings no longer hold.
+            _snapPushed = -1f;
+            _cycleSeq = -1;
+            _menuPushed = -1;
+            // Each match reloads the sprites through Engine.LoadSprite, so
+            // last match's AssetIDs are not safe to assume still valid.
+            ClearSpriteCache();
+
+            foreach (var line in _installLog)
+                Logger.LogInfo($"Build hotkeys: {line}");
+            // What the moves ran into: an action missing from this game
+            // version, a key taken off another action, a key another group
+            // also answers to.
+            var report = GetLuaGlobal("__SdbBuildHotkeysRemapReport");
+            if (!string.IsNullOrEmpty(report))
+                foreach (var line in report.Split('\n'))
+                    Logger.LogWarning($"Build hotkeys: {line}");
+            Logger.LogInfo(_installSummary);
+
+            if (!_discovered)
             {
-                if (!RunLua(chunk)) return;
-                _installed = true;
-                _installedSignature = signature;
-                _builds = 0;
-                _unstuck = 0;
-                _unityDisagreed = false;
-                // The new install starts from the chunk's own snap and a fresh
-                // press counter, so last install's readings no longer hold.
-                _snapPushed = -1f;
-                _cycleSeq = -1;
-                _menuPushed = -1;
-                // Each match reloads the sprites through Engine.LoadSprite, so
-                // last match's AssetIDs are not safe to assume still valid.
-                ClearSpriteCache();
-
-                foreach (var pair in layout.OrderBy(p => p.Key, StringComparer.Ordinal))
-                {
-                    Logger.LogInfo($"Build hotkeys: {pair.Key} -> {string.Join(", ", pair.Value.ToArray())}");
-                }
-                if (cancelKey.Length > 0)
-                    Logger.LogInfo($"Build hotkeys: {cancelKey} -> stop selected factories");
-                if (repeatKey.Length > 0)
-                    Logger.LogInfo($"Build hotkeys: {repeatKey} -> repeat build on/off");
-                if (menuKey.Length > 0)
-                    Logger.LogInfo($"Build hotkeys: {menuKey} -> pause menu (escape only closes it)");
-                foreach (var line in remapLog)
-                    Logger.LogInfo($"Build hotkeys: {line}");
-                // What the moves ran into: an action missing from this game
-                // version, a key taken off another action, a key another group
-                // also answers to.
-                var report = GetLuaGlobal("__SdbBuildHotkeysRemapReport");
-                if (!string.IsNullOrEmpty(report))
-                    foreach (var line in report.Split('\n'))
-                        Logger.LogWarning($"Build hotkeys: {line}");
-                Logger.LogInfo($"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys, " +
-                               $"{remapEntries.Count} game hotkey(s) moved.");
-
-                if (!_discovered)
-                {
-                    _discovered = true;
-                    // With nothing new already remapped, the new settings are
-                    // at their defaults and the install stands; otherwise the
-                    // changed signature reinstalls next tick to apply them.
-                    if (!DiscoverActions()) _installedSignature = Signature();
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning($"Build hotkeys could not be installed: {e.Message}");
+                _discovered = true;
+                // With nothing new already remapped, the new settings are at
+                // their defaults and the chunk comes out the same; otherwise
+                // it changes and the hook reinstalls it to apply them.
+                if (DiscoverActions()) _chunkDirty = true;
             }
         }
 
@@ -783,7 +781,7 @@ namespace SanctuaryHud
         /// the current zoom, into the hook's BH.snap.
         private void PushSnap()
         {
-            if (!_installed) return;
+            if (!_hook.Live) return;
             _snapPoll += Time.unscaledDeltaTime;
             if (_snapPoll < 0.2f) return;
             _snapPoll = 0f;
@@ -814,27 +812,9 @@ namespace SanctuaryHud
             if (_snapPushed >= 0f && Mathf.Abs(snap - _snapPushed) < Mathf.Max(0.5f, _snapPushed * 0.05f)) return;
             var chunk = "if __SdbBuildHotkeys then __SdbBuildHotkeys.snap = " +
                         snap.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " end";
-            try
-            {
-                if (LuaReady && RunLua(chunk)) _snapPushed = snap;
-            }
-            catch { /* next poll tries again */ }
-        }
-
-        private void Remove()
-        {
-            if (!_installed) return;
-            _installed = false;
-            _snapPushed = -1f;
-            _installedSignature = null;
-            try
-            {
-                if (LuaReady) RunLua(RemoveChunk);
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning($"Build hotkeys could not be removed: {e.Message}");
-            }
+            // RunLua doesn't throw; false (no VM, or an error it has logged)
+            // leaves it for the next poll to try again.
+            if (LuaReady && RunLua(chunk)) _snapPushed = snap;
         }
 
         private static string Quote(string s) => "'" + s.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
@@ -859,8 +839,9 @@ namespace SanctuaryHud
             return prefix + b;
         }
 
-        // Installed once per match, guarded by a global inside the VM so a
-        // retry is harmless. Every name it reaches for is a module-level global
+        // Installed once per VM (and again when the settings change it), by
+        // the hook; guarded by a global inside the VM so a retry is harmless.
+        // Every name it reaches for is a module-level global
         // of the file that owns it: Import hands back the file's environment
         // table (it discards the file's own `return`), so these are reachable
         // even where the file exports a narrower table — which is how
@@ -1076,15 +1057,19 @@ if not __SdbBuildHotkeys then
     Shift = { 'Shift', 'LeftShift', 'RightShift' },
     Alt = { 'Alt', 'LeftAlt', 'RightAlt' },
   }
+  -- Called ten times a second, so no table is made per call.
+  local function release(raw, name, up)
+    if up and raw[name] then
+      for _, k in ipairs(modKeys[name]) do raw[k] = false end
+      __SdbBuildHotkeysUnstuck = __SdbBuildHotkeysUnstuck + 1
+    end
+  end
   BH.ReleaseMods = function(ctrlUp, shiftUp, altUp)
     local raw = IS.InputStatesRawKeys
     if not raw then return end
-    for name, up in pairs({ Ctrl = ctrlUp, Shift = shiftUp, Alt = altUp }) do
-      if up and raw[name] then
-        for _, k in ipairs(modKeys[name]) do raw[k] = false end
-        __SdbBuildHotkeysUnstuck = __SdbBuildHotkeysUnstuck + 1
-      end
-    end
+    release(raw, 'Ctrl', ctrlUp)
+    release(raw, 'Shift', shiftUp)
+    release(raw, 'Alt', altUp)
   end
 
   -- Escape has to keep closing the pause menu, and Lua has no getter for

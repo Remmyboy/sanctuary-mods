@@ -44,6 +44,10 @@ namespace SanctuaryHud
         // before returning.
         private static readonly Dictionary<string, NativeArray<byte>> _mapFileCache =
             new Dictionary<string, NativeArray<byte>>(StringComparer.OrdinalIgnoreCase);
+        // Paths in the current map's folder that aren't there, so a script
+        // asking again doesn't go back to the disk. A map's folder doesn't
+        // change while it is loaded; forgotten with the map.
+        private static readonly HashSet<string> _mapFileMisses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static string _cachedMapRoot;
         private static readonly object _cacheLock = new object();
 
@@ -77,6 +81,7 @@ namespace SanctuaryHud
                 if (array.IsCreated) array.Dispose();
             }
             _mapFileCache.Clear();
+            _mapFileMisses.Clear();
             _cachedMapRoot = null;
         }
 
@@ -118,11 +123,16 @@ namespace SanctuaryHud
                     __result = true;
                     return;
                 }
+                if (_mapFileMisses.Contains(full)) return;
 
                 try
                 {
                     var info = new FileInfo(full);
-                    if (!info.Exists) return;
+                    if (!info.Exists)
+                    {
+                        _mapFileMisses.Add(full);
+                        return;
+                    }
                     if (info.Length > MaxFileBytes)
                     {
                         _log.LogWarning($"Map-local file {path} is {info.Length:N0} bytes, over the {MaxFileBytes / (1024 * 1024)} MB limit; not served.");

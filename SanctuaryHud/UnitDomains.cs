@@ -1,35 +1,29 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
-    // Which element a unit type belongs to — land, water, both, or the air —
-    // for colouring the unit tiles. The game's unit buttons carry no
+    // Which unit type a button stands for. The game's unit buttons carry no
     // template id, but their portrait is the template's foreground icon,
     // one per unit type; so once a match, a Lua query lists every template's
-    // foreground icon id with its tags, and each id is resolved to the
-    // Sprite the game hands its buttons. A button's portrait sprite then
-    // looks the domain up by reference.
+    // foreground icon id, and each id is resolved to the Sprite the game
+    // hands its buttons. A button's portrait sprite then looks the template
+    // up by reference (the build card asks which option is under the mouse).
+    // The name is from when it also gave each type its element for
+    // colouring the tiles, which nothing does any more.
     internal static class UnitDomains
     {
-        internal enum Domain { Unknown, Land, Naval, Amphibious, Air }
-
-        private struct Info
-        {
-            public Domain Domain;
-            public string TpId;
-            /// The map's strategic icon image for the type (shape_tech_symbol_normal).
-            public string IconName;
-        }
-
-        private static readonly Dictionary<Sprite, Info> _bySprite = new Dictionary<Sprite, Info>();
-        private static readonly List<KeyValuePair<uint, Info>> _pending = new List<KeyValuePair<uint, Info>>();
+        private static readonly Dictionary<Sprite, string> _bySprite = new Dictionary<Sprite, string>();
+        private static readonly List<KeyValuePair<uint, string>> _pending = new List<KeyValuePair<uint, string>>();
         private static bool _queried;
         private static float _nextTry;
         private static int _cursor;   // where the next batch starts, so every entry gets its turn
 
+        // Templates with tags only, as before: the rest are not units a
+        // panel shows.
         private const string Chunk =
             "local ok, err = pcall(function() " +
             "  local out = {} " +
@@ -37,18 +31,7 @@ namespace SanctuaryHud
             "    local g = tp.general " +
             "    local id = g and g.foregroundIconID and tonumber(g.foregroundIconID.index) or 0 " +
             "    if id and id > 0 and tp.tags then " +
-            "      local air, amph, naval, land = false, false, false, false " +
-            "      for _, t in pairs(tp.tags) do " +
-            "        if t == 'AIR' then air = true " +
-            "        elseif t == 'AMPHIBIOUS' or t == 'HOVER' then amph = true " +
-            "        elseif t == 'NAVAL' then naval = true " +
-            "        elseif t == 'LAND' then land = true end " +
-            "      end " +
-            "      local d = 0 " +
-            "      if air then d = 4 elseif amph or (naval and land) then d = 3 elseif naval then d = 2 elseif land then d = 1 end " +
-            "      local ic = g.icon " +
-            "      local iconName = (ic and ic.shape and ic.tech and ic.symbol) and string.format('%s_%s_%s_normal', ic.shape, ic.tech, ic.symbol) or '' " +
-            "      out[#out + 1] = id .. ',' .. d .. ',' .. tostring(tpId) .. ',' .. iconName " +
+            "      out[#out + 1] = id .. ',' .. tostring(tpId) " +
             "    end " +
             "  end " +
             "  __SdbDomains = table.concat(out, ';') " +
@@ -89,9 +72,9 @@ namespace SanctuaryHud
                 if (string.IsNullOrEmpty(raw)) return;   // templates not loaded yet
                 foreach (var entry in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    var f = entry.Split(',');
-                    if (f.Length < 3 || !uint.TryParse(f[0], out var id) || !int.TryParse(f[1], out var d)) continue;
-                    _pending.Add(new KeyValuePair<uint, Info>(id, new Info { Domain = (Domain)Mathf.Clamp(d, 0, 4), TpId = f[2], IconName = f.Length > 3 ? f[3] : null }));
+                    var comma = entry.IndexOf(',');
+                    if (comma <= 0 || !uint.TryParse(entry.Substring(0, comma), NumberStyles.None, CultureInfo.InvariantCulture, out var id)) continue;
+                    _pending.Add(new KeyValuePair<uint, string>(id, entry.Substring(comma + 1)));
                 }
                 _queried = true;
                 _log?.LogInfo($"Unit domains: {_pending.Count} template(s) listed.");
@@ -117,6 +100,6 @@ namespace SanctuaryHud
 
         /// The template id behind a button's portrait, or null.
         internal static string TemplateOf(Sprite portrait) =>
-            portrait != null && _bySprite.TryGetValue(portrait, out var info) ? info.TpId : null;
+            portrait != null && _bySprite.TryGetValue(portrait, out var tpId) ? tpId : null;
     }
 }

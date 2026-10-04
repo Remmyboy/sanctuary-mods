@@ -19,6 +19,12 @@
 -- balance.lua.
 
 local Events = Import("modapi/events.lua").Events
+-- The host helpers below (Events.Guard, Players and the rest) came with Mod
+-- API 1.8.
+if not Events.Guard then
+    Warn("Zone Control needs Mod API 1.8.0 or later (a newer Mod Manager); its rules are off this match.")
+    return
+end
 local Options = Import("modoptions/sanctuarymods.zonecontrol.lua").Options
 local B = Import("zonecontrol/balance.lua")
 local GameUtils = Import("common/gameUtils.lua")
@@ -45,40 +51,25 @@ local offset = 0            -- where the original map sits in the terrain
 local spawnBeat = 0
 local named = {}            -- [unit] = true for units with a label to keep drawn
 local shopOf = {}           -- [shop unit] = { army, kind }
-local lastStatus = {}       -- [client id] = the banner it has
 
 local function Announce(text)
     SessionCommands.AddLog.Send(text)
 end
 
 -- The game's Lua warnings reach no log in this build, so problems are shown
--- in the match's own message log, once each, where a player can see them.
-local reported = {}
+-- in the match's own message log too, once each, where a player can see
+-- them (Events.Report).
 local function Report(what, err)
-    if reported[what] then return end
-    reported[what] = true
-    local text = tostring(err or "")
-    text = string.gsub(text, "stack traceback:", "")
-    text = string.gsub(text, "%s*\n%s*", " < ")
-    if #text > 400 then text = string.sub(text, 1, 400) .. "..." end
-    Warn("Zone Control: " .. what .. ": " .. text)
-    Announce("Zone Control problem: " .. what .. ": " .. text)
+    Events.Report("Zone Control: " .. what, err)
 end
 
 ---Runs fn, reporting rather than losing an error.
 local function Guarded(what, fn, ...)
-    local ok, err = xpcall(fn, debug.traceback, ...)
-    if not ok then Report(what, err) end
-    return ok
+    return Events.Guard("Zone Control: " .. what, fn, ...)
 end
 
 ---To one army's player only, when it has one (an AI hasn't).
-local function Tell(army, text)
-    local player = Import("common/lobby.lua").ArmyToPlayer[army.id]
-    if player and player.clientID then
-        pcall(SessionCommands.AddLog.SendTo, player.clientID, text)
-    end
-end
+local Tell = Events.Tell
 
 local function NormalizeName(name)
     return (string.gsub(string.lower(name or ""), "[^%a%d]", ""))
@@ -145,14 +136,7 @@ end
 -- Armies
 -- ============================================================
 
-local function IsPlayerArmy(army)
-    local isEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot
-    return not army.civilian and not isEmptySlot
-end
-
-local function ArmyName(army)
-    return (army.lobbyOptions and army.lobbyOptions.playerName) or army.name
-end
+local ArmyName = Events.ArmyName
 
 local function Friendly(a, b)
     return a == b or a:IsAlly(b)
@@ -181,10 +165,7 @@ local function CreateNeutralArmy()
 
     for _, id in ipairs(ids) do
         local other = Armies[id]
-        if not other.civilian then
-            army:SetEnemy(other)
-            other:SetEnemy(army)
-        end
+        if not other.civilian then Events.Enemy(army, other) end
     end
 
     return army
@@ -266,7 +247,7 @@ end
 local function SetSpeed(unit, fn)
     local ok, err, speed = pcall(Engine.GetMovementMaxSpeed, unit.id)
     if ok and type(speed) == "number" then
-        pcall(Engine.SetMovementMaxSpeed, unit.id, fn(speed))
+        pcall(Engine.SetMovementMaxSpeed, unit.id, fn(speed)) -- lua-check: ok
     end
 end
 
@@ -825,14 +806,10 @@ local function BroadcastStatus()
     parts[#parts + 1] = "Neutral " .. (counts[neutral] or 0)
     local zonesText = "ZONES | " .. table.concat(parts, " | ")
 
-    -- Each player also sees their own money and level.
-    for clientId, player in pairs(Import("common/lobby.lua").Players) do
-        local text = zonesText .. Personal(player.armyID and Armies[player.armyID])
-        if text ~= lastStatus[clientId] then
-            lastStatus[clientId] = text
-            SendToClient({ text = text, enabled = true }, "ZoneControlStatus", clientId)
-        end
-    end
+    -- Each player also sees their own money and level. Sent when it changes.
+    Events.SendToEachClient("ZoneControlStatus", function(army)
+        return { text = zonesText .. Personal(army), enabled = true }
+    end)
 end
 
 -- ============================================================
@@ -872,15 +849,9 @@ end
 local function StartZoneControl()
     offset = (GameInfo.MapInfo.size[1] - Map.size) / 2
 
-    local ids = {}
-    for id in pairs(Armies) do ids[#ids + 1] = id end
-    table.sort(ids)
-    for _, id in ipairs(ids) do
-        local army = Armies[id]
-        if IsPlayerArmy(army) then
-            players[#players + 1] = army
-            data[army] = { kills = 0, money = 0, level = 0, attack = 0, defence = 0, bought = 0, artillery = {} }
-        end
+    players = Events.Players()
+    for _, army in ipairs(players) do
+        data[army] = { kills = 0, money = 0, level = 0, attack = 0, defence = 0, bought = 0, artillery = {} }
     end
 
     neutral = CreateNeutralArmy()
@@ -969,7 +940,8 @@ local function StartZoneControl()
         if not ended then Guarded("spawning", SpawnUnits) end
     end)
 
-    Log("Zone Control: " .. #players .. " players, " .. #playableZones .. " zones, neutral army " .. neutral.id
+    -- Warn: Log is debug-level and never reaches Player.log.
+    Warn("Zone Control: " .. #players .. " players, " .. #playableZones .. " zones, neutral army " .. neutral.id
         .. ", map offset " .. offset .. (economy and ", kill credit on" or ", no kill credit"))
 end
 
@@ -978,7 +950,7 @@ end
 ---every tick, which stops the match. Such a weapon is left idle instead, and
 ---reported. Put in at match start: importing the weapon code as this script
 ---loads would be before the game's lobby setup (see OnMatchStart below).
-function GuardTargeting()
+local function GuardTargeting()
     local HostWeapon = Import("host/units/weaponsClasses/weaponsBaseClass.lua").HostWeapon
     local originalSelectTarget = HostWeapon.SelectTarget
     HostWeapon.SelectTarget = function(self, ...)
@@ -1018,12 +990,8 @@ Events.OnMatchStart(function()
     GuardTargeting()
     WatchShopOrders()
     Guarded("setup", StartZoneControl)
-    -- The engine only shows a name while it's drawn every tick. Names don't
-    -- show in the Playtest build either way; this and client.lua are for when
-    -- they do.
-    Events.OnTick(function()
-        for unit in pairs(named) do
-            if not (unit.dead or unit.deleted) then unit:DrawCustomName(unit.zcName) end
-        end
-    end)
+    -- Names are drawn by each player's client (client.lua) from the labels
+    -- sent out above. The simulation drawing them too only ever showed on
+    -- the host's own screen, a second time (and, like the client's, only
+    -- with the game's debug text on), so it no longer does, every tick.
 end)

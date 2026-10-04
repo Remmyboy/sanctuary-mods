@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -89,7 +90,15 @@ namespace SanctuaryHud
                 SetRounded(panel.alloyNetIncome, v.alloyNetIncome);
                 SetRounded(panel.energyNetIncome, v.energyNetIncome);
             }
-            catch { /* cosmetic */ }
+            catch (Exception e)
+            {
+                // Cosmetic: the game's card stays as it drew it.
+                if (!_tidyLogged)
+                {
+                    _tidyLogged = true;
+                    _log?.LogWarning($"Unit card: the game's card could not be tidied (logged once): {e.Message}");
+                }
+            }
         }
 
         /// The game's figure to three decimals, made whole: the sign element
@@ -118,8 +127,9 @@ namespace SanctuaryHud
         // one job, but a factory builds alone, so the biggest one selected.
 
         private static string _hoverTemplate;
-        private static float _hoverSeconds, _hoverPower;
+        private static float _hoverSeconds;
         private static float _hoverRefresh;
+        private static bool _queryLogged, _peekLogged, _tidyLogged;
 
         /// The template of the build option under the mouse, or null.
         internal static void SetHover(string template)
@@ -138,48 +148,69 @@ namespace SanctuaryHud
         {
             _hoverRefresh = Time.realtimeSinceStartup + 1f;
             _hoverSeconds = 0f;
-            _hoverPower = 0f;
             var id = _hoverTemplate;
             if (string.IsNullOrEmpty(id) || !id.All(char.IsLetterOrDigit)) return;
             try
             {
-                EnsureLuaBridge();
-                if (!LuaReady) return;
-                var chunk =
-                    "local ok = pcall(function() " +
-                    $"  local tp = __Templates.Units['{id}'] " +
-                    "  local bt = tp and tp.economy and tp.economy.buildTime or 0 " +
-                    "  local sel = Import('client/input/selectionSystem.lua') " +
-                    "  local picked = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
-                    "    or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
-                    "  local mobile, fixed = 0, 0 " +
-                    "  for _, u in pairs(picked) do " +
-                    "    local p = u.buildPower or (u.tp and u.tp.construction and u.tp.construction.buildPower) or 0 " +
-                    "    if u.tp and u.tp.movement then mobile = mobile + p else fixed = math.max(fixed, p) end " +
-                    "  end " +
-                    "  local power = mobile > 0 and mobile or fixed " +
-                    "  local secs = power > 0 and bt / power or bt " +
-                    "  __SdbBuildSecs = string.format('%.1f,%.1f', secs, power) " +
-                    "end) " +
-                    "if not ok then __SdbBuildSecs = '' end";
-                if (!RunLua(chunk)) return;
+                Queries.Tick();
+                if (!Queries.Call($"__SdbCard.BuildTime('{id}')")) return;
                 var raw = GetLuaGlobal("__SdbBuildSecs");
                 if (string.IsNullOrEmpty(raw)) return;
-                var parts = raw.Split(',');
-                float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _hoverSeconds);
-                if (parts.Length > 1) float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _hoverPower);
+                var comma = raw.IndexOf(',');
+                float.TryParse(comma >= 0 ? raw.Substring(0, comma) : raw, NumberStyles.Float, Inv, out _hoverSeconds);
             }
-            catch { /* the card shows the cost without a time */ }
+            catch (Exception e)
+            {
+                // The card shows the cost without a time.
+                if (!_queryLogged)
+                {
+                    _queryLogged = true;
+                    _log?.LogWarning($"Unit card: build time query failed (logged once): {e.Message}");
+                }
+            }
         }
 
         private static string Duration(float seconds)
         {
-            if (seconds < 60f) return seconds.ToString("0") + "s";
+            if (seconds < 60f) return seconds.ToString("0", Inv) + "s";
             var m = Mathf.FloorToInt(seconds / 60f);
             var s = Mathf.RoundToInt(seconds - m * 60f);
             if (s == 60) { m++; s = 0; }
-            return $"{m}:{s:00}";
+            return m.ToString(Inv) + ":" + s.ToString("00", Inv);
         }
+
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        // The card's two queries as functions, installed once per VM: the
+        // peek runs four times a second while the card is up.
+        private static readonly LuaHook Queries = new LuaHook("__SdbCard", "unit card queries", CardChunk)
+        {
+            LogInstalls = false,
+        };
+
+        private const string CardChunk =
+            "__SdbCard = { " +
+            "Peek = function() " + PeekBody + " end, " +
+            // The selected builders' time for a template: its buildTime over
+            // their build power, summed for mobile ones, the biggest of the rest.
+            "BuildTime = function(id) " +
+            "local ok = pcall(function() " +
+            "  local tp = __Templates.Units[id] " +
+            "  local bt = tp and tp.economy and tp.economy.buildTime or 0 " +
+            "  local sel = Import('client/input/selectionSystem.lua') " +
+            "  local picked = (sel.GetSelectedUnits and sel.GetSelectedUnits()) " +
+            "    or (sel.GetSelectedEntities and sel.GetSelectedEntities()) or {} " +
+            "  local mobile, fixed = 0, 0 " +
+            "  for _, u in pairs(picked) do " +
+            "    local p = u.buildPower or (u.tp and u.tp.construction and u.tp.construction.buildPower) or 0 " +
+            "    if u.tp and u.tp.movement then mobile = mobile + p else fixed = math.max(fixed, p) end " +
+            "  end " +
+            "  local power = mobile > 0 and mobile or fixed " +
+            "  local secs = power > 0 and bt / power or bt " +
+            "  __SdbBuildSecs = string.format('%.1f,%.1f', secs, power) " +
+            "end) " +
+            "if not ok then __SdbBuildSecs = '' end " +
+            "end }";
 
         // ---- a factory's queue and progress ----------------------------------------
         //
@@ -204,7 +235,7 @@ namespace SanctuaryHud
         private static bool _hoveringUnit;
         private static float _nextPeek;
 
-        private const string PeekChunk =
+        private const string PeekBody =
             "local ok = pcall(function() " +
             "  local m = Import('client/inputEventsFunctions.lua') " +
             "  local u = m.GetHoverUnit and m.GetHoverUnit() " +
@@ -264,8 +295,8 @@ namespace SanctuaryHud
             _nextPeek = Time.realtimeSinceStartup + 0.25f;
             try
             {
-                EnsureLuaBridge();
-                if (!LuaReady || !RunLua(PeekChunk)) return;
+                Queries.Tick();
+                if (!Queries.Call("__SdbCard.Peek()")) return;
                 var raw = GetLuaGlobal("__SdbFactory") ?? "";
                 var parts = raw.Split('|');
                 _hoveringUnit = parts.Length > 0 && parts[0] == "1";
@@ -274,17 +305,17 @@ namespace SanctuaryHud
                 if (parts.Length >= 5)
                 {
                     var sp = parts[4].Split(':');
-                    if (sp.Length >= 3) float.TryParse(sp[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _shieldRecharge);
+                    if (sp.Length >= 3) float.TryParse(sp[2], NumberStyles.Float, Inv, out _shieldRecharge);
                     if (sp.Length >= 2)
                     {
-                        float.TryParse(sp[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _shieldCur);
-                        float.TryParse(sp[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _shieldMax);
+                        float.TryParse(sp[0], NumberStyles.Float, Inv, out _shieldCur);
+                        float.TryParse(sp[1], NumberStyles.Float, Inv, out _shieldMax);
                     }
                 }
                 _queue.Clear();
                 _factoryProgress = -1f;
                 if (parts.Length < 4) return;
-                float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _factoryProgress);
+                float.TryParse(parts[1], NumberStyles.Float, Inv, out _factoryProgress);
                 // What it is working on right now, first — its own next
                 // item for a factory, which then merges with the queue's
                 // head; something else's job for an assisting engineer.
@@ -310,7 +341,15 @@ namespace SanctuaryHud
                     if (_queue.Count > 5) _queue.RemoveAt(5);
                 }
             }
-            catch { /* the card shows without the queue */ }
+            catch (Exception e)
+            {
+                // The card shows without the queue.
+                if (!_peekLogged)
+                {
+                    _peekLogged = true;
+                    _log?.LogWarning($"Unit card: queue and shield query failed (logged once): {e.Message}");
+                }
+            }
         }
 
         private static void ForgetPeek()
@@ -369,6 +408,7 @@ namespace SanctuaryHud
         {
             _conceal.Release();
             RestoreBuiltIn();
+            Queries.Remove();
             _card?.Destroy();
             _card = null;
         }
@@ -440,14 +480,32 @@ namespace SanctuaryHud
 
         private static string Rate(float value) => (value > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(value) + "/s";
 
-        /// The occasional figures, one line, only the ones that apply.
+        private static float _extrasVeterancy = float.NaN, _extrasTransport, _extrasAmmo;
+        private static string _extras;
+
+        /// The occasional figures, one line, only the ones that apply; made
+        /// again only when one of them changes.
         private static string Extras(UIInformationValues v)
         {
-            var parts = new List<string>();
-            if (v.veterancy > 0f) parts.Add("VETERANCY " + SanctuaryHudPlugin.Fmt(v.veterancy));
-            if (v.transportCapacity > 0f) parts.Add("TRANSPORT " + SanctuaryHudPlugin.Fmt(v.transportCapacity));
-            if (v.ammoCapacity > 0f) parts.Add("AMMO " + SanctuaryHudPlugin.Fmt(v.ammoCapacity));
-            return parts.Count == 0 ? null : string.Join("    ", parts);
+            if (v.veterancy.Equals(_extrasVeterancy) && v.transportCapacity.Equals(_extrasTransport) && v.ammoCapacity.Equals(_extrasAmmo))
+                return _extras;
+            _extrasVeterancy = v.veterancy;
+            _extrasTransport = v.transportCapacity;
+            _extrasAmmo = v.ammoCapacity;
+            string text = null;
+            void Add(string part) => text = text == null ? part : text + "    " + part;
+            if (v.veterancy > 0f) Add("VETERANCY " + SanctuaryHudPlugin.Fmt(v.veterancy));
+            if (v.transportCapacity > 0f) Add("TRANSPORT " + SanctuaryHudPlugin.Fmt(v.transportCapacity));
+            if (v.ammoCapacity > 0f) Add("AMMO " + SanctuaryHudPlugin.Fmt(v.ammoCapacity));
+            return _extras = text;
+        }
+
+        /// SetActive that tells the panels a layout changed, when it did.
+        private static void Active(GameObject go, bool on)
+        {
+            if (go == null || go.activeSelf == on) return;
+            go.SetActive(on);
+            HudCanvas.LayoutVersion++;
         }
 
         /// The card's objects: a plate with a column of rows.
@@ -463,6 +521,16 @@ namespace SanctuaryHud
             private readonly QueueTileView[] _small = new QueueTileView[2];
             private QueueTileView _job;
             private TMP_Text _jobPercent;
+            // Each figure's text, made again only when its value changes.
+            private readonly SanctuaryHudPlugin.FigureText _alloyCost = new SanctuaryHudPlugin.FigureText(),
+                _energyCost = new SanctuaryHudPlugin.FigureText(), _time = new SanctuaryHudPlugin.FigureText(),
+                _alloyRate = new SanctuaryHudPlugin.FigureText(), _energyRate = new SanctuaryHudPlugin.FigureText(),
+                _buildPower = new SanctuaryHudPlugin.FigureText(), _percent = new SanctuaryHudPlugin.FigureText();
+
+            /// Lay out again on the next Fill even if nothing in it changed:
+            /// it was just shown, or its size changed.
+            private bool _dirty = true;
+            private float _scale = -1f;
 
             internal bool Alive => _rect != null;
             internal RectTransform Rect => _rect;
@@ -563,8 +631,9 @@ namespace SanctuaryHud
 
             internal void Show(bool showing)
             {
-                if (_rect == null) return;
-                if (_rect.gameObject.activeSelf != showing) _rect.gameObject.SetActive(showing);
+                if (_rect == null || _rect.gameObject.activeSelf == showing) return;
+                _rect.gameObject.SetActive(showing);
+                if (showing) _dirty = true;
             }
 
             internal void Place(Vector2 bottomLeft)
@@ -580,8 +649,17 @@ namespace SanctuaryHud
 
             internal void Fill(UIInformationValues v, bool building, float scale)
             {
-                _rect.localScale = new Vector3(scale, scale, 1f);
-                HudCanvas.PlateStyle(_rect, false);
+                // Anything below that changes the card's size bumps the
+                // layout version (SetText, Active), so an unchanged card is
+                // not laid out again.
+                var version = HudCanvas.LayoutVersion;
+                if (scale != _scale)
+                {
+                    _scale = scale;
+                    _rect.localScale = new Vector3(scale, scale, 1f);
+                    _dirty = true;
+                }
+                if (_dirty) HudCanvas.PlateStyle(_rect, false);
                 var factory = _queue.Count > 0;
                 if (Mathf.Abs(_rect.sizeDelta.x - Width) > 0.5f) _rect.sizeDelta = new Vector2(Width, _rect.sizeDelta.y);
 
@@ -602,8 +680,7 @@ namespace SanctuaryHud
                 // the game shows 1 / 10,000 and the figure means nothing.
                 if (showShield && _shieldRecharge >= 0f && _shieldRecharge < 1f)
                 {
-                    var frac = Mathf.Clamp01(_shieldRecharge);
-                    _gauges[0].Set("SHIELD CHARGING", (frac * 100f).ToString("0") + "%", null, frac, new Color(0.55f, 0.78f, 1f, 0.55f));
+                    _gauges[0].SetPercent("SHIELD CHARGING", Mathf.Clamp01(_shieldRecharge), new Color(0.55f, 0.78f, 1f, 0.55f));
                 }
                 else if (showShield)
                 {
@@ -624,8 +701,7 @@ namespace SanctuaryHud
                 _gauges[3].Show(showBubble);
                 if (v.isConstructionPercentEnabled)
                 {
-                    var frac = Mathf.Clamp01(v.constructionPercent);
-                    _gauges[4].Set("BUILDING", (frac * 100f).ToString("0") + "%", null, frac, UpgradeColour);
+                    _gauges[4].SetPercent("BUILDING", Mathf.Clamp01(v.constructionPercent), UpgradeColour);
                 }
                 _gauges[4].Show(v.isConstructionPercentEnabled);
 
@@ -636,20 +712,20 @@ namespace SanctuaryHud
                 // by the time this card is about a unit.
                 if (building)
                 {
-                    _build.Set(0, "alloy", SanctuaryHudPlugin.AlloyTint, SanctuaryHudPlugin.Fmt(v.alloyBuildCost));
-                    _build.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, SanctuaryHudPlugin.Fmt(v.energyBuildCost));
-                    _build.Set(2, "time", Color.white, _hoverSeconds > 0f ? Duration(_hoverSeconds) : "—");
+                    _build.Set(0, "alloy", SanctuaryHudPlugin.AlloyTint, _alloyCost.Fmt(v.alloyBuildCost));
+                    _build.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, _energyCost.Fmt(v.energyBuildCost));
+                    _build.Set(2, "time", Color.white, _time.Get(_hoverSeconds, s => s > 0f ? Duration(s) : "—"));
                 }
                 _build.Show(building);
 
                 var alloy = Mathf.Abs(v.alloyNetIncome) >= 0.5f;
                 var energy = Mathf.Abs(v.energyNetIncome) >= 0.5f;
-                if (alloy) _income.Set(0, "alloy", SanctuaryHudPlugin.AlloyTint, Rate(v.alloyNetIncome));
+                if (alloy) _income.Set(0, "alloy", SanctuaryHudPlugin.AlloyTint, _alloyRate.Get(v.alloyNetIncome, f => Rate(f)));
                 else _income.Clear(0);
-                if (energy) _income.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, Rate(v.energyNetIncome));
+                if (energy) _income.Set(1, "energy", SanctuaryHudPlugin.EnergyTint, _energyRate.Get(v.energyNetIncome, f => Rate(f)));
                 else _income.Clear(1);
                 // Build power behind its mark, on the same line.
-                if (v.buildPower > 0f) _income.Set(2, "power", LabelColour, SanctuaryHudPlugin.Fmt(v.buildPower));
+                if (v.buildPower > 0f) _income.Set(2, "power", LabelColour, _buildPower.Fmt(v.buildPower));
                 else _income.Clear(2);
                 _income.Show(!building);
 
@@ -663,7 +739,7 @@ namespace SanctuaryHud
                 if (factory)
                 {
                     _job.Set(_queue[0], false);
-                    var pct = _factoryProgress >= 0f ? (Mathf.Clamp01(_factoryProgress) * 100f).ToString("0") + "%" : "";
+                    var pct = _percent.Get(_factoryProgress, p => p >= 0f ? (Mathf.Clamp01(p) * 100f).ToString("0", Inv) + "%" : "");
                     HudCanvas.SetText(_jobPercent, pct);
                     Active(_jobPercent.gameObject, pct.Length > 0);
                     var queued = Mathf.Min(_queue.Count - 1, _small.Length);
@@ -678,13 +754,13 @@ namespace SanctuaryHud
                 }
                 Active(_queueBlock, factory);
                 Active(_band, true);
-                // So the height is right for the dock this frame.
-                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
-            }
-
-            private static void Active(GameObject go, bool on)
-            {
-                if (go != null && go.activeSelf != on) go.SetActive(on);
+                // So the height is right for the dock this frame, on the
+                // frames something in it changed.
+                if (_dirty || HudCanvas.LayoutVersion != version)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                    _dirty = false;
+                }
             }
         }
 
@@ -745,25 +821,51 @@ namespace SanctuaryHud
                 return gauge;
             }
 
-            internal void Show(bool showing)
-            {
-                if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
-            }
+            internal void Show(bool showing) => Active(_go, showing);
+
+            // The figures as last written, so they are only made again when
+            // they change.
+            private float _shownValue = float.NaN, _shownMax = float.NaN, _shownRegen = float.NaN, _shownPercent = float.NaN;
+            private string _valueText, _regenText;
 
             internal void Set(string label, float value, float max, float regen, Color colour)
             {
-                var text = SanctuaryHudPlugin.Fmt(value) + " / " + SanctuaryHudPlugin.Fmt(max);
+                if (_valueText == null || !value.Equals(_shownValue) || !max.Equals(_shownMax) || !float.IsNaN(_shownPercent))
+                {
+                    _shownValue = value;
+                    _shownMax = max;
+                    _shownPercent = float.NaN;
+                    _valueText = SanctuaryHudPlugin.Fmt(value) + " / " + SanctuaryHudPlugin.Fmt(max);
+                }
+                if (!regen.Equals(_shownRegen))
+                {
+                    _shownRegen = regen;
+                    _regenText = regen >= 0.5f ? "+" + SanctuaryHudPlugin.Fmt(regen) + "/s" : null;
+                }
                 var frac = max > 0f ? Mathf.Clamp01(value / max) : 0f;
-                Set(label, text, regen >= 0.5f ? "+" + SanctuaryHudPlugin.Fmt(regen) + "/s" : null, frac, colour);
+                Set(label, _valueText, _regenText, frac, colour);
             }
 
-            internal void Set(string label, string value, string regen, float frac, Color colour)
+            /// A bar that is a percentage (charging, building): the figure
+            /// is the percentage, with no regen.
+            internal void SetPercent(string label, float frac, Color colour)
+            {
+                var percent = frac * 100f;
+                if (_valueText == null || !percent.Equals(_shownPercent))
+                {
+                    _shownPercent = percent;
+                    _shownValue = _shownMax = float.NaN;
+                    _valueText = percent.ToString("0", Inv) + "%";
+                }
+                Set(label, _valueText, null, frac, colour);
+            }
+
+            private void Set(string label, string value, string regen, float frac, Color colour)
             {
                 HudCanvas.SetText(_label, label);
                 HudCanvas.SetText(_value, value);
                 HudCanvas.SetText(_regen, regen ?? "");
-                var showRegen = !string.IsNullOrEmpty(regen);
-                if (_regen.gameObject.activeSelf != showRegen) _regen.gameObject.SetActive(showRegen);
+                Active(_regen.gameObject, !string.IsNullOrEmpty(regen));
                 _fill.fillAmount = frac;
                 _fill.color = colour;
             }
@@ -833,10 +935,7 @@ namespace SanctuaryHud
                 return line;
             }
 
-            internal void Show(bool showing)
-            {
-                if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
-            }
+            internal void Show(bool showing) => Active(_go, showing);
 
             /// Keeps this height even with nothing on the line.
             internal void Reserve(float height)
@@ -860,32 +959,27 @@ namespace SanctuaryHud
                 if (_icons[index] != null)
                 {
                     _icons[index].color = tint;
-                    if (_marks[index].gameObject.activeSelf) _marks[index].gameObject.SetActive(false);
+                    Active(_marks[index].gameObject, false);
                 }
                 else
                 {
                     var mark = Glyphs.Get(glyph);
                     _marks[index].texture = mark;
                     _marks[index].color = tint;
-                    var showMark = mark != null;
-                    if (_marks[index].gameObject.activeSelf != showMark) _marks[index].gameObject.SetActive(showMark);
+                    Active(_marks[index].gameObject, mark != null);
                 }
                 _figures[index].color = tint;
                 HudCanvas.SetText(_figures[index], text);
-                if (!_items[index].activeSelf) _items[index].SetActive(true);
+                Active(_items[index], true);
             }
 
-            internal void Clear(int index)
-            {
-                if (_items[index].activeSelf) _items[index].SetActive(false);
-            }
+            internal void Clear(int index) => Active(_items[index], false);
 
             internal void SetExtras(string text)
             {
                 if (_extras == null) return;
                 HudCanvas.SetText(_extras, text ?? "");
-                var on = !string.IsNullOrEmpty(text);
-                if (_extras.gameObject.activeSelf != on) _extras.gameObject.SetActive(on);
+                Active(_extras.gameObject, !string.IsNullOrEmpty(text));
             }
         }
 
@@ -940,10 +1034,9 @@ namespace SanctuaryHud
                 return image;
             }
 
-            internal void Show(bool showing)
-            {
-                if (_go != null && _go.activeSelf != showing) _go.SetActive(showing);
-            }
+            internal void Show(bool showing) => Active(_go, showing);
+
+            private int _shownCount = -1;
 
             internal void Set(QueueItem item, bool withCount)
             {
@@ -955,8 +1048,12 @@ namespace SanctuaryHud
                 _icon.enabled = icon != null;
                 if (_countBox == null) return;
                 var on = withCount && item.Count > 1;
-                if (on) HudCanvas.SetText(_count, item.Count.ToString());
-                if (_countBox.activeSelf != on) _countBox.SetActive(on);
+                if (on && item.Count != _shownCount)
+                {
+                    _shownCount = item.Count;
+                    HudCanvas.SetText(_count, item.Count.ToString(Inv));
+                }
+                Active(_countBox, on);
             }
         }
 
@@ -966,7 +1063,7 @@ namespace SanctuaryHud
         {
             try
             {
-                _log?.LogInfo("Information panel concealed; its tree:");
+                _log?.LogDebug("Information panel concealed; its tree:");
                 PanelConceal.DumpSubtree(panel.transform, 0, _log, 2);
             }
             catch (Exception e)

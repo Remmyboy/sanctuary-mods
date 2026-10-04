@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
+using System.Threading;
 using BepInEx;
 using UnityEngine;
 
@@ -23,7 +23,9 @@ namespace SanctuaryModLoader
     //
     // Each DLL is watched and reloaded independently about a second after every
     // rebuild; F6 forces a reload of everything. A DLL deleted from the folder
-    // has its plugins destroyed on the next poll.
+    // has its plugins destroyed on the next poll. A rebuild that fails to load
+    // leaves the copy already running alone. Two DLLs carrying the same
+    // plugin GUID run only the first; the second waits until the first goes.
     //
     // Reloading is not unloading. Mono can't remove one assembly from the
     // running AppDomain, so a reload destroys the old plugin components (their
@@ -42,7 +44,7 @@ namespace SanctuaryModLoader
     // off on the Mods page is held back before it is ever created, so none of
     // its code runs, and the manager lists, starts and stops plugins through
     // the static methods at the bottom rather than adding components itself.
-    [BepInPlugin(LoaderGuid, "Sanctuary Mod Loader", "1.4.1")]
+    [BepInPlugin(LoaderGuid, "Sanctuary Mod Loader", "1.5.0")]
     [BepInDependency(ModApiGuid, BepInDependency.DependencyFlags.SoftDependency)]
     public class LoaderPlugin : BaseUnityPlugin
     {
@@ -59,6 +61,15 @@ namespace SanctuaryModLoader
             public string Path;
             public bool Gameplay;
             public BaseUnityPlugin Instance;
+            // Not started because the same GUID runs from another DLL.
+            public bool HeldAsTwin;
+        }
+
+        /// One search of the folder for DLLs, and the folders it couldn't read.
+        private sealed class Search
+        {
+            public readonly List<string> Dlls = new List<string>();
+            public readonly List<string> Problems = new List<string>();
         }
 
         // Libraries the game or BepInEx already has. An author who ships one
@@ -70,8 +81,6 @@ namespace SanctuaryModLoader
             "Mono.Cecil.dll", "MonoMod.Utils.dll", "MonoMod.RuntimeDetour.dll", "Newtonsoft.Json.dll",
         };
 
-        private static readonly Regex GameplayKind = new Regex("\"kind\"\\s*:\\s*\"\\s*gameplay\\s*\"", RegexOptions.IgnoreCase);
-
         private static LoaderPlugin _instance;
 
         private string _modsDir;
@@ -81,13 +90,20 @@ namespace SanctuaryModLoader
         private readonly HashSet<string> _activeGameplayFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _skippedLibraries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _deferredLogged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _problemsLogged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private float _pollAccum;
         /// The DLLs found by the last search of the folder. Each second only
         /// these are checked for changes; the whole folder (hundreds of files,
-        /// mostly Lua) is searched for new ones every few seconds.
+        /// mostly Lua) is searched for new ones every few seconds, on a
+        /// worker thread, so the search never stalls a frame. (A
+        /// FileSystemWatcher is no cheaper here: the game's Mono implements
+        /// it on Windows as a thread searching the whole tree every 750 ms.)
         private List<string> _knownDlls;
         private float _discoverAccum;
         private const float DiscoverEvery = 5f;
+        // A finished background search, waiting for the next poll to take it.
+        private Search _found;
+        private volatile bool _searching;
 
         private void Awake()
         {
@@ -162,7 +178,7 @@ namespace SanctuaryModLoader
                     if (File.Exists(Path.Combine(d, "mod.json"))) return d;
                 }
             }
-            catch { }
+            catch { /* a folder deleted or unreadable mid-check: the top-level folder stands in, as for no mod.json */ }
             return top;
         }
 
@@ -173,9 +189,81 @@ namespace SanctuaryModLoader
             try
             {
                 var manifest = Path.Combine(folder, "mod.json");
-                return File.Exists(manifest) && GameplayKind.IsMatch(File.ReadAllText(manifest));
+                return File.Exists(manifest) && ManifestSaysGameplay(File.ReadAllText(manifest));
             }
-            catch { return false; }
+            catch { return false; } // unreadable or not JSON: the Mod API reads it as no kind, a UI mod, too
+        }
+
+        /// The manifest's own top-level "kind", read as the Mod API reads it.
+        /// A method of its own so that, were Newtonsoft ever missing, the
+        /// failure lands in IsGameplayDll's catch rather than the load.
+        private static bool ManifestSaysGameplay(string json)
+        {
+            var kind = Newtonsoft.Json.Linq.JObject.Parse(json)["kind"];
+            return kind != null && kind.Type == Newtonsoft.Json.Linq.JTokenType.String &&
+                   string.Equals(((string)kind).Trim(), "gameplay", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string Relative(string path) =>
+            path.StartsWith(_modsDir, StringComparison.OrdinalIgnoreCase) ? path.Substring(_modsDir.Length).TrimStart('\\', '/') : path;
+
+        /// Every DLL under the folder. A folder that can't be read, or goes
+        /// mid-search, is skipped rather than ending the search; dot-folders
+        /// (.git and the like) and build intermediates (obj, inside a mod's
+        /// folder) are left out. Thread-safe: it touches no loader state.
+        private static Search FindDlls(string root)
+        {
+            var search = new Search();
+            void Walk(string dir, int depth)
+            {
+                string[] files, subs;
+                try
+                {
+                    files = Directory.GetFiles(dir, "*.dll");
+                    subs = Directory.GetDirectories(dir);
+                }
+                catch (DirectoryNotFoundException) { return; } // deleted mid-search
+                catch (Exception e)
+                {
+                    search.Problems.Add($"{dir}: {e.Message}");
+                    return;
+                }
+                // "*.dll" also matches longer extensions (Foo.dll_off), which
+                // is how people switch a DLL off by hand.
+                foreach (var file in files)
+                    if (file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) search.Dlls.Add(file);
+                foreach (var sub in subs)
+                {
+                    var name = Path.GetFileName(sub);
+                    if (name.StartsWith(".") || (depth > 0 && string.Equals(name, "obj", StringComparison.OrdinalIgnoreCase))) continue;
+                    Walk(sub, depth + 1);
+                }
+            }
+            Walk(root, 0);
+            return search;
+        }
+
+        /// Starts a search on a worker thread; the next poll takes its result.
+        private void SearchInBackground()
+        {
+            if (_searching) return;
+            _searching = true;
+            var root = _modsDir;
+            try
+            {
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    try { Interlocked.Exchange(ref _found, FindDlls(root)); }
+                    catch { /* FindDlls catches per folder; the next search tries again */ }
+                    finally { _searching = false; }
+                });
+            }
+            catch (Exception e)
+            {
+                _searching = false;
+                Interlocked.Exchange(ref _found, FindDlls(root)); // no worker to be had: search here, as before
+                Logger.LogWarning($"Background search unavailable ({e.Message}); searching on the main thread.");
+            }
         }
 
         private void LoadChanged(bool force)
@@ -185,17 +273,25 @@ namespace SanctuaryModLoader
             // One folder per mod is the convention, but a DLL dropped anywhere
             // under SanctuaryMods is picked up — no silent no-shows. Between
             // searches, the DLLs already known are checked; one that has gone
-            // drops out at once.
-            List<string> onDisk;
-            if (force || _knownDlls == null || _discoverAccum >= DiscoverEvery)
+            // drops out at once. At start-up and on F6 the search runs here
+            // and now; otherwise a background one hands in its result.
+            var search = force || _knownDlls == null ? FindDlls(_modsDir) : Interlocked.Exchange(ref _found, null);
+            if (_discoverAccum >= DiscoverEvery)
             {
                 _discoverAccum = 0f;
+                SearchInBackground();
+            }
+            List<string> onDisk;
+            if (search != null)
+            {
+                foreach (var problem in search.Problems)
+                    if (_problemsLogged.Add(problem)) Logger.LogWarning($"Couldn't search {problem}; DLLs in it aren't loaded.");
                 onDisk = new List<string>();
-                foreach (var path in Directory.GetFiles(_modsDir, "*.dll", SearchOption.AllDirectories))
+                foreach (var path in search.Dlls)
                 {
                     if (!IsLibrary(path)) { onDisk.Add(path); continue; }
                     if (_skippedLibraries.Add(path))
-                        Logger.LogWarning($"{path.Substring(_modsDir.Length).TrimStart('\\')}: a library the game already has; not loaded. Mods reference it, they don't ship it.");
+                        Logger.LogWarning($"{Relative(path)}: a library the game already has; not loaded. Mods reference it, they don't ship it.");
                 }
                 _knownDlls = new List<string>(onDisk);
             }
@@ -204,13 +300,18 @@ namespace SanctuaryModLoader
             var frozen = GameplayFrozen();
 
             // A DLL removed from the folder takes its plugins with it.
+            var removed = false;
             foreach (var gone in _loadedStamps.Keys.Except(onDisk, StringComparer.OrdinalIgnoreCase).ToList())
             {
                 if (frozen && _live.TryGetValue(gone, out var was) && was.Any(p => p.Gameplay && p.Instance != null)) continue;
                 TearDown(gone);
                 _loadedStamps.Remove(gone);
+                removed = true;
                 Logger.LogInfo($"{Path.GetFileName(gone)} removed; its plugin(s) destroyed.");
             }
+            // A second copy of a plugin held back for the one just removed
+            // takes its place.
+            if (removed) StartHeldTwins();
 
             // Every changed assembly is loaded before any plugin is created, so
             // the held-back decision sees a Mod Manager arriving in this same
@@ -218,7 +319,9 @@ namespace SanctuaryModLoader
             var loaded = new List<string>();
             foreach (var path in onDisk)
             {
-                var stamp = File.GetLastWriteTimeUtc(path);
+                DateTime stamp;
+                try { stamp = File.GetLastWriteTimeUtc(path); }
+                catch (Exception) { continue; } // unreadable for now; the next poll looks again
                 if (!force && _loadedStamps.TryGetValue(path, out var was) && was == stamp) continue;
                 // Gameplay DLLs wait for the match to end before a reload.
                 if (frozen && _live.TryGetValue(path, out var running) && running.Any(p => p.Gameplay))
@@ -232,9 +335,7 @@ namespace SanctuaryModLoader
             }
             if (loaded.Count == 0) return;
 
-            var heldBack = ManagerListsHeldBackPlugins()
-                ? ReadDisabledGuids()
-                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var heldBack = HeldBackGuids();
             foreach (var path in loaded)
             {
                 var started = 0;
@@ -245,7 +346,7 @@ namespace SanctuaryModLoader
                     if (plugin.Gameplay)
                     {
                         if (_activeGameplayFolders.Contains(ModFolderOf(plugin.Path)) && StartPlugin(plugin)) started++;
-                        else waiting.Add(plugin.Name);
+                        else if (!plugin.HeldAsTwin) waiting.Add(plugin.Name);
                     }
                     else if (heldBack.Contains(plugin.Guid)) held.Add(plugin.Name);
                     else if (StartPlugin(plugin)) started++;
@@ -264,17 +365,28 @@ namespace SanctuaryModLoader
         {
             if (!_live.TryGetValue(path, out var plugins)) return;
             // Their OnDestroy handlers drop the Harmony patches they applied.
+            // Destroyed now rather than at the end of the frame: the new copy
+            // starts in this same pass, and an old OnDestroy running after
+            // the new Awake would undo what the new copy just set up (patches
+            // under the same Harmony id, statics, Lua globals). Only ever
+            // called from the loader's own Awake and Update, never from inside
+            // a plugin's callbacks, where destroying it immediately isn't safe.
             foreach (var plugin in plugins)
             {
-                if (plugin.Instance != null) Destroy(plugin.Instance);
+                if (plugin.Instance != null)
+                {
+                    try { DestroyImmediate(plugin.Instance); }
+                    catch (Exception e) { Logger.LogError($"Stopping {plugin.Name} failed: {e}"); }
+                }
                 plugin.Instance = null;
             }
             _live.Remove(path);
         }
 
         /// Loads a fresh copy of the assembly and records its plugin types,
-        /// destroying the previous copy's plugins first. Creates nothing:
-        /// LoadChanged decides what starts.
+        /// then destroys the previous copy's plugins. A copy that fails to load
+        /// leaves the previous one running. Creates nothing: LoadChanged
+        /// decides what starts.
         private bool TryLoadAssembly(string path, DateTime stamp)
         {
             byte[] bytes;
@@ -286,11 +398,18 @@ namespace SanctuaryModLoader
             {
                 return false; // mid-copy; the poll picks it up next second
             }
-
-            TearDown(path);
+            catch (UnauthorizedAccessException e)
+            {
+                // Locked by a virus scanner or a copy in progress, or not
+                // ours to read: tried again each second, said once.
+                if (_problemsLogged.Add(path)) Logger.LogWarning($"{Relative(path)} can't be read yet ({e.Message}); trying again.");
+                return false;
+            }
+            _problemsLogged.Remove(path);
 
             // Record the stamp even if the load fails, so a broken build logs
-            // one error instead of one per second; F6 retries on demand.
+            // one error instead of one per second; it is tried again when the
+            // file changes, and F6 retries on demand.
             _loadedStamps[path] = stamp;
 
             try
@@ -311,7 +430,6 @@ namespace SanctuaryModLoader
                 }
 
                 var assembly = Assembly.Load(bytes);
-                _loadCounts[path] = _loadCounts.TryGetValue(path, out var count) ? count + 1 : 1;
 
                 var gameplay = IsGameplayDll(path);
                 var plugins = new List<Managed>();
@@ -335,13 +453,63 @@ namespace SanctuaryModLoader
                         Path = path, Gameplay = gameplay && meta?.GUID != ManagerGuid,
                     });
                 }
+
+                // The new copy is in hand: only now does the old one go.
+                TearDown(path);
                 _live[path] = plugins;
+                _loadCounts[path] = _loadCounts.TryGetValue(path, out var count) ? count + 1 : 1;
                 return true;
             }
             catch (Exception e)
             {
-                Logger.LogError($"Hot reload of {Path.GetFileName(path)} failed: {e}");
+                Logger.LogError($"Hot reload of {Path.GetFileName(path)} failed" +
+                                (_live.ContainsKey(path) ? "; the copy already running stays" : "") + $": {e}");
                 return false;
+            }
+        }
+
+        /// The switched-off GUIDs to hold back, when the manager can list them.
+        private HashSet<string> HeldBackGuids() =>
+            ManagerListsHeldBackPlugins()
+                ? ReadDisabledGuids()
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// The running copy of this plugin's GUID from a different DLL, if
+        /// any: two copies of one plugin would both patch the game. A reload
+        /// of the same DLL is not a twin.
+        private Managed RunningTwin(Managed plugin)
+        {
+            foreach (var list in _live.Values)
+            {
+                foreach (var other in list)
+                {
+                    if (other != plugin && other.Instance != null && other.Guid == plugin.Guid &&
+                        !string.Equals(other.Path, plugin.Path, StringComparison.OrdinalIgnoreCase))
+                        return other;
+                }
+            }
+            return null;
+        }
+
+        /// Second copies held back for a twin that has since gone start now,
+        /// unless the Mods page or the lobby says otherwise.
+        private void StartHeldTwins()
+        {
+            HashSet<string> heldBack = null;
+            foreach (var plugin in _live.Values.SelectMany(l => l).Where(p => p.HeldAsTwin).ToList())
+            {
+                if (plugin.Instance != null || RunningTwin(plugin) != null) continue;
+                plugin.HeldAsTwin = false;
+                if (plugin.Gameplay)
+                {
+                    if (!_activeGameplayFolders.Contains(ModFolderOf(plugin.Path))) continue;
+                }
+                else
+                {
+                    if (heldBack == null) heldBack = HeldBackGuids();
+                    if (heldBack.Contains(plugin.Guid)) continue;
+                }
+                if (StartPlugin(plugin)) Logger.LogInfo($"{plugin.Name} started from {Relative(plugin.Path)}, now that its other copy has gone.");
             }
         }
 
@@ -350,6 +518,16 @@ namespace SanctuaryModLoader
         private bool StartPlugin(Managed plugin)
         {
             if (plugin.Instance != null) return true;
+            var twin = RunningTwin(plugin);
+            if (twin != null)
+            {
+                if (!plugin.HeldAsTwin)
+                    Logger.LogWarning($"{Relative(plugin.Path)}: {plugin.Name} ({plugin.Guid}) is already running from {Relative(twin.Path)}, " +
+                                      "so this second copy is held back. Keep one of the two.");
+                plugin.HeldAsTwin = true;
+                return false;
+            }
+            plugin.HeldAsTwin = false;
             try
             {
                 plugin.Instance = (BaseUnityPlugin)gameObject.AddComponent(plugin.Type);
@@ -445,11 +623,11 @@ namespace SanctuaryModLoader
         }
 
         /// The DLL a type from PluginTypes was loaded from, or null.
-        public static string PathOf(Type type) => _instance?.Find(type)?.Path;
+        public static string PathOf(Type type) => _instance == null ? null : _instance.Find(type)?.Path;
 
         /// True for a type from a gameplay mod's DLL: the lobby starts and
         /// stops it, not the player.
-        public static bool IsGameplay(Type type) => _instance?.Find(type)?.Gameplay ?? false;
+        public static bool IsGameplay(Type type) => _instance != null && (_instance.Find(type)?.Gameplay ?? false);
 
         /// Starts or destroys a type from PluginTypes and returns its running
         /// instance (null when off). A type the loader no longer manages is

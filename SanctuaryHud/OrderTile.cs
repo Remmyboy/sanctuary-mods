@@ -32,8 +32,6 @@ namespace SanctuaryHud
         /// root, and the art draws at the size it does on the game's panel.
         private const float Cell = 80f;
 
-        internal OrderButtonElement Source => _source;
-
         internal static OrderTile Create(SanctuaryPanelUI panel, Transform parent)
         {
             var prefab = panel != null ? panel.buttonPrefab : null;
@@ -87,9 +85,19 @@ namespace SanctuaryHud
 
         private static bool _createLogged;
 
+        // The source's own Button and whether it has a tooltip, looked up
+        // when the source changes rather than every frame.
+        private Button _sourceButton;
+        private bool _sourceHasTooltip;
+
         internal void Mirror(OrderButtonElement source, string caption)
         {
-            _source = source;
+            if (source != _source)
+            {
+                _source = source;
+                _sourceButton = source.GetComponent<Button>();
+                _sourceHasTooltip = source.GetComponent<TooltipTrigger>() != null;
+            }
             Copy(source.background, _background);
             Copy(source.frame, _frame);
             // The glyph on its own, without the game's glow: drawn plain,
@@ -98,17 +106,13 @@ namespace SanctuaryHud
             var glyph = source.icon != null ? Glyph(source.icon.overrideSprite) : null;
             Copy(source.icon, _icon, glyph);
             if (glyph != null && _icon != null) _icon.material = null;
-            if (_button != null)
+            if (_button != null && _sourceButton != null)
             {
-                var sourceButton = source.GetComponent<Button>();
-                if (sourceButton != null)
-                {
-                    _button.colors = sourceButton.colors;
-                    _button.interactable = sourceButton.interactable;
-                }
+                _button.colors = _sourceButton.colors;
+                _button.interactable = _sourceButton.interactable;
             }
 
-            if (source.GetComponent<TooltipTrigger>() == null)
+            if (!_sourceHasTooltip)
             {
                 if (_tooltip == null) _tooltip = gameObject.AddComponent<TooltipTrigger>();
                 _tooltip.usesDictionaryTitle = false;
@@ -132,11 +136,10 @@ namespace SanctuaryHud
         // white blob. So the glyph channel is lifted out once per icon into a
         // sprite of its own — white where the glyph is, clear elsewhere — and
         // drawn with the plain UI material. The atlas isn't readable, so it
-        // goes through a render texture once.
+        // goes through a render texture, and only the icon's own rectangle
+        // comes back: no copy of the whole atlas is kept on the CPU.
 
         private static readonly Dictionary<Sprite, Sprite> _glyphs = new Dictionary<Sprite, Sprite>();
-        private static Texture _copiedFrom;
-        private static Texture2D _atlasCopy;
         private static bool _glyphFailed;
 
         private static Sprite Glyph(Sprite source)
@@ -154,16 +157,8 @@ namespace SanctuaryHud
                 var h = Mathf.RoundToInt(Mathf.Abs(rect.height));
                 if (w < 2 || h < 2) return null;
 
-                if (_atlasCopy == null || _copiedFrom != atlas)
-                {
-                    if (_atlasCopy != null) UnityEngine.Object.Destroy(_atlasCopy);
-                    _atlasCopy = ReadBack(atlas);
-                    _copiedFrom = atlas;
-                    if (_atlasCopy == null) { _glyphFailed = true; return null; }
-                }
-
-                var pixels = _atlasCopy.GetPixels(x, y, w, h);
-                var glyph = new Texture2D(w, h, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+                var glyph = ReadBack(atlas, x, y, w, h);
+                var pixels = glyph.GetPixels();
                 for (var i = 0; i < pixels.Length; i++)
                 {
                     var p = pixels[i];
@@ -171,10 +166,9 @@ namespace SanctuaryHud
                 }
                 glyph.SetPixels(pixels);
                 glyph.Apply(false, true);
-                made = Sprite.Create(glyph, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-                made.hideFlags = HideFlags.HideAndDontSave;
+                made = Generated.Keep(Sprite.Create(glyph, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
                 _glyphs[source] = made;
-                if (_glyphs.Count == 1) _log?.LogInfo($"Order glyphs: lifted out of '{atlas.name}' ({w}x{h}, rect y {rect.y:0} h {rect.height:0}).");
+                if (_glyphs.Count == 1) _log?.LogInfo(FormattableString.Invariant($"Order glyphs: lifted out of '{atlas.name}' ({w}x{h}, rect y {rect.y:0} h {rect.height:0})."));
                 return made;
             }
             catch (Exception e)
@@ -185,8 +179,10 @@ namespace SanctuaryHud
             }
         }
 
-        /// A CPU copy of a texture the CPU can't read, by way of the GPU.
-        private static Texture2D ReadBack(Texture texture)
+        /// A CPU copy of one rectangle (texture pixels, from the bottom-left,
+        /// as GetPixels counts them) of a texture the CPU can't read, by way
+        /// of the GPU: kept (Generated), readable, for the caller to fill.
+        private static Texture2D ReadBack(Texture texture, int x, int y, int w, int h)
         {
             var rt = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             var previous = RenderTexture.active;
@@ -194,8 +190,12 @@ namespace SanctuaryHud
             {
                 Graphics.Blit(texture, rt);
                 RenderTexture.active = rt;
-                var copy = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
-                copy.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+                var copy = Generated.Keep(new Texture2D(w, h, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp,
+                });
+                copy.ReadPixels(new Rect(x, y, w, h), 0, 0);
                 copy.Apply(false, false);
                 return copy;
             }
@@ -216,9 +216,6 @@ namespace SanctuaryHud
                 UnityEngine.Object.Destroy(glyph);
             }
             _glyphs.Clear();
-            if (_atlasCopy != null) UnityEngine.Object.Destroy(_atlasCopy);
-            _atlasCopy = null;
-            _copiedFrom = null;
             _glyphFailed = false;
         }
 
@@ -239,8 +236,28 @@ namespace SanctuaryHud
 
         public void OnPointerDown(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerDownHandler);
         public void OnPointerUp(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerUpHandler);
-        public void OnPointerEnter(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerEnterHandler);
-        public void OnPointerExit(PointerEventData eventData) => Forward(eventData, ExecuteEvents.pointerExitHandler);
+        private bool _hover;
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            _hover = true;
+            Forward(eventData, ExecuteEvents.pointerEnterHandler);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            _hover = false;
+            Forward(eventData, ExecuteEvents.pointerExitHandler);
+        }
+
+        private void OnDisable()
+        {
+            // A row taken down under the mouse still owes the game's button
+            // its leave, or its tooltip and glow stay up.
+            if (!_hover) return;
+            _hover = false;
+            Forward(new PointerEventData(EventSystem.current) { position = Input.mousePosition }, ExecuteEvents.pointerExitHandler);
+        }
 
         private static bool _forwardLogged;
 

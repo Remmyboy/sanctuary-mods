@@ -106,7 +106,7 @@ namespace SanctuaryHud
                 // caller has picked one.
                 if (_font == null) TakeFont(canvasTransform.GetComponentInChildren<TMP_Text>(true));
 
-                _log?.LogInfo($"HUD canvas: root on '{canvas.rootCanvas.name}' after '{top.name}', scale factor {canvas.scaleFactor:0.###}.");
+                _log?.LogInfo(FormattableString.Invariant($"HUD canvas: root on '{canvas.rootCanvas.name}' after '{top.name}', scale factor {canvas.scaleFactor:0.###}."));
                 return _root;
             }
             catch (Exception e)
@@ -242,6 +242,7 @@ namespace SanctuaryHud
             _canvas = null;
             _root = null;
             _holder = null;
+            Generated.DestroyAll();
         }
 
         // ---- where things are -----------------------------------------------
@@ -317,8 +318,15 @@ namespace SanctuaryHud
         /// layout.
         internal static void SetText(TMP_Text text, string value)
         {
-            if (text != null && text.text != value) text.text = value;
+            if (text == null || text.text == value) return;
+            text.text = value;
+            LayoutVersion++;
         }
+
+        /// Bumped by the helpers here whenever something that can change a
+        /// panel's size changes (a text, a tile shown or hidden), so a panel
+        /// lays itself out again only on a frame that needs it.
+        internal static int LayoutVersion;
 
         private static Sprite _white;
 
@@ -328,11 +336,10 @@ namespace SanctuaryHud
             get
             {
                 if (_white != null) return _white;
-                var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+                var texture = Generated.Keep(new Texture2D(2, 2, TextureFormat.RGBA32, false));
                 texture.SetPixels(new[] { Color.white, Color.white, Color.white, Color.white });
                 texture.Apply(false, true);
-                _white = Sprite.Create(texture, new Rect(0f, 0f, 2f, 2f), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-                _white.hideFlags = HideFlags.HideAndDontSave;
+                _white = Generated.Keep(Sprite.Create(texture, new Rect(0f, 0f, 2f, 2f), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
                 return _white;
             }
         }

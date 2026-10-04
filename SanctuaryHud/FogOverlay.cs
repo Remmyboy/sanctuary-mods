@@ -62,12 +62,11 @@ namespace SanctuaryHud
             if (width <= 0f || length <= 0f) return;
 
             if (Mask == null)
-                Mask = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
+                Mask = Generated.Keep(new Texture2D(Size, Size, TextureFormat.RGBA32, false)
                 {
-                    hideFlags = HideFlags.HideAndDontSave,
                     wrapMode = TextureWrapMode.Clamp,
                     filterMode = FilterMode.Bilinear,
-                };
+                });
             if (_pixels == null || _pixels.Length != Size * Size) _pixels = new Color32[Size * Size];
             if (_shade == null || _shade.Length != Size * Size) _shade = new byte[Size * Size];
 

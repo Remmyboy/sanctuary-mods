@@ -42,20 +42,20 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.16.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.16.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
-| [IdleEngineers](IdleEngineers/) | [**0.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.0) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
-| [EcoManager](EcoManager/) | [**0.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.0) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
-| [BuildHotkeys](BuildHotkeys/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
-| [LadderReporter](LadderReporter/) | [**0.3.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.5) | Reports ranked results; launches matchmade games |
-| [ReplayManager](ReplayManager/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.0) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
-| [CameraUtilities](CameraUtilities/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.0) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.12.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.12.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
-| [ZoneControl](ZoneControl/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.0) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
-| [PhantomX](PhantomX/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.0) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [SanctuaryHud](SanctuaryHud/) | [**0.16.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.16.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
+| [IdleEngineers](IdleEngineers/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
+| [EcoManager](EcoManager/) | [**0.9.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
+| [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
+| [LadderReporter](LadderReporter/) | [**0.3.6**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.6) | Reports ranked results; launches matchmade games |
+| [ReplayManager](ReplayManager/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.1) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
+| [CameraUtilities](CameraUtilities/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
+| [ModManager](ModManager/) | [**0.13.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.13.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
+| [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
+| [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.4.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.12.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.7.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.12.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.13.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.13.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1556,7 +1556,8 @@ A **gameplay mod**: the lobby host picks it, and every player needs the same
 copy. It ports johnie102's Zone Control for Forged Alliance (8P V2) to the
 converted [Zone Control for FAF 8P V2](https://github.com/Remmyboy/sanctuary-map-converter/releases/tag/map-zone-control-for-faf-8p-v2)
 map. It is Lua only, so its zip is just the `SanctuaryMods\ZoneControl` folder.
-It needs Mod Manager 0.7.0 or later, whose Mod API has kill credit.
+It needs Mod Manager 0.13.0 or later (Mod API 1.8.0, for its host helpers),
+for every player.
 
 - **No commanders, no building.** 53 zones on the diamond, each with a T2
   point defence. Every zone you hold sends you a unit every few seconds.
@@ -1601,8 +1602,8 @@ needs a Mod Manager with Mod API 1.7.0 or later, for every player.
 
 A **gameplay mod**: Supreme Commander's Phantom-X (faf-phantomx v268, by
 Novaprim3, Duck_42, mead, SpikeyNoob and Fichom), ported. It is Lua only, and
-its panel is drawn by the Mod API from Lua, so it needs Mod Manager 0.10.0 or
-later (Mod API 1.5.0), for every player.
+its panel is drawn by the Mod API from Lua, so it needs Mod Manager 0.13.0 or
+later (Mod API 1.8.0), for every player.
 
 - **Everyone starts allied**, whatever the lobby's teams, and nobody shares
   resources. A few minutes in (8 by default) some players secretly become

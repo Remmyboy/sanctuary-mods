@@ -26,7 +26,9 @@ namespace SanctuaryHud
     // the menu background, and closing it returns to whatever was showing.
     internal sealed partial class ModsPage
     {
-        private const string HarmonyId = "com.sanctuarydb.modmanager.page";
+        // Per load: UnpatchSelf on an old copy's id would otherwise strip the
+        // patch of the copy that replaced it.
+        private static readonly string HarmonyId = "com.sanctuarydb.modmanager.page." + Guid.NewGuid().ToString("N").Substring(0, 8);
         private static ModsPage _current;
 
         private readonly ModManagerPlugin _owner;
@@ -44,6 +46,9 @@ namespace SanctuaryHud
         private Transform _templates;
         private Transform _uiList, _gameList;
         private string _pluginSignature = "";
+        // The plugin list and catalog versions the UI tab's signature was
+        // last checked at: the signature string is only built after one moves.
+        private int _pluginsVersionSeen = -1, _catalogVersionSeen = -1;
         private bool _sidebarRegistered;
 
         // The InterfaceManager window that was up when the page opened
@@ -158,15 +163,21 @@ namespace SanctuaryHud
                 // active buttons, so it has to run once the menu is up.
                 var pb = _sidebarButton.GetComponent<PanelButton>();
                 ForceNormal(pb);
-                _sidebarButton.GetComponentInParent<PanelButtonDimmer>()?.FetchButtons();
+                var dimmer = _sidebarButton.GetComponentInParent<PanelButtonDimmer>();
+                if (dimmer != null) dimmer.FetchButtons();
                 _sidebarRegistered = true;
             }
 
             if (IsOpen)
             {
                 if (Input.GetKeyDown(KeyCode.Escape)) { Close(); return; }
-                if (PluginSignature() != _pluginSignature) RebuildUiTab();
-                if (GameplaySignature() != _gameplaySignature) RebuildGameplayTab();
+                if (_owner.PluginsVersion != _pluginsVersionSeen || Sanctuary.ModApi.ModCatalog.Version != _catalogVersionSeen)
+                {
+                    _pluginsVersionSeen = _owner.PluginsVersion;
+                    _catalogVersionSeen = Sanctuary.ModApi.ModCatalog.Version;
+                    if (PluginSignature() != _pluginSignature) RebuildUiTab();
+                }
+                if (GameplayChanged()) RebuildGameplayTab();
             }
 
             try { TickLobby(); }
@@ -209,6 +220,8 @@ namespace SanctuaryHud
             // hides the side bar and puts up the backdrop over the game.
             if (frontMenu) CurrentWindow(im) = InterfaceManager.Window.Background;
             else im.TransitionTo(InterfaceManager.Window.Background);
+            // The plugin list is only kept fresh while the page is up.
+            _owner.RefreshPluginsNow();
             RebuildUiTab();
             RebuildGameplayTab();
             pm.OpenPanel(PanelName);
@@ -231,13 +244,15 @@ namespace SanctuaryHud
             // menu on an empty screen.
             if (IsOpen) Close();
             DestroyLobbyPanel();
-            try { _harmony?.UnpatchSelf(); } catch { }
+            try { _harmony?.UnpatchSelf(); }
+            catch (Exception e) { _log.LogWarning($"Mods page: could not remove its patch: {e.Message}"); }
             _harmony = null;
             Unregister();
             if (_page != null) Object.Destroy(_page);
             if (_sidebarButton != null) Object.Destroy(_sidebarButton);
             if (_icon != null) { Object.Destroy(_icon.texture); Object.Destroy(_icon); }
             if (_cover != null) { Object.Destroy(_cover.texture); Object.Destroy(_cover); }
+            DestroySymbolArt();
             _page = null;
             _sidebarButton = null;
             _icon = null;
@@ -288,8 +303,9 @@ namespace SanctuaryHud
             // The Settings screen as the menu's PanelManager holds it: the
             // Animator it plays In/Out on, with SettingsInterface on it or
             // inside it.
-            var menu = InterfaceManager.Instance?.GetComponent<PanelManager>()
-                       ?? throw new InvalidOperationException("The menu's PanelManager was not found.");
+            var im = InterfaceManager.Instance;
+            var menu = im != null ? im.GetComponent<PanelManager>() : null;
+            if (menu == null) throw new InvalidOperationException("The menu's PanelManager was not found.");
             var settingsItem = menu.panels.Find(p => p.panelName == InterfaceManager.Window.Settings.ToString())
                                ?? throw new InvalidOperationException("The menu has no Settings panel.");
             var settings = settingsItem.panelObject.gameObject;
@@ -323,8 +339,8 @@ namespace SanctuaryHud
             // bar, and each one's full-screen backdrop would hide it.
             _page.transform.SetSiblingIndex(settings.transform.GetSiblingIndex() + 1);
             _page.name = "ModsInterface";
-            var settingsClone = _page.GetComponentInChildren<SanctuaryUI.SettingsInterface>(true)
-                                ?? throw new InvalidOperationException("The Settings panel has no SettingsInterface.");
+            var settingsClone = _page.GetComponentInChildren<SanctuaryUI.SettingsInterface>(true);
+            if (settingsClone == null) throw new InvalidOperationException("The Settings panel has no SettingsInterface.");
             var screen = settingsClone.transform;
             Object.DestroyImmediate(settingsClone);
 
@@ -421,8 +437,8 @@ namespace SanctuaryHud
             open.onClick.AddListener(_owner.OpenModsFolder);
 
             // -- the sidebar entry: a clone of the Settings button, right after it.
-            var settingsButton = bar.settingsButton?.transform
-                                 ?? throw new InvalidOperationException("The side bar has no Settings button.");
+            if (bar.settingsButton == null) throw new InvalidOperationException("The side bar has no Settings button.");
+            var settingsButton = bar.settingsButton.transform;
             _sidebarButton = Object.Instantiate(settingsButton.gameObject, settingsButton.parent);
             _sidebarButton.name = "Mods";
             _sidebarButton.transform.SetSiblingIndex(settingsButton.GetSiblingIndex() + 1);
@@ -442,12 +458,13 @@ namespace SanctuaryHud
             // With our side bar button as its button, the PanelManager lights
             // it (and moves the side bar's indicator line to it) while the
             // page is up, and puts it back when another screen opens.
+            var animator = _page.GetComponent<Animator>();
+            if (animator == null) throw new InvalidOperationException("The cloned Settings panel has no Animator.");
             menu.panels.Add(new PanelManager.PanelItem
             {
                 panelName = PanelName,
                 panelButton = pb,
-                panelObject = _page.GetComponent<Animator>()
-                              ?? throw new InvalidOperationException("The cloned Settings panel has no Animator."),
+                panelObject = animator,
             });
             _registeredIn = menu;
 
@@ -520,7 +537,8 @@ namespace SanctuaryHud
 
         private GameObject TakeTemplate(Transform list, string childName, string newName)
         {
-            var t = list.Find(childName) ?? throw new InvalidOperationException($"Settings row '{childName}' not found.");
+            var t = list.Find(childName);
+            if (t == null) throw new InvalidOperationException($"Settings row '{childName}' not found.");
             t.SetParent(_templates, false);
             t.name = newName;
             return t.gameObject;
@@ -574,7 +592,8 @@ namespace SanctuaryHud
             inputRect.sizeDelta = Vector2.zero;
             inputRect.anchoredPosition = Vector2.zero;
             input.SetAsLastSibling(); // above the static frame, not under it
-            var bg = input.Find("Background")?.GetComponent<Image>();
+            var bgT = input.Find("Background");
+            var bg = bgT != null ? bgT.GetComponent<Image>() : null;
             if (bg != null) bg.enabled = false; // the frame behind shows through
             var field = input.GetComponent<TMP_InputField>();
             field.contentType = TMP_InputField.ContentType.Standard;
@@ -720,6 +739,9 @@ namespace SanctuaryHud
             foreach (var deg in new[] { 30f, 150f, 270f }) segs.Add((c, V(deg)));
             var glowReach = r * 0.35f;
 
+            // Generated.Keep is the Mod API's own (internal): this project
+            // doesn't compile shared/. Both are destroyed in Destroy().
+#pragma warning disable SMOD003
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
                 name = name,
@@ -752,6 +774,7 @@ namespace SanctuaryHud
             var sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
             sprite.name = tex.name;
             sprite.hideFlags = HideFlags.HideAndDontSave;
+#pragma warning restore SMOD003
             return sprite;
         }
 
@@ -958,7 +981,8 @@ namespace SanctuaryHud
             slider.maxValue = max;
             slider.wholeNumbers = whole;
             slider.SetValueWithoutNotify(Mathf.Clamp(value, min, max));
-            var field = sliderT.Find("Text Input")?.GetComponent<TMP_InputField>();
+            var fieldT = sliderT.Find("Text Input");
+            var field = fieldT != null ? fieldT.GetComponent<TMP_InputField>() : null;
             string Show(float v) => whole ? Mathf.RoundToInt(v).ToString(System.Globalization.CultureInfo.InvariantCulture) : v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);   // as the box parses it
             if (field != null) field.SetTextWithoutNotify(Show(slider.value));
             sm.onValueChanged.AddListener(v =>
@@ -1211,7 +1235,7 @@ namespace SanctuaryHud
         {
             string version = null;
             try { version = p.Type != null ? BepInEx.MetadataHelper.GetMetadata(p.Type)?.Version?.ToString() : null; }
-            catch { }
+            catch { /* no readable [BepInPlugin]: the summary goes without a version */ }
             var m = p.Mod != null && !p.Mod.Manifest.Synthesised ? p.Mod.Manifest : null;
             return (m != null && m.Description.Length > 0 ? m.Description + "\n\n" : "") +
                    (version != null ? $"Version {version}" + (m != null && m.Author.Length > 0 ? $" by {m.Author}. " : ". ") : "") +
