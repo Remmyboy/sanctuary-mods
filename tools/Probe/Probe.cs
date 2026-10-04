@@ -37,6 +37,8 @@ public class Probe : BaseUnityPlugin
     private const string Help = @"verbs (one per line; # starts a comment):
   state                       window, Lua VM, replay, lobby
   plugins                     loaded plugins (stale hot-reload copies marked)
+  objects [Type...]           live Unity objects per type, Type=count (default Texture2D Sprite Font
+                              RenderTexture Material GameObject; other types by name or full name)
   lua <statements>            run in the client VM; prints whatever it returns
   eval <expr>                 lua 'return <expr>'
   luaf <file>                 lua from a file (absolute, or relative to the probe dir)
@@ -189,6 +191,7 @@ public class Probe : BaseUnityPlugin
             case "echo": Out(arg); break;
             case "state": Out(StateLine()); break;
             case "plugins": Plugins(); break;
+            case "objects": Objects(a); break;
 
             case "lua": Out(Lua(arg)); break;
             case "eval": Out(Lua("return " + arg)); break;
@@ -583,6 +586,22 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
                 var asm = p.GetType().Assembly.GetName();
                 Out($"  {g.Key}  {meta?.Name} {meta?.Version}  [{asm.Name} {asm.Version}]  enabled={p.enabled}" + (copies.Count > 1 ? "  (one of " + copies.Count + " copies)" : ""));
             }
+        }
+    }
+
+    // Live object counts, for hot-reload leak checks (probe.ps1 leakcheck):
+    // what a reload's OnDestroy fails to Destroy stays alive and counted.
+    private static readonly string[] LeakTypes = { "Texture2D", "Sprite", "Font", "RenderTexture", "Material", "GameObject" };
+
+    private void Objects(string[] names)
+    {
+        foreach (var name in names.Length > 0 ? names : LeakTypes)
+        {
+            var full = name.Contains(".") ? name : "UnityEngine." + name;
+            var t = AppDomain.CurrentDomain.GetAssemblies().Where(x => !x.IsDynamic)
+                .Select(x => { try { return x.GetType(full, false); } catch { return null; } })
+                .FirstOrDefault(x => x != null && typeof(UnityEngine.Object).IsAssignableFrom(x));
+            Out(t == null ? $"{name}=? (no such UnityEngine.Object type)" : $"{name}={Resources.FindObjectsOfTypeAll(t).Length}");
         }
     }
 

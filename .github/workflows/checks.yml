@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # The same compile the game's LuaJIT does (tools/lua-check.ps1 locally),
-      # over every .lua file and every Lua chunk held in a C# string.
+      # over every .lua file and every Lua chunk held in a C# string. Its lint
+      # warnings (globals, dropped pcall results) print but don't fail the job.
       - name: Install LuaJIT
         run: sudo apt-get update -q && sudo apt-get install -y -q libluajit-5.1-2
       - uses: actions/setup-dotnet@v4
