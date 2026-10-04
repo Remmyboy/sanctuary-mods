@@ -1,7 +1,4 @@
-using System;
 using BepInEx.Configuration;
-using UnityEngine;
-using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
@@ -18,9 +15,9 @@ namespace SanctuaryHud
     {
         internal static ConfigEntry<bool> Enabled;
 
-        private static bool _installed;
-        private static float _accum;
-        private static float _retryAt;
+        // In each match's VM while switched on; LuaHook puts it back in a new
+        // VM and takes it out when switched off or unloaded.
+        private static readonly LuaHook Hook = new LuaHook("__SdbSameType", "Ctrl-A select of the selected types", InstallChunk);
 
         internal static void Bind(ConfigFile config)
         {
@@ -30,52 +27,13 @@ namespace SanctuaryHud
                 "selected Ctrl-A keeps the game's own meaning (hold it to box-select only air units).");
         }
 
-        internal static void Shutdown() => Remove();
+        internal static void Shutdown() => Hook.Remove();
 
-        internal static void Tick()
-        {
-            _accum += Time.unscaledDeltaTime;
-            if (_accum < 1f) return;
-            _accum = 0f;
+        internal static void Tick() => Hook.Tick(Enabled != null && Enabled.Value);
 
-            EnsureLuaBridge();
-            if (!LuaReady)
-            {
-                _installed = false;
-                return;
-            }
-            var want = Enabled != null && Enabled.Value;
-            if (_installed)
-            {
-                if (!want) Remove();
-                // A new match's VM starts without it. (A number: the
-                // read-back bridge reads no booleans.)
-                else if (GetLuaGlobal("__SdbSameTypeVer") == null) _installed = false;
-                else return;
-            }
-            if (!want || Time.unscaledTime < _retryAt) return;
-            if (RunLua(InstallChunk))
-            {
-                _installed = true;
-                _log?.LogInfo("Ctrl-A selects all units of the selected types for this match.");
-            }
-            else _retryAt = Time.unscaledTime + 30f;
-        }
-
-        private static void Remove()
-        {
-            if (!_installed) return;
-            _installed = false;
-            try
-            {
-                if (LuaReady) RunLua("if __SdbSameType then __SdbSameType.Remove() end");
-            }
-            catch (Exception e)
-            {
-                _log?.LogWarning($"Ctrl-A select could not be removed: {e.Message}");
-            }
-        }
-
+        // Guarded, so a copy left in the VM by an earlier version of the mod
+        // (which has no hash marker) is kept rather than wrapped twice; its
+        // Remove takes it out the same way.
         private const string InstallChunk = @"
 if not __SdbSameType then
   local IS = Import('client/input/inputSystem.lua')
@@ -121,10 +79,8 @@ if not __SdbSameType then
   S.Remove = function()
     if S.entry.press == S.mine then S.entry.press = S.orig end
     __SdbSameType = nil
-    __SdbSameTypeVer = nil
   end
   __SdbSameType = S
-  __SdbSameTypeVer = 1
 end";
     }
 }

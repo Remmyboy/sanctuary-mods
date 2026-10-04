@@ -275,9 +275,10 @@ namespace SanctuaryHud
             {
                 _backdrop.texture = backdrop;
                 _backdrop.color = new Color(1f, 1f, 1f, opacity);
-                var r = MapSurface.BackdropRect(area);
-                _backdrop.rectTransform.anchoredPosition = new Vector2(r.x, -r.y);
-                _backdrop.rectTransform.sizeDelta = new Vector2(r.width, r.height);
+                // All of the map area: the panel is framed on the same
+                // playable area the preview was rendered of.
+                _backdrop.rectTransform.anchoredPosition = new Vector2(area.x, -area.y);
+                _backdrop.rectTransform.sizeDelta = new Vector2(area.width, area.height);
             }
 
             // Fog over the ground, under everything the player is being told
@@ -336,12 +337,30 @@ namespace SanctuaryHud
                 if (_spots[i].gameObject.activeSelf) _spots[i].gameObject.SetActive(false);
         }
 
+        // What the icons were last laid out from: the contacts change a few
+        // times a second, not every frame, so the frames between leave them.
+        private static List<Contacts.Contact> _drawnContacts;
+        private static Rect _drawnArea;
+        private static float _drawnSize;
+        private static Texture _drawnAtlas;
+        private static int _drawnUvs = -1;
+        private static int _drawnColours = -1;
+
         private static void SyncContacts(Rect area, float k)
         {
             var contacts = Contacts.Live;
             var count = contacts != null ? contacts.Count : 0;
             var size = _cfgIconSize.Value * k;
             var haveAtlas = _iconAtlas != null && _iconUvRects != null;
+            var uvs = _iconUvRects != null ? _iconUvRects.Count : -1;
+            if (ReferenceEquals(contacts, _drawnContacts) && area == _drawnArea && size == _drawnSize &&
+                _iconAtlas == _drawnAtlas && uvs == _drawnUvs && Contacts.ColoursVersion == _drawnColours) return;
+            _drawnContacts = contacts;
+            _drawnArea = area;
+            _drawnSize = size;
+            _drawnAtlas = _iconAtlas;
+            _drawnUvs = uvs;
+            _drawnColours = Contacts.ColoursVersion;
             for (var i = 0; i < count; i++)
             {
                 if (i >= _icons.Count) _icons.Add(Icon(_map));
@@ -378,6 +397,7 @@ namespace SanctuaryHud
             // The last match's images went with its scene.
             _icons.Clear();
             _spots.Clear();
+            _drawnContacts = null;
             _plateImage = HudCanvas.Fill(root, "Mini-map", HudStyle.PlateTint);
             _plateImage.raycastTarget = true;
             HudStyle.Dress(_plateImage);
@@ -532,13 +552,14 @@ namespace SanctuaryHud
         {
             FogOverlay.Release();
             MapSurface.Clear();
-            Contacts.Clear();
+            Contacts.Shutdown();
             if (_plate != null) UnityEngine.Object.Destroy(_plate.gameObject);
             if (_dragShield != null) UnityEngine.Object.Destroy(_dragShield.gameObject);
             _plate = null;
             _dragShield = null;
             _icons.Clear();
             _spots.Clear();
+            _drawnContacts = null;
         }
     }
 }

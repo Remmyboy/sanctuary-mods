@@ -1,7 +1,4 @@
-using System;
 using BepInEx.Configuration;
-using UnityEngine;
-using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
@@ -25,9 +22,9 @@ namespace SanctuaryHud
     {
         internal static ConfigEntry<bool> Enabled;
 
-        private static bool _installed;
-        private static float _accum;
-        private static float _retryAt;
+        // In each match's VM while switched on; LuaHook puts it back in a new
+        // VM and takes it out when switched off or unloaded.
+        private static readonly LuaHook Hook = new LuaHook("__SdbQueueClick", "factory queue right-click fix", InstallChunk);
 
         internal static void Bind(ConfigFile config)
         {
@@ -36,51 +33,13 @@ namespace SanctuaryHud
                 "item of that unit in the queue instead of the one clicked. With this on it removes from the one clicked.");
         }
 
-        internal static void Shutdown() => Remove();
+        internal static void Shutdown() => Hook.Remove();
 
-        internal static void Tick()
-        {
-            _accum += Time.unscaledDeltaTime;
-            if (_accum < 1f) return;
-            _accum = 0f;
+        internal static void Tick() => Hook.Tick(Enabled != null && Enabled.Value);
 
-            EnsureLuaBridge();
-            if (!LuaReady)
-            {
-                _installed = false;
-                return;
-            }
-            var want = Enabled != null && Enabled.Value;
-            if (_installed)
-            {
-                if (!want) Remove();
-                // A new match's VM starts without it.
-                else if (GetLuaGlobal("__SdbQueueClickVer") == null) _installed = false;
-                else return;
-            }
-            if (!want || Time.unscaledTime < _retryAt) return;
-            if (RunLua(InstallChunk))
-            {
-                _installed = true;
-                _log?.LogInfo("Factory queue right-clicks take from the item clicked for this match.");
-            }
-            else _retryAt = Time.unscaledTime + 30f;
-        }
-
-        private static void Remove()
-        {
-            if (!_installed) return;
-            _installed = false;
-            try
-            {
-                if (LuaReady) RunLua("if __SdbQueueClick then __SdbQueueClick.Remove() end");
-            }
-            catch (Exception e)
-            {
-                _log?.LogWarning($"Queue right-click fix could not be removed: {e.Message}");
-            }
-        }
-
+        // Guarded, so a copy left in the VM by an earlier version of the mod
+        // (which has no hash marker) is kept rather than wrapped twice; its
+        // Remove takes it out the same way.
         private const string InstallChunk = @"
 if not __SdbQueueClick then
   local P = Import('client/ui/constructionBuildQueuePanel.lua')
@@ -145,11 +104,9 @@ if not __SdbQueueClick then
   S.Remove = function()
     if P.UpdateQueueAmount == S.mine then P.UpdateQueueAmount = S.orig end
     __SdbQueueClick = nil
-    __SdbQueueClickVer = nil
     UI.SetUIDirty()
   end
   __SdbQueueClick = S
-  __SdbQueueClickVer = 1
   -- The queue's buttons hold the function they were made with: remake them.
   UI.SetUIDirty()
 end";

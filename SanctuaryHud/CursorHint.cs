@@ -46,9 +46,13 @@ namespace SanctuaryHud
         private static int _size;
         private static readonly Dictionary<string, Texture2D> _cursors = new Dictionary<string, Texture2D>();
         private static string _current;
-        private static float _installCheck;
-        private static bool _installed;
         private static bool _artFailed;
+        private static bool _readLogged;
+
+        private static readonly LuaHook Hook = new LuaHook("__SdbHint", "right-click cursor hint", InstallChunk)
+        {
+            LogInstalls = false,
+        };
 
         internal static void Bind(ConfigFile config)
         {
@@ -63,37 +67,38 @@ namespace SanctuaryHud
         {
             SetCursor(null);
             ClearCursors();
-            _installed = false;
+            Hook.Remove();
         }
 
         /// From Update, every frame.
         internal static void Tick()
         {
+            var enabled = Enabled != null && Enabled.Value;
+            // A new match's VM starts without it; switched off, it comes out.
+            Hook.Tick(enabled);
             // The pause menu and the Mods page keep the normal cursor.
-            var want = Enabled != null && Enabled.Value && InMatch && LuaReady && !_artFailed && !GamePanel.GameMenuOpen();
+            var want = enabled && InMatch && LuaReady && !_artFailed && !GamePanel.GameMenuOpen();
             string hint = null;
             if (want)
             {
                 try { hint = Read(); }
-                catch { hint = null; }
+                catch (Exception e)
+                {
+                    hint = null;
+                    if (!_readLogged)
+                    {
+                        _readLogged = true;
+                        _log?.LogWarning($"Right-click cursor: reading the hint failed (logged once): {e.Message}");
+                    }
+                }
             }
             SetCursor(hint);
         }
 
         private static string Read()
         {
-            _installCheck -= Time.unscaledDeltaTime;
-            if (!_installed || _installCheck <= 0f)
-            {
-                _installCheck = 1f;
-                // A new match's VM starts without it. (A number: the read-back
-                // bridge reads no booleans.)
-                if (GetLuaGlobal("__SdbHintVer") != "2") _installed = RunLua(InstallChunk);
-                else _installed = true;
-            }
-            if (!_installed) return null;
-            if (!RunLua("local ok, r = pcall(__SdbHintFn) __SdbHint = ok and r or ''")) return null;
-            var hint = GetLuaGlobal("__SdbHint");
+            if (!Hook.Call("__SdbHint.Poll()")) return null;
+            var hint = GetLuaGlobal("__SdbHintOut");
             return string.IsNullOrEmpty(hint) ? null : hint;
         }
 
@@ -150,8 +155,8 @@ namespace SanctuaryHud
             return made;
         }
 
-        /// Decodes an embedded PNG. ImageConversion is looked up rather than
-        /// referenced, as the other optional Unity modules are here.
+        /// Decodes an embedded PNG into a texture the caller destroys once
+        /// it has been scaled.
         private static Texture2D Load(string file)
         {
             byte[] bytes;
@@ -167,11 +172,8 @@ namespace SanctuaryHud
                     read += n;
                 }
             }
-            var load = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")
-                ?.GetMethod("LoadImage", new[] { typeof(Texture2D), typeof(byte[]) });
-            if (load == null) throw new MissingMethodException("ImageConversion.LoadImage not found");
-            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
-            if (!(bool)load.Invoke(null, new object[] { texture, bytes }))
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = "cursor " + file };
+            if (!Generated.LoadImage(texture, bytes))
             {
                 UnityEngine.Object.Destroy(texture);
                 throw new InvalidOperationException($"cursor '{file}' did not decode");
@@ -207,12 +209,11 @@ namespace SanctuaryHud
                 }
                 dst[y * size + x] = a > 0f ? new Color(r / a, g / a, b / a, a / weight) : Color.clear;
             }
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            var texture = Generated.Keep(new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
-                hideFlags = HideFlags.HideAndDontSave,
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
-            };
+            });
             texture.SetPixels(dst);
             texture.Apply(false, false);
             return texture;
@@ -275,12 +276,18 @@ local function decide()
 end
 -- Over the map the cursor is always one of ours: the plain arrow where a
 -- right-click would do nothing. Off it (the UI, the menus) it is left alone.
-__SdbHintFn = function()
+local function hint()
   if not MC.IsCursorInGameView() or Engine.IsMouseOverUI() then return '' end
-  local hint = decide()
-  if hint == '' then return 'pointer' end
-  return hint
+  local h = decide()
+  if h == '' then return 'pointer' end
+  return h
 end
-__SdbHintVer = 2";
+-- Called every frame; the answer is left in a global for the plugin to read.
+__SdbHint = {
+  Poll = function()
+    local ok, r = pcall(hint)
+    __SdbHintOut = ok and r or ''
+  end,
+}";
     }
 }

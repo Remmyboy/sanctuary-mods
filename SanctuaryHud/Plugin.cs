@@ -61,13 +61,16 @@ namespace SanctuaryHud
         private void Awake()
         {
             _log ??= Logger;
+            // OnGUI only draws labels, with GUI rather than GUILayout, so
+            // the layout pass Unity would run before every event is skipped.
+            useGUILayout = false;
 
             // The Mods page lists sections in the order they are bound, and the
             // entries within each as bound, so this order is the page's:
             // the HUD as a whole, then its pieces top to bottom of the
             // screen, then what it draws over the map, the alerts, and the
-            // QoL extras last. Keys renamed since 0.13.1 are carried over by
-            // MigrateRenamedSettings at the end.
+            // QoL extras last. Keys renamed since 0.13.1 are carried over
+            // (RenamedSettings) at the end.
 
             _cfgVisible = Config.Bind("Overlay", "Visible", true,
                 "Show the HUD. The toggle key flips this during a match; everything here then gives the game its own panels back.");
@@ -110,7 +113,8 @@ namespace SanctuaryHud
             _cfgReclaimMinValue = Config.Bind("MapLabels", "ReclaimMinValue", 5f,
                 "Leave out reclaim values below this many alloys (energy counts a tenth).");
             _cfgReclaimCluster = Config.Bind("MapLabels", "ReclaimClusterPixels", 110f,
-                "How close two reclaim values can sit on screen before they are summed into one figure, in pixels at 1080p. Smaller = more, finer numbers.");
+                new ConfigDescription("How close two reclaim values can sit on screen before they are summed into one figure, in pixels at 1080p. Smaller = more, finer numbers.",
+                    new AcceptableValueRange<float>(24f, 400f)));
             _cfgBuildEta = Config.Bind("MapLabels", "BuildCountdowns", true,
                 "Show a time-to-finish under each of your structures under construction (upgrades included): normal while it builds, " +
                 "dark orange while your economy is stalling, red once nothing is building it. A paused upgrade that nothing is building is left out.");
@@ -161,6 +165,19 @@ namespace SanctuaryHud
                 _cfgCompleteRules[role + ".upgrade"] = Config.Bind(StructureAlerts, label + "Upgraded", upgradeDefault, $"A {label.ToLowerInvariant()} finishes upgrading to its next tier.");
             }
             foreach (var (role, label, newDefault, upgradeDefault) in CompleteRules) Rule(role, label, newDefault, upgradeDefault);
+            Alerts.UseSettings(new Alerts.Settings
+            {
+                Attacked = _cfgAlertAttacked,
+                Critical = _cfgAlertCritical,
+                CriticalAt = _cfgAlertCriticalAt,
+                BuildComplete = _cfgAlertBuildComplete,
+                AnyTier4 = _cfgCompleteTier4,
+                CompleteRules = _cfgCompleteRules,
+                Sound = _cfgAlertSound,
+                Volume = _cfgAlertVolume,
+                VoicePack = _cfgVoicePack,
+                Disconnect = _cfgAlertDisconnect,
+            });
 
             MatchStats.Bind(Config);
             QueueRightClick.Bind(Config);
@@ -173,7 +190,10 @@ namespace SanctuaryHud
             QueueReorder.Bind(Config);
             GameClock.Bind(Config);
 
-            MigrateRenamedSettings();
+            // Every Bind has run by now, and the file is this mod's alone, so
+            // whatever is still unclaimed is a setting no version reads any
+            // more: it goes rather than sit in the file forever.
+            ConfigMigrate.MoveAll(Config, RenamedSettings(), _log, dropUnclaimed: true);
 
             _visible = _cfgVisible.Value;
 
@@ -209,7 +229,7 @@ namespace SanctuaryHud
                 _log.LogWarning($"Panel stand-ins unavailable (hook failed): {e.Message}");
                 PanelConceal.Unavailable = true;
             }
-            _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log.");
+            _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log (at Debug level).");
         }
 
         private const string StructureAlerts = "StructureAlerts";
@@ -264,52 +284,6 @@ namespace SanctuaryHud
             yield return ("QoL", "ShowClock", "QoL", "ShowMatchClock");
         }
 
-        /// Carries a renamed setting's saved value over to its new name. A
-        /// line in the .cfg that no Bind claims stays in the file as an
-        /// orphan (ConfigFile.OrphanedEntries, private), so the old value is
-        /// still there to read; it moves to the new entry and the old line
-        /// goes, so it only ever happens once. Called after every Bind.
-        private void MigrateRenamedSettings()
-        {
-            try
-            {
-                var orphans = AccessTools.Property(typeof(ConfigFile), "OrphanedEntries")?.GetValue(Config)
-                    as Dictionary<ConfigDefinition, string>;
-                if (orphans == null || orphans.Count == 0) return;
-                var moved = 0;
-                var save = Config.SaveOnConfigSet;
-                Config.SaveOnConfigSet = false;
-                try
-                {
-                    foreach (var (oldSection, oldKey, newSection, newKey) in RenamedSettings())
-                    {
-                        var old = new ConfigDefinition(oldSection, oldKey);
-                        if (!orphans.TryGetValue(old, out var text)) continue;
-                        orphans.Remove(old);
-                        var entry = Config[new ConfigDefinition(newSection, newKey)];
-                        entry.SetSerializedValue(text);
-                        moved++;
-                    }
-                }
-                finally
-                {
-                    Config.SaveOnConfigSet = save;
-                }
-                // Whatever is still unclaimed is a setting no version reads
-                // any more (every Bind has run by now, and the file is this
-                // mod's alone), so it goes rather than sit in the file forever.
-                var dropped = orphans.Count;
-                orphans.Clear();
-                Config.Save();
-                if (moved > 0) _log.LogInfo($"Settings: carried {moved} value(s) over to their renamed settings.");
-                if (dropped > 0) _log.LogInfo($"Settings: dropped {dropped} line(s) left over from settings that no longer exist.");
-            }
-            catch (Exception e)
-            {
-                _log.LogWarning($"Settings: renamed settings could not be carried over, so they are at their defaults ({e.Message}).");
-            }
-        }
-
         // Hot reload (or the mod manager) destroys and recreates the plugin;
         // drop our patches so the reloaded copy doesn't stack a second postfix,
         // and give the game its readouts back.
@@ -329,6 +303,7 @@ namespace SanctuaryHud
                 BuildStrip.Shutdown();
                 BottomDock.Shutdown();
                 EcoStrip.Shutdown();
+                WorldOverlays.Shutdown();
                 Waypoints.Shutdown();
                 CursorHint.Shutdown();
                 SelectSameType.Shutdown();
@@ -366,9 +341,10 @@ namespace SanctuaryHud
             _meterNext = Time.realtimeSinceStartup + 10f;
             if (_meterFrames > 0 && InMatch)
             {
-                _log.LogInfo($"HUD cost: update {_swUpdate.Elapsed.TotalMilliseconds / _meterFrames:0.00} ms/frame, " +
-                             $"gui {_swGui.Elapsed.TotalMilliseconds / _meterFrames:0.00} ms/frame over {_meterFrames} frames " +
-                             $"({_meterFrames / 10f:0} fps).");
+                var update = _swUpdate.Elapsed.TotalMilliseconds / _meterFrames;
+                var gui = _swGui.Elapsed.TotalMilliseconds / _meterFrames;
+                _log.LogInfo(FormattableString.Invariant(
+                    $"HUD cost: update {update:0.00} ms/frame, gui {gui:0.00} ms/frame over {_meterFrames} frames ({_meterFrames / 10f:0} fps)."));
             }
             _swUpdate.Reset();
             _swGui.Reset();
@@ -394,24 +370,14 @@ namespace SanctuaryHud
             SharedTick();
             StepSmoothing();
 
-            // Config is read every frame so the Mod Manager's settings page
-            // takes effect at once; the entries are cheap to read.
+            // Config is read where it is used (Alerts reads its entries
+            // itself), so the Mod Manager's settings page takes effect at once.
             // Reclaim is only scanned while its labels can show: with a hold
             // key, while it is held (scanning every rock on the map once a
             // second for labels nobody sees was most of the overlay's cost).
             var reclaimKey = _cfgReclaimHoldKey.Value;
             WorldOverlays.ReclaimEnabled = _cfgReclaim.Value && (reclaimKey == KeyCode.None || Input.GetKey(reclaimKey));
             WorldOverlays.BuildEtaEnabled = _cfgBuildEta.Value || _cfgAlertBuildComplete.Value;
-            Alerts.AttackedEnabled = _cfgAlertAttacked.Value;
-            Alerts.CriticalEnabled = _cfgAlertCritical.Value;
-            Alerts.CriticalFraction = Mathf.Clamp(_cfgAlertCriticalAt.Value, 0.05f, 0.9f);
-            Alerts.BuildCompleteEnabled = _cfgAlertBuildComplete.Value;
-            Alerts.CompleteAnyTier4 = _cfgCompleteTier4.Value;
-            foreach (var kv in _cfgCompleteRules) Alerts.CompleteRules[kv.Key] = kv.Value.Value;
-            Alerts.SoundEnabled = _cfgAlertSound.Value;
-            Alerts.Volume = _cfgAlertVolume.Value / 100f;
-            Alerts.VoicePack = _cfgVoicePack.Value;
-            Alerts.DisconnectEnabled = _cfgAlertDisconnect.Value;
             WorldOverlays.Tick();
             Alerts.Tick();
             // Controls, not display: on whether the overlay is showing or not.
@@ -493,6 +459,29 @@ namespace SanctuaryHud
         /// the edge off bursty reclaim, not to trail the game's numbers.
         private const float SmoothTau = 0.25f;
 
+        /// One resource's names in the economy stream, made once rather than
+        /// put together on every read.
+        internal sealed class EcoKeys
+        {
+            internal readonly string Resource, Current, Limit, Income, Wanted, Spent;
+
+            private EcoKeys(string resource)
+            {
+                Resource = resource;
+                Current = resource + "StorageCurrent";
+                Limit = resource + "StorageLimit";
+                Income = resource + "GeneratedIncome";
+                Wanted = resource + "RequestedTotal";
+                Spent = resource + "RequestedStalled";
+            }
+
+            internal static readonly EcoKeys Alloy = new EcoKeys("alloy");
+            internal static readonly EcoKeys Energy = new EcoKeys("energy");
+            internal static readonly EcoKeys[] Both = { Alloy, Energy };
+        }
+
+        internal static float Value(Dictionary<string, float> eco, string name) => eco.TryGetValue(name, out var v) ? v : 0f;
+
         private static void StepSmoothing()
         {
             Dictionary<string, float> eco;
@@ -514,9 +503,9 @@ namespace SanctuaryHud
             var dt = Mathf.Clamp(Time.unscaledDeltaTime, 0f, 1f);
             var alpha = first ? 1f : 1f - Mathf.Exp(-dt / SmoothTau);
 
-            foreach (var key in new[] { "alloy", "energy" })
+            foreach (var names in EcoKeys.Both)
             {
-                float V(string name) => eco.TryGetValue(key + name, out var v) ? v : 0f;
+                var key = names.Resource;
                 // GeneratedIncome already includes harvest: economy.lua sets
                 // res.income = generation + harvest, and that is what Lua ships
                 // as GeneratedIncome. Adding HarvestIncome on top would
@@ -524,12 +513,12 @@ namespace SanctuaryHud
                 // economyPanel.lua assigns alloyHarvestIncome twice in one
                 // table constructor (real value, then 0 beside a TODO), so the
                 // zero wins and it always arrives empty.
-                var income = V("GeneratedIncome");
+                var income = Value(eco, names.Income);
                 // Lua sends these negated (economyPanel.lua): RequestedTotal is
                 // "how much we wanted to spend", RequestedStalled "how much we
                 // actually spent".
-                var demand = -V("RequestedTotal");
-                var spend = -V("RequestedStalled");
+                var demand = -Value(eco, names.Wanted);
+                var spend = -Value(eco, names.Spent);
 
                 if (!_smooth.TryGetValue(key, out var s)) _smooth[key] = s = new float[3];
                 s[0] += (income - s[0]) * alpha;
@@ -589,13 +578,10 @@ namespace SanctuaryHud
         private static float SliderScale => _cfgScale != null ? Mathf.Clamp(_cfgScale.Value, 0.6f, 1.5f) : 1f;
         internal static float HudScale => SliderScale * 1.2f;
 
-        // The game's UI palette (Beam UI, as the front menu uses it): near-
-        // black blue panels with a hairline of accent blue.
-        internal static Color GamePanelColour => PanelColour;
-        internal static Color GameAccent => AccentColour;
         internal static readonly Color MutedText = new Color(0.62f, 0.70f, 0.80f, 0.75f);
 
-        private static bool _gameStyleReady;
+        private static bool _fontApplied;
+        private static Component _tintsFrom;
         private static Color _alloyTint = AlloyColour;
         private static Color _energyTint = EnergyColour;
 
@@ -604,19 +590,25 @@ namespace SanctuaryHud
         internal static Color AlloyTint => _alloyTint;
         internal static Color EnergyTint => _energyTint;
 
-        /// Once, in a match: put the game's typeface on the map labels and
+        /// In a match: put the game's typeface on the map labels (once) and
         /// take its resource tints off the game's own panel, so the two read
-        /// as one UI. Falls back to the built-in styles piece by piece.
+        /// as one UI. Falls back to the built-in styles piece by piece. The
+        /// tints are read again for each new panel, so a first look before
+        /// the panel existed is not the last word.
         private void EnsureGameStyle()
         {
-            if (_gameStyleReady) return;
-            _gameStyleReady = true;
+            if (!_fontApplied)
+            {
+                _fontApplied = true;
+                WorldOverlays.ApplyFont(GamePanel.ResolveFont(_log));
+            }
 
-            WorldOverlays.ApplyFont(GamePanel.ResolveFont(_log));
-
+            var panel = _ecoPanel;
+            if (panel == null || panel == _tintsFrom) return;
+            _tintsFrom = panel;
             var alloy = AlloyColour;
             var energy = EnergyColour;
-            GamePanel.SampleColours(_ecoPanel, ref alloy, ref energy);
+            GamePanel.SampleColours(panel, ref alloy, ref energy);
             _alloyTint = alloy;
             _energyTint = energy;
         }
@@ -627,10 +619,11 @@ namespace SanctuaryHud
         internal static string Fmt(float v)
         {
             var a = Mathf.Round(Mathf.Abs(v));
-            if (a > 999_999_999f) return (a / 1_000_000_000f).ToString("0.###") + "B";
-            if (a > 999_999f) return (a / 1_000_000f).ToString("0.##") + "M";
-            if (a > 999f) return (a / 1_000f).ToString("0.#") + "K";
-            return a.ToString("0");
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            if (a > 999_999_999f) return (a / 1_000_000_000f).ToString("0.###", inv) + "B";
+            if (a > 999_999f) return (a / 1_000_000f).ToString("0.##", inv) + "M";
+            if (a > 999f) return (a / 1_000f).ToString("0.#", inv) + "K";
+            return a.ToString("0", inv);
         }
 
         /// The host's economy ticks ten times a second; the stream's rates are
@@ -647,11 +640,8 @@ namespace SanctuaryHud
         internal static bool IsStalling(float stored, float income, float wanted, float spent) =>
             wanted - spent > 0.5f && stored * TicksPerSecond + income < wanted - 0.5f;
 
-        private static bool IsStalling(Dictionary<string, float> eco, string key)
-        {
-            float V(string name) => eco.TryGetValue(key + name, out var v) ? v : 0f;
-            return IsStalling(V("StorageCurrent"), V("GeneratedIncome"), -V("RequestedTotal"), -V("RequestedStalled"));
-        }
+        private static bool IsStalling(Dictionary<string, float> eco, EcoKeys k) =>
+            IsStalling(Value(eco, k.Current), Value(eco, k.Income), -Value(eco, k.Wanted), -Value(eco, k.Spent));
 
         /// Whether alloy or energy is stalling on the latest update, for the
         /// build countdowns: construction draws on both, so a stall in either
@@ -660,7 +650,7 @@ namespace SanctuaryHud
         {
             Dictionary<string, float> eco;
             lock (_ecoLock) eco = _eco;
-            return eco != null && (IsStalling(eco, "alloy") || IsStalling(eco, "energy"));
+            return eco != null && (IsStalling(eco, EcoKeys.Alloy) || IsStalling(eco, EcoKeys.Energy));
         }
 
         internal static Color FillColour(Color baseColour, float stored, float net, bool stalling)
@@ -679,21 +669,24 @@ namespace SanctuaryHud
         }
 
         // ---- diagnostics (F9) ---------------------------------------------
+        //
+        // At Debug level: up to 6000 lines a press, which only someone who
+        // has turned BepInEx's console or disk logging up to Debug wants.
 
         private static void DumpHierarchy()
         {
-            _log.LogInfo("=== UI hierarchy dump ===");
+            _log.LogDebug("=== UI hierarchy dump ===");
             var lines = 0;
             for (var s = 0; s < SceneManager.sceneCount; s++)
             {
                 var scene = SceneManager.GetSceneAt(s);
-                _log.LogInfo($"--- scene '{scene.name}' ---");
+                _log.LogDebug($"--- scene '{scene.name}' ---");
                 foreach (var root in scene.GetRootGameObjects())
                 {
                     DumpNode(root.transform, 0, ref lines);
                 }
             }
-            _log.LogInfo($"=== dump complete ({lines} nodes) ===");
+            _log.LogDebug($"=== dump complete ({lines} nodes) ===");
         }
 
         private static void DumpNode(Transform node, int depth, ref int lines)
@@ -703,14 +696,14 @@ namespace SanctuaryHud
             var rectInfo = "";
             if (node is RectTransform rect)
             {
-                rectInfo = $" [rect {rect.rect.width:F0}x{rect.rect.height:F0} @ {rect.anchoredPosition.x:F0},{rect.anchoredPosition.y:F0}]";
+                rectInfo = FormattableString.Invariant($" [rect {rect.rect.width:F0}x{rect.rect.height:F0} @ {rect.anchoredPosition.x:F0},{rect.anchoredPosition.y:F0}]");
             }
             var components = string.Join(",", node.GetComponents<Component>()
                 .Where(c => c != null)
                 .Select(c => c.GetType().Name)
                 .Where(n => n != "Transform" && n != "RectTransform" && n != "CanvasRenderer"));
 
-            _log.LogInfo($"{new string(' ', depth * 2)}{node.name}{(node.gameObject.activeInHierarchy ? "" : " (inactive)")}{rectInfo}{(components.Length > 0 ? " {" + components + "}" : "")}");
+            _log.LogDebug($"{new string(' ', depth * 2)}{node.name}{(node.gameObject.activeInHierarchy ? "" : " (inactive)")}{rectInfo}{(components.Length > 0 ? " {" + components + "}" : "")}");
             lines++;
 
             for (var i = 0; i < node.childCount; i++)
