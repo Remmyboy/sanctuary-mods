@@ -758,10 +758,15 @@ namespace SanctuaryHud
         /// that to luaL_dostring dereferences null inside LuaJIT - a native
         /// access violation that no managed try/catch can stop, so the process
         /// dies. Everything that reaches into Lua has to check this first.
+        ///
+        /// Resolves the bridge itself if nothing has yet: a mod that skips
+        /// the unit scan (LadderReporter) used to be left with no bridge, so
+        /// this read false all match and its result hook never went in.
         internal static bool LuaReady
         {
             get
             {
+                if (_lua == null) EnsureLuaBridge();
                 try { return _lua != null && _lua.Ready(); }
                 catch { return false; }
             }
