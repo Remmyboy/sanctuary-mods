@@ -83,6 +83,14 @@ Mods page before a dump showed the sibling order.
 visible), `call <Type.Member> [args]` (statics; the newest hot-reload copy of
 the type), `plugins` (stale copies show as "one of N copies").
 
+**Hot-reload leaks**: `objects [Type...]` counts live Unity objects
+(Texture2D, Sprite, Font, RenderTexture, Material, GameObject by default).
+`probe.ps1 leakcheck <Mod> -Force` counts, touches the deployed
+`SanctuaryMods\...\<Mod>.dll` (the loader reloads on a file-time change, no
+rebuild), waits for its `Hot-loaded` line, waits `-Settle` s, counts again and
+prints the delta. It reloads the mod in the user's game: ask first. Untested
+in game as of 2026-10-04.
+
 **Screenshots**: `shot name` -> `%LOCALAPPDATA%\SanctuaryProbe\shots\name.png`;
 read it with Read. Small details: `pwsh tools/crop.ps1 <png> x y w h -Scale 3`.
 A shot in the same frame as an opening animation catches it half drawn: `wait 1`.

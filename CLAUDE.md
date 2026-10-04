@@ -17,7 +17,7 @@ spell out what each client receives, fog/focus calls or host trust gaps.
 | Drive the running game: Lua, screenshots, UI tree, replays, skirmish vs AI | `pwsh tools/probe.ps1` - see the **in-game-test** skill |
 | Read the game's C# and Lua for the installed build | `pwsh tools/game-ref.ps1 path`, then Grep `cs\Trebuchet`, `lua\`, `api.txt` |
 | After a game patch: what moved, and which mod names broke | `pwsh tools/game-ref.ps1 snapshot`, `diff`, `check` - the **game-patch** skill |
-| Syntax-check every Lua chunk (files and C# strings) with the game's LuaJIT | `pwsh tools/lua-check.ps1 [paths]` |
+| Syntax-check every Lua chunk (files and C# strings) with the game's LuaJIT, plus warnings for stray globals and dropped pcall results | `pwsh tools/lua-check.ps1 [-Strict] [paths]` |
 | Validate every mod.json against docs/mod.schema.json | `python tools/check-manifests.py` (needs `pip install jsonschema`) |
 | What the game and mods logged, minus noise; wait for a log line | `pwsh tools/gamelog.ps1 [-Mod X] [-Previous] [-Wait regex]` |
 | The user's past game sessions (both logs, kept by tools/LogKeeper) | `pwsh tools/gamelog.ps1 -Sessions`, then `-Session <n>` |
