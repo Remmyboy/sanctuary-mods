@@ -66,6 +66,7 @@ namespace SanctuaryHud
         // The match being acted on.
         private enum Phase { Idle, Leaving, HostCreating, HostWaiting, JoinerWaiting, JoinerJoining, JoinerInLobby, Started }
         private Phase _phase = Phase.Idle;
+        private string _phaseName = nameof(Phase.Idle);   // _phase as /status shows it, kept by SetPhase
         private MmMatch _match;
         private float _phaseSince;
         private float _launchSince;
@@ -76,7 +77,6 @@ namespace SanctuaryHud
         private string _mmReportMatchId;       // attached to the result report
 
         // Overlay.
-        private string _overlayTitle;
         private string _overlayText;
         private float _overlayUntil;
 
@@ -214,6 +214,9 @@ namespace SanctuaryHud
                 "For testing without the site: a JSON file holding the match object. Read every few seconds " +
                 "in place of what the page would push; session and event posts are logged, not sent.");
             AwakeBridge();
+            // The file as Bind just read (and maybe wrote) it.
+            try { _cfgStamp = File.GetLastWriteTimeUtc(Config.ConfigFilePath); }
+            catch (Exception e) { Logger.LogWarning($"Matchmaking: config file unreadable: {e.Message}"); }
 
             // The game already runs in the background (checked on the playtest
             // build), so a minimised window keeps polling; assert it anyway
@@ -277,12 +280,13 @@ namespace SanctuaryHud
             var dt = Time.unscaledDeltaTime;
 
             // Re-read the config file so a tester without the F8 window can
-            // set MockFile (or flip Enabled) by editing it, no restart.
+            // set MockFile (or flip Enabled) by editing it, no restart. Only
+            // when the file has been written since the last look.
             _cfgReloadAccum += dt;
             if (_cfgReloadAccum >= 15f)
             {
                 _cfgReloadAccum = 0f;
-                try { Config.Reload(); } catch { }
+                ReloadConfigIfEdited();
             }
 
             // The listener starts and stops with the Enabled flag, so this
@@ -332,6 +336,27 @@ namespace SanctuaryHud
                         Abort("Something went wrong on this side: " + e.Message, "exception: " + e.Message);
                     }
                 }
+            }
+        }
+
+        private DateTime _cfgStamp;
+        private string _cfgReloadError;
+
+        private void ReloadConfigIfEdited()
+        {
+            try
+            {
+                var stamp = File.GetLastWriteTimeUtc(Config.ConfigFilePath);
+                if (stamp == _cfgStamp) return;
+                _cfgStamp = stamp;
+                Config.Reload();
+                _cfgReloadError = null;
+            }
+            catch (Exception e)
+            {
+                if (e.Message == _cfgReloadError) return;
+                _cfgReloadError = e.Message;
+                Logger.LogWarning($"Matchmaking: couldn't re-read the config file: {e.Message}");
             }
         }
 
@@ -463,6 +488,7 @@ namespace SanctuaryHud
             var body = new JObject { ["ticket"] = ticket, ["identity"] = TicketIdentity };
             var req = Post("/api/mm/session", body, null);
             yield return req.SendWebRequest();
+            _inFlight.Remove(req);
             _mmSessionInFlight = false;
             if (req.result == UnityWebRequest.Result.Success)
             {
@@ -509,7 +535,27 @@ namespace SanctuaryHud
                 timeout = 15,
             };
             if (token != null) req.SetRequestHeader("Authorization", "Bearer " + token);
+            _inFlight.Add(req);
             return req;
+        }
+
+        // Requests a coroutine is waiting on. A coroutine stops dead when the
+        // plugin goes (no finally, no using), so OnDestroy aborts and frees
+        // whatever is still out rather than leaving it to finish unowned.
+        private readonly List<UnityWebRequest> _inFlight = new List<UnityWebRequest>();
+
+        private void AbortRequests()
+        {
+            foreach (var req in _inFlight)
+            {
+                try
+                {
+                    req.Abort();
+                    req.Dispose();
+                }
+                catch (Exception e) { Logger.LogWarning($"Ladder reporter: a request could not be stopped: {e.Message}"); }
+            }
+            _inFlight.Clear();
         }
 
         // Don't repeat the same failure while the site is down.
@@ -536,10 +582,12 @@ namespace SanctuaryHud
             // ticket and the session exchange a moment rather than dropping
             // the post.
             var waitUntil = Time.realtimeSinceStartup + 15f;
+            // One per coroutine, reused: it resets itself each time it ends.
+            var halfSecond = new WaitForSecondsRealtime(0.5f);
             while (_mmToken == null && Time.realtimeSinceStartup < waitUntil)
             {
                 if (UsingSteam) EnsureSession();
-                yield return new WaitForSecondsRealtime(0.5f);
+                yield return halfSecond;
             }
             if (_mmToken == null)
             {
@@ -548,6 +596,7 @@ namespace SanctuaryHud
             }
             var req = Post(path, body, _mmToken);
             yield return req.SendWebRequest();
+            _inFlight.Remove(req);
             if ((int)req.responseCode == 401) _mmToken = null;   // expired; the next post signs in again
             if (req.result != UnityWebRequest.Result.Success) LogHttp(what, req);
             req.Dispose();
@@ -596,9 +645,15 @@ namespace SanctuaryHud
             var isHost = m.Host == me;
             var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
 
+            // A push about some other match (a stale one, arriving late) must
+            // not replace or end the one being launched: mid-launch, a
+            // swapped-in match would hand KickStrangers a different joiner.
+            var current = _match == null || _match.Id == m.Id;
+
             switch (m.Status)
             {
                 case "countdown":
+                    if (!current && _phase != Phase.Idle) break;
                     _match = m;
                     if (isNew)
                     {
@@ -652,11 +707,13 @@ namespace SanctuaryHud
                         Overlay(m.Status == "cancelled" ? "MATCH CANCELLED" : "LAUNCH FAILED",
                             string.IsNullOrEmpty(m.Reason) ? "" : m.Reason, 20f);
                     }
+                    if (!current) break;
                     if (_phase == Phase.Idle) ForgetReplayQuit();
                     _match = null;
                     break;
 
                 case "done":
+                    if (!current) break;
                     if (_phase == Phase.Idle) ForgetReplayQuit();
                     _match = null;
                     break;
@@ -713,7 +770,7 @@ namespace SanctuaryHud
                 try
                 {
                     LobbyManager.LeaveLobby();
-                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Home);
+                    GoHome();
                 }
                 catch (Exception e)
                 {
@@ -783,7 +840,8 @@ namespace SanctuaryHud
             if (MockMode)
             {
                 // Testing without the site: the joiner needs this number.
-                try { GUIUtility.systemCopyBuffer = sessionId.ToString(); } catch { }
+                try { GUIUtility.systemCopyBuffer = sessionId.ToString(); }
+                catch { /* no clipboard: the overlay shows the number anyway */ }
                 Overlay("LAUNCHING (MOCK)", $"Lobby up. Session ID {sessionId} (copied to the clipboard). " +
                     $"Waiting for {_match.OpponentName ?? "your opponent"} to join...", 300f);
             }
@@ -815,8 +873,10 @@ namespace SanctuaryHud
                 Logger.LogWarning($"Matchmaking: UI move via CreateLobby failed ({e.Message}); using the public route.");
             }
             ui.TransitionTo(InterfaceManager.Window.Lobby);
-            LobbyInterface.Instance?.Clear();
-            LobbyInterface.Instance?.UpdateData(state);
+            var lobbyUi = LobbyInterface.Instance;
+            if (lobbyUi == null) return;
+            lobbyUi.Clear();
+            lobbyUi.UpdateData(state);
         }
 
         private void TryJoin(ulong sessionId)
@@ -1022,6 +1082,7 @@ namespace SanctuaryHud
 
         private void SetPhase(Phase phase)
         {
+            if (phase != _phase) _phaseName = phase.ToString();
             _phase = phase;
             _phaseSince = Time.realtimeSinceStartup;
         }
@@ -1037,7 +1098,7 @@ namespace SanctuaryHud
                 try
                 {
                     LobbyManager.LeaveLobby();
-                    InterfaceManager.Instance?.TransitionTo(InterfaceManager.Window.Home);
+                    GoHome();
                 }
                 catch (Exception e) { Logger.LogWarning($"Matchmaking: leaving the lobby failed: {e.Message}"); }
             }
@@ -1046,6 +1107,12 @@ namespace SanctuaryHud
             Logger.LogInfo($"Matchmaking: {message}");
             Overlay("MATCH NOT LAUNCHED", message + " You can host a game manually from the site's instructions.", 40f);
             SetPhase(Phase.Idle);
+        }
+
+        private static void GoHome()
+        {
+            var ui = InterfaceManager.Instance;
+            if (ui != null) ui.TransitionTo(InterfaceManager.Window.Home);
         }
 
         private static bool MapExists(string map)
@@ -1124,11 +1191,17 @@ namespace SanctuaryHud
 
         private static Texture2D _mmPanelTex;
         private static GUIStyle _mmTitle, _mmBody;
+        // OnGUI runs twice a frame and more on input, overlay or not: the
+        // heading and the text's height are worked out once per message.
+        private string _overlayHeading;
+        private string _overlayMeasured;
+        private float _overlayTextHeight;
+        private readonly GUIContent _overlayContent = new GUIContent();
 
         private void Overlay(string title, string text, float seconds)
         {
-            _overlayTitle = title;
             _overlayText = text;
+            _overlayHeading = "LADDER  ·  " + title;
             _overlayUntil = Time.realtimeSinceStartup + seconds;
         }
 
@@ -1137,11 +1210,18 @@ namespace SanctuaryHud
             if (_overlayText == null || Time.realtimeSinceStartup > _overlayUntil) return;
             if (_mmPanelTex == null)
             {
-                _mmPanelTex = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+                _mmPanelTex = Generated.Keep(new Texture2D(1, 1, TextureFormat.RGBA32, false));
                 _mmPanelTex.SetPixel(0, 0, new Color(0.05f, 0.07f, 0.09f, 0.9f));
                 _mmPanelTex.Apply();
                 _mmTitle = new GUIStyle { fontSize = 11, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.3f, 0.6f, 0.95f) } };
                 _mmBody = new GUIStyle { fontSize = 14, wordWrap = true, normal = { textColor = Color.white } };
+                _overlayMeasured = null;
+            }
+            if (!ReferenceEquals(_overlayMeasured, _overlayText))
+            {
+                _overlayMeasured = _overlayText;
+                _overlayContent.text = _overlayText;
+                _overlayTextHeight = _mmBody.CalcHeight(_overlayContent, 492);
             }
 
             var scale = Screen.height / 1080f;
@@ -1149,11 +1229,11 @@ namespace SanctuaryHud
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var width = Screen.width / scale;
             var rect = new Rect((width - 520) / 2, 90, 520, 0);
-            var textHeight = _mmBody.CalcHeight(new GUIContent(_overlayText), 492);
+            var textHeight = _overlayTextHeight;
             rect.height = 14 + 16 + 4 + textHeight + 14;
             GUI.DrawTexture(rect, _mmPanelTex);
-            GUI.Label(new Rect(rect.x + 14, rect.y + 12, 492, 16), "LADDER  ·  " + _overlayTitle, _mmTitle);
-            GUI.Label(new Rect(rect.x + 14, rect.y + 32, 492, textHeight), _overlayText, _mmBody);
+            GUI.Label(new Rect(rect.x + 14, rect.y + 12, 492, 16), _overlayHeading, _mmTitle);
+            GUI.Label(new Rect(rect.x + 14, rect.y + 32, 492, textHeight), _overlayContent, _mmBody);
             GUI.matrix = previous;
         }
     }

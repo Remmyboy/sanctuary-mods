@@ -52,7 +52,6 @@ namespace SanctuaryHud
         private ConfigEntry<string> _cfgMmDevOrigins;
 
         private TcpListener _bridgeListener;
-        private Thread _bridgeThread;
         private int _bridgePort;
         private bool _bridgeBindFailedLogged;
         private float _bridgeNextBindTry;
@@ -117,7 +116,7 @@ namespace SanctuaryHud
             {
                 Logger.LogInfo($"Matchmaking: state {last?.State ?? "(none)"} -> {state}");
             }
-            else if (last.MatchId == m?.Id && last.MatchStatus == m?.Status && last.Phase == _phase.ToString())
+            else if (last.MatchId == m?.Id && last.MatchStatus == m?.Status && last.Phase == _phaseName)
             {
                 return;   // nothing changed since last frame; keep the old snapshot
             }
@@ -126,7 +125,7 @@ namespace SanctuaryHud
                 State = state,
                 MatchId = m?.Id,
                 MatchStatus = m?.Status,
-                Phase = _phase.ToString(),
+                Phase = _phaseName,
             };
         }
 
@@ -158,8 +157,8 @@ namespace SanctuaryHud
             _bridgeListener = listener;
             _bridgePort = port;
             _bridgeBindFailedLogged = false;
-            _bridgeThread = new Thread(() => AcceptLoop(listener)) { IsBackground = true, Name = "LadderReporter bridge" };
-            _bridgeThread.Start();
+            // Nothing joins it: stopping the listener ends its loop.
+            new Thread(() => AcceptLoop(listener)) { IsBackground = true, Name = "LadderReporter bridge" }.Start();
             Logger.LogInfo($"Matchmaking: listening for the site on 127.0.0.1:{port}.");
         }
 
@@ -170,8 +169,8 @@ namespace SanctuaryHud
             var listener = _bridgeListener;
             _bridgeListener = null;
             if (listener == null) return;
-            try { listener.Stop(); } catch { }
-            _bridgeThread = null;
+            try { listener.Stop(); }
+            catch { /* already closed by its own thread after a failure: stopped either way */ }
             Logger.LogInfo($"Matchmaking: stopped listening on 127.0.0.1:{_bridgePort}.");
         }
 
@@ -194,7 +193,8 @@ namespace SanctuaryHud
                     {
                         _bridgeListener = null;
                         _bridgeNextBindTry = 0f;
-                        try { listener.Stop(); } catch { }
+                        try { listener.Stop(); }
+                        catch { /* the socket is already gone, which is all this is for */ }
                     }
                     return;
                 }

@@ -130,6 +130,8 @@ namespace SanctuaryHud
         private void Awake()
         {
             _log ??= Logger;
+            // The overlay draws with GUI, never GUILayout: skip the layout pass.
+            useGUILayout = false;
             // Only the in-match signal is used here, never what the shared
             // unit scan finds, so this copy of the HUD core skips it.
             UnitScan = false;
@@ -167,6 +169,7 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             DestroyMatchmaking();
+            AbortRequests();
             _harmony?.UnpatchSelf();
             try
             {
@@ -180,6 +183,8 @@ namespace SanctuaryHud
             // goes, so any ticket one still held is cancelled here.
             ReleaseAllTickets();
             _ticketCallback?.Dispose();
+            // The overlay's panel texture.
+            Generated.DestroyAll();
         }
 
         private void Update()
@@ -195,7 +200,9 @@ namespace SanctuaryHud
                     Logger.LogError($"Matchmaking: update failed: {e}");
                 }
             }
-            SharedTick();
+            // No SharedTick: this plugin reads only InMatch, which the economy
+            // patch keeps, and the shared tick's once-a-second focus-army
+            // Lua poll was paid for nothing.
             if (!_cfgEnabled.Value) return;
 
             _tickAccum += Time.unscaledDeltaTime;
@@ -514,7 +521,9 @@ namespace SanctuaryHud
                     request.uploadHandler = new UploadHandlerRaw(payload) { contentType = "application/json" };
                     request.downloadHandler = new DownloadHandlerBuffer();
                     request.timeout = 15;
+                    _inFlight.Add(request);
                     yield return request.SendWebRequest();
+                    _inFlight.Remove(request);
 
                     var status = (int)request.responseCode;
                     if (request.result == UnityWebRequest.Result.Success)
@@ -543,7 +552,7 @@ namespace SanctuaryHud
                                           $"(attempt {attempt}/3): {request.error}");
                     }
                 }
-                if (attempt < 3) yield return new WaitForSecondsRealtime(5f * attempt);
+                if (attempt < 3) yield return new WaitForSecondsRealtime(5f * attempt); // at most twice a report: not worth caching
             }
             Logger.LogWarning("Ladder reporter: giving up — report the result on the site instead.");
         }
