@@ -122,8 +122,8 @@ namespace SanctuaryHud
             // The game's buttons in the middle, when its panel is hidden.
             var middle = _middle.Sync(GamePanel.Controls, GamePanel.VersionText);
             var half = (width - middle) / 2f;
-            _alloy.Sync(eco, "alloy", SanctuaryHudPlugin.AlloyTint, 0f, half);
-            _energy.Sync(eco, "energy", SanctuaryHudPlugin.EnergyTint, half + middle, half);
+            _alloy.Sync(eco, SanctuaryHudPlugin.AlloyTint, 0f, half);
+            _energy.Sync(eco, SanctuaryHudPlugin.EnergyTint, half + middle, half);
             _middle.Place(half, middle);
             _leftLine.rectTransform.anchoredPosition = new Vector2(half - 1f, -20f);
             var showRight = middle > 0f;
@@ -156,8 +156,8 @@ namespace SanctuaryHud
             _strip.pivot = new Vector2(0f, 1f);
             _strip.anchoredPosition = Vector2.zero;
 
-            _alloy = Half.Create(_strip, "Alloy", "alloy", "ALLOY", SanctuaryHudPlugin.AlloyTint);
-            _energy = Half.Create(_strip, "Energy", "energy", "ENERGY", SanctuaryHudPlugin.EnergyTint);
+            _alloy = Half.Create(_strip, "Alloy", SanctuaryHudPlugin.EcoKeys.Alloy, "ALLOY", SanctuaryHudPlugin.AlloyTint);
+            _energy = Half.Create(_strip, "Energy", SanctuaryHudPlugin.EcoKeys.Energy, "ENERGY", SanctuaryHudPlugin.EnergyTint);
             _middle = Middle.Create(_strip);
 
             // The game's panels sit on a hairline of accent blue; give the
@@ -224,19 +224,34 @@ namespace SanctuaryHud
 
         /// The chip over a full store that is spilling: amber, with dark type.
         private static readonly Color WasteColour = new Color(0.94f, 0.66f, 0.19f, 0.95f);
+        private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
 
         private sealed class Half
         {
             private RectTransform _rect;
             private Color _tint;
+            private SanctuaryHudPlugin.EcoKeys _keys;
             private RectTransform _storageRow;
             private TMP_Text _storage, _max, _net, _income, _spent, _chip;
             private Image _track, _fill, _tip, _tipGlow, _chipBox;
+            /// The resource's mark (the game's icon, or its name), which takes
+            /// the tint as it is read off the game's panel.
+            private Graphic _mark;
             private float _lead;
 
-            internal static Half Create(Transform parent, string name, string key, string label, Color tint)
+            // The figures' texts, made again only when what they show changes.
+            private readonly SanctuaryHudPlugin.FigureText _storageText = new SanctuaryHudPlugin.FigureText(),
+                _maxText = new SanctuaryHudPlugin.FigureText(), _netText = new SanctuaryHudPlugin.FigureText(),
+                _incomeText = new SanctuaryHudPlugin.FigureText(), _spentText = new SanctuaryHudPlugin.FigureText();
+            private int _chipKind = -1;
+            private float _chipValue;
+            private string _chipText;
+            private float _laidOutWidth = -1f;
+
+            internal static Half Create(Transform parent, string name, SanctuaryHudPlugin.EcoKeys keys, string label, Color tint)
             {
-                var half = new Half { _tint = tint };
+                var key = keys.Resource;
+                var half = new Half { _tint = tint, _keys = keys };
                 var go = new GameObject(name, typeof(RectTransform));
                 go.transform.SetParent(parent, false);
                 var rt = (RectTransform)go.transform;
@@ -262,6 +277,7 @@ namespace SanctuaryHud
                     irt.offsetMin = Vector2.zero;
                     irt.offsetMax = Vector2.zero;
                     half._lead = 60f;
+                    half._mark = icon;
                 }
                 else
                 {
@@ -274,6 +290,7 @@ namespace SanctuaryHud
                     wrt.offsetMax = Vector2.zero;
                     HudCanvas.SetText(word, label);
                     half._lead = 132f;
+                    half._mark = word;
                 }
 
                 // Storage, then "/ limit" after it, sized to the figure.
@@ -355,52 +372,70 @@ namespace SanctuaryHud
                 return half;
             }
 
-            internal void Sync(Dictionary<string, float> eco, string key, Color tint, float x, float w)
+            internal void Sync(Dictionary<string, float> eco, Color tint, float x, float w)
             {
-                _tint = tint;
+                // The tint can arrive after the strip was built (it is read
+                // off the game's panel once that exists), so the mark takes
+                // it here too.
+                if (tint != _tint)
+                {
+                    _tint = tint;
+                    if (_mark != null) _mark.color = tint;
+                }
                 _rect.anchoredPosition = new Vector2(x, 0f);
-                _rect.sizeDelta = new Vector2(w, Height);
+                var flowsX = w - Pad - 216f - 12f - 128f;
+                if (w != _laidOutWidth)
+                {
+                    _laidOutWidth = w;
+                    _rect.sizeDelta = new Vector2(w, Height);
+                    _net.rectTransform.anchoredPosition = new Vector2(w - Pad - 216f, -22f);
+                    _income.rectTransform.anchoredPosition = new Vector2(flowsX, -10f);
+                    _spent.rectTransform.anchoredPosition = new Vector2(flowsX, -46f);
+                }
 
-                float V(string name) => eco.TryGetValue(key + name, out var v) ? v : 0f;
-                var current = V("StorageCurrent");
-                var limit = Mathf.Max(1f, V("StorageLimit"));
-                var incomeRaw = V("GeneratedIncome");
-                var wantedRaw = -V("RequestedTotal");
-                var spendRaw = -V("RequestedStalled");
+                var k = _keys;
+                var current = SanctuaryHudPlugin.Value(eco, k.Current);
+                var limit = Mathf.Max(1f, SanctuaryHudPlugin.Value(eco, k.Limit));
+                var incomeRaw = SanctuaryHudPlugin.Value(eco, k.Income);
+                var wantedRaw = -SanctuaryHudPlugin.Value(eco, k.Wanted);
+                var spendRaw = -SanctuaryHudPlugin.Value(eco, k.Spent);
                 var stalling = SanctuaryHudPlugin.IsStalling(current, incomeRaw, wantedRaw, spendRaw);
 
-                var s = SanctuaryHudPlugin.Smoothed(key) ?? new[] { incomeRaw, wantedRaw, spendRaw };
-                var income = s[0];
+                // Smoothed [income, demand, spend], or the raw figures before
+                // the first update.
+                var s = SanctuaryHudPlugin.Smoothed(k.Resource);
+                var income = s != null ? s[0] : incomeRaw;
+                var demand = s != null ? s[1] : wantedRaw;
+                var actual = s != null ? s[2] : spendRaw;
                 // While this resource is the one stalling, the spend figure
                 // shows demand, not what the economy managed to pay: actual
                 // spend is then capped by income, so it would just mirror the
                 // income back at you and hide the shortfall. Otherwise it
                 // shows actual spend, as the game's panel does.
-                var spent = stalling ? s[1] : s[2];
+                var spent = stalling ? demand : actual;
                 // Net stays on actual spend: it describes the store's real
                 // movement, which is what the bar and the "empty in" chip need.
-                var net = s[0] - s[2];
+                var net = income - actual;
 
-                HudCanvas.SetText(_storage, SanctuaryHudPlugin.Fmt(current));
+                HudCanvas.SetText(_storage, _storageText.Fmt(current));
                 // The figure itself pulses towards red while this store is
                 // what holds the economy back.
                 _storage.color = stalling ? Color.Lerp(Color.white, LossColour, HudStyle.Pulse()) : Color.white;
-                HudCanvas.SetText(_max, "/ " + SanctuaryHudPlugin.Fmt(limit));
+                HudCanvas.SetText(_max, _maxText.Get(Mathf.Round(limit), l => "/ " + SanctuaryHudPlugin.Fmt(l)));
 
-                var netText = (net >= 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(net) + "/s";
+                // Keyed on the sign and the whole number shown (+1, so a
+                // signed zero is still told apart).
+                var netShown = Mathf.Round(Mathf.Abs(net)) + 1f;
                 _net.color = stalling ? DangerColour : net >= 0f ? GainColour : LossColour;
-                HudCanvas.SetText(_net, netText);
-                _net.rectTransform.anchoredPosition = new Vector2(w - Pad - 216f, -22f);
+                HudCanvas.SetText(_net, _netText.Get(net >= 0f ? netShown : -netShown,
+                    n => (n > 0f ? "+" : "−") + SanctuaryHudPlugin.Fmt(Mathf.Abs(n) - 1f) + "/s"));
 
-                var flowsX = w - Pad - 216f - 12f - 128f;
-                _income.rectTransform.anchoredPosition = new Vector2(flowsX, -10f);
-                _spent.rectTransform.anchoredPosition = new Vector2(flowsX, -46f);
-                HudCanvas.SetText(_income, "+" + SanctuaryHudPlugin.Fmt(income));
+                HudCanvas.SetText(_income, _incomeText.Get(Mathf.Round(Mathf.Abs(income)), a => "+" + SanctuaryHudPlugin.Fmt(a)));
                 // Flag the spend figure while stalling, since it is then
                 // demand you are not actually meeting rather than resources
                 // leaving the store.
                 _spent.color = stalling ? DangerColour : LossColour;
-                HudCanvas.SetText(_spent, "−" + SanctuaryHudPlugin.Fmt(spent));
+                HudCanvas.SetText(_spent, _spentText.Get(Mathf.Round(Mathf.Abs(spent)), a => "−" + SanctuaryHudPlugin.Fmt(a)));
 
                 // The bar's length scales gently with the storage size and
                 // stops short of the flows column whatever that size.
@@ -421,23 +456,42 @@ namespace SanctuaryHud
                 // satisfaction figure). Full and earning more than it spends:
                 // what is being thrown away. Otherwise a store on its way
                 // down: how long it has.
-                string chip = null;
-                var wasting = false;
+                // What the chip says, as a kind and the one number in it; its
+                // text is made again only when either changes.
+                var kind = 0;
+                var value = 0f;
                 if (stalling)
                 {
-                    var speed = s[1] > 0.5f ? Mathf.Clamp01(s[2] / s[1]) : 0f;
-                    chip = "BUILD SPEED " + Mathf.RoundToInt(speed * 100f) + "%";
+                    var speed = demand > 0.5f ? Mathf.Clamp01(actual / demand) : 0f;
+                    kind = 1;
+                    value = Mathf.RoundToInt(speed * 100f);
                 }
-                else if (current >= limit - 1f && s[0] - s[2] > 0.5f)
+                else if (current >= limit - 1f && income - actual > 0.5f)
                 {
-                    wasting = true;
-                    chip = "WASTING " + SanctuaryHudPlugin.Fmt(s[0] - s[2]) + "/s";
+                    kind = 2;
+                    value = Mathf.Round(Mathf.Abs(income - actual));
                 }
                 else if (net < -0.5f)
                 {
                     var tte = current / -net;
-                    if (tte < 120f) chip = "EMPTY IN " + tte.ToString("0") + "s";
+                    if (tte < 120f)
+                    {
+                        kind = 3;
+                        // As ToString("0") rounds it: half away from zero.
+                        value = (float)Math.Round(tte, MidpointRounding.AwayFromZero);
+                    }
                 }
+                if (kind != _chipKind || !value.Equals(_chipValue))
+                {
+                    _chipKind = kind;
+                    _chipValue = value;
+                    _chipText = kind == 1 ? "BUILD SPEED " + ((int)value).ToString(Inv) + "%"
+                        : kind == 2 ? "WASTING " + SanctuaryHudPlugin.Fmt(value) + "/s"
+                        : kind == 3 ? "EMPTY IN " + ((int)value).ToString(Inv) + "s"
+                        : null;
+                }
+                var chip = _chipText;
+                var wasting = kind == 2;
                 var showChip = chip != null;
                 if (_chipBox.gameObject.activeSelf != showChip) _chipBox.gameObject.SetActive(showChip);
                 if (showChip)
@@ -463,7 +517,8 @@ namespace SanctuaryHud
             private TMP_Text _caption;
             private readonly List<ControlTile> _tiles = new List<ControlTile>();
             private readonly List<GamePanel.PanelControl> _shown = new List<GamePanel.PanelControl>();
-            private string _versionText;
+            /// Lay out again: the buttons changed, or it was just shown.
+            private bool _dirty = true;
 
             internal static Middle Create(Transform parent)
             {
@@ -510,14 +565,26 @@ namespace SanctuaryHud
                 // so its buttons, are still showing.
                 var clock = GameClock.Text;
                 var show = controls.Count > 0 || clock != null;
-                if (_rect.gameObject.activeSelf != show) _rect.gameObject.SetActive(show);
+                if (_rect.gameObject.activeSelf != show)
+                {
+                    _rect.gameObject.SetActive(show);
+                    _dirty = true;
+                }
                 if (!show) return 0f;
 
                 var same = controls.Count == _shown.Count;
                 for (var i = 0; same && i < controls.Count; i++) same = controls[i] == _shown[i];
                 if (!same)
                 {
-                    foreach (var tile in _tiles) if (tile != null) UnityEngine.Object.Destroy(tile.gameObject);
+                    _dirty = true;
+                    // Switched off first: Destroy waits for the frame's end,
+                    // and the layout below must not count them.
+                    foreach (var tile in _tiles)
+                    {
+                        if (tile == null) continue;
+                        tile.gameObject.SetActive(false);
+                        UnityEngine.Object.Destroy(tile.gameObject);
+                    }
                     _tiles.Clear();
                     _shown.Clear();
                     foreach (var control in controls)
@@ -539,11 +606,17 @@ namespace SanctuaryHud
                         hovered = true;
                     }
                 }
+                var version = HudCanvas.LayoutVersion;
                 HudCanvas.SetText(_caption, caption ?? "");
                 // Muted like the version line, but the clock is something to read.
                 _caption.color = clock != null && !hovered ? Color.white : SanctuaryHudPlugin.MutedText;
-                _versionText = versionText;
-                LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                // The width depends on the buttons and the caption: laid out
+                // again only on a frame either changed.
+                if (_dirty || HudCanvas.LayoutVersion != version)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(_rect);
+                    _dirty = false;
+                }
                 return _rect.rect.width;
             }
 

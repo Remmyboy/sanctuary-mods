@@ -42,7 +42,6 @@ namespace SanctuaryHud
         private static readonly Color DimText = new Color(1f, 1f, 1f, 0.55f);
         private static readonly Color HeadText = new Color(1f, 1f, 1f, 0.5f);
 
-        private readonly RectTransform _root;
         private readonly GameObject _overlay;
         private readonly RectTransform _window;
         private readonly TMP_Text _title, _sub;
@@ -114,8 +113,6 @@ namespace SanctuaryHud
 
         internal StatsScreen(RectTransform root)
         {
-            _root = root;
-
             // The dim over everything, which also takes every click.
             var dim = HudCanvas.Fill(root, "Match stats", new Color(0f, 0f, 0f, 0.6f));
             dim.raycastTarget = true;
@@ -334,7 +331,8 @@ namespace SanctuaryHud
             var h = _reopen.rect.height;
             var x = (size.x - w) * 0.5f;
             var y = size.y * 0.3f;
-            var text = (result as GameResultPanelUI)?.gameResultText;
+            var resultPanel = result as GameResultPanelUI;
+            var text = resultPanel != null ? resultPanel.gameResultText : null;
             if (text != null && HudCanvas.LocalRect(text, out var r) && r.yMin - 40f - h > 0f)
             {
                 x = r.center.x - w * 0.5f;

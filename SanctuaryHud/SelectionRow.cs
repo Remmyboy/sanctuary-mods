@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using BepInEx.Configuration;
 using SanctuaryUI;
 using UnityEngine;
@@ -96,14 +97,26 @@ namespace SanctuaryHud
                 {
                     var child = container.GetChild(i);
                     if (!child.gameObject.activeInHierarchy || child.localScale.x < 0.5f) continue;
-                    var element = child.GetComponent<UnitButtonElement>();
+                    var (element, _) = _children.Get(container, child);
                     if (element == null || element.textOverlayText == null) continue;
-                    if (int.TryParse(element.textOverlayText.text, out var n)) _count += n;
+                    if (int.TryParse(element.textOverlayText.text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) _count += n;
                 }
             }
-            catch { /* unknown counts as none */ }
+            catch (Exception e)
+            {
+                // Unknown counts as none.
+                if (!_countLogged)
+                {
+                    _countLogged = true;
+                    _log?.LogWarning($"Selection row: the selection could not be counted (logged once): {e.Message}");
+                }
+            }
             return _count;
         }
+
+        private static bool _countLogged;
+        private static readonly PanelChildren<UnitButtonElement, UnityEngine.UI.Button> _children =
+            new PanelChildren<UnitButtonElement, UnityEngine.UI.Button>();
 
         // ---- the row ----------------------------------------------------------------
 
@@ -162,7 +175,6 @@ namespace SanctuaryHud
         /// The row's size on the canvas, 0 while it is not showing: what the
         /// build strip lays its rows out around.
         internal static float RowWidth => _row != null && _row.Showing ? _row.Width : 0f;
-        internal static float RowHeight => _row != null && _row.Showing ? _row.Height : 0f;
 
         // ---- diagnostics ------------------------------------------------------
 
@@ -170,11 +182,11 @@ namespace SanctuaryHud
         {
             try
             {
-                _log?.LogInfo("Selection panel concealed; its tree:");
+                _log?.LogDebug("Selection panel concealed; its tree:");
                 PanelConceal.DumpSubtree(panel.transform, 0, _log, 2);
                 if (panel.buttonPrefab != null)
                 {
-                    _log?.LogInfo("...and its button prefab:");
+                    _log?.LogDebug("...and its button prefab:");
                     PanelConceal.DumpSubtree(panel.buttonPrefab.transform, 0, _log, 3);
                 }
             }

@@ -626,6 +626,28 @@ namespace SanctuaryHud
             return a.ToString("0", inv);
         }
 
+        /// A figure's text, made again only when what it shows changes: the
+        /// strip and the card are filled every frame, and their figures hold
+        /// still far more often than not.
+        internal sealed class FigureText
+        {
+            private float _key;
+            private string _text;
+
+            internal string Get(float key, Func<float, string> make)
+            {
+                if (_text == null || !key.Equals(_key))
+                {
+                    _key = key;
+                    _text = make(key);
+                }
+                return _text;
+            }
+
+            /// Fmt(v), keyed on all Fmt shows of it: the whole number, unsigned.
+            internal string Fmt(float v) => Get(Mathf.Round(Mathf.Abs(v)), a => SanctuaryHudPlugin.Fmt(a));
+        }
+
         /// The host's economy ticks ten times a second; the stream's rates are
         /// per second, its storage a plain amount (economyPanel.lua).
         private const float TicksPerSecond = 10f;
