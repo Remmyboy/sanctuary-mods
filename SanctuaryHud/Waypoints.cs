@@ -636,14 +636,14 @@ if not __SdbWaypoints then
       end
     end)
     if not ok then
-      if lid then pcall(Engine.DeletePrefabInstance, lid) end
+      if lid then pcall(Engine.DeletePrefabInstance, lid) end -- lua-check: ok
       lid = nil
     end
     COM.ClientIssueOrder(OT.BUILD, units, append, pos, pl, function(accepted, gid)
       if lid then
         local ok2 = pcall(IEF.OnBuildOrderAcknowledged, accepted, lid, gid)
         local pu = not ok2 and _G.PredictedUnits[lid.index]
-        if pu then pcall(pu.Delete, pu) end
+        if pu then pcall(pu.Delete, pu) end -- lua-check: ok
       end
       onAck(accepted, gid)
     end)
@@ -653,8 +653,8 @@ if not __SdbWaypoints then
   -- it would draw the old queue: the waypoint flicks back to where it was
   -- before jumping to where it was dropped. Predict and draw straight away.
   local function showNow()
-    pcall(COM.RecalculatePendingMessages)
-    pcall(COM.DebugDraw)
+    pcall(COM.RecalculatePendingMessages) -- lua-check: ok
+    pcall(COM.DebugDraw) -- lua-check: ok
   end
 
   W.Start = function(plan)
@@ -730,8 +730,8 @@ if not __SdbWaypoints then
   -------------------------------------------------------------------- drag
   local function clearPreview()
     if W.preview then
-      pcall(Engine.SetRangeRingsEnabled, W.preview, false)
-      pcall(Engine.DeletePrefabInstance, W.preview)
+      pcall(Engine.SetRangeRingsEnabled, W.preview, false) -- lua-check: ok
+      pcall(Engine.DeletePrefabInstance, W.preview) -- lua-check: ok
       W.preview = nil
     end
   end
@@ -801,7 +801,7 @@ if not __SdbWaypoints then
   W.Cancel = function()
     W.drag = nil
     clearPreview()
-    pcall(COM.DebugDraw)
+    pcall(COM.DebugDraw) -- lua-check: ok
   end
 
   -- A left press on a waypoint marker picks it up instead of starting a
@@ -946,7 +946,7 @@ if not __SdbWaypoints then
         end
       end
     end
-    pcall(COM.DebugDraw)
+    pcall(COM.DebugDraw) -- lua-check: ok
     return true
   end
 

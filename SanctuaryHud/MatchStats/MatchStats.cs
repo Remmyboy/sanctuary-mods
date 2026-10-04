@@ -467,7 +467,8 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
       local r = S.units[data.unitID.index]
       if r and not r.dead then
         r.dead = true
-        pcall(gone, r, data.destroyType ~= ((DestroyType and DestroyType.Delete) or 1))
+        local okg, eg = pcall(gone, r, data.destroyType ~= ((DestroyType and DestroyType.Delete) or 1))
+        if not okg then __SdbStatsErr = 'destroyed: ' .. tostring(eg) end
       end
       return du(data, ...)
     end
@@ -477,7 +478,10 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
       local idx = data.unitID.index
       local r = S.units[idx]
       if r then
-        if not r.dead then pcall(gone, r, false) end
+        if not r.dead then
+          local okg, eg = pcall(gone, r, false)
+          if not okg then __SdbStatsErr = 'deleted: ' .. tostring(eg) end
+        end
         S.units[idx] = nil
       end
       return xu(data, ...)
@@ -492,7 +496,7 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
 
     local wc = W.WinConditionUpdate
     W.WinConditionUpdate = function(data, ...)
-      pcall(function() S.cond[data.armyID] = { data.condition, tick() } end)
+      pcall(function() S.cond[data.armyID] = { data.condition, tick() } end) -- lua-check: ok
       return wc(data, ...)
     end
 

@@ -212,7 +212,7 @@ namespace SanctuaryHud
         private const string GameAlertHookChunk =
             // pcall'd so a game without the command (older, or renamed) is
             // a quiet no-op rather than a failed chunk retried and logged.
-            "do local S = {} pcall(function() " +
+            "do local S = {} pcall(function() " + // lua-check: ok
             "  local c = Import('common/commands/definitions/session.lua').PlayUnitDamagedAlert " +
             "  if c and type(c.Receive) == 'function' then " +
             "    local orig = c.Receive " +

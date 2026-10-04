@@ -182,7 +182,7 @@ namespace SanctuaryHud
             // image was rendered of. Last, and in a pcall of its own, so a
             // failure here can never cost the colours or the deposits.
             "  __SdbMmArea = '' " +
-            "  pcall(function() " +
+            "  pcall(function() " + // lua-check: ok
             "    local area = Import('common/mapUtils.lua').GetDefaultPlayableArea() " +
             "    if area and area.position and area.size then " +
             "      __SdbMmArea = string.format('%.2f,%.2f,%.2f,%.2f', area.position.x, area.position.y, area.size.x, area.size.y) " +
