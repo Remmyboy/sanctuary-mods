@@ -109,7 +109,8 @@ namespace Sanctuary.ModApi
             _active = true;
 
             // The canvas goes with the scene: rebuild from scratch then.
-            var lost = _panels.Values.Any(v => !v.Alive) || (_toast != null && !_toast.Alive);
+            var lost = _toast != null && !_toast.Alive;
+            foreach (var v in _panels.Values) lost |= !v.Alive;
             if (lost)
             {
                 foreach (var view in _panels.Values) view.Destroy();
@@ -192,7 +193,7 @@ namespace Sanctuary.ModApi
             {
                 if (_saved != null) return _saved;
                 try { _saved = JsonConvert.DeserializeObject<Dictionary<string, SavedPanel>>(_cfgPanels?.Value ?? ""); }
-                catch { }
+                catch (Exception e) { ModApiPlugin.Log.LogWarning($"UI.Panels isn't readable JSON ({e.Message}); mod panels start where their mods put them."); }
                 return _saved = _saved ?? new Dictionary<string, SavedPanel>(StringComparer.Ordinal);
             }
         }
@@ -242,6 +243,8 @@ namespace Sanctuary.ModApi
             private bool _visible, _hasTitle;
             private Vector2 _initial;
             private bool _alignRight;
+            private int _measuredAt = -1;
+            private float _measuredScale = -1f;
 
             internal bool Alive => _panel.Alive;
 
@@ -263,6 +266,7 @@ namespace Sanctuary.ModApi
             {
                 var folded = _content.gameObject.activeSelf;
                 _content.gameObject.SetActive(!folded);
+                HudCanvas.LayoutVersion++;
                 var entry = Entry(Id);
                 entry.Folded = folded;
                 Save(Id, entry);
@@ -272,9 +276,17 @@ namespace Sanctuary.ModApi
             {
                 var title = Str(o, "title");
                 _hasTitle = !string.IsNullOrEmpty(title);
-                if (_title.gameObject.activeSelf != _hasTitle) _title.gameObject.SetActive(_hasTitle);
+                if (_title.gameObject.activeSelf != _hasTitle)
+                {
+                    _title.gameObject.SetActive(_hasTitle);
+                    HudCanvas.LayoutVersion++;
+                }
                 // Without a title nothing could unfold it.
-                if (!_hasTitle && !_content.gameObject.activeSelf) _content.gameObject.SetActive(true);
+                if (!_hasTitle && !_content.gameObject.activeSelf)
+                {
+                    _content.gameObject.SetActive(true);
+                    HudCanvas.LayoutVersion++;
+                }
                 HudCanvas.SetText(_title.Text, title ?? "");
                 _visible = Flag(o, "visible", true);
                 _initial = new Vector2(Num(o, "x", 20f), Num(o, "y", 300f));
@@ -285,6 +297,9 @@ namespace Sanctuary.ModApi
                 {
                     Rev = rev;
                     Reconcile(_content, _nodes, o["items"], this);
+                    // Elements came, went or changed size (not only text,
+                    // which bumps it itself): the panel is laid out afresh.
+                    HudCanvas.LayoutVersion++;
                 }
                 _panel.Show(_visible && (_hasTitle || _nodes.Count > 0));
             }
@@ -300,17 +315,25 @@ namespace Sanctuary.ModApi
                     entry.Scale = resized.Value;
                     Save(Id, entry);
                 }
-                _panel.SetScale(Saved.TryGetValue(Id, out var sized) && sized.Scale.HasValue ? sized.Scale.Value : 1f);
+                Saved.TryGetValue(Id, out var s);
+                _panel.SetScale(s != null && s.Scale.HasValue ? s.Scale.Value : 1f);
 
-                var saved = Saved.TryGetValue(Id, out var s) && s.X.HasValue && s.Y.HasValue ? s : null;
                 Vector2 want;
-                if (saved != null) want = new Vector2(saved.X.Value, saved.Y.Value);
+                if (s != null && s.X.HasValue && s.Y.HasValue) want = new Vector2(s.X.Value, s.Y.Value);
                 else if (_alignRight)
                 {
-                    // Measured from the right edge, once the width is known.
-                    LayoutRebuilder.ForceRebuildLayoutImmediate(_panel.Rect);
+                    // Measured from the right edge, once the width is known:
+                    // laid out here only on the frames something changed it,
+                    // as Place does.
+                    var scale = _panel.Rect.localScale.x;
+                    if (_measuredAt != HudCanvas.LayoutVersion || _measuredScale != scale)
+                    {
+                        LayoutRebuilder.ForceRebuildLayoutImmediate(_panel.Rect);
+                        _measuredAt = HudCanvas.LayoutVersion;
+                        _measuredScale = scale;
+                    }
                     var k = HudCanvas.UnitsPerLogical;
-                    var width = _panel.Rect.rect.width * _panel.Rect.localScale.x / k;
+                    var width = _panel.Rect.rect.width * scale / k;
                     want = new Vector2(HudCanvas.Size.x / k - width - _initial.x, _initial.y);
                 }
                 else want = _initial;

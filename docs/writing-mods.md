@@ -326,6 +326,36 @@ Events.Kills(army)   -- enemy units that army has killed
 The [`SupplyDrop`](../examples/SupplyDrop) example is a complete mod built
 this way.
 
+**Helpers (host).** What most rules mods end up writing for themselves
+(Mod API 1.8):
+
+```lua
+local players = Events.Players()   -- the player armies, AI included, by army id
+Events.ArmyName(army)              -- the name the player chose
+Events.Ally(a, b)                  -- allies both ways round; Events.Enemy(a, b) too
+
+-- Runs fn; if it errors, it's reported once for that name: in the log, and
+-- in the match's message log where players see it.
+Events.Guard("Alice's No Rush: spawning", SpawnWave)
+Events.Report("Alice's No Rush: map", "no spawn markers")
+
+Events.Tell(army, "Your wave is ready")   -- one player's message log
+
+-- Each client gets what fn returns for it, only when it has changed since
+-- the last time (army is nil for an observer).
+Events.SendToEachClient("NoRushState", function(army, clientId)
+    return { secondsLeft = SecondsLeft(), mine = army and Waves(army) }
+end)
+
+-- A client's SendToHost(data, "NoRushRequest"), with the army that sent it
+-- (nil for an observer).
+Events.OnRequest("NoRushRequest", function(army, data, clientId) ... end)
+```
+
+Name the mod in what you pass to `Guard` and `Report`, so players know
+whose problem it is. Mods using these need Mod API 1.8 or later; check
+`if not Events.OnRequest then ... end` to say so rather than fail to load.
+
 ## Panels and notices (no DLL needed)
 
 A gameplay mod can put its own panel on the match HUD from its client script,
@@ -378,11 +408,10 @@ client, then handle it in your host script. To show a player something only
 the host knows, send it to them: `SendToClient(data, "YourState", clientId)`
 on the host, `RegisterListener("client_YourState", fn)` in the client.
 
-**Who sent a request?** If your rules depend on which player asked, wrap
-the game's handler in your host script and keep the client id for your own
-call.
-[`PhantomX`](../PhantomX/lua/phantomx/host.lua) does this. Look for
-`ExecuteHostFunction`.
+**Who sent a request?** If your rules depend on which player asked, take
+the request with `Events.OnRequest(name, fn)` in your host script: `fn`
+gets the sender's army (Mod API 1.8).
+[`PhantomX`](../PhantomX/lua/phantomx/host.lua) does this.
 
 `modapi/ui.lua` is only put in place for matches where a picked mod's Lua
 names it, so mods that don't draw panels run with exactly the files they did

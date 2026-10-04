@@ -46,7 +46,6 @@ end
 -- unit, its beams, and every shield go through the game's own intel check
 -- again, on the next tick (a change arrives as two commands, one each way).
 do
-    local Events = Import("modapi/events.lua").Events
     local ClientArmy = Import("client/army.lua")
     local stale = false
 
@@ -269,7 +268,7 @@ local function RenderStory(story)
     end
     items[#items + 1] = UI.Row({
         UI.Text(showAll and "Showing every role" or "Showing what they knew", { size = 18, color = Grey }),
-        UI.Fill and UI.Fill() or UI.Space(8),
+        Fill(),
         UI.Button(showAll and "Hide spoilers" or "Show all", function()
             showAll = not showAll
             RenderStory(story)
@@ -287,7 +286,7 @@ local function RenderStory(story)
         end
         if at.marked[p.id] then row[#row + 1] = UI.Text("marked", { size = 18, color = Colours.paladin }) end
         if not alive then row[#row + 1] = UI.Text("out", { size = 18, color = Grey }) end
-        row[#row + 1] = UI.Fill and UI.Fill() or UI.Space(8)
+        row[#row + 1] = Fill()
         if p.id ~= focus then
             row[#row + 1] = UI.Button("View", function()
                 pcall(function() _G.SetFocusArmy(p.id) end)

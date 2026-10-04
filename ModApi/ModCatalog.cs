@@ -186,9 +186,75 @@ namespace Sanctuary.ModApi
             return found.Except(gameOwn).ToList();
         }
 
+        // A rescan lists and stats every file of every mod, so the API asks
+        // for one only once something under SanctuaryMods has changed. The
+        // watcher's events arrive on a pool thread: all they do is set the
+        // flag, which Unity's thread reads and clears.
+        private static FileSystemWatcher _watcher;
+        private static volatile bool _dirty = true;
+
+        /// Something under SanctuaryMods changed since the last rescan, or
+        /// the watcher isn't running (so nothing can be ruled out).
+        public static bool Dirty => _dirty || _watcher == null;
+
+        /// True when the watcher is running and Dirty can be trusted.
+        internal static bool Watching => _watcher != null;
+
+        internal static void Watch()
+        {
+            if (_watcher != null) return;
+            try
+            {
+                var w = new FileSystemWatcher(ModsRoot)
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                };
+                FileSystemEventHandler changed = (s, e) => _dirty = true;
+                w.Changed += changed;
+                w.Created += changed;
+                w.Deleted += changed;
+                w.Renamed += (s, e) => _dirty = true;
+                // Its buffer overflowed (a big copy): changes were lost, so
+                // assume everything changed.
+                w.Error += (s, e) => _dirty = true;
+                w.EnableRaisingEvents = true;
+                // Mono can fall back to a managed watcher that lists and
+                // stats the whole tree itself every 750 ms: more work than the
+                // rescans it would save. Then the timer rescans stay.
+                var impl = typeof(FileSystemWatcher).GetField("watcher", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                    ?.GetValue(w)?.GetType().Name;
+                if (impl == "DefaultWatcher")
+                {
+                    w.EnableRaisingEvents = false;
+                    w.Dispose();
+                    ModApiPlugin.Log?.LogInfo("This runtime's folder watcher polls, so mod folders are rescanned on a timer instead.");
+                    return;
+                }
+                _watcher = w;
+                ModApiPlugin.Log?.LogInfo($"Watching {ModsRoot} for changes ({impl ?? "native"}); mod folders are rescanned only when something changes.");
+            }
+            catch (Exception e)
+            {
+                ModApiPlugin.Log?.LogWarning($"Can't watch {ModsRoot} for changes ({e.Message}); mod folders are rescanned on a timer instead.");
+            }
+        }
+
+        internal static void Unwatch()
+        {
+            var w = _watcher;
+            _watcher = null;
+            if (w == null) return;
+            try { w.EnableRaisingEvents = false; w.Dispose(); }
+            catch (Exception e) { ModApiPlugin.Log?.LogWarning($"Stopping the mod folder watcher: {e.Message}"); }
+        }
+
         /// Looks at every folder again. Returns true when anything changed.
         public static bool Rescan()
         {
+            // Cleared first: a change landing while this pass runs sets it
+            // again, and is picked up by the next one.
+            _dirty = false;
             var old = _mods.ToDictionary(m => m.Folder, StringComparer.OrdinalIgnoreCase);
             var next = new List<ModInfo>();
             var notices = new List<string>();

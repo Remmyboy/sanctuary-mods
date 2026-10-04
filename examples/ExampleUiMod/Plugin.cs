@@ -28,6 +28,9 @@ namespace ExampleUiMod
 
         private string _text = "";
         private GUIStyle _style;
+        private string _measured;
+        private int _measuredFont;
+        private Vector2 _size;
 
         private void Awake()
         {
@@ -68,8 +71,16 @@ namespace ExampleUiMod
         {
             if (!_show.Value || !(Modding.InLobby || Modding.InReplay)) return;
             if (_style == null) _style = new GUIStyle(GUI.skin.label);
-            _style.fontSize = _fontSize.Value;
-            var size = _style.CalcSize(new GUIContent(_text));
+            // OnGUI runs several times a frame: the text is measured again
+            // only when it or its size has changed.
+            if (_measured != _text || _measuredFont != _fontSize.Value)
+            {
+                _measured = _text;
+                _measuredFont = _fontSize.Value;
+                _style.fontSize = _measuredFont;
+                _size = _style.CalcSize(new GUIContent(_text));
+            }
+            var size = _size;
             var right = _corner.Value.EndsWith("right");
             var bottom = _corner.Value.StartsWith("Bottom");
             var rect = new Rect(right ? Screen.width - size.x - 12 : 12, bottom ? Screen.height - size.y - 12 : 12, size.x, size.y);

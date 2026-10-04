@@ -66,7 +66,6 @@ namespace Sanctuary.ModApi
         private static readonly Dictionary<ulong, ReportMsg> _reports = new Dictionary<ulong, ReportMsg>();
         private static readonly HashSet<ulong> _hellos = new HashSet<ulong>();
         private static bool _statusDirty;
-        private static string _rosterSig = "";
         private static List<ModInfo> _hostResolved = new List<ModInfo>();
         private static string _hostSelectionProblem;
         // The host's option values for each picked mod that has options.
@@ -126,7 +125,9 @@ namespace Sanctuary.ModApi
         // Screens read Selection and the status every frame; both are worked
         // out again only when something they come from has changed.
         private static IReadOnlyList<SelectedMod> _selectionCache;
-        private static string _selectionKey;
+        private static bool _selectionHost;
+        private static int _selectionCounter;
+        private static int _selectionCatalog;
         private static StatusMsg _statusCache;
         private static IReadOnlyList<PlayerModStatus> _playersCache;
         private static StatusMsg _playersFrom;
@@ -139,9 +140,13 @@ namespace Sanctuary.ModApi
                 // Everything the list is made from bumps the change counter
                 // (the pick, option values, the host's message) or the
                 // catalog's version.
-                var key = $"{IsHost}|{_changeCounter}|{ModCatalog.Version}";
-                if (_selectionCache != null && key == _selectionKey) return _selectionCache;
-                _selectionKey = key;
+                var host = IsHost;
+                if (_selectionCache != null && host == _selectionHost && _changeCounter == _selectionCounter &&
+                    ModCatalog.Version == _selectionCatalog)
+                    return _selectionCache;
+                _selectionHost = host;
+                _selectionCounter = _changeCounter;
+                _selectionCatalog = ModCatalog.Version;
                 return _selectionCache = BuildSelection();
             }
         }
@@ -437,7 +442,7 @@ namespace Sanctuary.ModApi
             _helloSent = false;
             _received = null;
             _status = null;
-            _rosterSig = "";
+            _roster.Clear();
             _abortPending = false;
             _startQueuedAt = -1f;
             _startButtonTouched = false;
@@ -457,7 +462,11 @@ namespace Sanctuary.ModApi
             {
                 _abortPending = false;
                 ModApiPlugin.Log.LogError($"Leaving the match: {_abortReason}");
-                try { EM.DOTS.Engine.Loader.EngineLoader.Instance?.QuitGame(); }
+                try
+                {
+                    var loader = EM.DOTS.Engine.Loader.EngineLoader.Instance;
+                    if (loader != null) loader.QuitGame();
+                }
                 catch (Exception e) { ModApiPlugin.Log.LogError($"Couldn't leave the match: {e.Message}"); }
                 return;
             }
@@ -519,10 +528,8 @@ namespace Sanctuary.ModApi
 
             if (_hostSession)
             {
-                var sig = RosterSignature();
-                if (sig != _rosterSig)
+                if (RosterChanged())
                 {
-                    _rosterSig = sig;
                     // Reports from players who left go with them.
                     var present = new HashSet<ulong>(Humans().Select(p => p.id.value));
                     foreach (var gone in _reports.Keys.Where(k => !present.Contains(k)).ToList()) _reports.Remove(gone);
@@ -597,7 +604,8 @@ namespace Sanctuary.ModApi
             _changeCounter++;
             ModEvents.RaiseSelectionChanged();
             // The advert carries a "[mods]" marker while anything is picked.
-            try { LobbyManager.RefreshServerAdvertisement(); } catch { }
+            try { LobbyManager.RefreshServerAdvertisement(); }
+            catch (Exception e) { ModApiPlugin.Log.LogWarning($"Refreshing the lobby's advert: {e.Message}"); }
         }
 
         private static ModSetMsg HostModSet() => new ModSetMsg
@@ -621,6 +629,19 @@ namespace Sanctuary.ModApi
             _hostResolved.Where(m => m.Manifest.Options.Count > 0).ToDictionary(m => m.Id, HostValues, StringComparer.Ordinal);
 
         internal static bool HostSelectionActive => _hostSession && _hostResolved.Count > 0;
+
+        /// The host has picked anything at all, resolved or not: what decides
+        /// whether a Start gate that threw refuses the start or lets a
+        /// vanilla lobby play. Plain field reads, so it can't throw itself.
+        internal static bool HostHasPicks => _hostSession && (_selection.Count > 0 || _hostResolved.Count > 0 || _aiPicks.Count > 0);
+
+        /// The start check threw part-way: undo the freeze it may have put on,
+        /// so the host can change the pick and try again.
+        internal static void HostStartFailed()
+        {
+            _locked = false;
+            _statusDirty = true;
+        }
 
         internal static void HostReceived(PlayerID sender, byte type, Unity.Collections.NativeArray<byte> payload)
         {
@@ -653,9 +674,32 @@ namespace Sanctuary.ModApi
         }
 
         // Names and seat types too: the status shows both, and is only
-        // worked out again when something in it has changed.
-        private static string RosterSignature() =>
-            string.Join(",", Humans().Select(p => p.id.value + ":" + (int)p.type + ":" + p.name));
+        // worked out again when something in it has changed. Checked every
+        // frame while hosting, so compared field by field against the last
+        // roster rather than built into a string.
+        private static readonly List<(ulong id, PlayerType type, string name)> _roster = new List<(ulong, PlayerType, string)>();
+
+        private static bool RosterChanged()
+        {
+            var players = LobbyManager.hostState?.players;
+            var n = 0;
+            var same = true;
+            if (players != null)
+            {
+                for (var i = 0; i < players.Count && same; i++)
+                {
+                    var p = players[i];
+                    if (p.type != PlayerType.Player && p.type != PlayerType.Observer) continue;
+                    same = n < _roster.Count && _roster[n].id == p.id.value && _roster[n].type == p.type &&
+                           string.Equals(_roster[n].name, p.name, StringComparison.Ordinal);
+                    n++;
+                }
+            }
+            if (same && n == _roster.Count) return false;
+            _roster.Clear();
+            foreach (var p in Humans()) _roster.Add((p.id.value, p.type, p.name));
+            return true;
+        }
 
         // A player who has just joined gets this long to say hello (their
         // client does on its first lobby state) before they count as having
@@ -797,8 +841,12 @@ namespace Sanctuary.ModApi
             if (!IsHost || !Settling) return false;
             if (_startQueuedAt < 0f)
             {
-                try { EM.UI.LobbyInterface.Instance?.AddChatMessage("Gameplay mods: starting as soon as everyone has the latest change…"); }
-                catch { }
+                try
+                {
+                    var ui = EM.UI.LobbyInterface.Instance;
+                    if (ui != null) ui.AddChatMessage("Gameplay mods: starting as soon as everyone has the latest change…");
+                }
+                catch (Exception e) { ModApiPlugin.Log.LogWarning($"Lobby chat line: {e.Message}"); }
             }
             _startQueuedAt = UnityEngine.Time.unscaledTime;
             return true;
@@ -864,8 +912,17 @@ namespace Sanctuary.ModApi
                 // button flickering grey for half a second.
                 button.Interactable(allReady && (GateOpen(out _) || Settling));
             }
-            catch { }
+            catch (Exception e)
+            {
+                // Every lobby redraw: once is enough. The start itself is
+                // still checked when it's asked for.
+                if (_startButtonErrorLogged) return;
+                _startButtonErrorLogged = true;
+                ModApiPlugin.Log.LogWarning($"Setting the Start button: {e}");
+            }
         }
+
+        private static bool _startButtonErrorLogged;
 
         // ---- client ------------------------------------------------------------
 

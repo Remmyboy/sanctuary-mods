@@ -18,6 +18,12 @@
 -- Numbers are in balance.lua.
 
 local Events = Import("modapi/events.lua").Events
+-- The host helpers below (Events.Guard, OnRequest and the rest) came with
+-- Mod API 1.8.
+if not Events.OnRequest then
+    Warn("Phantom-X needs Mod API 1.8.0 or later (a newer Mod Manager); its rules are off this match.")
+    return
+end
 local Options = Import("modoptions/sanctuarymods.phantomx.lua").Options
 local B = Import("phantomx/balance.lua")
 local Lobby = Import("common/lobby.lua")
@@ -54,7 +60,6 @@ local result = nil          -- how the match ended
 local paying = {}           -- [phantom] = { left = alloys still owed, target = army }
 local vampireHooked = false
 local dirty = true
-local lastSent = {}         -- [client id] = the state it has, as JSON
 local started = false
 local bonusEntity = {}      -- [army] = the economy entity its bonus arrives through
 local story = {}            -- what happened when, sent to everyone once it's over (for replays)
@@ -77,35 +82,18 @@ end
 -- ============================================================
 -- Reporting
 -- ============================================================
+--
+-- A problem goes in the game's log and the match's message log, once for
+-- each what: "Phantom-X: bonus".
 
-local reported = {}
-local function Report(what, err)
-    if reported[what] then return end
-    reported[what] = true
-    local text = string.gsub(tostring(err or ""), "%s*\n%s*", " < ")
-    if #text > 400 then text = string.sub(text, 1, 400) .. "..." end
-    Warn("Phantom-X: " .. what .. ": " .. text)
-    SessionCommands.AddLog.Send("Phantom-X problem: " .. what .. ": " .. text)
-end
-
-local function Guarded(what, fn, ...)
-    local ok, err = xpcall(fn, debug.traceback, ...)
-    if not ok then Report(what, err) end
-    return ok
-end
+local Guard = Events.Guard
 
 -- ============================================================
 -- Players
 -- ============================================================
 
-local function IsPlayerArmy(army)
-    local isEmptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot
-    return not army.civilian and not isEmptySlot
-end
-
-local function Name(army)
-    return (army.lobbyOptions and army.lobbyOptions.playerName) or army.name
-end
+local Name = Events.ArmyName
+local Ally, Enemy = Events.Ally, Events.Enemy
 
 local function Alive(army)
     return P[army] ~= nil and not P[army].dead
@@ -133,16 +121,6 @@ local function Clock(seconds)
     return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
-local function Ally(a, b)
-    a:SetAlly(b)
-    b:SetAlly(a)
-end
-
-local function Enemy(a, b)
-    a:SetEnemy(b)
-    b:SetEnemy(a)
-end
-
 -- ============================================================
 -- Notices
 -- ============================================================
@@ -167,8 +145,7 @@ local function Alert(to, title, text, colour)
         if to.id then to = { to } end
         for _, army in ipairs(to) do
             Push(army, notice)
-            local client = ClientOf(army)
-            if client then pcall(SessionCommands.AddLog.SendTo, client, line) end
+            Events.Tell(army, line)
         end
     end
     dirty = true
@@ -195,7 +172,8 @@ end
 ---own panel, the HUD) and in its stall maths, instead of resources turning
 ---up in storage from nowhere. The economy scales generation by its income
 ---multiplier, which the shares were already taken from, so that is
----divided out.
+---divided out. The economy is only told when the amount changes: each
+---update copies the entity and redoes the army's totals.
 local function SetBonusIncome(army, alloys, energy)
     local economy = army.economy
     if not economy then return end
@@ -208,8 +186,21 @@ local function SetBonusIncome(army, alloys, energy)
     end
     local m = economy.incomeAndBuildMultiplier
     if type(m) ~= "number" or m <= 0 then m = 1 end
-    e.income = { alloys = math.max(0, alloys) / m, energy = math.max(0, energy) / m }
+    local a, en = math.max(0, alloys) / m, math.max(0, energy) / m
+    if e.income.alloys == a and e.income.energy == en then return end
+    -- Changed in place: the economy keeps its own copy of what it last added.
+    e.income.alloys, e.income.energy = a, en
     economy:UpdateResourceEntity(e)
+end
+
+---What the panel shows of a bonus, per second.
+local function ShowBonus(army, alloys, energy, percent)
+    local b = P[army].bonus
+    if not b then
+        b = {}
+        P[army].bonus = b
+    end
+    b.alloys, b.energy, b.percent = alloys, energy, percent
 end
 
 ---The bonus an army is being paid this tick, as it arrives.
@@ -221,23 +212,21 @@ local function BonusOf(army)
     return e.income.alloys * m, e.income.energy * m
 end
 
----Every tick: each live phantom gets its share of the live innocents'
----combined income, and each unmarked paladin a part of that, as income.
----Paladins are innocents, so their own bonus is left out of what is shared
----(it would feed itself otherwise); everyone not paid this tick goes back to
----none.
-local function GiveBonus()
-    local paid = {}
-    local function Pay(army, alloys, energy)
-        paid[army] = true
-        SetBonusIncome(army, alloys, energy)
-    end
-    local function StopTheRest()
-        for army in pairs(bonusEntity) do
-            if not paid[army] then SetBonusIncome(army, 0, 0) end
-        end
-    end
+local paid = {}             -- [army] = true for those GiveBonus is paying
 
+local function StopTheRest()
+    for army in pairs(bonusEntity) do
+        if not paid[army] then SetBonusIncome(army, 0, 0) end
+    end
+end
+
+---Once a second, and when alliances change: each live phantom gets its
+---share of the live innocents' combined income, and each unmarked paladin
+---a part of that, as income, paid every tick until the next time. Paladins
+---are innocents, so their own bonus is left out of what is shared (it would
+---feed itself otherwise); everyone not paid this time goes back to none.
+local function GiveBonus()
+    for army in pairs(paid) do paid[army] = nil end
     local live = Living(phantoms)
     local row = Row(#live)
     if not row then return StopTheRest() end
@@ -273,19 +262,20 @@ local function GiveBonus()
                 end
             end
         end
-        Pay(phantom, alloys * own, energy * own)
-        P[phantom].bonus = { alloys = alloys * own * Events.TicksPerSecond, energy = energy * own * Events.TicksPerSecond,
-                             percent = own * 100 }
+        paid[phantom] = true
+        SetBonusIncome(phantom, alloys * own, energy * own)
+        ShowBonus(phantom, alloys * own * Events.TicksPerSecond, energy * own * Events.TicksPerSecond, own * 100)
     end
 
     local paladinShare = share * Options.paladinBonus / 100
     for _, paladin in ipairs(Living(paladins)) do
         if P[paladin].marked then
-            P[paladin].bonus = { alloys = 0, energy = 0, percent = 0 }
+            ShowBonus(paladin, 0, 0, 0)
         else
-            Pay(paladin, alloys * paladinShare, energy * paladinShare)
-            P[paladin].bonus = { alloys = alloys * paladinShare * Events.TicksPerSecond,
-                                 energy = energy * paladinShare * Events.TicksPerSecond, percent = paladinShare * 100 }
+            paid[paladin] = true
+            SetBonusIncome(paladin, alloys * paladinShare, energy * paladinShare)
+            ShowBonus(paladin, alloys * paladinShare * Events.TicksPerSecond,
+                energy * paladinShare * Events.TicksPerSecond, paladinShare * 100)
         end
     end
     StopTheRest()
@@ -411,7 +401,7 @@ local function EndMatch(winners, title, text)
         everyone[#everyone + 1] = { id = army.id, name = Name(army), role = P[army].role, marked = P[army].marked or nil }
     end
     local ok, err = pcall(SendToAllClients, { players = everyone, events = story, assignAt = declareAt }, StoryName)
-    if not ok then Report("story", err) end
+    if not ok then Events.Report("Phantom-X: story", err) end
     for _, army in ipairs(winners) do
         decided[army.id] = WinCondition.Won
         SessionCommands.ExecuteClientFunction.Send("WinConditionUpdate", { armyID = army.id, condition = WinCondition.Won })
@@ -573,7 +563,7 @@ local function RevealRound()
         if army then
             P[army].revealed = true
             Events.After(RevealsPhantoms() and B.PaladinRevealDelay or 0, function()
-                Guarded("reveal", Reveal, army)
+                Guard("Phantom-X: reveal", Reveal, army)
             end)
         end
     end
@@ -606,13 +596,13 @@ local function PlanReveals()
     local now = Events.GameTime()
     for i, when in ipairs(planned) do
         Events.After(when - now, function()
-            Guarded("reveal", RevealRound)
+            Guard("Phantom-X: reveal", RevealRound)
             nextRevealAt = planned[i + 1]
         end)
     end
     nextRevealAt = planned[1]
     local last = planned[#planned] or now
-    Events.After(last - now + B.RevealGap, function() Guarded("reveals", DoneRevealing, #planned > 0) end)
+    Events.After(last - now + B.RevealGap, function() Guard("Phantom-X: reveals", DoneRevealing, #planned > 0) end)
 end
 
 -- ============================================================
@@ -773,10 +763,9 @@ end
 -- Requests from the panel
 -- ============================================================
 
-local function HandleRequest(clientID, data)
+---army: the requesting player's, as the engine says which client sent it.
+local function HandleRequest(army, data)
     if phase == "over" or type(data) ~= "table" then return end
-    local player = clientID and Lobby.Players[clientID]
-    local army = player and player.armyID and Armies[player.armyID]
     if not army or not Alive(army) then return end
     local p = P[army]
     local target = tonumber(data.target) and Armies[tonumber(data.target)]
@@ -788,6 +777,9 @@ local function HandleRequest(clientID, data)
         p.offers[target] = nil
         P[target].offers[army] = nil
         Alert(nil, Name(army) .. " has broken the alliance with " .. Name(target), nil, Colours.phantom)
+        -- Who is allied with whom sets the phantoms' share: not left to the
+        -- next once-a-second bonus.
+        if phase == "playing" then GiveBonus() end
 
     elseif op == "ally" and validTarget and not army:IsAlly(target) then
         if phase == "war" then
@@ -800,6 +792,7 @@ local function HandleRequest(clientID, data)
             P[target].offers[army] = nil
             Ally(army, target)
             Alert(nil, Name(army) .. " and " .. Name(target) .. " are allies again", nil, Colours.innocent)
+            if phase == "playing" then GiveBonus() end
         else
             p.offers[target] = true
             Alert(target, Name(army) .. " offers an alliance", "Accept it on the Phantom-X panel.", Colours.innocent)
@@ -827,21 +820,12 @@ local function HandleRequest(clientID, data)
     dirty = true
 end
 
--- Requests come in as the game's client-to-host function calls. The game
--- passes those on without the client they came from, so its handler is
--- wrapped here to keep that, for this mod's calls only.
-do
-    local Call = SessionCommands.ExecuteHostFunction
-    local originalReceive = Call.Receive
-    Call.Receive = function(data, command)
-        local ok, call = pcall(json.decode, data and data.call or "")
-        if ok and type(call) == "table" and call.functionName == RequestName then
-            if started then Guarded("request", HandleRequest, command and command.clientID, call.functionData) end
-            return
-        end
-        return originalReceive(data, command)
-    end
-end
+-- Requests come in as the game's client-to-host function calls, with the
+-- client they came from (the Mod API keeps that, which the game's own
+-- handling drops). Before the match has started they are ignored.
+Events.OnRequest(RequestName, function(army, data)
+    if started then Guard("Phantom-X: request", HandleRequest, army, data) end
+end)
 
 -- ============================================================
 -- What each player is told
@@ -929,18 +913,15 @@ local function StateFor(viewer)
     return s
 end
 
+---A client's army, if it plays; observers see as nil.
+local function StateOf(army)
+    return StateFor(army and P[army] and army or nil)
+end
+
+---Each client is sent its state when it has changed.
 local function Broadcast()
     dirty = false
-    for clientID, player in pairs(Lobby.Players) do
-        local army = player.armyID and Armies[player.armyID]
-        local viewer = army and P[army] and army or nil
-        local state = StateFor(viewer)
-        local text = json.encode(state)
-        if text ~= lastSent[clientID] then
-            lastSent[clientID] = text
-            pcall(SendToClient, state, StateName, clientID)
-        end
-    end
+    Events.SendToEachClient(StateName, StateOf)
 end
 
 -- ============================================================
@@ -954,16 +935,8 @@ local function Start()
     math.randomseed(seed)
     for _ = 1, 4 do math.random() end
 
-    local ids = {}
-    for id in pairs(Armies) do ids[#ids + 1] = id end
-    table.sort(ids)
-    for _, id in ipairs(ids) do
-        local army = Armies[id]
-        if IsPlayerArmy(army) then
-            players[#players + 1] = army
-            P[army] = { offers = {}, score = 0 }
-        end
-    end
+    players = Events.Players()
+    for _, army in ipairs(players) do P[army] = { offers = {}, score = 0 } end
 
     -- Everyone allied, whatever the lobby's teams, and nobody's overflow
     -- going to anyone else.
@@ -974,24 +947,32 @@ local function Start()
     TakeOverWinCondition()
     started = true
 
-    Events.After(math.max(0, declareAt - B.VoteLead), function() Guarded("vote", OpenVote) end)
-    Events.After(math.max(0, declareAt - B.VolunteerLead), function() Guarded("volunteers", OpenVolunteers) end)
-    Events.After(declareAt, function() Guarded("assignment", Assign) end)
+    Events.After(math.max(0, declareAt - B.VoteLead), function() Guard("Phantom-X: vote", OpenVote) end)
+    Events.After(math.max(0, declareAt - B.VolunteerLead), function() Guard("Phantom-X: volunteers", OpenVolunteers) end)
+    Events.After(declareAt, function()
+        Guard("Phantom-X: assignment", Assign)
+        if phase == "playing" then Guard("Phantom-X: bonus", GiveBonus) end
+    end)
     Events.Every(1, function()
-        Guarded("check", Check)
+        -- The bonus is paid every tick at the rate worked out here. Worked
+        -- out before the check, so the second a phantom war starts it was
+        -- last set with the dead innocents' income, as when it was worked
+        -- out every tick.
+        if phase == "playing" then Guard("Phantom-X: bonus", GiveBonus) end
+        Guard("Phantom-X: check", Check)
         dirty = true
     end)
     Events.OnTick(function()
-        if phase == "pending" then Guarded("spending", TallySpending)
-        elseif phase == "playing" then Guarded("bonus", GiveBonus) end
-        if phase == "playing" or phase == "war" then Guarded("marks", TakePayments) end
-        if dirty then Guarded("state", Broadcast) end
+        if phase == "pending" then Guard("Phantom-X: spending", TallySpending) end
+        if phase == "playing" or phase == "war" then Guard("Phantom-X: marks", TakePayments) end
+        if dirty then Guard("Phantom-X: state", Broadcast) end
     end)
 
     Alert(nil, "Phantom-X", "Everyone is allied. In " .. Clock(declareAt) .. " some of you become phantoms.", Colours.neutral)
-    Log("Phantom-X: " .. #players .. " players, phantoms chosen at " .. declareAt .. " s")
+    -- Warn: Log is debug-level and never reaches Player.log.
+    Warn("Phantom-X: " .. #players .. " players, phantoms chosen at " .. declareAt .. " s")
 end
 
 Events.OnMatchStart(function()
-    Guarded("setup", Start)
+    Guard("Phantom-X: setup", Start)
 end)
