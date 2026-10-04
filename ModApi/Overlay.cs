@@ -369,7 +369,13 @@ namespace Sanctuary.ModApi
                     {
                         if (File.ReadAllText(Path.Combine(mod.LuaRootPath, onDisk)).Contains(path)) return true;
                     }
-                    catch { }
+                    catch (Exception e)
+                    {
+                        // Left out here and put in on a machine that could
+                        // read the file, the same mods hash differently.
+                        ModApiPlugin.Log.LogWarning($"Couldn't read {mod.Id}'s {rel} to see whether it uses {path} ({e.Message}); " +
+                                                    "if it does, this player's Lua won't match the lobby's.");
+                    }
                 }
             return false;
         }
@@ -634,7 +640,8 @@ namespace Sanctuary.ModApi
             // went with the old dictionary — nothing references these arrays.
             foreach (var arr in Allocated)
             {
-                try { if (arr.IsCreated) arr.Dispose(); } catch { }
+                try { if (arr.IsCreated) arr.Dispose(); }
+                catch { /* freed with the old cache already: nothing to do */ }
             }
             Pristine.Clear();
             Added.Clear();

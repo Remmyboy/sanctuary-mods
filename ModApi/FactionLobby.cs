@@ -6,6 +6,7 @@ using EM.Core;
 using EM.Network;
 using EM.UI;
 using HarmonyLib;
+using SanctuaryHud;
 using UnityEngine;
 using BeamDropdown = Michsky.UI.Beam.Dropdown;
 using LobbyPlayer = EM.Network.Lobby.LobbyPlayer;
@@ -134,7 +135,7 @@ namespace Sanctuary.ModApi
                 var ui = LobbyInterface.Instance;
                 if (ui != null && LobbyManager.CurrentState != null) ui.UpdateData(LobbyManager.CurrentState);
             }
-            catch { }
+            catch (Exception e) { ModApiPlugin.Log.LogWarning($"Redrawing the lobby after a faction change: {e.Message}"); }
         }
 
         private static bool Mine(LobbyPlayer p) =>
@@ -142,10 +143,22 @@ namespace Sanctuary.ModApi
 
         // ---- icons -------------------------------------------------------------
 
-        private static readonly Dictionary<string, (DateTime stamp, Sprite sprite)> Icons =
-            new Dictionary<string, (DateTime, Sprite)>(StringComparer.OrdinalIgnoreCase);
+        private sealed class Icon
+        {
+            internal DateTime? Stamp;
+            internal float CheckedAt = -1f;
+            internal Texture2D Texture;
+            internal Sprite Sprite;
+            // A sprite was made: if Sprite now reads as null, Unity destroyed
+            // it (Generated.DestroyAll at a match's end) and it is made again.
+            internal bool Made;
+        }
 
-        private static System.Reflection.MethodInfo _loadImage;
+        private static readonly Dictionary<string, Icon> Icons = new Dictionary<string, Icon>(StringComparer.OrdinalIgnoreCase);
+
+        // Every row asks on every lobby redraw: the file is looked at no more
+        // often than this.
+        private const float IconCheckSeconds = 1f;
 
         /// The faction's PNG as a sprite, loaded once per version of the file;
         /// null for none, or one that won't load.
@@ -153,26 +166,29 @@ namespace Sanctuary.ModApi
         {
             if (f.Faction.Icon.Length == 0) return null;
             var path = Path.Combine(f.Mod.Folder, f.Faction.Icon);
+            if (!Icons.TryGetValue(path, out var icon)) Icons[path] = icon = new Icon();
+            var lost = icon.Made && icon.Sprite == null;
+            var now = Time.unscaledTime;
+            if (!lost && icon.CheckedAt >= 0f && now - icon.CheckedAt < IconCheckSeconds) return icon.Sprite;
+            icon.CheckedAt = now;
             try
             {
-                if (!File.Exists(path)) return null;
-                var stamp = File.GetLastWriteTimeUtc(path);
-                if (Icons.TryGetValue(path, out var cached) && cached.stamp == stamp) return cached.sprite;
-                // ImageConversion lives in its own Unity module; looked up so
-                // the API needn't reference it.
-                _loadImage = _loadImage ?? Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")
-                    ?.GetMethod("LoadImage", new[] { typeof(Texture2D), typeof(byte[]) });
-                if (_loadImage == null) return null;
-                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = "Faction icon " + f.Faction.Key };
-                if (!(bool)_loadImage.Invoke(null, new object[] { tex, File.ReadAllBytes(path) }))
+                DateTime? stamp = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : (DateTime?)null;
+                if (!lost && stamp == icon.Stamp) return icon.Sprite;
+                Release(icon);
+                icon.Stamp = stamp;
+                if (stamp == null) return null;
+                var tex = Generated.DecodePng(File.ReadAllBytes(path), "Faction icon " + f.Faction.Key);
+                if (tex == null)
                 {
                     ModApiPlugin.Log.LogWarning($"Faction icon {f.Faction.Icon} of '{f.Mod.Name}' isn't a PNG Unity can read.");
-                    Icons[path] = (stamp, null);
                     return null;
                 }
                 var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                 sprite.name = tex.name;
-                Icons[path] = (stamp, sprite);
+                icon.Texture = tex;
+                icon.Sprite = Generated.Keep(sprite);
+                icon.Made = true;
                 return sprite;
             }
             catch (Exception e)
@@ -180,6 +196,17 @@ namespace Sanctuary.ModApi
                 ModApiPlugin.Log.LogWarning($"Faction icon {f.Faction.Icon} of '{f.Mod.Name}': {e.Message}");
                 return null;
             }
+        }
+
+        /// The file changed or went: the old picture goes with it, rather
+        /// than staying in memory for the rest of the session.
+        private static void Release(Icon icon)
+        {
+            if (icon.Sprite != null) UnityEngine.Object.Destroy(icon.Sprite);
+            if (icon.Texture != null) UnityEngine.Object.Destroy(icon.Texture);
+            icon.Sprite = null;
+            icon.Texture = null;
+            icon.Made = false;
         }
     }
 }
