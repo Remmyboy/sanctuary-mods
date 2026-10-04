@@ -319,11 +319,20 @@ namespace SanctuaryHud
             rt.sizeDelta = new Vector2(w, h);
         }
 
+        private static List<Vector2> _drawnSpots;
+        private static Rect _drawnSpotArea;
+        private static float _drawnDot;
+
         private static void SyncSpots(Rect area, float k)
         {
             var spots = _cfgAlloySpots.Value ? Contacts.AlloySpots : null;
             var count = spots != null ? spots.Count : 0;
             var dot = 3f * k;
+            // The deposits are read every two seconds: laid out only then.
+            if (ReferenceEquals(spots, _drawnSpots) && area == _drawnSpotArea && dot == _drawnDot && _drawnSpots != null) return;
+            _drawnSpots = spots;
+            _drawnSpotArea = area;
+            _drawnDot = dot;
             for (var i = 0; i < count; i++)
             {
                 if (i >= _spots.Count) _spots.Add(Dot(_map, "Alloy", AlloyColour));
@@ -398,6 +407,7 @@ namespace SanctuaryHud
             _icons.Clear();
             _spots.Clear();
             _drawnContacts = null;
+            _drawnSpots = null;
             _plateImage = HudCanvas.Fill(root, "Mini-map", HudStyle.PlateTint);
             _plateImage.raycastTarget = true;
             HudStyle.Dress(_plateImage);
@@ -560,6 +570,7 @@ namespace SanctuaryHud
             _icons.Clear();
             _spots.Clear();
             _drawnContacts = null;
+            _drawnSpots = null;
         }
     }
 }
