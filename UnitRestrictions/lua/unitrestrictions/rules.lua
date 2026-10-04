@@ -15,6 +15,9 @@ local decided = {}
 -- Anything restricted at all: with nothing, the mod changes nothing.
 Any = (Options.noLand or Options.noAir or Options.noNaval or Options.noExperimental or next(picked) ~= nil) and true or false
 
+-- The sections switched off, by the AI's layer names (AI useLayer).
+LayersOff = { land = Options.noLand and true or nil, air = Options.noAir and true or nil, water = Options.noNaval and true or nil }
+
 local function tagged(tag, tpId)
     return Tags[tag][tpId] and true or false
 end
@@ -30,13 +33,14 @@ local function decide(tpId)
 end
 
 -- Tags are complete once the templates have loaded, which is before anything
--- builds, so each answer is worked out once.
+-- builds, so each answer is worked out once. An answer asked for before the
+-- unit's template is in (the AI's unit list can be read early) isn't kept.
 function IsRestricted(tpId)
     if not Any or type(tpId) ~= "string" then return false end
     local answer = decided[tpId]
     if answer == nil then
         answer = decide(tpId) and true or false
-        decided[tpId] = answer
+        if rawget(Tags, "ALL_UNITS") and Tags.ALL_UNITS[tpId] then decided[tpId] = answer end
     end
     return answer
 end

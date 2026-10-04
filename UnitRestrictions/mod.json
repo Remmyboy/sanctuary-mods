@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.unitrestrictions",
   "name": "Unit Restrictions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Sanctuary Mods",
   "description": "The host takes units out of the match: whole sections (land, air, naval, experimentals), a kind of unit for every faction (every T1 tank), or one faction's unit alone (just the EDA Puma). Restricted units leave every build menu and the host refuses them if anything queues one anyway, AI armies included. Engineers and commanders are never restricted by a section.",
   "kind": "gameplay",
