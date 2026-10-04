@@ -18,6 +18,16 @@
 --   Events.Kills(army)  -- enemy units the army has killed
 --   Events.IsHost()     -- true in the simulation, false in a client
 --
+-- Helpers for host scripts (Mod API 1.8):
+--   Events.Players()          -- the player armies, AI included, by army id
+--   Events.ArmyName(army)     -- the player's name, or the army's
+--   Events.Ally(a, b), Events.Enemy(a, b)      -- both ways round
+--   Events.Guard(what, fn, ...)  -- runs fn; an error is reported once
+--   Events.Report(what, err)     -- in the log, and the match's message log
+--   Events.Tell(army, text)      -- a line in one player's message log
+--   Events.SendToEachClient(name, fn)  -- fn(army, clientId)'s table, if changed
+--   Events.OnRequest(name, fn)   -- fn(army, data, clientId) for SendToHost(data, name)
+--
 -- info = { army, unit, cause, destroyType }: who dealt the damage (either
 -- may be nil) and how: "projectile", "area", "beam", "dash",
 -- "deathExplosion", or "none" when nothing did (an army's defeat, a script).
@@ -139,17 +149,32 @@ function Events.Every(seconds, fn)
     return addTimer(seconds, true, fn, "Every")
 end
 
+-- Every tick, so nothing is made here: the timers still wanted are packed
+-- down in place, and the due ones go in a list kept for the purpose. Which
+-- run is settled before any of them does: a timer one of them sets up waits
+-- for the next tick.
+local dueNow = {}
+
 local function runTimers(tick)
-    local due = {}
-    local keep = {}
-    for _, t in ipairs(timers) do
+    local count = #timers
+    local kept, due = 0, 0
+    for i = 1, count do
+        local t = timers[i]
         if not t.cancelled then
-            if t.due <= tick then due[#due + 1] = t end
-            if t.every or t.due > tick then keep[#keep + 1] = t end
+            if t.due <= tick then
+                due = due + 1
+                dueNow[due] = t
+            end
+            if t.every or t.due > tick then
+                kept = kept + 1
+                timers[kept] = t
+            end
         end
     end
-    timers = keep
-    for _, t in ipairs(due) do
+    for i = kept + 1, count do timers[i] = nil end
+    for i = 1, due do
+        local t = dueNow[i]
+        dueNow[i] = nil
         if not t.cancelled then
             call(t.what, t.fn)
             if t.every then t.due = t.due + t.every end
@@ -184,8 +209,14 @@ local damagedHandlers = {}
 local killsByArmy = {}
 local damageWanted = false     -- any mod listening; until then the hooks just pass through
 local damageHooked = false
-local sourceStack = {}         -- what is dealing damage right now, innermost last
-local hitStack = {}            -- units taking damage right now: { victim, info, final }
+-- What is dealing damage right now, innermost last, and the units taking it.
+-- Both run on every hit, so their records are kept and reused by depth
+-- rather than made each time: sources[i] = { army, unit, cause }, hits[i] =
+-- { victim, army, unit, cause, destroyType, final, info }. Nothing outside
+-- this file sees them; the info table handlers get is made per hit, and only
+-- when a handler needs it.
+local sources, sourceDepth = {}, 0
+local hits, hitDepth = {}, 0
 local muzzleUnits = setmetatable({}, { __mode = "v" })
 
 local hookDamage -- below
@@ -240,27 +271,59 @@ function Events.Kills(army)
     return killsByArmy[id] or 0
 end
 
--- Pops a stack back to depth n-1 whatever happened, then returns or rethrows.
-local function unwind(stack, n, ok, ...)
-    for i = #stack, n, -1 do stack[i] = nil end
+-- Pops the sources back to depth d whatever happened (letting go of the
+-- units they held), then returns or rethrows.
+local function unwindSources(d, ok, ...)
+    for i = sourceDepth, d + 1, -1 do
+        local s = sources[i]
+        s.army, s.unit, s.cause = nil, nil, nil
+    end
+    sourceDepth = d
     if not ok then error((...), 0) end
     return ...
 end
 
-local function withSource(source, fn, ...)
-    local n = #sourceStack + 1
-    sourceStack[n] = source
-    return unwind(sourceStack, n, pcall(fn, ...))
+local function withSource(army, unit, cause, fn, ...)
+    local d = sourceDepth
+    local s = sources[d + 1]
+    if not s then
+        s = {}
+        sources[d + 1] = s
+    end
+    s.army, s.unit, s.cause = army, unit, cause
+    sourceDepth = d + 1
+    return unwindSources(d, pcall(fn, ...))
+end
+
+local function currentSource()
+    return sourceDepth > 0 and sources[sourceDepth] or nil
 end
 
 local function currentInfo(destroyType)
-    local src = sourceStack[#sourceStack]
+    local src = currentSource()
     return {
         army = src and src.army or nil,
         unit = src and src.unit or nil,
         cause = src and src.cause or "none",
         destroyType = destroyType,
     }
+end
+
+-- The info for a hit, made the first time a handler needs it and shared by
+-- every handler of that hit after, as one table always was.
+local function infoOf(hit)
+    local info = hit.info
+    if not info then
+        info = { army = hit.army, unit = hit.unit, cause = hit.cause, destroyType = hit.destroyType }
+        hit.info = info
+    end
+    return info
+end
+
+local function currentHit(victim)
+    local hit = hitDepth > 0 and hits[hitDepth] or nil
+    if hit and hit.victim == victim then return hit end
+    return nil
 end
 
 local function wrap(tbl, name, make)
@@ -307,41 +370,38 @@ function hookDamage()
                 local army = Armies[projectile.armyId]
                 local unit = projectile.muzzleId and muzzleUnits[projectile.muzzleId.index]
                 if unit and unit.army ~= army then unit = nil end -- a muzzle id reused since
-                return withSource({ army = army, unit = unit, cause = "projectile" }, original, event, ...)
+                return withSource(army, unit, "projectile", original, event, ...)
             end
         end)
         wrap(collision, "ProcessAreaDamage", function(original)
             return function(position, radius, damage, army, damageFriendly, ...)
                 if not damageWanted then return original(position, radius, damage, army, damageFriendly, ...) end
-                local outer = sourceStack[#sourceStack]
-                local source
+                local outer = currentSource()
                 if outer and outer.cause == "deathExplosion" then
-                    source = outer
+                    return withSource(outer.army, outer.unit, outer.cause, original, position, radius, damage, army, damageFriendly, ...)
                 elseif outer and (army == nil or outer.army == army) then
                     -- Splash from a projectile hit keeps the unit that fired.
-                    source = { army = outer.army, unit = outer.unit, cause = "area" }
-                else
-                    source = { army = army, unit = nil, cause = "area" }
+                    return withSource(outer.army, outer.unit, "area", original, position, radius, damage, army, damageFriendly, ...)
                 end
-                return withSource(source, original, position, radius, damage, army, damageFriendly, ...)
+                return withSource(army, nil, "area", original, position, radius, damage, army, damageFriendly, ...)
             end
         end)
         wrap(HostBeam, "Fire", function(original)
             return function(self, ...)
                 if not damageWanted or not self.unit then return original(self, ...) end
-                return withSource({ army = self.unit.army, unit = self.unit, cause = "beam" }, original, self, ...)
+                return withSource(self.unit.army, self.unit, "beam", original, self, ...)
             end
         end)
         wrap(HostUnit, "CheckDashCollisionsWithUnits", function(original)
             return function(self, ...)
                 if not damageWanted then return original(self, ...) end
-                return withSource({ army = self.army, unit = self, cause = "dash" }, original, self, ...)
+                return withSource(self.army, self, "dash", original, self, ...)
             end
         end)
         wrap(HostUnit, "CreateDeathExplosions", function(original)
             return function(self, ...)
                 if not damageWanted then return original(self, ...) end
-                return withSource({ army = self.army, unit = self, cause = "deathExplosion" }, original, self, ...)
+                return withSource(self.army, self, "deathExplosion", original, self, ...)
             end
         end)
 
@@ -351,12 +411,30 @@ function hookDamage()
                 if not damageWanted or self.dead or not self.canTakeDamage then
                     return original(self, amount, destroyType, ...)
                 end
-                local hit = { victim = self, info = currentInfo(destroyType) }
-                local n = #hitStack + 1
-                hitStack[n] = hit
-                unwind(hitStack, n, pcall(original, self, amount, destroyType, ...))
-                if hit.final and #damagedHandlers > 0 then
-                    for _, fn in ipairs(damagedHandlers) do call("OnUnitDamaged", fn, self, hit.final, hit.info) end
+                -- Who is dealing it is noted now, as the hit starts.
+                local d = hitDepth
+                local hit = hits[d + 1]
+                if not hit then
+                    hit = {}
+                    hits[d + 1] = hit
+                end
+                local src = currentSource()
+                hit.victim, hit.final, hit.info = self, nil, nil
+                hit.army = src and src.army or nil
+                hit.unit = src and src.unit or nil
+                hit.cause = src and src.cause or "none"
+                hit.destroyType = destroyType
+                hitDepth = d + 1
+                local ok, err = pcall(original, self, amount, destroyType, ...)
+                -- Read before the record is let go: a handler below may
+                -- deal damage itself, and reuse it.
+                local final = hit.final
+                local info = final and #damagedHandlers > 0 and infoOf(hit) or nil
+                hit.victim, hit.army, hit.unit, hit.info = nil, nil, nil, nil
+                hitDepth = d
+                if not ok then error(err, 0) end
+                if info then
+                    for _, fn in ipairs(damagedHandlers) do call("OnUnitDamaged", fn, self, final, info) end
                 end
             end
         end)
@@ -364,10 +442,9 @@ function hookDamage()
             return function(self, damage, ...)
                 local amount = original(self, damage, ...)
                 if not damageWanted then return amount end
-                local hit = hitStack[#hitStack]
-                if not (hit and hit.victim == self) then hit = nil end
+                local hit = currentHit(self)
                 if #damageModifiers > 0 then
-                    local info = hit and hit.info or currentInfo(nil)
+                    local info = hit and infoOf(hit) or currentInfo(nil)
                     for _, fn in ipairs(damageModifiers) do
                         local okFn, result = xpcall(fn, debug.traceback, self, amount, info)
                         if not okFn then
@@ -390,10 +467,10 @@ function hookDamage()
                 local wasAlive = not self.dead
                 original(self, overkillRatio, destroyType, ...)
                 if not (damageWanted and wasAlive and self.dead) then return end
-                local hit = hitStack[#hitStack]
+                local hit = currentHit(self)
                 local info
-                if hit and hit.victim == self then
-                    info = hit.info
+                if hit then
+                    info = infoOf(hit)
                     info.destroyType = destroyType or info.destroyType
                 else
                     info = { cause = "none", destroyType = destroyType }
@@ -427,11 +504,153 @@ local function hookDefeats()
     end
 end
 
+-- ---- helpers for host scripts ------------------------------------------------
+--
+-- What every rules mod ended up writing for itself. The game's modules are
+-- imported when first needed: this file can be imported before they exist.
+
+local function lobby() return Import("common/lobby.lua") end
+local function session() return Import("common/commands/definitions/session.lua") end
+
+--- The players' armies, AI included, by ascending army id: every army but
+--- the civilian ones and empty start slots. A new list each call.
+function Events.Players()
+    local ids = {}
+    for id in pairs(Armies or {}) do ids[#ids + 1] = id end
+    table.sort(ids)
+    local out = {}
+    for _, id in ipairs(ids) do
+        local army = Armies[id]
+        local emptySlot = army.lobbyOptions and army.lobbyOptions.isEmptySlot
+        if not army.civilian and not emptySlot then out[#out + 1] = army end
+    end
+    return out
+end
+
+--- The name the player chose in the lobby, or the army's own name.
+function Events.ArmyName(army)
+    return (army.lobbyOptions and army.lobbyOptions.playerName) or army.name
+end
+
+--- Makes two armies allies, both ways round.
+function Events.Ally(a, b)
+    a:SetAlly(b)
+    b:SetAlly(a)
+end
+
+--- Makes two armies enemies, both ways round.
+function Events.Enemy(a, b)
+    a:SetEnemy(b)
+    b:SetEnemy(a)
+end
+
+local reportedWhat = {}
+
+--- Reports a problem once for each `what`: in the game's log (Warn), and on
+--- the host in the match's message log too, where players see it. Name the
+--- mod in `what` ("Alice's No Rush: spawning"). A traceback is folded onto
+--- one line and cut short.
+function Events.Report(what, err)
+    what = tostring(what)
+    if reportedWhat[what] then return end
+    reportedWhat[what] = true
+    local text = tostring(err or "")
+    text = string.gsub(text, "stack traceback:", "")
+    text = string.gsub(text, "%s*\n%s*", " < ")
+    if #text > 400 then text = string.sub(text, 1, 400) .. "..." end
+    local line = what .. ": " .. text
+    if Warn then Warn(line) elseif Log then Log(line) end
+    if side == "host" then pcall(function() session().AddLog.Send(line) end) end
+end
+
+--- Runs fn(...) and returns true; if it errors, reports it (Events.Report)
+--- and returns false.
+function Events.Guard(what, fn, ...)
+    local ok, err = xpcall(fn, debug.traceback, ...)
+    if not ok then Events.Report(what, err) end
+    return ok
+end
+
+--- Host only: a line in the message log of the player an army belongs to.
+--- Nothing for an AI's army.
+function Events.Tell(army, text)
+    local player = lobby().ArmyToPlayer[army.id]
+    if player and player.clientID then
+        local ok, err = pcall(session().AddLog.SendTo, player.clientID, text)
+        if not ok then Events.Report("[Mod API] Events.Tell", err) end
+    end
+end
+
+local sentTo = {}   -- [name] = { [client id] = what it was last sent, as JSON }
+
+--- Host only: sends every client (each player, and each observer) the table
+--- fn(army, clientId) returns for it, as SendToClient(data, name, clientId)
+--- would, but only when it differs from what that client was last sent
+--- under that name. army is the client's army, nil for an observer; return
+--- nil to send nothing. The client receives it with
+--- RegisterListener("client_" .. name, fn).
+function Events.SendToEachClient(name, fn)
+    local last = sentTo[name]
+    if not last then
+        last = {}
+        sentTo[name] = last
+    end
+    for clientId, player in pairs(lobby().Players) do
+        local army = player.armyID and Armies[player.armyID] or nil
+        local data = fn(army, clientId)
+        if data ~= nil then
+            local text = json.encode(data)
+            if text ~= last[clientId] then
+                last[clientId] = text
+                local ok, err = pcall(SendToClient, data, name, clientId)
+                if not ok then Events.Report("[Mod API] Events.SendToEachClient " .. tostring(name), err) end
+            end
+        end
+    end
+end
+
+local requestHandlers = {}
+local requestsHooked = false
+
+-- A client's SendToHost reaches the host as an ExecuteHostFunction command,
+-- which the game passes on without saying which client sent it. The engine
+-- does say, to the command's handler: that handler is wrapped here to keep
+-- it, for the names a mod has asked for only. Everything else goes on to the
+-- game as before.
+local function hookRequests()
+    if requestsHooked then return end
+    requestsHooked = true
+    local Call = session().ExecuteHostFunction
+    local originalReceive = Call.Receive
+    Call.Receive = function(data, command)
+        local ok, decoded = pcall(json.decode, data and data.call or "")
+        local fn = ok and type(decoded) == "table" and requestHandlers[decoded.functionName]
+        if not fn then return originalReceive(data, command) end
+        local clientId = command and command.clientID
+        local player = clientId and lobby().Players[clientId]
+        local army = player and player.armyID and Armies[player.armyID] or nil
+        call("OnRequest", fn, army, decoded.functionData, clientId)
+    end
+end
+
+--- Host only: runs fn(army, data, clientId) when a client calls
+--- SendToHost(data, name), instead of the game's own handling. army is the
+--- sender's army (nil for an observer), as the engine names the client it
+--- came from, so a player can't act for another. One handler per name: a
+--- later one replaces it.
+function Events.OnRequest(name, fn)
+    assert(type(name) == "string", "Events.OnRequest takes a request name")
+    assert(type(fn) == "function", "Events.OnRequest takes a function")
+    requestHandlers[name] = fn
+    if side == "host" then hookRequests() end
+end
+
 --- Called once by the framework from the end of host/hostMain.lua or
 --- client/clientMain.lua. Not for mods.
 function Events._Install(where)
     if side then return end
     side = where
+    if where == "host" and next(requestHandlers) then hookRequests() end
     local original = _G.OnSimulationTickUpdate
     if type(original) ~= "function" then
         report("install", "the game has no OnSimulationTickUpdate here; match events won't fire")
