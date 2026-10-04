@@ -33,7 +33,6 @@ namespace SanctuaryHud
         private static FieldInfo[] _ecoFields;
 
         // ---- idle-builder polling ----
-        private const int IdleIconIndex = 2;
         internal static int _idleCount;
         internal static string _pollStatus = "starting";
         private static float _pollAccum;
@@ -81,7 +80,6 @@ namespace SanctuaryHud
         /// The subset currently upgrading, same tier keys.
         internal static List<IdleGroup> _alloyUpgradingGroups = new List<IdleGroup>();
         internal static int _alloyCount;
-        internal static int _alloyUpgradingCount;
 
         // ---- commander ----
         // "bot2_t1_direct" is the commander icon for all three factions and is
@@ -191,19 +189,6 @@ namespace SanctuaryHud
         /// The sprite itself, for a uGUI Image; null when it isn't loaded.
         internal static Sprite SpriteFor(uint index) => ResolveSprite(index);
 
-        /// Draws one in IMGUI. A Sprite's pixels are a window into a packed
-        /// atlas, so the draw has to be told which corner of the texture.
-        /// `fraction` clips it horizontally, for showing one running off an edge.
-        internal static void DrawSprite(Rect rect, uint index, float fraction = 1f)
-        {
-            var sprite = ResolveSprite(index);
-            var tex = sprite == null ? null : sprite.texture;
-            if (tex == null) return;
-            var tr = sprite.textureRect;
-            GUI.DrawTextureWithTexCoords(rect, tex,
-                new Rect(tr.x / tex.width, tr.y / tex.height, tr.width * fraction / tex.width, tr.height / tex.height));
-        }
-
         private static readonly int IconAtlasId = Shader.PropertyToID("_StrategicIconAtlas");
 
         private static void ResolveIconAtlas()
@@ -294,42 +279,55 @@ namespace SanctuaryHud
             _log?.LogInfo($"Economy hook: patched {patched} method(s).");
         }
 
+        private static float[] _ecoValues;
+
         internal static void EconomyValuesPostfix(object __instance, object[] __args)
         {
-            var box = __args?.FirstOrDefault(a => a != null && a.GetType().Name.Contains("UIEconomyValues"));
+            object box = null;
+            if (__args != null)
+            {
+                foreach (var arg in __args)
+                {
+                    if (arg != null && arg.GetType().Name.Contains("UIEconomyValues"))
+                    {
+                        box = arg;
+                        break;
+                    }
+                }
+            }
             if (box == null) return;
 
             _ecoFields ??= box.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            _ecoValues ??= new float[_ecoFields.Length];
 
-            var snapshot = new Dictionary<string, float>(_ecoFields.Length);
-            foreach (var f in _ecoFields)
+            // The patch lands on both SetAlloyValues and SetEnergyValues,
+            // which the game calls back to back with the same struct, so
+            // every Lua update arrives here twice. Count it once, so a
+            // consumer smoothing per update runs at the real data rate, and
+            // only make a new snapshot (consumers keep the old one) when a
+            // value moved.
+            var changed = false;
+            for (var i = 0; i < _ecoFields.Length; i++)
             {
-                var v = f.GetValue(box);
-                snapshot[f.Name] = v is IConvertible c ? Convert.ToSingle(c) : 0f;
+                var v = _ecoFields[i].GetValue(box);
+                var f = v is IConvertible c ? Convert.ToSingle(c, CultureInfo.InvariantCulture) : 0f;
+                if (f != _ecoValues[i]) changed = true;
+                _ecoValues[i] = f;
             }
             lock (_ecoLock)
             {
-                // The patch lands on both SetAlloyValues and SetEnergyValues,
-                // which the game calls back to back with the same struct, so
-                // every Lua update arrives here twice. Count it once, so a
-                // consumer smoothing per update runs at the real data rate.
-                if (!SameSnapshot(_eco, snapshot)) _ecoSequence++;
-                _eco = snapshot;
+                if (changed || _eco == null)
+                {
+                    var snapshot = new Dictionary<string, float>(_ecoFields.Length);
+                    for (var i = 0; i < _ecoFields.Length; i++) snapshot[_ecoFields[i].Name] = _ecoValues[i];
+                    _ecoSequence++;
+                    _eco = snapshot;
+                }
             }
             if (__instance is Component panel) _ecoPanel = panel;
             // The host streams economy continuously during a match and never
             // outside one, so this doubles as the "am I in a game?" signal.
             _lastEcoRealtime = Time.realtimeSinceStartup;
-        }
-
-        private static bool SameSnapshot(Dictionary<string, float> a, Dictionary<string, float> b)
-        {
-            if (a == null || b == null || a.Count != b.Count) return false;
-            foreach (var kv in a)
-            {
-                if (!b.TryGetValue(kv.Key, out var v) || v != kv.Value) return false;
-            }
-            return true;
         }
 
         private static float _lastEcoRealtime = -999f;
@@ -405,8 +403,6 @@ namespace SanctuaryHud
         private static bool _loggedIdleIndexWait;
         // Cached for the late-resolve retries (see PollIdleBuilders).
         private static Type _iconLoaderType;
-        private static int _idleAllCount;
-        private static int _idleBuilderCount;
 
         // ---- ownership filter: local army colour matching ----
         // Render entities carry no army id, but every unit's renderer tint is
@@ -605,11 +601,21 @@ namespace SanctuaryHud
             return null;
         }
 
+        private static readonly object[] _entityArg = new object[1];
+
+        /// The argument array for a GetComponentData(entity) call, reused:
+        /// the unit scan makes several per unit. Main thread only.
+        private static object[] EntityArg(object entity)
+        {
+            _entityArg[0] = entity;
+            return _entityArg;
+        }
+
         private static bool ColourMatches(object em, object entity, Vector4 target)
         {
             try
             {
-                var renderer = _getRendererMi.Invoke(em, new[] { entity });
+                var renderer = _getRendererMi.Invoke(em, EntityArg(entity));
                 var instance = _instanceData0Field.GetValue(_renderInstanceDataField.GetValue(renderer));
                 var dx = Convert.ToSingle(_f4x.GetValue(instance)) - target.x;
                 var dy = Convert.ToSingle(_f4y.GetValue(instance)) - target.y;
@@ -857,14 +863,14 @@ namespace SanctuaryHud
             {
                 if (_localIdField != null && _getLocalIdMi != null)
                 {
-                    var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var localComponent = _getLocalIdMi.Invoke(em, EntityArg(entity));
                     var localId = _localIdField.GetValue(localComponent);
                     var indexField = IndexField(localId);
                     if (indexField != null) _commanderLocalIndex = Convert.ToInt32(indexField.GetValue(localId));
                 }
 
                 if (_getPairedGlobalMi == null || _getHealthMi == null) return;
-                var pairedComponent = _getPairedGlobalMi.Invoke(em, new[] { entity });
+                var pairedComponent = _getPairedGlobalMi.Invoke(em, EntityArg(entity));
                 var globalId = _pairedGlobalField.GetValue(pairedComponent);
                 // A commander that has died can still be drawn for a while;
                 // its id is known to be gone, so don't ask about it again.
@@ -1017,7 +1023,7 @@ namespace SanctuaryHud
                 // LocalID index is the key the selection system uses.
                 if (_localIdField != null && _getLocalIdMi != null)
                 {
-                    var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
                     var localId = _localIdField.GetValue(component);
                     var indexField = IndexField(localId);
                     if (indexField != null) group.UnitIds.Add(Convert.ToInt32(indexField.GetValue(localId)));
@@ -1234,7 +1240,7 @@ namespace SanctuaryHud
             try
             {
                 if (_localIdField == null || _getLocalIdMi == null) return;
-                var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
                 var localId = _localIdField.GetValue(component);
                 var indexField = IndexField(localId);
                 if (indexField == null) return;
@@ -1287,7 +1293,7 @@ namespace SanctuaryHud
                 var localIndex = -1;
                 if (_localIdField != null && _getLocalIdMi != null)
                 {
-                    var component = _getLocalIdMi.Invoke(em, new[] { entity });
+                    var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
                     var localId = _localIdField.GetValue(component);
                     var indexField = IndexField(localId);
                     if (indexField != null) localIndex = Convert.ToInt32(indexField.GetValue(localId));
@@ -1500,7 +1506,7 @@ namespace SanctuaryHud
             try
             {
                 if (_localIdField == null || _getLocalIdMi == null) return -1;
-                var localComponent = _getLocalIdMi.Invoke(em, new[] { entity });
+                var localComponent = _getLocalIdMi.Invoke(em, EntityArg(entity));
                 var localId = _localIdField.GetValue(localComponent);
                 var indexField = IndexField(localId);
                 return indexField != null ? Convert.ToInt32(indexField.GetValue(localId)) : -1;
@@ -1570,8 +1576,6 @@ namespace SanctuaryHud
 
             try
             {
-                var count = 0;
-                var allCount = 0;
                 var ownColour = LocalArmyColour();
                 RefreshArmyLookups();
                 var groups = new Dictionary<int, IdleGroup>();
@@ -1587,7 +1591,6 @@ namespace SanctuaryHud
                     _idleCount = 0;
                     _idleFactoryCount = 0;
                     _alloyCount = 0;
-                    _alloyUpgradingCount = 0;
                     _commanderLocalIndex = -1;
                     lock (_groupLock)
                     {
@@ -1672,10 +1675,8 @@ namespace SanctuaryHud
 
                                     if (idle)
                                     {
-                                        allCount++;
                                         if (ColourMatches(em, entity, ownColour.Value))
                                         {
-                                            count++;
                                             RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
                                         }
 
@@ -1694,11 +1695,6 @@ namespace SanctuaryHud
                                         RecordAlloy(em, entity, alloyTier, upgrading, alloyGroups, alloyUpgrading);
                                     }
                                 }
-                                else if (bufLength > IdleIconIndex)
-                                {
-                                    var element = ItemAt(itemGetter, buffer, IdleIconIndex);
-                                    if ((bool)_iconEnabledField.GetValue(element)) count++;
-                                }
                             }
                         }
                         finally
@@ -1713,16 +1709,13 @@ namespace SanctuaryHud
                 }
 
                 var ordered = groups.Values.OrderBy(g => g.Tier).ToList();
-                // The headline number is idle *engineers*; `count` also covers
-                // factories and the commander, which the rows deliberately skip.
+                // The headline number is idle *engineers*: factories and the
+                // commander are left out of the rows on purpose.
                 _idleCount = ordered.Sum(g => g.Count);
-                _idleBuilderCount = count;
-                _idleAllCount = allCount;
 
                 var alloyOrdered = alloyGroups.Values.OrderBy(g => g.Tier).ToList();
                 var alloyUpgradingOrdered = alloyUpgrading.Values.OrderBy(g => g.Tier).ToList();
                 _alloyCount = alloyOrdered.Sum(g => g.Count);
-                _alloyUpgradingCount = alloyUpgradingOrdered.Sum(g => g.Count);
 
                 // The key is domain * 10 + tier, so it sorts land, air, naval.
                 var factoryOrdered = factoryGroups.OrderBy(kv => kv.Key).Select(kv => kv.Value).ToList();
@@ -1754,7 +1747,19 @@ namespace SanctuaryHud
         /// The army the client is looking through: an army id, -1 for the
         /// all-armies view a replay can sit in, and int.MinValue before it has
         /// been read.
-        internal static int FocusedArmy = int.MinValue;
+        internal static int FocusedArmy
+        {
+            get
+            {
+                // Polled only for a mod that reads it (two of the mods that
+                // run this tick do; the rest needn't ask Lua every second).
+                _focusWanted = true;
+                return _focusedArmy;
+            }
+        }
+
+        private static int _focusedArmy = int.MinValue;
+        private static bool _focusWanted;
 
         /// Whether the client is looking through one army's eyes.
         ///
@@ -1771,9 +1776,40 @@ namespace SanctuaryHud
             if (!LuaReady) return;
             if (!RunLua("__SdbFocusArmy = tostring(GetFocusArmy())")) return;
             var raw = GetLuaGlobal("__SdbFocusArmy");
-            FocusedArmy = int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
+            _focusedArmy = int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
                 ? id
                 : int.MinValue;
+        }
+
+        private static bool _wasInMatch;
+
+        // How long the unit scan takes, for the log at the end of a match:
+        // it reads every unit through reflection once a second, in each mod
+        // that runs it, so it is the first thing to measure if the HUD mods
+        // ever show up as a hitch.
+        private static readonly System.Diagnostics.Stopwatch _scanWatch = new System.Diagnostics.Stopwatch();
+        private static int _scans;
+        private static double _scanTotalMs, _scanMaxMs;
+
+        private static void TimedScan()
+        {
+            _scanWatch.Restart();
+            PollIdleBuilders();
+            _scanWatch.Stop();
+            var ms = _scanWatch.Elapsed.TotalMilliseconds;
+            _scans++;
+            _scanTotalMs += ms;
+            if (ms > _scanMaxMs) _scanMaxMs = ms;
+        }
+
+        private static void LogScanTimes()
+        {
+            if (_scans == 0) return;
+            _log?.LogInfo(FormattableString.Invariant(
+                $"Unit scan: {_scans} scans this match, {_scanTotalMs / _scans:0.00} ms on average, {_scanMaxMs:0.00} ms at most."));
+            _scans = 0;
+            _scanTotalMs = 0;
+            _scanMaxMs = 0;
         }
 
         internal static void SharedTick()
@@ -1788,18 +1824,21 @@ namespace SanctuaryHud
                 // reused between matches, so a refused one is forgotten too.
                 _commanderGlobalId = null;
                 _refusedCommanderId = null;
-                if (_commanderLocalIndex >= 0 || _idleCount > 0 || _idleFactoryCount > 0 || _alloyCount > 0 ||
-                    _rowIcons.Count > 0)
+                // Once per match left, whatever it counted: an observer or a
+                // replay's all-armies view counts nothing, and its icon table
+                // and seat must not carry into the next match either.
+                if (_wasInMatch)
                 {
+                    _wasInMatch = false;
+                    LogScanTimes();
                     _commanderLocalIndex = -1;
                     _commanderIconIndex = -1;
                     _idleCount = 0;
                     _idleFactoryCount = 0;
                     _alloyCount = 0;
-                    _alloyUpgradingCount = 0;
                     // Unread again, so the next match starts by showing rather
                     // than by carrying the last one's seat over.
-                    FocusedArmy = int.MinValue;
+                    _focusedArmy = int.MinValue;
                     // Each match reloads its sprites through Engine.LoadSprite,
                     // so a reused id could otherwise draw last game's art.
                     ClearSpriteCache();
@@ -1824,12 +1863,13 @@ namespace SanctuaryHud
                 return;
             }
 
+            _wasInMatch = true;
             _pollAccum += Time.unscaledDeltaTime;
             if (_pollAccum >= 1f)
             {
                 _pollAccum = 0f;
-                if (UnitScan) PollIdleBuilders();
-                PollFocusArmy();
+                if (UnitScan) TimedScan();
+                if (_focusWanted) PollFocusArmy();
             }
 
             // Deferred selection: wait for the mouse to come up, then let two
@@ -1862,7 +1902,7 @@ namespace SanctuaryHud
         // Only the textures are left in use: the panels, strip and rows that
         // had IMGUI styles here are all on the game's canvas now.
         private static bool _stylesReady;
-        internal static Texture2D _texPanel, _texWhite, _texRowHover;
+        internal static Texture2D _texWhite;
 
         /// The game's own panel colour and accent (its front menu's
         /// near-black blue and accent blue), for anything drawn in its shape.
@@ -1885,9 +1925,7 @@ namespace SanctuaryHud
             if (_stylesReady) return;
             _stylesReady = true;
 
-            _texPanel = MakeTex(new Color(0.04f, 0.06f, 0.08f, 0.82f));
             _texWhite = MakeTex(Color.white);
-            _texRowHover = MakeTex(new Color(1f, 1f, 1f, 0.12f));
         }
 
         private static Texture2D MakeTex(Color color)
