@@ -26,15 +26,19 @@ namespace SanctuaryHud
     // rows are the page's own row templates, so it looks like the rest.
     internal sealed partial class ModsPage
     {
-        private string _gameplaySignature = "";
+        // What the tab was last built from; compared every frame the page is
+        // up, so as plain values rather than a string built each time.
+        private (int catalog, int lobby, string hash) _gameplayBuiltFrom = (-1, -1, null);
 
-        private string GameplaySignature() =>
-            $"{ModCatalog.Version}|{Lobby.ChangeCounter}|{Overlay.CurrentHash}";
+        private static (int catalog, int lobby, string hash) GameplayInputs() =>
+            (ModCatalog.Version, Lobby.ChangeCounter, Overlay.CurrentHash);
+
+        private bool GameplayChanged() => !GameplayInputs().Equals(_gameplayBuiltFrom);
 
         private void RebuildGameplayTab()
         {
             if (_gameList == null) return;
-            _gameplaySignature = GameplaySignature();
+            _gameplayBuiltFrom = GameplayInputs();
             Clear(_gameList);
 
             InstallNotices(_gameList);
@@ -155,6 +159,8 @@ namespace SanctuaryHud
         private Transform _lobbyList;
         private string _lobbySignature = "";
         private string _lobbyButtonText = "";
+        // What the button's label was made from: (picked count, "!" shown).
+        private (int count, bool bang) _lobbyButtonFrom = (-1, false);
 
         private void TickLobby()
         {
@@ -171,11 +177,16 @@ namespace SanctuaryHud
 
             AnnounceSelection(ui);
 
-            var label = LobbyButtonLabel();
-            if (label != _lobbyButtonText && _lobbyButton != null)
+            var from = LobbyButtonInputs();
+            if (!from.Equals(_lobbyButtonFrom) && _lobbyButton != null)
             {
-                _lobbyButtonText = label;
-                SetButtonText(_lobbyButton, label);
+                _lobbyButtonFrom = from;
+                var label = LobbyButtonLabel(from);
+                if (label != _lobbyButtonText)
+                {
+                    _lobbyButtonText = label;
+                    SetButtonText(_lobbyButton, label);
+                }
             }
 
             if (_lobbyPanel != null && _lobbyPanel.activeSelf)
@@ -187,8 +198,8 @@ namespace SanctuaryHud
                 // while it's dragging a slider or typing. Whatever the rows
                 // show changes the lobby's counter or the catalog's version
                 // first, so the rest waits for one of those to move.
-                var key = $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|{SettlingShown()}|{_pickerVersion}";
-                if (key != _lobbyPanelKey && !LobbyPanelBusy())
+                var key = (Lobby.ChangeCounter, ModCatalog.Version, Lobby.CanChangeSelection, SettlingShown(), _pickerVersion);
+                if (!(_lobbyPanelKey.HasValue && _lobbyPanelKey.Value.Equals(key)) && !LobbyPanelBusy())
                 {
                     _lobbyPanelKey = key;
                     var structure = LobbyStructure();
@@ -224,14 +235,17 @@ namespace SanctuaryHud
         /// Settling long enough to say so.
         private bool SettlingShown() => Lobby.Settling && _settlingSince >= 0f && Time.unscaledTime - _settlingSince >= SettleGrace;
 
-        private static string LobbyButtonLabel()
+        /// What the lobby button's label says: how many mods are picked, and
+        /// whether to flag a problem. The "!" is for someone missing
+        /// something, not for a change on its way.
+        private static (int count, bool bang) LobbyButtonInputs()
         {
             var n = Lobby.Selection.Count;
-            if (n == 0) return "Mods";
-            // The "!" is for someone missing something, not for a change on
-            // its way.
-            return Lobby.StartBlockedReason != null && !Lobby.Settling ? $"Mods ({n}) !" : $"Mods ({n})";
+            return (n, n > 0 && Lobby.StartBlockedReason != null && !Lobby.Settling);
         }
+
+        private static string LobbyButtonLabel((int count, bool bang) from) =>
+            from.count == 0 ? "Mods" : from.bang ? $"Mods ({from.count}) !" : $"Mods ({from.count})";
 
         private string LobbySignature() =>
             $"{Lobby.ChangeCounter}|{ModCatalog.Version}|{Lobby.CanChangeSelection}|{SettlingShown()}|" +
@@ -240,8 +254,8 @@ namespace SanctuaryHud
         // What the chat was last told: each mod's id and contents, and its
         // option values as shown.
         private List<(string id, string hash, string name, Dictionary<string, string> options)> _announced;
-        private string _announceKey;
-        private string _lobbyPanelKey;
+        private (int lobby, int catalog)? _announceKey;
+        private (int, int, bool, bool, int)? _lobbyPanelKey;
 
         /// A line in the lobby chat whenever the pick changes, so nobody
         /// misses it: players see what they're about to play. A change of
@@ -253,8 +267,8 @@ namespace SanctuaryHud
             // once it has settled, so a dragged slider isn't a line per step.
             if (Lobby.Settling) return;
             // Nothing new since the last look.
-            var key = $"{Lobby.ChangeCounter}|{ModCatalog.Version}";
-            if (key == _announceKey) return;
+            var key = (Lobby.ChangeCounter, ModCatalog.Version);
+            if (_announceKey.HasValue && _announceKey.Value.Equals(key)) return;
             _announceKey = key;
             var sel = Lobby.Selection;
             var now = sel.Select(s => (s.Id, s.ContentHash, $"{s.Name} {s.Version}".TrimEnd(), OptionDisplay(s))).ToList();
@@ -325,6 +339,7 @@ namespace SanctuaryHud
             _lobbyButton.onClick.AddListener(ToggleLobbyPanel);
             _lobbyButton.Interactable(true);
             _lobbyButtonText = "";
+            _lobbyButtonFrom = (-1, false);
 
             // Laid out by hand when the buttons aren't in a layout group:
             // just left of the Settings button.
@@ -691,14 +706,18 @@ namespace SanctuaryHud
                     }
                     default:
                     {
-                        var number = double.Parse(v, System.Globalization.CultureInfo.InvariantCulture);
+                        // Normalize hands back a number for a number option;
+                        // anything else (an odd value from an older host)
+                        // shows as 0, held to the range, not an exception.
+                        double.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number);
                         if (o.Min.HasValue && o.Max.HasValue)
                         {
                             var (slider, box) = SliderRow(_lobbyList, label, (float)o.Min.Value, (float)o.Max.Value, (float)number, o.IsWhole,
                                 f => Lobby.SetOption(m.Id, o.Key, f.ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
                             _lobbyUpdaters.Add(() =>
                             {
-                                var now = (float)double.Parse(Value(), System.Globalization.CultureInfo.InvariantCulture);
+                                if (!double.TryParse(Value(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)) return;
+                                var now = (float)parsed;
                                 if (Mathf.Approximately(slider.value, now)) return;
                                 slider.SetValueWithoutNotify(now);
                                 if (box != null && !box.isFocused) box.SetTextWithoutNotify(Value());
@@ -764,7 +783,8 @@ namespace SanctuaryHud
         private bool LobbyPanelBusy()
         {
             if (Input.GetMouseButton(0)) return true;
-            var selected = UnityEngine.EventSystems.EventSystem.current?.currentSelectedGameObject;
+            var events = UnityEngine.EventSystems.EventSystem.current;
+            var selected = events != null ? events.currentSelectedGameObject : null;
             if (selected == null || _lobbyPanel == null || !selected.transform.IsChildOf(_lobbyPanel.transform)) return false;
             var field = selected.GetComponent<TMP_InputField>();
             return field != null && field.isFocused;
