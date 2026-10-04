@@ -133,10 +133,10 @@ namespace SanctuaryHud
             {
                 if (_disc != null) return _disc;
                 const int size = 32;
-                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                var texture = Generated.Keep(new Texture2D(size, size, TextureFormat.RGBA32, false)
                 {
-                    hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,
-                };
+                    wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,
+                });
                 var pixels = new Color[size * size];
                 for (var y = 0; y < size; y++)
                     for (var x = 0; x < size; x++)
@@ -146,8 +146,7 @@ namespace SanctuaryHud
                     }
                 texture.SetPixels(pixels);
                 texture.Apply(false, true);
-                _disc = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-                _disc.hideFlags = HideFlags.HideAndDontSave;
+                _disc = Generated.Keep(Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect));
                 return _disc;
             }
         }

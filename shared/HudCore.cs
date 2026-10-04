@@ -127,10 +127,8 @@ namespace SanctuaryHud
             _spriteBridgeTried = true;
             try
             {
-                var types = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic).SelectMany(GetTypesSafe).ToList();
-                _assetIdType = types.FirstOrDefault(t => t.FullName == "EM.Core.AssetID");
-                _tryGetSprite = types.FirstOrDefault(t => t.FullName == "SanctuaryUI.Utils")
+                _assetIdType = TypeIndex.ByFullName("EM.Core.AssetID");
+                _tryGetSprite = TypeIndex.ByFullName("SanctuaryUI.Utils")
                     ?.GetMethod("TryGetLoadedSprite", BindingFlags.Public | BindingFlags.Static);
                 if (_tryGetSprite == null || _assetIdType == null)
                     _log?.LogWarning("Unit sprite lookup unavailable; callers fall back to text.");
@@ -206,12 +204,14 @@ namespace SanctuaryHud
                 new Rect(tr.x / tex.width, tr.y / tex.height, tr.width * fraction / tex.width, tr.height / tex.height));
         }
 
+        private static readonly int IconAtlasId = Shader.PropertyToID("_StrategicIconAtlas");
+
         private static void ResolveIconAtlas()
         {
             try
             {
                 if (_iconLoaderType == null) return;
-                _iconAtlas = Shader.GetGlobalTexture(Shader.PropertyToID("_StrategicIconAtlas"));
+                _iconAtlas = Shader.GetGlobalTexture(IconAtlasId);
                 if (_iconAtlas == null)
                 {
                     if (!_loggedAtlasWait)
@@ -275,10 +275,7 @@ namespace SanctuaryHud
         // the same snapshot — and each mod unpatches only its own instance.
         internal static void ApplyEconomyPatch(Harmony harmony)
         {
-            var types = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => !a.IsDynamic)
-                .SelectMany(GetTypesSafe)
-                .Where(t => t.Name == "EconomyPanelUI");
+            var types = TypeIndex.All.Where(t => t.Name == "EconomyPanelUI").ToList();
 
             var postfix = new HarmonyMethod(typeof(HudCore), nameof(EconomyValuesPostfix));
             var patched = 0;
@@ -429,7 +426,7 @@ namespace SanctuaryHud
 
         private static void ResolveOwnership(List<Assembly> assemblies, Type emType)
         {
-            var rendererType = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Components.RendererComponent");
+            var rendererType = NeedType(TypeIndex.ByFullName("EM.Components.RendererComponent"), "EM.Components.RendererComponent");
             _getRendererMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                 .MakeGenericMethod(rendererType);
@@ -441,10 +438,9 @@ namespace SanctuaryHud
 
             // ownClientID lives in a Burst SharedStatic, but the Lua-facing
             // getter is a plain managed method we can just call.
-            _getClientIdMi = assemblies.SelectMany(GetTypesSafe)
-                .FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface")
+            _getClientIdMi = TypeIndex.ByFullName("EM.Lua.Client.ClientLuaInterface")
                 ?.GetMethod("GetClientID", BindingFlags.Public | BindingFlags.Static);
-            _lobbyInfoType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "LobbyInformationManaged");
+            _lobbyInfoType = TypeIndex.ByName("LobbyInformationManaged");
 
             var colorsPath = System.IO.Path.Combine(Paths.GameRootPath, "LJ", "lua", "common", "colors.lua");
             _armyColours = ParseArmyColours(colorsPath);
@@ -502,10 +498,9 @@ namespace SanctuaryHud
         /// idle list. Ask the game instead of inferring.
         private static Vector4? FocusedArmyColourFromLua()
         {
-            if (_getLuaGlobal == null) return null;
-            // Guards the read-back below too: _getLuaGlobal goes straight into
-            // LuaJIT with the same null-able state handle that RunLua checks.
-            if (_luaStateReady == null || !_luaStateReady()) return null;
+            // Guards the read-back below too: it goes straight into LuaJIT
+            // with the same null-able state handle that RunLua checks.
+            if (!LuaReady) return null;
             try
             {
                 // Exactly one focused army is a player; a replay's all-armies
@@ -523,7 +518,7 @@ namespace SanctuaryHud
                     "  __SdbOwn = string.format('%f,%f,%f', own.color.x, own.color.y, own.color.z) " +
                     "end");
 
-                var raw = _getLuaGlobal("__SdbOwn");
+                var raw = GetLuaGlobal("__SdbOwn");
                 // The client answered (possibly "nobody"): that answer stands,
                 // and the lobby-derived guess below must not overrule it.
                 _luaOwnerAnswered = raw != null;
@@ -538,7 +533,7 @@ namespace SanctuaryHud
                 if (!_loggedOwnColour)
                 {
                     _loggedOwnColour = true;
-                    _log.LogInfo($"Ownership: focused army colour {colour.x:0.###},{colour.y:0.###},{colour.z:0.###} (from client Lua).");
+                    _log.LogInfo(FormattableString.Invariant($"Ownership: focused army colour {colour.x:0.###},{colour.y:0.###},{colour.z:0.###} (from client Lua)."));
                 }
 
                 var lift = Mathf.Max(0.35f, Mathf.Max(colour.x, Mathf.Max(colour.y, colour.z)));
@@ -748,12 +743,23 @@ namespace SanctuaryHud
         // Selection lives in client Lua and needs live entity objects, so
         // rather than marshalling them we ask the client VM to do the work.
         // Client-side only: no sim state, no hashed files touched.
-        private static Func<string, int> _runLuaChunk;
-        private static Func<string, string> _getLuaGlobal;
+        private static LuaBridge.Calls _lua;
         private static float _nextLuaBridgeTry;
+        private static string _lastLuaError;
 
-        /// True once the client VM exists and can be called into.
-        internal static bool LuaReady => _luaStateReady != null && _luaStateReady();
+        /// True once the client VM exists and can be called into. Outside a
+        /// match ClientLuaInterface.Data.luaState is a null handle, and handing
+        /// that to luaL_dostring dereferences null inside LuaJIT - a native
+        /// access violation that no managed try/catch can stop, so the process
+        /// dies. Everything that reaches into Lua has to check this first.
+        internal static bool LuaReady
+        {
+            get
+            {
+                try { return _lua != null && _lua.Ready(); }
+                catch { return false; }
+            }
+        }
 
         /// Resolves the Lua bridge on demand, outside the in-match poll that
         /// normally does it. Replay playback needs to talk to the client VM
@@ -761,7 +767,7 @@ namespace SanctuaryHud
         /// that never polls the ECS still wants RunLua to work.
         internal static void EnsureLuaBridge()
         {
-            if (_runLuaChunk != null) return;
+            if (_lua != null) return;
             // Callers poll this every frame; a bridge that won't resolve (a
             // game update renamed something) would rescan every assembly and
             // log a warning each time.
@@ -769,8 +775,9 @@ namespace SanctuaryHud
             _nextLuaBridgeTry = Time.realtimeSinceStartup + 5f;
             try
             {
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
-                ResolveLuaBridge(assemblies);
+                _lua = LuaBridge.Emit(typeof(HudCore), out var missing);
+                if (_lua == null) _log?.LogWarning($"Lua bridge unavailable, missing: {missing}.");
+                else _log?.LogInfo("Lua bridge: ready (emitted).");
             }
             catch (Exception e)
             {
@@ -778,137 +785,38 @@ namespace SanctuaryHud
             }
         }
 
-        /// Reads a global out of the client VM as a string, or null.
+        /// Reads a global out of the client VM as a string, or null. Booleans
+        /// read as null: expose a number or a string to read something back.
         internal static string GetLuaGlobal(string name)
         {
-            if (_getLuaGlobal == null || !LuaReady) return null;
-            try { return _getLuaGlobal(name); }
+            if (!LuaReady) return null;
+            try { return _lua.GetGlobal(name); }
             catch { return null; }
         }
 
-        /// True once the client VM actually exists. Outside a match
-        /// ClientLuaInterface.Data.luaState is a null handle, and handing that
-        /// to luaL_dostring dereferences null inside LuaJIT — a native access
-        /// violation that no managed try/catch can stop, so the process dies.
-        /// Everything that reaches into Lua has to check this first.
-        private static Func<bool> _luaStateReady;
-
-        // ClientLuaInterface.Data is `ref Unmanaged` over a Burst SharedStatic,
-        // and reflection refuses to invoke ByRef-returning getters. Emit a tiny
-        // method that does it in IL instead: get the ref, load .luaState off it,
-        // and call luaL_dostring.
-        private static void ResolveLuaBridge(List<Assembly> assemblies)
-        {
-            var luaJit = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "LuaJIT");
-            var doString = luaJit?.GetMethod("luaL_dostring", BindingFlags.Public | BindingFlags.Static);
-
-            var cli = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
-            var dataGetter = cli?.GetProperty("Data", BindingFlags.Public | BindingFlags.Static)?.GetGetMethod();
-
-            var unmanagedType = dataGetter?.ReturnType;
-            if (unmanagedType != null && unmanagedType.IsByRef) unmanagedType = unmanagedType.GetElementType();
-            var stateField = unmanagedType?.GetField("luaState", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-            if (doString == null || dataGetter == null || stateField == null)
-            {
-                _log.LogWarning($"Lua bridge unavailable: dostring {(doString != null ? "ok" : "missing")}, " +
-                                $"getter {(dataGetter != null ? "ok" : "missing")}, state {(stateField != null ? "ok" : "missing")}.");
-                return;
-            }
-
-            var dm = new System.Reflection.Emit.DynamicMethod(
-                "SanctuaryHud_RunLua", typeof(int), new[] { typeof(string) }, typeof(HudCore), skipVisibility: true);
-            var il = dm.GetILGenerator();
-            il.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);      // ref Unmanaged
-            il.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);     // lua_State
-            il.Emit(System.Reflection.Emit.OpCodes.Ldarg_0);               // chunk
-            il.Emit(System.Reflection.Emit.OpCodes.Call, doString);
-            il.Emit(System.Reflection.Emit.OpCodes.Ret);
-
-            _runLuaChunk = (Func<string, int>)dm.CreateDelegate(typeof(Func<string, int>));
-
-            // lua_State is a struct wrapping a single nuint Handle, so the
-            // readiness check is Data.luaState.Handle != 0.
-            var handleField = stateField.FieldType.GetField("Handle", BindingFlags.Public | BindingFlags.Instance);
-            if (handleField != null)
-            {
-                var rm = new System.Reflection.Emit.DynamicMethod(
-                    "SanctuaryHud_LuaStateReady", typeof(bool), Type.EmptyTypes, typeof(HudCore), skipVisibility: true);
-                var ril = rm.GetILGenerator();
-                ril.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);   // ref Unmanaged
-                ril.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);  // lua_State
-                ril.Emit(System.Reflection.Emit.OpCodes.Ldfld, handleField); // nuint
-                ril.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_0);
-                ril.Emit(System.Reflection.Emit.OpCodes.Conv_U);
-                ril.Emit(System.Reflection.Emit.OpCodes.Cgt_Un);             // handle != 0
-                ril.Emit(System.Reflection.Emit.OpCodes.Ret);
-                _luaStateReady = (Func<bool>)rm.CreateDelegate(typeof(Func<bool>));
-            }
-            else
-            {
-                // Without a way to test the handle, calling in is a coin flip
-                // between working and killing the process. Stay out.
-                _log.LogWarning("Lua bridge disabled: lua_State.Handle not found, so the null-state guard " +
-                                "can't be emitted. Selection and camera jumps will be inert.");
-                _runLuaChunk = null;
-                return;
-            }
-
-            // Reading back out of Lua: push a global, convert to string, pop.
-            var getGlobal = luaJit.GetMethod("lua_getglobal", BindingFlags.Public | BindingFlags.Static);
-            var toString = luaJit.GetMethod("lua_tostring", BindingFlags.Public | BindingFlags.Static);
-            var setTop = luaJit.GetMethod("lua_settop", BindingFlags.Public | BindingFlags.Static);
-            if (getGlobal != null && toString != null && setTop != null)
-            {
-                var gm = new System.Reflection.Emit.DynamicMethod(
-                    "SanctuaryHud_GetLuaGlobal", typeof(string), new[] { typeof(string) }, typeof(HudCore), skipVisibility: true);
-                var gil = gm.GetILGenerator();
-                var stateLocal = gil.DeclareLocal(stateField.FieldType);
-                var resultLocal = gil.DeclareLocal(typeof(string));
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, dataGetter);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldfld, stateField);
-                gil.Emit(System.Reflection.Emit.OpCodes.Stloc, stateLocal);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, stateLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldarg_0);
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, getGlobal);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, stateLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_M1);
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, toString);
-                gil.Emit(System.Reflection.Emit.OpCodes.Stloc, resultLocal);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, stateLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldc_I4_S, (sbyte)-2);
-                gil.Emit(System.Reflection.Emit.OpCodes.Call, setTop);
-
-                gil.Emit(System.Reflection.Emit.OpCodes.Ldloc, resultLocal);
-                gil.Emit(System.Reflection.Emit.OpCodes.Ret);
-
-                _getLuaGlobal = (Func<string, string>)gm.CreateDelegate(typeof(Func<string, string>));
-            }
-
-            _log.LogInfo($"Lua bridge: ready (emitted), read-back {(_getLuaGlobal != null ? "ok" : "missing")}.");
-        }
-
         /// Runs a chunk in the client's own VM. Returns false (rather than
-        /// throwing) when there is no VM yet, so callers can simply retry.
+        /// throwing) when there is no VM yet or the chunk raised an error, so
+        /// callers can simply retry. The same error twice running is logged
+        /// once.
         internal static bool RunLua(string chunk)
         {
             try
             {
-                if (_runLuaChunk == null) return false;
-                // No VM yet (menu, loading, or after a match) — calling in
+                // No VM yet (menu, loading, or after a match): calling in
                 // would segfault the process rather than throw.
-                if (_luaStateReady == null || !_luaStateReady()) return false;
-                var code = _runLuaChunk(chunk);
-                if (code != 0) _log.LogWarning($"Lua chunk failed (code {code}): {chunk}");
-                return code == 0;
+                if (!LuaReady) return false;
+                var err = _lua.Run(chunk);
+                if (err == null) return true;
+                if (err != _lastLuaError)
+                {
+                    _lastLuaError = err;
+                    _log?.LogWarning($"Lua chunk failed: {err} (in: {LuaBridge.Trim(chunk)})");
+                }
+                return false;
             }
             catch (Exception e)
             {
-                _log.LogWarning($"Lua bridge call failed: {e.Message}");
+                _log?.LogWarning($"Lua bridge call failed: {e.Message}");
                 return false;
             }
         }
@@ -1179,7 +1087,7 @@ namespace SanctuaryHud
             // last poll's (or, local ids being reused, last match's).
             _factoryKindsValid = false;
             _extractorIdsValid = false;
-            if (_getLuaGlobal == null || _luaStateReady == null || !_luaStateReady()) return;
+            if (!LuaReady) return;
             try
             {
                 if (!RunLua(
@@ -1255,7 +1163,7 @@ namespace SanctuaryHud
                         "end)"))
                     return;
 
-                var raw = _getLuaGlobal("__SdbExtractors");
+                var raw = GetLuaGlobal("__SdbExtractors");
                 if (raw == null) return;
 
                 _extractorLocalIds.Clear();
@@ -1268,7 +1176,7 @@ namespace SanctuaryHud
 
                 if (_trackIdleFactories)
                 {
-                    var factoriesRaw = _getLuaGlobal("__SdbFactories");
+                    var factoriesRaw = GetLuaGlobal("__SdbFactories");
                     if (factoriesRaw != null)
                     {
                         _factoryKinds.Clear();
@@ -1287,7 +1195,7 @@ namespace SanctuaryHud
                 }
 
                 // Art is a nicety: without it the rows stay labelled.
-                var iconsRaw = _getLuaGlobal("__SdbRowIcons");
+                var iconsRaw = GetLuaGlobal("__SdbRowIcons");
                 if (iconsRaw == null) return;
                 // What Lua found. The per-id sprite line says what the registry
                 // made of it, so a blank row can be pinned on one or the other.
@@ -1428,7 +1336,7 @@ namespace SanctuaryHud
             try
             {
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
-                _iconElemType = assemblies.SelectMany(GetTypesSafe).First(t => t.Name == "IconEntityElementComponent");
+                _iconElemType = NeedType(TypeIndex.ByName("IconEntityElementComponent"), "IconEntityElementComponent");
                 _iconEnabledField = _iconElemType.GetField("Enabled", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                     ?? throw new MissingFieldException("IconEntityElementComponent.Enabled");
                 _iconIndexField = _iconElemType.GetField("IconIndex", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -1439,7 +1347,7 @@ namespace SanctuaryHud
                 // alone overcounts badly. Registration happens during match
                 // load, so this (and the other icon lookups below) may not
                 // succeed yet — PollIdleBuilders keeps retrying them.
-                _iconLoaderType = assemblies.SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
+                _iconLoaderType = TypeIndex.ByName("IconLoader");
                 TryResolveIdleImageIndex();
                 TryResolveUpgradeImageIndex();
 
@@ -1473,24 +1381,25 @@ namespace SanctuaryHud
 
                 try
                 {
-                    var localIdComponent = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Components.LocalIDComponent");
+                    var localIdComponent = NeedType(TypeIndex.ByFullName("EM.Components.LocalIDComponent"), "EM.Components.LocalIDComponent");
                     _getLocalIdMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                         .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                         .MakeGenericMethod(localIdComponent);
                     _localIdField = localIdComponent.GetFields(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
 
-                    var pairedType = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Components.LocalPairedGlobalIDComponent");
+                    var pairedType = NeedType(TypeIndex.ByFullName("EM.Components.LocalPairedGlobalIDComponent"), "EM.Components.LocalPairedGlobalIDComponent");
                     _getPairedGlobalMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                         .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                         .MakeGenericMethod(pairedType);
                     _pairedGlobalField = pairedType.GetField("Value");
 
-                    var cli = assemblies.SelectMany(GetTypesSafe).First(t => t.FullName == "EM.Lua.Client.ClientLuaInterface");
+                    var cli = NeedType(TypeIndex.ByFullName("EM.Lua.Client.ClientLuaInterface"), "EM.Lua.Client.ClientLuaInterface");
                     _getHealthMi = cli.GetMethod("GetHealth", BindingFlags.Public | BindingFlags.Static);
                     _getMaxHealthMi = cli.GetMethod("GetMaxHealth", BindingFlags.Public | BindingFlags.Static);
                     _log.LogInfo($"Commander tracking: health {(_getHealthMi != null ? "ok" : "missing")}, paired-id {(_pairedGlobalField != null ? "ok" : "missing")}.");
 
-                    ResolveLuaBridge(assemblies);
+                    _nextLuaBridgeTry = 0f;
+                    EnsureLuaBridge();
                 }
                 catch (Exception e)
                 {
@@ -1968,6 +1877,9 @@ namespace SanctuaryHud
         /// alloy teal and the idle orange so the two panels never read alike.
         internal static readonly Color UpgradeColour = new Color(0.55f, 0.78f, 1f);
 
+        /// After Generated.DestroyAll.
+        internal static void ReleasedStyles() => _stylesReady = false;
+
         internal static void EnsureStyles()
         {
             if (_stylesReady) return;
@@ -1980,18 +1892,17 @@ namespace SanctuaryHud
 
         private static Texture2D MakeTex(Color color)
         {
-            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            var tex = Generated.Keep(new Texture2D(1, 1, TextureFormat.RGBA32, false));
             tex.SetPixel(0, 0, color);
             tex.Apply();
-            tex.hideFlags = HideFlags.HideAndDontSave;
             return tex;
         }
 
-        internal static IEnumerable<Type> GetTypesSafe(Assembly assembly)
-        {
-            try { return assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t != null); }
-        }
+        internal static IEnumerable<Type> GetTypesSafe(Assembly assembly) => TypeIndex.Types(assembly);
+
+        /// A type the resolve can't go on without: missing throws, as the
+        /// linear scan's First() did, naming what moved.
+        private static Type NeedType(Type found, string name) => found ?? throw new TypeLoadException($"{name} not found");
 
         // ---- strategic icons, by name ---------------------------------------
         //
@@ -2018,8 +1929,7 @@ namespace SanctuaryHud
             {
                 if (_iconLoaderType == null)
                 {
-                    _iconLoaderType = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic)
-                        .SelectMany(GetTypesSafe).FirstOrDefault(t => t.Name == "IconLoader");
+                    _iconLoaderType = TypeIndex.ByName("IconLoader");
                 }
                 if (_iconNamesByIndex == null) ResolveIconNames();
                 if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();

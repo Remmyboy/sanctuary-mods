@@ -27,9 +27,10 @@ namespace SanctuaryHud
         /// How long the popup waits before it cancels itself.
         private const float Timeout = 8f;
 
-        private static bool _installed;
-        private static float _accum;
-        private static float _retryAt;
+        private static readonly LuaHook Hook = new LuaHook("__SdbCmdrGuard", "commander delete guard", InstallChunk)
+        {
+            Installed = () => _lastAsk = GetLuaGlobal("__SdbCmdrGuardAsk"),
+        };
         private static string _lastAsk;
 
         internal static void Bind(ConfigFile config)
@@ -41,43 +42,21 @@ namespace SanctuaryHud
 
         internal static void Shutdown()
         {
-            Remove();
+            Hook.Remove();
             Popup.Close();
         }
 
         internal static void Tick()
         {
-            if (_installed) Poll();
+            if (Hook.Live) Poll();
             Popup.Tick();
 
-            _accum += Time.unscaledDeltaTime;
-            if (_accum < 1f) return;
-            _accum = 0f;
-
-            EnsureLuaBridge();
-            if (!LuaReady)
+            Hook.Tick(Enabled != null && Enabled.Value);
+            if (!Hook.Live && Popup.Open)
             {
-                _installed = false;
                 _lastAsk = null;
                 Popup.Close();
-                return;
             }
-            var want = Enabled != null && Enabled.Value;
-            if (_installed)
-            {
-                if (!want) Remove();
-                // A new match's VM starts without it.
-                else if (GetLuaGlobal("__SdbCmdrGuardVer") == null) _installed = false;
-                else return;
-            }
-            if (!want || Time.unscaledTime < _retryAt) return;
-            if (RunLua(InstallChunk))
-            {
-                _installed = true;
-                _lastAsk = GetLuaGlobal("__SdbCmdrGuardAsk");
-                _log?.LogInfo("Deleting the commander asks first, for this match.");
-            }
-            else _retryAt = Time.unscaledTime + 30f;
         }
 
         /// A request is a counter the wrapper bumps on each guarded press: a
@@ -94,31 +73,17 @@ namespace SanctuaryHud
         private static void Confirm()
         {
             Popup.Close();
-            if (LuaReady) RunLua("if __SdbCmdrGuard then __SdbCmdrGuard.Go() end");
+            Hook.Call("__SdbCmdrGuard.Go()");
         }
 
         private static void Cancel()
         {
             Popup.Close();
-            if (LuaReady) RunLua("if __SdbCmdrGuard then __SdbCmdrGuard.ids = nil end");
-        }
-
-        private static void Remove()
-        {
-            if (!_installed) return;
-            _installed = false;
-            try
-            {
-                if (LuaReady) RunLua("if __SdbCmdrGuard then __SdbCmdrGuard.Remove() end");
-            }
-            catch (Exception e)
-            {
-                _log?.LogWarning($"Commander delete guard could not be removed: {e.Message}");
-            }
+            Hook.Call("__SdbCmdrGuard.ids = nil");
         }
 
         private const string InstallChunk = @"
-if not __SdbCmdrGuard then
+do
   local SE = Import('client/simpleEvents.lua')
   local SS = Import('client/input/selectionSystem.lua')
   if type(SE.DestroySelectedUnits) ~= 'function' or type(SE.DeleteSelectedUnits) ~= 'function' then
@@ -159,11 +124,9 @@ if not __SdbCmdrGuard then
     if SE.DestroySelectedUnits == S.mine.Destroy then SE.DestroySelectedUnits = S.orig.Destroy end
     if SE.DeleteSelectedUnits == S.mine.Delete then SE.DeleteSelectedUnits = S.orig.Delete end
     __SdbCmdrGuard = nil
-    __SdbCmdrGuardVer = nil
   end
   __SdbCmdrGuard = S
   __SdbCmdrGuardAsk = __SdbCmdrGuardAsk or 0
-  __SdbCmdrGuardVer = 1
 end";
 
         // ---- the popup -------------------------------------------------------------

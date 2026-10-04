@@ -1,0 +1,4 @@
+<Project>
+  <!-- Stops the repo's mod settings (net472, game references, deploy) from
+       applying: this is a Roslyn analyzer the mods load. -->
+</Project>

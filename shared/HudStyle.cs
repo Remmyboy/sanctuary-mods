@@ -72,7 +72,7 @@ namespace SanctuaryHud
             texture.Apply(false, true);
             var sprite = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0,
                 SpriteMeshType.FullRect, new Vector4(Slice, Slice, Slice, Slice));
-            sprite.hideFlags = HideFlags.HideAndDontSave;
+            Generated.Keep(sprite);
             return sprite;
         }
 
@@ -112,7 +112,7 @@ namespace SanctuaryHud
                 texture.Apply(false, true);
                 _ring = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
                     SpriteMeshType.FullRect, new Vector4(border, border, border, border));
-                _ring.hideFlags = HideFlags.HideAndDontSave;
+                Generated.Keep(_ring);
                 return _ring;
             }
         }
@@ -120,6 +120,9 @@ namespace SanctuaryHud
         // ---- icons ------------------------------------------------------------------
 
         private static readonly System.Collections.Generic.Dictionary<string, Sprite> _icons = new System.Collections.Generic.Dictionary<string, Sprite>();
+
+        /// After Generated.DestroyAll: the sprites above are made again on demand.
+        internal static void Released() => _icons.Clear();
 
         /// One of the HUD's own white icons, 64 pixels square, to tint:
         /// "menu" (three lines), "ring" (a circle, for a glyph to sit in) or
@@ -158,7 +161,7 @@ namespace SanctuaryHud
             texture.SetPixels(pixels);
             texture.Apply(false, true);
             var sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-            sprite.hideFlags = HideFlags.HideAndDontSave;
+            Generated.Keep(sprite);
             _icons[name] = sprite;
             return sprite;
         }
@@ -173,7 +176,7 @@ namespace SanctuaryHud
         }
 
         private static Texture2D NewTexture(int w, int h) =>
-            new Texture2D(w, h, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            Generated.Keep(new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear });
 
         /// A w by h sprite whose colour runs along its long side, from
         /// colour(0) at the left or bottom to colour(1) at the right or top.
@@ -191,7 +194,7 @@ namespace SanctuaryHud
             texture.SetPixels(pixels);
             texture.Apply(false, true);
             var sprite = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
-            sprite.hideFlags = HideFlags.HideAndDontSave;
+            Generated.Keep(sprite);
             return sprite;
         }
 

@@ -18,11 +18,22 @@
     <AssemblyVersion>0.2.*</AssemblyVersion>
     <!-- ...which the compiler flags as an unusual version format, per project. -->
     <NoWarn>$(NoWarn);CS7035</NoWarn>
+    <!-- IDE rules (unused members) only run in a build with this on. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Compile against .NET Framework reference assemblies without a Framework SDK install. -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Analyzers: which rules are on, and why, is in .editorconfig. They run
+       on local builds only; CI can't compile the mods (no game DLLs). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Unity.Analyzers" Version="1.28.0" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.16.1" PrivateAssets="all" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)tools\Analyzers\Analyzers.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

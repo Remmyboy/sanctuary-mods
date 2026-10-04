@@ -17,6 +17,9 @@ namespace SanctuaryHud
         private const int Size = 64;
         private static readonly Dictionary<string, Texture2D> _cache = new Dictionary<string, Texture2D>();
 
+        /// After Generated.DestroyAll.
+        internal static void Released() => _cache.Clear();
+
         /// The texture for an order key (the icon's name past "icon_order_"),
         /// or null where there is no shape for it.
         internal static Texture2D Get(string key)
@@ -56,12 +59,11 @@ namespace SanctuaryHud
 
         private static Texture2D Rasterise(Func<float, float, bool> inside)
         {
-            var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
+            var texture = Generated.Keep(new Texture2D(Size, Size, TextureFormat.RGBA32, false)
             {
-                hideFlags = HideFlags.HideAndDontSave,
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
-            };
+            });
             var pixels = new Color32[Size * Size];
             const int sub = 3;
             for (var py = 0; py < Size; py++)

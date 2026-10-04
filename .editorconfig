@@ -1,0 +1,33 @@
+root = true
+
+# Which analyzer rules the mods' builds report, and why. Everything not
+# named here stays at its default (mostly silent). Rules come from three
+# places: tools/Analyzers (SMODxxx, this repo's own), Microsoft.Unity.Analyzers
+# (UNTxxxx) and Roslynator (RCSxxxx), referenced in Directory.Build.props.
+[*.cs]
+
+# Only the Roslynator rules switched on below.
+roslynator_analyzers.enabled_by_default = false
+dotnet_diagnostic.RCS1139.severity = none
+
+# Empty catch with no comment: failures vanish (the Start gate failed open).
+dotnet_diagnostic.SMOD001.severity = warning
+# A float made into text with the player's culture: "1,5" into Lua or a file.
+dotnet_diagnostic.SMOD002.severity = warning
+# HideAndDontSave outside Generated.Keep: leaks on every hot reload.
+dotnet_diagnostic.SMOD003.severity = warning
+
+# ?. and ?? on a Unity object skip its destroyed check: a destroyed object
+# reads as alive, and the next call throws.
+dotnet_diagnostic.UNT0007.severity = warning
+dotnet_diagnostic.UNT0008.severity = warning
+# new WaitForSeconds per loop, Shader.PropertyToID per call.
+dotnet_diagnostic.UNT0038.severity = warning
+dotnet_diagnostic.UNT0046.severity = warning
+
+# Private members nothing uses, and fields written but never read: dead
+# code, or a value someone meant to use. (Not Roslynator's RCS1213, which
+# flags Unity's Update/OnDisable; the Unity analyzers suppress these for
+# Unity messages.)
+dotnet_diagnostic.IDE0051.severity = warning
+dotnet_diagnostic.IDE0052.severity = warning
