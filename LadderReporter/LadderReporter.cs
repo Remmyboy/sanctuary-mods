@@ -540,7 +540,16 @@ namespace SanctuaryHud
                 // Delivered, rejected or given up on: the ticket is spent.
                 ReleaseTicket(ticketId);
                 if (_status?.Report.Tone == Tone.Busy) SetReport(Tone.Bad, "Result not reported: report it on sanctuarydb.net");
-                // Not reported (a no-op when it was): nothing to upload.
+                // Not reported (a no-op when it was). A matchmade game still
+                // uploads under its own id: the usual cause is the opponent's
+                // report of their loss closing the match first (the ladder
+                // then says it has no open match), and the upload endpoints
+                // check the match's status themselves.
+                if (job != null && UploadId(job.FallbackId) != null)
+                {
+                    if (_status != null) _status.MatchId ??= UploadId(job.FallbackId);
+                    ResolveUploadId(job, null, true);
+                }
                 ResolveUploadId(job, null, false);
             }
         }
@@ -581,6 +590,8 @@ namespace SanctuaryHud
                         // rejection is debuggable from this side alone.
                         if (status < 500)
                         {
+                            if (status == 404 && !string.IsNullOrEmpty(_mmReportMatchId))
+                                SetReport(Tone.Quiet, "Result: the match was already closed, most likely by your opponent's report");
                             Logger.LogWarning("Ladder reporter: rejected payload was " +
                                               System.Text.RegularExpressions.Regex.Replace(
                                                   json, "\"ticket\":\"[0-9a-f]*\"", "\"ticket\":\"…\""));
