@@ -105,6 +105,7 @@ namespace SanctuaryHud
             if (string.IsNullOrEmpty(job.ReplayPath))
             {
                 Logger.LogWarning("Ladder uploads: the game didn't record this match, so there is no replay to upload.");
+                SetLine(_status?.Replay, Tone.Bad, "Replay: the game didn't record this match");
                 return;
             }
             if (_pending.Any(p => p.matchId == job.MatchId)) return;
@@ -122,6 +123,7 @@ namespace SanctuaryHud
             _pending.Add(item);
             SaveManifest(item);
             Logger.LogInfo(FormattableString.Invariant($"Ladder uploads: replay {item.fileName} will be copied {EarlyCopyDelay:0} s after the result, or once you leave the match."));
+            SetReplay(item.matchId, Tone.Busy, "Replay: copying the recording...");
         }
 
         /// Picks up what earlier sessions left: items waiting for their file
@@ -363,6 +365,7 @@ namespace SanctuaryHud
                 p.Failures++;
                 Logger.LogWarning($"Ladder uploads: couldn't copy {p.fileName}" + (early ? " at the result" : "") + $": {error}" +
                                   (early ? "; it is copied once you leave the match instead." : ""));
+                if (early) SetReplay(p.matchId, Tone.Busy, "Replay: copied once you leave the match");
                 if (p.Failures >= 3) Drop(p, "it couldn't be copied");
                 return;
             }
@@ -384,6 +387,7 @@ namespace SanctuaryHud
             // Frames are the game's network frames, 10 a second of game time.
             Logger.LogInfo($"Ladder uploads: replay {p.fileName} copied " + (early ? "at the result" : "after the match") +
                            $": {bytes / 1024} KB, {frames} frames" + (cut > 0 ? $", {cut} byte(s) of an unfinished frame left off" : "") + ".");
+            SetReplay(p.matchId, Tone.Busy, UploadStateOk(p) ? "Replay: uploading..." : "Replay: uploads once you're in the menu or a lobby");
         }
 
         // The game's own reader (main thread: it allocates Allocator.Temp
@@ -446,6 +450,7 @@ namespace SanctuaryHud
             if (p.dryRun)
             {
                 WriteDryRun(p.matchId + ".replay.json", SlotRequest(p).ToString(Formatting.Indented));
+                SetReplay(p.matchId, Tone.Quiet, "Replay: written to a file, not sent (dry run)", true);
                 Drop(p, null);
                 yield break;
             }
@@ -480,7 +485,8 @@ namespace SanctuaryHud
                 catch (Exception e) { Logger.LogWarning($"Ladder uploads: slot reply unreadable: {e.Message}"); }
                 if (reply?["skip"] != null && reply["skip"].Type != JTokenType.Null)
                 {
-                    Drop(p, $"the ladder already has it ({reply["skip"]})");
+                    Drop(p, $"the ladder already has it ({reply["skip"]})", told: true);
+                    SetReplay(p.matchId, Tone.Good, "Replay uploaded (your opponent's copy got there first)", true);
                     yield break;
                 }
                 var retryAfter = reply?["retryAfterS"];
@@ -490,6 +496,7 @@ namespace SanctuaryHud
                     var seconds = Mathf.Clamp((float)retryAfter, 30f, 24f * 3600f);
                     p.NextTry = Time.realtimeSinceStartup + seconds;
                     Logger.LogInfo($"Ladder uploads: another upload of match {p.matchId} is in progress; trying again in {Mathf.CeilToInt(seconds / 60f)} min.");
+                    SetReplay(p.matchId, Tone.Busy, "Replay: your opponent is uploading it; checking again in " + Mathf.CeilToInt(seconds / 60f).ToString(CultureInfo.InvariantCulture) + " min");
                     yield break;
                 }
                 var upload = reply?["upload"] as JObject;
@@ -515,6 +522,7 @@ namespace SanctuaryHud
             if (!p.uploaded)
             {
                 Logger.LogInfo($"Ladder uploads: uploading replay {p.fileName} ({p.sizeBytes / 1024} KB)...");
+                SetReplay(p.matchId, Tone.Busy, "Replay: uploading...");
                 var put = new PutResult();
                 foreach (var step in PutFile(p, p.uploadUrl, CopyPath(p), put)) yield return step;
                 if (!put.Paused && put.Ok && p.sidecarUrl != null && p.sidecarBytes > 0 && File.Exists(SidecarCopyPath(p)))
@@ -529,6 +537,7 @@ namespace SanctuaryHud
                     SaveManifest(p);
                     p.NextTry = Time.realtimeSinceStartup + 30f;
                     Logger.LogInfo("Ladder uploads: a game is loading; the replay upload stops and resumes in the menu.");
+                    SetReplay(p.matchId, Tone.Busy, "Replay: the upload resumes in the menu");
                     yield break;
                 }
                 if (!put.Ok)
@@ -546,6 +555,7 @@ namespace SanctuaryHud
             if (result.Ok)
             {
                 Logger.LogInfo($"Ladder uploads: replay uploaded for match {p.matchId}.");
+                SetReplay(p.matchId, Tone.Good, "Replay uploaded", true);
                 Drop(p, null);
                 yield break;
             }
@@ -590,6 +600,8 @@ namespace SanctuaryHud
             SaveManifest(p);
             Logger.LogWarning($"Ladder uploads: replay for match {p.matchId}: {why}; " +
                               (float.IsPositiveInfinity(wait) ? "trying again next time the game starts." : $"trying again in {Mathf.RoundToInt(wait / 60f)} min."));
+            SetReplay(p.matchId, Tone.Bad, "Replay upload failed: trying again " +
+                (float.IsPositiveInfinity(wait) ? "next time the game starts" : "in " + Mathf.RoundToInt(wait / 60f).ToString(CultureInfo.InvariantCulture) + " min"), true);
         }
 
         private static void ClearSlot(PendingReplay p)
@@ -633,6 +645,11 @@ namespace SanctuaryHud
                     result.Paused = true;
                     break;
                 }
+                if (path == CopyPath(p))
+                {
+                    var percent = Mathf.FloorToInt(Mathf.Clamp01(req.uploadProgress) * 100f);
+                    SetReplay(p.matchId, Tone.Busy, "Replay: uploading " + percent.ToString(CultureInfo.InvariantCulture) + "%");
+                }
                 yield return null;
             }
             _inFlight.Remove(req);
@@ -668,10 +685,11 @@ namespace SanctuaryHud
 
         /// Forgets an item and deletes its copy. `why` is logged; null for
         /// a finished one.
-        private void Drop(PendingReplay p, string why)
+        private void Drop(PendingReplay p, string why, bool told = false)
         {
             _pending.Remove(p);
             if (why != null) Logger.LogInfo($"Ladder uploads: not uploading the replay of match {p.matchId}: {why}.");
+            if (why != null && !told) SetReplay(p.matchId, Tone.Bad, $"Replay not uploaded: {why}", true);
             TryDelete(CopyPath(p));
             TryDelete(SidecarCopyPath(p));
             TryDelete(ManifestPath(p));

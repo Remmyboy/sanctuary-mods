@@ -1324,6 +1324,14 @@ the player turns them on in the `[Upload]` section (F8 window):
 - `GET /status` on the local bridge also answers
   `"uploads": { "stats": bool, "replays": bool, "pending": n }`, so the
   match page can show that an upload is on its way.
+- **Status card.** While the game's victory/defeat panel is up, a small
+  card beside it says what happened to the result (recorded, waiting for
+  the opponent, disputed, not reported), the stats and the replay (with
+  its upload progress), with a link to the match page once the site has
+  said which match it is. With both uploads off it says where to turn them
+  on instead. It is on a canvas of the mod's own, so it shows over
+  SanctuaryHud's stats screen and with the HUD hidden. A replay upload that
+  ends after you've left the match is told by a toast in the menu.
 
 All three calls (`POST /api/mm/match/{id}/stats`, `.../replay`,
 `.../replay/done`) carry the matchmaking bearer session, minted from a Steam

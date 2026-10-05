@@ -289,22 +289,25 @@ namespace SanctuaryHud
             if (wonArmies.Count == 0) return; // still playing (or a no-winner wipe — leave those to manual reporting)
 
             _reported = true; // one attempt per match, however it goes
-            if (forceId != null) BeginUploads(forceId);
+            var winners = reportable ? _snapshot.Humans.Where(p => wonArmies.Contains(p.ArmyId)).ToList() : null;
+            // An AI won, or every human "won": not a 1v1 result.
+            var oneVsOne = winners != null && winners.Count > 0 && winners.Count < _snapshot.Humans.Count;
+            if (forceId != null || oneVsOne)
+            {
+                StartStatus(oneVsOne);
+                BeginUploads(forceId);
+            }
             if (!reportable)
             {
                 Logger.LogInfo("Ladder reporter: game decided; not a ladder game, so nothing to report.");
                 return;
             }
-
-            var winners = _snapshot.Humans.Where(p => wonArmies.Contains(p.ArmyId)).ToList();
-            if (winners.Count == 0 || winners.Count == _snapshot.Humans.Count)
+            if (!oneVsOne)
             {
-                // An AI won, or every human "won" — not a 1v1 result.
                 Logger.LogInfo("Ladder reporter: game decided but not a 1v1 human result; nothing to report.");
                 return;
             }
 
-            if (forceId == null) BeginUploads(null);
             SendReport(winners);
         }
 
@@ -376,6 +379,7 @@ namespace SanctuaryHud
             if (_cfgDryRun.Value)
             {
                 Logger.LogInfo($"Ladder reporter (dry run): {body}");
+                SetReport(Tone.Quiet, "Result not sent (dry run)");
                 ResolveUploadId(job, null, true);
                 return;
             }
@@ -386,6 +390,7 @@ namespace SanctuaryHud
                 if (ticket == null)
                 {
                     Logger.LogWarning("Ladder reporter: no Steam ticket; report the result on the site instead.");
+                    SetReport(Tone.Bad, "Result not reported (no Steam ticket): report it on sanctuarydb.net");
                     ResolveUploadId(job, null, false);
                     return;
                 }
@@ -534,6 +539,7 @@ namespace SanctuaryHud
             {
                 // Delivered, rejected or given up on: the ticket is spent.
                 ReleaseTicket(ticketId);
+                if (_status?.Report.Tone == Tone.Busy) SetReport(Tone.Bad, "Result not reported: report it on sanctuarydb.net");
                 // Not reported (a no-op when it was): nothing to upload.
                 ResolveUploadId(job, null, false);
             }
@@ -561,6 +567,8 @@ namespace SanctuaryHud
                         var (outcome, matchId) = ReadReportAnswer(request.downloadHandler?.text);
                         Logger.LogInfo($"Ladder reporter: result reported to the ladder ({outcome ?? "no outcome given"}" +
                                        (matchId != null ? $", match {matchId})." : ")."));
+                        SetReport(outcome == "disputed" ? Tone.Bad : Tone.Good, ReportLine(outcome));
+                        if (_status != null) _status.MatchId ??= UploadId(matchId) ?? UploadId(_mmReportMatchId);
                         ResolveUploadId(job, matchId, true);
                         yield break;
                     }

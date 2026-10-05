@@ -162,6 +162,7 @@ namespace SanctuaryHud
                 {
                     job.StatsPulled = true;
                     Logger.LogWarning("Ladder uploads: the match closed before its stats could be read; no stats for this one.");
+                    SetStats(Tone.Bad, "Stats: the match closed before they could be read");
                 }
             }
             else
@@ -229,6 +230,7 @@ namespace SanctuaryHud
             if (!RunLua("__SdbLadderStatsOut = __SdbStatsPull and __SdbStatsPull(0) or ''"))
             {
                 Logger.LogWarning("Ladder uploads: couldn't read this match's stats.");
+                SetStats(Tone.Bad, "Stats: couldn't be read in this match");
                 return;
             }
             var raw = GetLuaGlobal("__SdbLadderStatsOut");
@@ -236,6 +238,7 @@ namespace SanctuaryHud
             if (MatchData.SessionOf(raw) == null)
             {
                 Logger.LogWarning("Ladder uploads: no stats collector ran in this match, so there are no stats to upload.");
+                SetStats(Tone.Bad, "Stats: none were collected in this match");
                 return;
             }
             var data = new MatchData();
@@ -248,6 +251,7 @@ namespace SanctuaryHud
             if (job.StatsJson != null)
             {
                 Logger.LogInfo($"Ladder uploads: stats read at tick {data.Tick} ({Encoding.UTF8.GetByteCount(job.StatsJson) / 1024} KB).");
+                SetStats(Tone.Busy, job.Resolved ? "Stats: uploading..." : "Stats: read, waiting for the ladder to file the result");
             }
         }
 
@@ -280,6 +284,7 @@ namespace SanctuaryHud
             if (seats.Count == 0)
             {
                 Logger.LogWarning("Ladder uploads: the stats have no army for any player in the roster; nothing to upload.");
+                SetStats(Tone.Bad, "Stats: no player of this match is in them");
                 return null;
             }
 
@@ -291,6 +296,7 @@ namespace SanctuaryHud
                 if (Encoding.UTF8.GetByteCount(json) <= StatsMaxBytes) return json;
             }
             Logger.LogWarning("Ladder uploads: the stats are too big to upload even thinned to one sample in 80 s.");
+            SetStats(Tone.Bad, "Stats: too big to upload");
             return null;
         }
 
@@ -448,6 +454,13 @@ namespace SanctuaryHud
         {
             var stats = _cfgUpStats.Value;
             var replays = _cfgUpReplays.Value;
+            if (_status != null)
+            {
+                _status.UploadsOff = !stats && !replays;
+                _status.Stats = stats ? new CardLine { Tone = Tone.Busy, Text = "Stats: reading the match..." } : null;
+                _status.Replay = replays ? new CardLine { Tone = Tone.Busy, Text = "Replay: waiting for the result" } : null;
+                _status.Version++;
+            }
             if (!stats && !replays)
             {
                 _job = null;
@@ -482,6 +495,8 @@ namespace SanctuaryHud
             if (!reported)
             {
                 Logger.LogInfo("Ladder uploads: the result wasn't reported, so this match's stats and replay are not uploaded.");
+                SetStats(Tone.Bad, "Stats: not uploaded, the result wasn't reported");
+                SetLine(_status?.Replay, Tone.Bad, "Replay: not uploaded, the result wasn't reported");
                 return;
             }
             job.MatchId = UploadId(responseId) ?? UploadId(job.FallbackId) ??
@@ -489,8 +504,11 @@ namespace SanctuaryHud
             if (job.MatchId == null)
             {
                 Logger.LogWarning("Ladder uploads: the ladder didn't say which match this was; nothing uploaded.");
+                SetStats(Tone.Bad, "Stats: not uploaded, the ladder didn't say which match this was");
+                SetLine(_status?.Replay, Tone.Bad, "Replay: not uploaded, the ladder didn't say which match this was");
                 return;
             }
+            if (_status != null) _status.MatchId ??= job.MatchId;
             if (job.WantReplay && !job.ReplayQueued)
             {
                 job.ReplayQueued = true;
@@ -596,8 +614,10 @@ namespace SanctuaryHud
             if (job.DryRun)
             {
                 WriteDryRun(job.MatchId + ".stats.json", JObject.Parse(job.StatsJson).ToString(Formatting.Indented));
+                SetStats(Tone.Quiet, "Stats: written to a file, not sent (dry run)");
                 yield break;
             }
+            SetStats(Tone.Busy, "Stats: uploading...");
             var path = $"/api/mm/match/{job.MatchId}/stats";
             var result = new ApiResult();
             for (var attempt = 1; attempt <= 3; attempt++)
@@ -606,6 +626,7 @@ namespace SanctuaryHud
                 if (result.Ok)
                 {
                     Logger.LogInfo($"Ladder uploads: stats uploaded for match {job.MatchId}.");
+                    SetStats(Tone.Good, "Stats uploaded");
                     job.StatsJson = null;
                     yield break;
                 }
@@ -613,12 +634,15 @@ namespace SanctuaryHud
                 if (result.Status >= 400 && result.Status < 500)
                 {
                     Logger.LogWarning($"Ladder uploads: the ladder refused the stats ({result.Describe()}).");
+                    SetStats(Tone.Bad, "Stats refused by the ladder (" + result.Status.ToString(CultureInfo.InvariantCulture) + ")");
                     yield break;
                 }
                 Logger.LogWarning($"Ladder uploads: stats not uploaded ({result.Describe()}), attempt {attempt}/3.");
+                SetStats(Tone.Busy, attempt < 3 ? "Stats: couldn't reach the ladder, trying again..." : "Stats: couldn't reach the ladder");
                 if (attempt < 3) yield return new WaitForSecondsRealtime(5f * attempt);
             }
             Logger.LogWarning("Ladder uploads: giving up on this match's stats.");
+            SetStats(Tone.Bad, "Stats not uploaded: couldn't reach the ladder");
         }
 
         private void WriteDryRun(string name, string text)
