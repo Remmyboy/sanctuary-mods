@@ -162,8 +162,7 @@ namespace SanctuaryHud
             HudCanvas.FitToContents(_card);
             HudControls.Size(_card.gameObject, CardWidth, -1f);
 
-            HudControls.Label(_card, "Heading", "SANCTUARYDB LADDER", 22f, AccentColour, TextAlignmentOptions.Left,
-                style: FontStyles.Bold);
+            HudControls.Label(_card, "Heading", "SANCTUARYDB LADDER", 22f, AccentColour, TextAlignmentOptions.Left);
             for (var i = 0; i < _cardRows.Length; i++)
             {
                 var row = HudControls.Row(_card, "Line " + i, 14f, TextAnchor.UpperLeft);
@@ -202,6 +201,8 @@ namespace SanctuaryHud
             var link = _status.MatchId != null && !_status.MatchId.StartsWith("dryrun-", StringComparison.Ordinal);
             if (_cardLink.gameObject.activeSelf != link) _cardLink.gameObject.SetActive(link);
             HudCanvas.LayoutVersion++;
+            // Sized now, so it is placed (and logged) at its real size.
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_card);
 
             void Row(CardLine line)
             {
@@ -235,7 +236,7 @@ namespace SanctuaryHud
             var x = size.x - w - 60f;
             var y = size.y - h - 160f;
             var text = result != null ? result.gameResultText : null;
-            if (text != null && ScreenRectOnRoot(text.rectTransform, out var r) && r.xMax + 60f + w < size.x - 20f)
+            if (text != null && ScreenRectOnRoot(text, out var r) && r.xMax + 60f + w < size.x - 20f)
             {
                 x = r.xMax + 60f;
                 y = Mathf.Clamp(r.yMax - h, 20f, size.y - h - 20f);
@@ -253,11 +254,12 @@ namespace SanctuaryHud
         private bool _cardPlacedLogged;
         private static readonly Vector3[] _cardCorners = new Vector3[4];
 
-        // Where a game UI element is, in the card root's units (origin at
-        // its bottom-left, y up). Through screen pixels: the game's canvas
-        // and the mod's own overlay need not share a world space (a canvas
-        // drawn by a camera has world corners that mean nothing here).
-        private static bool ScreenRectOnRoot(RectTransform target, out Rect rect)
+        // Where a game text is drawn, in the card root's units (origin at
+        // its bottom-left, y up): its rendered glyphs, which overflow its
+        // rect ("VICTORY!" is wider than its box). Through screen pixels:
+        // the game's canvas and the mod's own overlay need not share a
+        // world space.
+        private static bool ScreenRectOnRoot(TMP_Text target, out Rect rect)
         {
             rect = default;
             var root = HudCanvas.Root;
@@ -265,7 +267,19 @@ namespace SanctuaryHud
             if (root == null || canvas == null) return false;
             var top = canvas.rootCanvas;
             var cam = top.renderMode == RenderMode.ScreenSpaceOverlay ? null : top.worldCamera;
-            target.GetWorldCorners(_cardCorners);
+            var bounds = target.textBounds;
+            if (bounds.size.x > 1f && bounds.size.y > 1f)
+            {
+                var t = target.transform;
+                _cardCorners[0] = t.TransformPoint(new Vector3(bounds.min.x, bounds.min.y, 0f));
+                _cardCorners[1] = t.TransformPoint(new Vector3(bounds.min.x, bounds.max.y, 0f));
+                _cardCorners[2] = t.TransformPoint(new Vector3(bounds.max.x, bounds.max.y, 0f));
+                _cardCorners[3] = t.TransformPoint(new Vector3(bounds.max.x, bounds.min.y, 0f));
+            }
+            else
+            {
+                target.rectTransform.GetWorldCorners(_cardCorners);
+            }
             float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
             foreach (var corner in _cardCorners)
             {

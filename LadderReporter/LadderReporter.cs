@@ -189,8 +189,8 @@ namespace SanctuaryHud
             // goes, so any ticket one still held is cancelled here.
             ReleaseAllTickets();
             _ticketCallback?.Dispose();
-            // The overlay's panel texture.
-            Generated.DestroyAll();
+            // The status card and its canvas, and the overlay's panel texture.
+            DestroyCard();
         }
 
         private void Update()
@@ -209,6 +209,7 @@ namespace SanctuaryHud
             // Uploads on their own too, and before the Enabled check: a
             // replay queued earlier still uploads with reporting switched off.
             UpdateUploads();
+            UpdateCard();
             // No SharedTick: this plugin reads only InMatch, which the economy
             // patch keeps, and the shared tick's once-a-second focus-army
             // Lua poll was paid for nothing.
