@@ -1288,7 +1288,7 @@ the player turns them on in the `[Upload]` section (F8 window):
 | Setting | Default | What it does |
 | --- | --- | --- |
 | `Upload.Stats` | false | Upload this match's stats (economy, units, score over time) after a ranked game, shown on the match page |
-| `Upload.Replays` | false | Upload the replay of each ranked game after you leave the match, so anyone can download and watch it |
+| `Upload.Replays` | false | Upload the replay of each ranked game once it is decided (or after you leave the match), so anyone can download and watch it |
 | `Upload.MaxReplayMB` | 30 | Larger replays are not uploaded |
 | `Upload.ForceUploadMatchId` | empty | Debug only, for testing against a site dev server: a match UUID. Every finished game (against AI, any player count) then runs the uploads against that id, skipping the ranked 1v1 check |
 
@@ -1303,15 +1303,18 @@ the player turns them on in the `[Upload]` section (F8 window):
   buckets. Only the seated players are sent, keyed by Steam ID. They are
   posted once the report's answer says which match the site filed it under
   (`/api/report` now returns `matchId`; a matchmade game also knows it).
-- **Replays.** The game writes a match's `.sanreplay` while it plays and
-  closes it only when you leave the match; until then it holds the file
-  open for writing, and the mod waits for that handle to go. Then it copies
-  the file (and its `.mods.json` sidecar, if any) to
+- **Replays.** The game writes a match's `.sanreplay` while it plays, one
+  whole network frame at a time, and closes it only when you leave the
+  match. 5 s after the result the mod copies it as it stands, cut after the
+  last whole frame, so the replay ends at the result instead of with the
+  players idling on the result screen; if that fails, or you left first, it
+  copies the closed file once the game lets go of it. The copy (and the
+  `.mods.json` sidecar, if any) goes to
   `BepInEx\cache\LadderReporter\pending\<matchId>.sanreplay`, safe from the
-  game's keep-the-newest-15 prune, hashing it on a worker thread. Uploads run
-  only in the menu or a lobby and stop the moment a game starts loading: a
-  slot request to the site, a PUT of the file straight to storage, then a
-  completion call. Retries back off 1, 5 and 30 minutes, then wait for the
+  game's keep-the-newest-15 prune, hashed on a worker thread. Uploads run
+  in the menu or a lobby, and on the result screen for that match's own
+  replay, and stop the moment a game starts loading: a slot request to the
+  site, a PUT of the file straight to storage, then a completion call. Retries back off 1, 5 and 30 minutes, then wait for the
   next launch; a pending replay is dropped once uploaded, when the site says
   it already has it (the opponent uploaded first) or refuses it, or after 7
   days. A replay still waiting for its match to close survives a crash or a

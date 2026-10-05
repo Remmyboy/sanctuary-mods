@@ -90,8 +90,8 @@ namespace SanctuaryHud
                 "Upload this match's stats (economy, units, score over time) to sanctuarydb.net after a ranked game, " +
                 "shown on the match page.");
             _cfgUpReplays = Config.Bind("Upload", "Replays", false,
-                "Upload the replay of each ranked game to sanctuarydb.net after you leave the match, so anyone can " +
-                "download and watch it.");
+                "Upload the replay of each ranked game to sanctuarydb.net once it is decided (or after you leave the " +
+                "match), so anyone can download and watch it.");
             _cfgUpMaxMB = Config.Bind("Upload", "MaxReplayMB", 30,
                 "Replays bigger than this many megabytes are not uploaded.");
             _cfgUpForceId = Config.Bind("Upload", "ForceUploadMatchId", "",
@@ -498,14 +498,23 @@ namespace SanctuaryHud
             }
         }
 
+        private static System.Reflection.FieldInfo _recordingPathField;
+        private bool _recordingPathFailed;
+
+        // The file the game records into (or last did: StopRecording leaves
+        // the path). Read every frame while a replay uploads in a match.
         private string RecordingPath()
         {
+            if (_recordingPathFailed) return null;
             try
             {
-                return HarmonyLib.AccessTools.Field(typeof(ReplayFile), "filePath")?.GetValue(null) as string;
+                _recordingPathField ??= HarmonyLib.AccessTools.Field(typeof(ReplayFile), "filePath") ??
+                                        throw new MissingFieldException(nameof(ReplayFile), "filePath");
+                return _recordingPathField.GetValue(null) as string;
             }
             catch (Exception e)
             {
+                _recordingPathFailed = true;
                 Logger.LogWarning($"Ladder uploads: can't find this match's replay file: {e.Message}");
                 return null;
             }

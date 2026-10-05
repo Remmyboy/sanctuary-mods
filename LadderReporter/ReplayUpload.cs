@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using EM.Network;
 using EM.Network.Replay;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,23 +25,35 @@ namespace SanctuaryHud
     // with FileShare.Read ourselves fails with a sharing violation until
     // then: that is the "left the match" signal, straight from the OS.
     //
-    // Once closed it is copied (with its .mods.json sidecar, if any) into
+    // The file is a length-prefixed header, then one record per network
+    // frame (a type byte, an int32 length, the payload), flushed after each.
+    // So it can be copied while the game still writes it (FileShare.
+    // ReadWrite), cut after the last whole frame: 5 s after the victory the
+    // recording is taken as it stands, and the replay ends at the result
+    // rather than with the players idling on the result screen. If that
+    // copy fails, or the player left first, the closed file is taken once
+    // the game lets go of it, as before.
+    //
+    // Either way it is copied (with its .mods.json sidecar, if any) into
     // BepInEx\cache\LadderReporter\pending\<matchId>.sanreplay, out of reach
     // of the game's keep-the-newest-15 prune, and hashed on the way, on a
     // worker thread. A <matchId>.json manifest beside it survives a restart;
     // a match still waiting to close is written down too, so a crash or a
     // quit straight from the match still gets its replay sent next launch.
     //
-    // Uploads run only in the menu or a lobby and stop the moment a game
-    // starts loading: slot request -> PUT straight to storage (streamed from
-    // disk by UploadHandlerFile) -> done. Retries back off 1, 5, 30 minutes,
-    // then wait for the next launch; an item is dropped once uploaded, when
-    // the site says it already has the replay or refuses it, or after 7 days.
+    // Uploads run in the menu or a lobby, and in the decided match itself
+    // (only that match's own replay, the game being over), and stop the
+    // moment a game starts loading: slot request -> PUT straight to storage
+    // (streamed from disk by UploadHandlerFile) -> done. Retries back off 1,
+    // 5, 30 minutes, then wait for the next launch; an item is dropped once
+    // uploaded, when the site says it already has the replay or refuses it,
+    // or after 7 days.
     public partial class LadderReporterPlugin
     {
         private const string Waiting = "waiting";   // the game may still be writing it
         private const string Ready = "ready";       // copied and hashed, to upload
         private static readonly TimeSpan PendingLifetime = TimeSpan.FromDays(7);
+        private const float EarlyCopyDelay = 5f;    // seconds after the victory
 
         private sealed class PendingReplay
         {
@@ -54,6 +67,7 @@ namespace SanctuaryHud
             public long sizeBytes;
             public string sha256;
             public long sidecarBytes;
+            public bool early;               // copied mid-match, at the result
             public DateTime createdUtc;
             public int attempts;
             public bool dryRun;
@@ -67,6 +81,9 @@ namespace SanctuaryHud
             [JsonIgnore] public float NextTry;
             [JsonIgnore] public int Failures;   // this session's, for the backoff
             [JsonIgnore] public bool Busy;
+            // This session's victory, for the copy at the result; an item
+            // from an earlier session has none, and its file is closed.
+            [JsonIgnore] public float? DecidedAt;
         }
 
         private readonly List<PendingReplay> _pending = new List<PendingReplay>();
@@ -100,10 +117,11 @@ namespace SanctuaryHud
                 buildId = job.BuildId,
                 createdUtc = DateTime.UtcNow,
                 dryRun = job.DryRun,
+                DecidedAt = job.DecidedAt,
             };
             _pending.Add(item);
             SaveManifest(item);
-            Logger.LogInfo($"Ladder uploads: replay {item.fileName} will upload once you leave the match.");
+            Logger.LogInfo(FormattableString.Invariant($"Ladder uploads: replay {item.fileName} will be copied {EarlyCopyDelay:0} s after the result, or once you leave the match."));
         }
 
         /// Picks up what earlier sessions left: items waiting for their file
@@ -157,19 +175,26 @@ namespace SanctuaryHud
                 else if (p.state == Waiting) TryCollect(p);
             }
 
-            if (_replayUploading || !UploadStateOk()) return;
+            if (_replayUploading) return;
             var now = Time.realtimeSinceStartup;
-            var next = _pending.FirstOrDefault(p => p.state == Ready && !p.Busy && p.NextTry <= now);
+            var next = _pending.FirstOrDefault(p => p.state == Ready && !p.Busy && p.NextTry <= now && UploadStateOk(p));
             if (next != null) StartCoroutine(UploadReplayRoutine(next));
         }
 
-        // Uploads only while the player is in the menu or a lobby: never
-        // while a game loads or plays.
-        private bool UploadStateOk()
+        // Uploads while the player is in the menu or a lobby, and in a
+        // decided match its own replay: never while a game loads, or plays
+        // on undecided.
+        private bool UploadStateOk(PendingReplay p)
         {
             var state = CurrentState();
-            return state == "menu" || state == "lobby";
+            return state == "menu" || state == "lobby" || (state == "ingame" && InDecidedMatchOf(p));
         }
+
+        // Still in the match this replay is of: the game records into its
+        // file (a new match records into a new one). Every pending replay
+        // is of a decided match; it is queued at the result.
+        private bool InDecidedMatchOf(PendingReplay p) =>
+            p.sourcePath != null && string.Equals(RecordingPath(), p.sourcePath, StringComparison.OrdinalIgnoreCase);
 
         // ---- collecting the file -------------------------------------------
 
@@ -188,6 +213,7 @@ namespace SanctuaryHud
                 }
             }
             long size;
+            var early = false;
             try
             {
                 // Refused (a sharing violation) while the game still has it
@@ -199,7 +225,14 @@ namespace SanctuaryHud
             }
             catch (IOException)
             {
-                return;
+                // Still recording. Once, 5 s after this session's victory
+                // and still in that match: take it as it stands.
+                if (p.DecidedAt == null || Time.realtimeSinceStartup - p.DecidedAt.Value < EarlyCopyDelay ||
+                    NetworkManager.IsReplayPlayback || !InDecidedMatchOf(p)) return;
+                p.DecidedAt = null;
+                try { size = new FileInfo(source).Length; }
+                catch (Exception) { return; }
+                early = true;
             }
             catch (Exception e)
             {
@@ -223,32 +256,40 @@ namespace SanctuaryHud
             {
                 try
                 {
-                    CopyAndHash(source, sidecar, dest, out var bytes, out var sha, out var sidecarBytes);
-                    _uploadMainThread.Enqueue(() => Collected(p, bytes, sha, sidecarBytes, null));
+                    CopyAndHash(source, sidecar, dest, out var bytes, out var frames, out var cut, out var sha, out var sidecarBytes);
+                    _uploadMainThread.Enqueue(() => Collected(p, early, bytes, frames, cut, sha, sidecarBytes, null));
                 }
                 catch (Exception e)
                 {
-                    _uploadMainThread.Enqueue(() => Collected(p, 0, null, 0, e.Message));
+                    _uploadMainThread.Enqueue(() => Collected(p, early, 0, 0, 0, null, 0, e.Message));
                 }
             });
         }
 
-        // Worker thread: copies the replay (hashing it on the way, one pass)
-        // and its sidecar into the pending folder.
-        private static void CopyAndHash(string source, string sidecar, string dest, out long bytes, out string sha256, out long sidecarBytes)
+        // Worker thread: copies the replay up to its last whole frame
+        // (hashing it on the way) and its sidecar into the pending folder.
+        // `cut` is what was left off: a frame the game was still writing,
+        // or the torn end of a recording a crash cut short.
+        private static void CopyAndHash(string source, string sidecar, string dest, out long bytes, out int frames,
+            out long cut, out string sha256, out long sidecarBytes)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(dest));
             var tmp = dest + ".tmp";
             bytes = 0;
             using (var sha = SHA256.Create())
             {
-                using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.SequentialScan))
+                // ReadWrite: the game may still have it open for writing.
+                using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 81920))
                 using (var output = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 81920))
                 {
+                    var length = WholeFrames(input, out frames);
+                    cut = input.Length - length;
+                    input.Position = 0;
                     var buffer = new byte[81920];
-                    int n;
-                    while ((n = input.Read(buffer, 0, buffer.Length)) > 0)
+                    while (bytes < length)
                     {
+                        var n = input.Read(buffer, 0, (int)Math.Min(buffer.Length, length - bytes));
+                        if (n <= 0) throw new IOException("the replay got shorter while it was being copied");
                         sha.TransformBlock(buffer, 0, n, null, 0);
                         output.Write(buffer, 0, n);
                         bytes += n;
@@ -275,15 +316,53 @@ namespace SanctuaryHud
             }
         }
 
+        /// The length of a replay's header plus every whole frame after it
+        /// (ReplayFile.WriteHeader / RecordFrame): what the game's own
+        /// player reads before it stops. Throws when not even the header is
+        /// whole.
+        private static long WholeFrames(Stream s, out int frames)
+        {
+            frames = 0;
+            var end = s.Length;
+            var head = new byte[5];
+            s.Position = 0;
+            if (ReadFully(s, head, 4) != 4) throw new IOException("the replay has no header");
+            long pos = 4 + BitConverter.ToInt32(head, 0);
+            if (pos <= 4 || pos > end) throw new IOException("the replay's header is cut short");
+            while (pos + 5 <= end)
+            {
+                s.Position = pos;
+                if (ReadFully(s, head, 5) != 5) break;
+                var length = BitConverter.ToInt32(head, 1);
+                if (length < 0 || pos + 5 + length > end) break;
+                pos += 5 + length;
+                frames++;
+            }
+            return pos;
+        }
+
+        private static int ReadFully(Stream s, byte[] buffer, int count)
+        {
+            var read = 0;
+            while (read < count)
+            {
+                var n = s.Read(buffer, read, count - read);
+                if (n <= 0) break;
+                read += n;
+            }
+            return read;
+        }
+
         // Main thread, back from the copy: read the header and queue it.
-        private void Collected(PendingReplay p, long bytes, string sha256, long sidecarBytes, string error)
+        private void Collected(PendingReplay p, bool early, long bytes, int frames, long cut, string sha256, long sidecarBytes, string error)
         {
             p.Busy = false;
             if (!_pending.Contains(p)) return;
             if (error != null)
             {
                 p.Failures++;
-                Logger.LogWarning($"Ladder uploads: couldn't copy {p.fileName}: {error}");
+                Logger.LogWarning($"Ladder uploads: couldn't copy {p.fileName}" + (early ? " at the result" : "") + $": {error}" +
+                                  (early ? "; it is copied once you leave the match instead." : ""));
                 if (p.Failures >= 3) Drop(p, "it couldn't be copied");
                 return;
             }
@@ -298,10 +377,13 @@ namespace SanctuaryHud
             p.sidecarBytes = sidecarBytes;
             p.gameVersion = gameVersion;
             p.mapPath = mapPath;
+            p.early = early;
             p.Failures = 0;
             p.NextTry = 0f;
             SaveManifest(p);
-            Logger.LogInfo($"Ladder uploads: replay {p.fileName} ({bytes / 1024} KB) copied; it uploads while you're in the menu or a lobby.");
+            // Frames are the game's network frames, 10 a second of game time.
+            Logger.LogInfo($"Ladder uploads: replay {p.fileName} copied " + (early ? "at the result" : "after the match") +
+                           $": {bytes / 1024} KB, {frames} frames" + (cut > 0 ? $", {cut} byte(s) of an unfinished frame left off" : "") + ".");
         }
 
         // The game's own reader (main thread: it allocates Allocator.Temp
@@ -434,10 +516,10 @@ namespace SanctuaryHud
             {
                 Logger.LogInfo($"Ladder uploads: uploading replay {p.fileName} ({p.sizeBytes / 1024} KB)...");
                 var put = new PutResult();
-                foreach (var step in PutFile(p.uploadUrl, CopyPath(p), put)) yield return step;
+                foreach (var step in PutFile(p, p.uploadUrl, CopyPath(p), put)) yield return step;
                 if (!put.Paused && put.Ok && p.sidecarUrl != null && p.sidecarBytes > 0 && File.Exists(SidecarCopyPath(p)))
                 {
-                    foreach (var step in PutFile(p.sidecarUrl, SidecarCopyPath(p), put)) yield return step;
+                    foreach (var step in PutFile(p, p.sidecarUrl, SidecarCopyPath(p), put)) yield return step;
                 }
                 if (put.Paused)
                 {
@@ -446,7 +528,7 @@ namespace SanctuaryHud
                     p.attempts--;
                     SaveManifest(p);
                     p.NextTry = Time.realtimeSinceStartup + 30f;
-                    Logger.LogInfo("Ladder uploads: a game is starting; the replay upload stops and resumes in the menu.");
+                    Logger.LogInfo("Ladder uploads: a game is loading; the replay upload stops and resumes in the menu.");
                     yield break;
                 }
                 if (!put.Ok)
@@ -530,7 +612,7 @@ namespace SanctuaryHud
         // PUTs a file to a pre-signed storage URL, streamed from disk. No
         // auth header: the signature is in the URL. Aborted (Paused) the
         // moment the game leaves the menu or lobby.
-        private IEnumerable PutFile(string url, string path, PutResult result)
+        private IEnumerable PutFile(PendingReplay p, string url, string path, PutResult result)
         {
             result.Ok = result.Paused = false;
             result.Status = 0;
@@ -545,7 +627,7 @@ namespace SanctuaryHud
             var op = req.SendWebRequest();
             while (!op.isDone)
             {
-                if (!UploadStateOk())
+                if (!UploadStateOk(p))
                 {
                     req.Abort();
                     result.Paused = true;
