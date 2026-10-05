@@ -46,7 +46,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [IdleEngineers](IdleEngineers/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
-| [LadderReporter](LadderReporter/) | [**0.3.6**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.6) | Reports ranked results; launches matchmade games |
+| [LadderReporter](LadderReporter/) | [**0.3.6**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.6) | Reports ranked results; launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.1) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.13.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.13.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
@@ -563,7 +563,10 @@ and economy updates as the match runs, by wrapping those commands' `Receive`
 fields in the client VM — a table-field swap, no file touched, so the lobby's
 Lua hash is unchanged — and keeps count there, in the client's memory,
 reading it out every two seconds. Nothing is sent anywhere, and nothing is
-shown until the match has a result.
+shown until the match has a result. The counting hooks are shared source
+(`shared/Stats`) with LadderReporter, whose opt-in stats upload reads the
+same figures; whichever of the two mods goes first in a match installs them
+for both.
 
 - Economy figures are per tick in the stream (`economy.lua` adds income
   straight into the store), so a second's figures are ten ticks summed.
@@ -1276,6 +1279,53 @@ window) at a copy of [docs/matchmaking-mock-host.json](docs/matchmaking-mock-hos
 or [matchmaking-mock-joiner.json](docs/matchmaking-mock-joiner.json); `"me"`
 stands in for your own Steam ID, and the joiner's file takes the session ID
 the host logs.
+
+**Stats and replay uploads (0.4, opt-in).** After a reported game the mod
+can upload the match's stats and its replay to the match's page on
+SanctuaryDB. Both are **off by default**; nothing leaves the game unless
+the player turns them on in the `[Upload]` section (F8 window):
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `Upload.Stats` | false | Upload this match's stats (economy, units, score over time) after a ranked game, shown on the match page |
+| `Upload.Replays` | false | Upload the replay of each ranked game after you leave the match, so anyone can download and watch it |
+| `Upload.MaxReplayMB` | 30 | Larger replays are not uploaded |
+| `Upload.ForceUploadMatchId` | empty | Debug only, for testing against a site dev server: a match UUID. Every finished game (against AI, any player count) then runs the uploads against that id, skipping the ranked 1v1 check |
+
+- **Stats.** The collector is SanctuaryHud's MatchStats one, compiled into
+  both mods from `shared/Stats`, so the upload works without SanctuaryHud;
+  whichever mod installs it first in a match serves both. It goes in as
+  early in a ranked-looking match as the client allows. The stats are read
+  once, when the game's victory/defeat panel comes up (or 5 s after the
+  result), while the match's Lua VM is still alive: per player totals
+  (alloy and energy gathered, spent, wasted, stalls, peaks; units built,
+  lost and killed with their value; peak army; score) and a timeline in 5 s
+  buckets. Only the seated players are sent, keyed by Steam ID. They are
+  posted once the report's answer says which match the site filed it under
+  (`/api/report` now returns `matchId`; a matchmade game also knows it).
+- **Replays.** The game writes a match's `.sanreplay` while it plays and
+  closes it only when you leave the match; until then it holds the file
+  open for writing, and the mod waits for that handle to go. Then it copies
+  the file (and its `.mods.json` sidecar, if any) to
+  `BepInEx\cache\LadderReporter\pending\<matchId>.sanreplay`, safe from the
+  game's keep-the-newest-15 prune, hashing it on a worker thread. Uploads run
+  only in the menu or a lobby and stop the moment a game starts loading: a
+  slot request to the site, a PUT of the file straight to storage, then a
+  completion call. Retries back off 1, 5 and 30 minutes, then wait for the
+  next launch; a pending replay is dropped once uploaded, when the site says
+  it already has it (the opponent uploaded first) or refuses it, or after 7
+  days. A replay still waiting for its match to close survives a crash or a
+  quit and goes next launch.
+- **DryRun** (`Report.DryRun`) writes the stats JSON and the replay slot
+  request to `BepInEx\cache\LadderReporter\dryrun\` instead of sending them.
+- `GET /status` on the local bridge also answers
+  `"uploads": { "stats": bool, "replays": bool, "pending": n }`, so the
+  match page can show that an upload is on its way.
+
+All three calls (`POST /api/mm/match/{id}/stats`, `.../replay`,
+`.../replay/done`) carry the matchmaking bearer session, minted from a Steam
+ticket when first needed. Stats and replays are cosmetic: the result and
+the rating come from the report alone.
 
 ## ReplayManager
 

@@ -8,7 +8,8 @@ namespace SanctuaryHud
 {
     // What the Lua side has gathered, as parsed out of its pull: one record
     // per army with its whole-match totals, and a sample a second of the
-    // figures the charts draw.
+    // figures the charts draw. Shared by SanctuaryHud's MatchStats screen and
+    // LadderReporter's stats upload (see MatchStatsCore).
 
     internal struct Sample
     {
@@ -82,6 +83,9 @@ namespace SanctuaryHud
         public int TickRate = 10;
         public int Focus = int.MinValue;
         public string Map = "";
+        /// The pull's format (MatchStatsCore.Format); 0 when the hook running
+        /// in this VM came from a mod built before the field existed.
+        public int Format;
         /// How many sample lines have come across; the next pull asks for
         /// the ones after it.
         public int Cursor;
@@ -135,6 +139,7 @@ namespace SanctuaryHud
                         TickRate = Math.Max(1, I(f, 3));
                         Focus = I(f, 4);
                         if (f.Length > 5 && f[5].Length > 0) Map = f[5];
+                        Format = I(f, 6);
                         break;
                     case 'P':
                     {

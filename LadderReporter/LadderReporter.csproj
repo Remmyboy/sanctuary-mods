@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <AssemblyName>LadderReporter</AssemblyName>
+    <!-- Compiles shared/Stats (the match-stats collector); see Directory.Build.targets. -->
+    <SharedMatchStats>true</SharedMatchStats>
   </PropertyGroup>
 
   <ItemGroup>

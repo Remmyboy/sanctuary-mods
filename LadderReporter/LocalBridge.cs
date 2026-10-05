@@ -22,7 +22,8 @@ namespace SanctuaryHud
     //
     // Two endpoints, plus OPTIONS preflights for both:
     //
-    //   GET  /status  -> { modVersion, gameVersion, state, match | null }
+    //   GET  /status  -> { modVersion, gameVersion, state, match | null,
+    //                      uploads: { stats, replays, pending } }
     //   POST /match   <- the match object (as the site's match API has it)
     //                    or null; -> { ok: true } or { ok: false, error }
     //
@@ -69,6 +70,8 @@ namespace SanctuaryHud
         {
             public string State;
             public string MatchId, MatchStatus, Phase;
+            public bool UploadStats, UploadReplays;
+            public int PendingReplays;
         }
 
         private sealed class HttpRequest
@@ -112,11 +115,16 @@ namespace SanctuaryHud
             var m = _match;
             var state = CurrentState();
             var last = _bridgeSnapshot;
+            // Bound in AwakeUploads, after the first snapshot.
+            var upStats = _cfgUpStats?.Value ?? false;
+            var upReplays = _cfgUpReplays?.Value ?? false;
+            var pending = _pending.Count;
             if (last == null || last.State != state)
             {
                 Logger.LogInfo($"Matchmaking: state {last?.State ?? "(none)"} -> {state}");
             }
-            else if (last.MatchId == m?.Id && last.MatchStatus == m?.Status && last.Phase == _phaseName)
+            else if (last.MatchId == m?.Id && last.MatchStatus == m?.Status && last.Phase == _phaseName &&
+                     last.UploadStats == upStats && last.UploadReplays == upReplays && last.PendingReplays == pending)
             {
                 return;   // nothing changed since last frame; keep the old snapshot
             }
@@ -126,6 +134,9 @@ namespace SanctuaryHud
                 MatchId = m?.Id,
                 MatchStatus = m?.Status,
                 Phase = _phaseName,
+                UploadStats = upStats,
+                UploadReplays = upReplays,
+                PendingReplays = pending,
             };
         }
 
@@ -291,6 +302,15 @@ namespace SanctuaryHud
                 ["match"] = s?.MatchId == null
                     ? null
                     : new JObject { ["id"] = s.MatchId, ["status"] = s.MatchStatus, ["phase"] = s.Phase },
+                // The opt-in uploads (0.4): what the player turned on, and
+                // replays still to upload (waiting for the match to close,
+                // or queued for the menu).
+                ["uploads"] = new JObject
+                {
+                    ["stats"] = s?.UploadStats ?? false,
+                    ["replays"] = s?.UploadReplays ?? false,
+                    ["pending"] = s?.PendingReplays ?? 0,
+                },
             };
             return o.ToString(Newtonsoft.Json.Formatting.None);
         }

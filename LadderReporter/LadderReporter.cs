@@ -11,6 +11,7 @@ using EM.Core;
 using EM.Network;
 using EM.Network.Lobby;
 using HarmonyLib;
+using Newtonsoft.Json.Linq;
 using Steamworks;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -43,7 +44,11 @@ namespace SanctuaryHud
     // watching. Spectators in a ladder game don't stop it reporting. The
     // server ignores reports for games that aren't an open ladder match, so
     // playing unranked with a friend is fine.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.3.6")]
+    //
+    // After a reported game it can also upload the match's stats and its
+    // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
+    // ReplayUpload.cs.
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.4.0")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -160,6 +165,7 @@ namespace SanctuaryHud
                 Logger.LogError($"Ladder reporter: economy patch failed (results will not be reported): {e}");
             }
             AwakeMatchmaking();
+            AwakeUploads();
             // The assembly version changes every build, so a log can be
             // matched to the DLL that produced it.
             Logger.LogInfo($"Ladder reporter loaded, build {typeof(LadderReporterPlugin).Assembly.GetName().Version} " +
@@ -200,6 +206,9 @@ namespace SanctuaryHud
                     Logger.LogError($"Matchmaking: update failed: {e}");
                 }
             }
+            // Uploads on their own too, and before the Enabled check: a
+            // replay queued earlier still uploads with reporting switched off.
+            UpdateUploads();
             // No SharedTick: this plugin reads only InMatch, which the economy
             // patch keeps, and the shared tick's once-a-second focus-army
             // Lua poll was paid for nothing.
@@ -241,7 +250,12 @@ namespace SanctuaryHud
             }
 
             _snapshot ??= TrySnapshot(); // null until the lobby state is readable
-            if (_snapshot == null || !_snapshot.Reportable || _reported) return;
+            var reportable = _snapshot != null && _snapshot.Reportable;
+            // Upload.ForceUploadMatchId (testing): any game's result is
+            // watched for, so its uploads can run; only a ladder game is
+            // still reported.
+            var forceId = ForceUploadId();
+            if ((!reportable && forceId == null) || _reported) return;
 
             if (!_hookInstalled)
             {
@@ -274,9 +288,15 @@ namespace SanctuaryHud
             var wonArmies = new HashSet<int>(conditions.Where(kv => kv.Value == 1).Select(kv => kv.Key));
             if (wonArmies.Count == 0) return; // still playing (or a no-winner wipe — leave those to manual reporting)
 
-            var winners = _snapshot.Humans.Where(p => wonArmies.Contains(p.ArmyId)).ToList();
             _reported = true; // one attempt per match, however it goes
+            if (forceId != null) BeginUploads(forceId);
+            if (!reportable)
+            {
+                Logger.LogInfo("Ladder reporter: game decided; not a ladder game, so nothing to report.");
+                return;
+            }
 
+            var winners = _snapshot.Humans.Where(p => wonArmies.Contains(p.ArmyId)).ToList();
             if (winners.Count == 0 || winners.Count == _snapshot.Humans.Count)
             {
                 // An AI won, or every human "won" — not a 1v1 result.
@@ -284,6 +304,7 @@ namespace SanctuaryHud
                 return;
             }
 
+            if (forceId == null) BeginUploads(null);
             SendReport(winners);
         }
 
@@ -348,10 +369,14 @@ namespace SanctuaryHud
         private void SendReport(List<Participant> winners)
         {
             var body = BuildPayload(winners);
+            // This match's uploads wait for the report's answer: it says
+            // which match the site filed the result under.
+            var job = _job;
 
             if (_cfgDryRun.Value)
             {
                 Logger.LogInfo($"Ladder reporter (dry run): {body}");
+                ResolveUploadId(job, null, true);
                 return;
             }
 
@@ -361,10 +386,11 @@ namespace SanctuaryHud
                 if (ticket == null)
                 {
                     Logger.LogWarning("Ladder reporter: no Steam ticket; report the result on the site instead.");
+                    ResolveUploadId(job, null, false);
                     return;
                 }
                 var json = "{\"ticket\":\"" + ticket + "\"," + body.Substring(1);
-                StartCoroutine(PostRoutine(_cfgEndpoint.Value, json, ticketId));
+                StartCoroutine(PostRoutine(_cfgEndpoint.Value, json, ticketId, job));
             });
         }
 
@@ -498,20 +524,22 @@ namespace SanctuaryHud
         // sending the request"), while UnityWebRequest uses the engine's
         // native TLS. A coroutine never blocks the frame — SendWebRequest is
         // asynchronous and this only wakes to check on it.
-        private IEnumerator PostRoutine(string endpoint, string json, uint ticketId)
+        private IEnumerator PostRoutine(string endpoint, string json, uint ticketId, UploadJob job)
         {
             try
             {
-                foreach (var step in PostAttempts(endpoint, json)) yield return step;
+                foreach (var step in PostAttempts(endpoint, json, job)) yield return step;
             }
             finally
             {
                 // Delivered, rejected or given up on: the ticket is spent.
                 ReleaseTicket(ticketId);
+                // Not reported (a no-op when it was): nothing to upload.
+                ResolveUploadId(job, null, false);
             }
         }
 
-        private IEnumerable PostAttempts(string endpoint, string json)
+        private IEnumerable PostAttempts(string endpoint, string json, UploadJob job)
         {
             var payload = Encoding.UTF8.GetBytes(json);
             for (var attempt = 1; attempt <= 3; attempt++)
@@ -528,7 +556,12 @@ namespace SanctuaryHud
                     var status = (int)request.responseCode;
                     if (request.result == UnityWebRequest.Result.Success)
                     {
-                        Logger.LogInfo("Ladder reporter: result reported to the ladder.");
+                        // {"outcome": "reported"|"applied"|"disputed",
+                        //  "matchId": "<uuid>"}; older sites send no matchId.
+                        var (outcome, matchId) = ReadReportAnswer(request.downloadHandler?.text);
+                        Logger.LogInfo($"Ladder reporter: result reported to the ladder ({outcome ?? "no outcome given"}" +
+                                       (matchId != null ? $", match {matchId})." : ")."));
+                        ResolveUploadId(job, matchId, true);
                         yield break;
                     }
                     if (status > 0)
@@ -555,6 +588,21 @@ namespace SanctuaryHud
                 if (attempt < 3) yield return new WaitForSecondsRealtime(5f * attempt); // at most twice a report: not worth caching
             }
             Logger.LogWarning("Ladder reporter: giving up — report the result on the site instead.");
+        }
+
+        private (string Outcome, string MatchId) ReadReportAnswer(string text)
+        {
+            try
+            {
+                var answer = JObject.Parse(text ?? "");
+                string Str(string key) => answer[key]?.Type == JTokenType.String ? (string)answer[key] : null;
+                return (Str("outcome"), Str("matchId"));
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning($"Ladder reporter: the ladder's answer was unreadable ({e.Message}).");
+                return (null, null);
+            }
         }
 
         private static string Truncate(string s, int max) =>

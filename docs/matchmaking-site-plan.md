@@ -150,6 +150,42 @@ The mod will add `matchId` to its existing `/api/report` payload. Accept it
 result to the matchmade game, so a manually hosted rematch doesn't get
 confused with it.
 
+### 8. Stats and replay uploads (LadderReporter 0.4, opt-in)
+
+Both off by default in the mod (`[Upload] Stats`, `Replays`). The site's
+plan is its repo's `docs/replays-and-stats-plan.md`; what the mod relies on:
+
+- `POST /api/report` answers 200 `{ "outcome": "reported"|"applied"|"disputed", "matchId": "<uuid>" }`.
+  The mod uploads against that `matchId` (else the matchmade id it already
+  had); without one, and whenever the report itself failed, it uploads
+  nothing.
+- `POST /api/mm/match/{id}/stats` (bearer, JSON, at most 256 KB) -> 200
+  `{ ok: true }`. Sent once per match, three tries on 5xx or no answer, no
+  retry on a 4xx except a 401 (sign in again, once). The payload is
+  `format: 1`: `modVersion`, `buildId` (Steam app build), `tickRate`,
+  `endTick`, one entry per seated player (keyed by `steamId`, with
+  `armyId`, `name`, `faction`, `team`, `colour` `#rrggbb`, `condition`,
+  `conditionTick`, `alloy`/`energy` `{gathered, spent, wasted, stallTicks,
+  peakIncome}`, `maxStorage`, `built {land, air, naval, engineers,
+  structures, value}`, `lost {mobile, structures, commander, value}`,
+  `killedValue`, `commanderKills`, `peakArmyValue`, `peakUnits`, `score`)
+  and a columnar `timeline { intervalS, t[], series { <steamId>:
+  { alloyIncome, energyIncome, alloySpend, energySpend, armyValue, units,
+  score } } }`. `intervalS` is 5, doubled (10, 20, ...) only when a very
+  long game would otherwise pass 256 KB. Numbers are rounded to 1 decimal.
+- `POST /api/mm/match/{id}/replay` (bearer) `{ sizeBytes, sha256, gameVersion,
+  buildId, mapPath, fileName, sidecarBytes }` -> `{ upload: { url,
+  sidecarUrl|null }, expiresAt }`, `{ skip: "stored" }` or
+  `{ retryAfterS }`. The mod PUTs the raw file to `url` (no auth header,
+  `application/octet-stream`) and the `.mods.json` sidecar to
+  `sidecarUrl`, then `POST .../replay/done` `{}` -> `{ ok: true }`; a 409
+  there restarts from a new slot. It keeps an unexpired slot (more than 5
+  minutes left) across retries and goes straight to the PUT, or straight to
+  `done` if the PUT already went through. 413, 404 and any other 4xx but
+  401, 408 and 429 drop the replay; anything else retries after 1, 5 and
+  30 minutes, then next launch, for up to 7 days.
+- The local bridge's `GET /status` adds `uploads: { stats, replays, pending }`.
+
 ## Not in scope now
 
 - Private lobbies or passwords: the lobby is public for the few seconds

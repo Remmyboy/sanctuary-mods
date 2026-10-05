@@ -1,5 +1,14 @@
 <Project>
 
+  <!-- shared/Stats (the match-stats Lua collector and its parser) is
+       compiled only into the mods that read match stats, the ones setting
+       SharedMatchStats (SanctuaryHud, LadderReporter); every other mod's
+       ..\shared\** glob leaves it out here. Items are evaluated after the
+       project body, so this Remove sees what the csproj included. -->
+  <ItemGroup Condition="'$(SharedMatchStats)' != 'true'">
+    <Compile Remove="$(MSBuildThisFileDirectory)shared\Stats\**" />
+  </ItemGroup>
+
   <!-- Where each project lands in the game install. Mods go to their own
        folder under SanctuaryMods (the loader scans those and hot-reloads
        them); the loader project overrides DeployPath to BepInEx\plugins,
