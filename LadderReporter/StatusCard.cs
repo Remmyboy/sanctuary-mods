@@ -134,6 +134,8 @@ namespace SanctuaryHud
                 {
                     _card.gameObject.SetActive(true);
                     _cardShownVersion = -1;
+                    _cardPlacedLogged = false;
+                    Logger.LogInfo("Ladder reporter: status card shown beside the result panel.");
                 }
                 if (_cardShownVersion != _status.Version) FillCard();
                 PlaceCard(result as SanctuaryUI.GameResultPanelUI);
@@ -233,13 +235,50 @@ namespace SanctuaryHud
             var x = size.x - w - 60f;
             var y = size.y - h - 160f;
             var text = result != null ? result.gameResultText : null;
-            if (text != null && HudCanvas.LocalRect(text, out var r) && r.xMax + 60f + w < size.x - 20f)
+            if (text != null && ScreenRectOnRoot(text.rectTransform, out var r) && r.xMax + 60f + w < size.x - 20f)
             {
                 x = r.xMax + 60f;
                 y = Mathf.Clamp(r.yMax - h, 20f, size.y - h - 20f);
             }
             var at = new Vector2(Mathf.Round(x), Mathf.Round(y));
-            if (_card.anchoredPosition != at) _card.anchoredPosition = at;
+            if (_card.anchoredPosition == at) return;
+            _card.anchoredPosition = at;
+            if (!_cardPlacedLogged)
+            {
+                _cardPlacedLogged = true;
+                Logger.LogInfo(FormattableString.Invariant($"Ladder reporter: status card at {at.x:0},{at.y:0} ({w:0}x{h:0}) on a {size.x:0}x{size.y:0} canvas."));
+            }
+        }
+
+        private bool _cardPlacedLogged;
+        private static readonly Vector3[] _cardCorners = new Vector3[4];
+
+        // Where a game UI element is, in the card root's units (origin at
+        // its bottom-left, y up). Through screen pixels: the game's canvas
+        // and the mod's own overlay need not share a world space (a canvas
+        // drawn by a camera has world corners that mean nothing here).
+        private static bool ScreenRectOnRoot(RectTransform target, out Rect rect)
+        {
+            rect = default;
+            var root = HudCanvas.Root;
+            var canvas = target.GetComponentInParent<Canvas>();
+            if (root == null || canvas == null) return false;
+            var top = canvas.rootCanvas;
+            var cam = top.renderMode == RenderMode.ScreenSpaceOverlay ? null : top.worldCamera;
+            target.GetWorldCorners(_cardCorners);
+            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+            foreach (var corner in _cardCorners)
+            {
+                var screen = RectTransformUtility.WorldToScreenPoint(cam, corner);
+                if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, null, out var p)) return false;
+                minX = Mathf.Min(minX, p.x);
+                maxX = Mathf.Max(maxX, p.x);
+                minY = Mathf.Min(minY, p.y);
+                maxY = Mathf.Max(maxY, p.y);
+            }
+            var origin = root.rect.min;
+            rect = new Rect(minX - origin.x, minY - origin.y, maxX - minX, maxY - minY);
+            return rect.width > 1f && rect.height > 1f;
         }
 
         private void OpenMatchPage()
