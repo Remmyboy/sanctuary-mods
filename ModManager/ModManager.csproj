@@ -20,6 +20,18 @@
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Updates: UnityWebRequest for GitHub (Mono's own TLS fails against
+         modern cert chains), the game's Newtonsoft for the release list, and
+         ZipArchive for the release zips. -->
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
 
   <ItemGroup>

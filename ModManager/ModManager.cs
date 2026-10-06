@@ -48,6 +48,34 @@ namespace SanctuaryHud
 
         internal void OpenModsFolder() => Application.OpenURL("file:///" + ModCatalog.ModsRoot.Replace('\\', '/'));
 
+        // ---- updates --------------------------------------------------------
+        internal Updates Updates { get; private set; }
+        internal bool CheckUpdatesOnOpen => _cfgCheckUpdates.Value;
+        private ConfigEntry<bool> _cfgCheckUpdates;
+
+        /// The version installed in a mod folder, as the mod reports it: its
+        /// plugin's [BepInPlugin] version, else its mod.json's. Null when the
+        /// folder isn't installed or has no version of its own.
+        internal string InstalledVersion(string folder)
+        {
+            if (string.Equals(folder, "ModManager", StringComparison.OrdinalIgnoreCase))
+                return MetadataHelper.GetMetadata(this)?.Version?.ToString();
+            var registry = LoaderRegistry.Resolve(_log);
+            var types = registry != null ? registry.PluginTypes() : _plugins.Select(p => p.Type).Where(t => t != null).ToArray();
+            foreach (var type in types)
+            {
+                if (!string.Equals(Modding.ModOf(type)?.FolderName, folder, StringComparison.OrdinalIgnoreCase)) continue;
+                try { return MetadataHelper.GetMetadata(type)?.Version?.ToString(); }
+                catch { /* no readable [BepInPlugin] */ }
+            }
+            var mod = ModCatalog.Mods.FirstOrDefault(m => string.Equals(m.FolderName, folder, StringComparison.OrdinalIgnoreCase));
+            return mod != null && !mod.Manifest.Synthesised ? mod.Version : null;
+        }
+
+        internal static string FolderPath(string folder) =>
+            ModCatalog.Mods.FirstOrDefault(m => string.Equals(m.FolderName, folder, StringComparison.OrdinalIgnoreCase))?.Folder
+            ?? System.IO.Path.Combine(ModCatalog.ModsRoot, folder);
+
         // ---- C# plugin toggles --------------------------------------------
         // Every UI plugin on this same hidden manager GameObject: the ones the
         // hot-reload loader manages, read from its registry, and any BepInEx
@@ -114,7 +142,12 @@ namespace SanctuaryHud
             _cfgDisabledPlugins = Config.Bind("Plugins", "Disabled", "",
                 "Semicolon-separated GUIDs of C# plugins switched off on the Mods page. ModLoader 1.3+ never starts " +
                 "these; an older loader starts them and the manager stops them straight away.");
+            _cfgCheckUpdates = Config.Bind("Updates", "CheckWhenOpened", true,
+                "Look for newer releases of these mods on GitHub when the Mods page opens (at most every 30 minutes). " +
+                "Check for Updates, at the bottom of the page, looks whatever this says.");
             MigrateLuaMods();
+            Updates.ApplyPending(_log);
+            Updates = new Updates(this, _log);
 
             _page = new ModsPage(this, _log);
             _log.LogInfo($"Mod manager ready: {ModCatalog.Mods.Count} mod folder(s) in {ModCatalog.ModsRoot}. " +

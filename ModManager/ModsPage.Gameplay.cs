@@ -71,6 +71,7 @@ namespace SanctuaryHud
                 var m = mod;
                 DescribeNext(m.Name, GameplayDescription(m));
                 InfoRow(_gameList, $"{m.Name} {m.Version}", GameplayFiles(m));
+                UpdateRow(_gameList, m.FolderName, m.Name, true);
             }
 
             var troubled = ModCatalog.Mods.Where(m => m.Problems.Count > 0).ToList();

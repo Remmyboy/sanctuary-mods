@@ -178,6 +178,13 @@ namespace SanctuaryHud
                     if (PluginSignature() != _pluginSignature) RebuildUiTab();
                 }
                 if (GameplayChanged()) RebuildGameplayTab();
+                if (_owner.Updates.Changes != _updatesSeen)
+                {
+                    _updatesSeen = _owner.Updates.Changes;
+                    ShowCheckState();
+                    KeepingScroll(_uiList, RebuildUiTab);
+                    KeepingScroll(_gameList, RebuildGameplayTab);
+                }
             }
 
             try { TickLobby(); }
@@ -218,6 +225,7 @@ namespace SanctuaryHud
             // would play its hide animation (and a Show() in the same frame
             // does not undo that). In a match the real one is wanted: it
             // hides the side bar and puts up the backdrop over the game.
+            _openedInMatch = !frontMenu;
             if (frontMenu) CurrentWindow(im) = InterfaceManager.Window.Background;
             else im.TransitionTo(InterfaceManager.Window.Background);
             // The plugin list is only kept fresh while the page is up.
@@ -226,6 +234,9 @@ namespace SanctuaryHud
             RebuildGameplayTab();
             pm.OpenPanel(PanelName);
             _open = true;
+            _updatesSeen = _owner.Updates.Changes;
+            ShowCheckState();
+            if (_owner.CheckUpdatesOnOpen) _owner.Updates.CheckIfStale();
         }
 
         public void Close()
@@ -410,6 +421,7 @@ namespace SanctuaryHud
             back.onClick.AddListener(Close);
             var open = buttons.Find("Reset Settings Button").GetComponent<ButtonManager>();
             var rescan = Object.Instantiate(open.gameObject, buttons).GetComponent<ButtonManager>();
+            _checkButton = Object.Instantiate(open.gameObject, buttons).GetComponent<ButtonManager>();
             var right = new GameObject("Right", typeof(RectTransform)).GetComponent<RectTransform>();
             right.SetParent(buttons, false);
             right.anchorMin = right.anchorMax = new Vector2(1f, 0f);
@@ -422,9 +434,10 @@ namespace SanctuaryHud
             hl.childAlignment = TextAnchor.LowerRight;
             var fit = right.gameObject.AddComponent<ContentSizeFitter>();
             fit.horizontalFit = fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            _checkButton.transform.SetParent(right, false);
             rescan.transform.SetParent(right, false);
             open.transform.SetParent(right, false);
-            foreach (var b in new[] { rescan, open })
+            foreach (var b in new[] { _checkButton, rescan, open })
             {
                 var rt = (RectTransform)b.transform;
                 rt.anchorMin = rt.anchorMax = new Vector2(0f, 0f);
@@ -435,6 +448,9 @@ namespace SanctuaryHud
             SetButtonText(open, "Open Mods Folder");
             rescan.onClick.AddListener(() => { _owner.Rescan(); RebuildGameplayTab(); RebuildUiTab(); });
             open.onClick.AddListener(_owner.OpenModsFolder);
+            _checkLabel = null;
+            ShowCheckState();
+            _checkButton.onClick.AddListener(_owner.Updates.Check);
 
             // -- the sidebar entry: a clone of the Settings button, right after it.
             if (bar.settingsButton == null) throw new InvalidOperationException("The side bar has no Settings button.");
@@ -1184,6 +1200,7 @@ namespace SanctuaryHud
             _sectionLabels.Clear();
 
             InstallNotices(_uiList);
+            if (UpdateRow(_uiList, "ModManager", "Mod Manager", false)) Line(_uiList);
 
             if (_owner.Plugins.Count == 0)
             {
@@ -1212,6 +1229,7 @@ namespace SanctuaryHud
                         if (_pluginGroups.TryGetValue(p.Guid, out var g) && g != null) g.gameObject.SetActive(expanded);
                         return expanded;
                     });
+                if (p.Mod != null) UpdateRow(_uiList, p.Mod.FolderName, p.Name, false);
 
                 var group = new GameObject("Settings " + p.Guid, typeof(RectTransform)).transform;
                 var vl = group.gameObject.AddComponent<VerticalLayoutGroup>();
