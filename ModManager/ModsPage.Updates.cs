@@ -14,8 +14,9 @@ namespace SanctuaryHud
         private ButtonManager _checkButton;
         private string _checkLabel;
         private int _updatesSeen = -1;
-        // Opened over a match rather than from the front menu: gameplay mods
-        // can't change under a running match.
+        // Opened over a match (or replay) rather than from the front menu:
+        // mods only update from the menu, so a match never has a mod
+        // reloading under it.
         private bool _openedInMatch;
 
         /// The check button says how the last check went.
@@ -71,10 +72,10 @@ namespace SanctuaryHud
             var installed = _owner.InstalledVersion(folder);
             var release = u.Available(folder, installed);
             if (release == null) return false;
-            if (gameplay && _openedInMatch)
+            if (_openedInMatch)
             {
-                DescribeNext(name, "A gameplay mod can't change under a running match; update it from the front menu.");
-                InfoRow(list, $"{name} {release.Display} is out", "update after the match");
+                DescribeNext(name, "Mods update from the main menu, not during a match. Open this page there to update it.");
+                InfoRow(list, $"{name} {release.Display} is out", "update from the main menu");
                 return true;
             }
             var failed = u.FailureOf(folder);
