@@ -178,13 +178,7 @@ namespace SanctuaryHud
                     if (PluginSignature() != _pluginSignature) RebuildUiTab();
                 }
                 if (GameplayChanged()) RebuildGameplayTab();
-                if (_owner.Updates.Changes != _updatesSeen)
-                {
-                    _updatesSeen = _owner.Updates.Changes;
-                    ShowCheckState();
-                    KeepingScroll(_uiList, RebuildUiTab);
-                    KeepingScroll(_gameList, RebuildGameplayTab);
-                }
+                TickUpdates();
             }
 
             try { TickLobby(); }
@@ -230,12 +224,11 @@ namespace SanctuaryHud
             else im.TransitionTo(InterfaceManager.Window.Background);
             // The plugin list is only kept fresh while the page is up.
             _owner.RefreshPluginsNow();
+            ResetUpdateRows();
             RebuildUiTab();
             RebuildGameplayTab();
             pm.OpenPanel(PanelName);
             _open = true;
-            _updatesSeen = _owner.Updates.Changes;
-            ShowCheckState();
             if (_owner.CheckUpdatesOnOpen) _owner.Updates.CheckIfStale();
         }
 
@@ -297,7 +290,9 @@ namespace SanctuaryHud
         }
 
         private string PluginSignature() =>
-            string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-"))) +
+            // The version too: a mod hot-reloaded at a new version (an
+            // update, a rebuild) shows it in its heading.
+            string.Join(";", _owner.Plugins.Select(p => p.Guid + (p.Enabled ? "+" : "-") + PluginVersion(p))) +
             "|" + string.Join("|", Sanctuary.ModApi.ModCatalog.Notices);
 
         // ---- construction ---------------------------------------------------
@@ -450,7 +445,7 @@ namespace SanctuaryHud
             open.onClick.AddListener(_owner.OpenModsFolder);
             _checkLabel = null;
             ShowCheckState();
-            _checkButton.onClick.AddListener(_owner.Updates.Check);
+            _checkButton.onClick.AddListener(CheckButtonClicked);
 
             // -- the sidebar entry: a clone of the Settings button, right after it.
             if (bar.settingsButton == null) throw new InvalidOperationException("The side bar has no Settings button.");
@@ -1216,7 +1211,7 @@ namespace SanctuaryHud
                 first = false;
                 var p = plugin;
                 DescribeNext(p.Name, PluginSummary(p));
-                _sectionLabels[p.Guid] = SectionRow(_uiList, p.Name, p.Enabled, _expanded.Contains(p.Guid),
+                _sectionLabels[p.Guid] = SectionRow(_uiList, PluginTitle(p), p.Enabled, _expanded.Contains(p.Guid),
                     on =>
                     {
                         _owner.SetPluginEnabled(p, on);
@@ -1248,12 +1243,23 @@ namespace SanctuaryHud
             ScrollToTop(_uiList);
         }
 
+        /// The version in a plugin's [BepInPlugin], or null.
+        private static string PluginVersion(ModManagerPlugin.PluginEntry p)
+        {
+            try { return p.Type != null ? BepInEx.MetadataHelper.GetMetadata(p.Type)?.Version?.ToString() : null; }
+            catch { return null; } // no readable [BepInPlugin]
+        }
+
+        /// "Replay Manager (0.5.1)": a mod's heading, with its version.
+        internal static string Titled(string name, string version) =>
+            string.IsNullOrEmpty(version) ? name : $"{name} ({version})";
+
+        private static string PluginTitle(ModManagerPlugin.PluginEntry p) => Titled(p.Name, PluginVersion(p));
+
         /// A UI mod's hover text: its version, and what the row does.
         private static string PluginSummary(ModManagerPlugin.PluginEntry p)
         {
-            string version = null;
-            try { version = p.Type != null ? BepInEx.MetadataHelper.GetMetadata(p.Type)?.Version?.ToString() : null; }
-            catch { /* no readable [BepInPlugin]: the summary goes without a version */ }
+            var version = PluginVersion(p);
             var m = p.Mod != null && !p.Mod.Manifest.Synthesised ? p.Mod.Manifest : null;
             return (m != null && m.Description.Length > 0 ? m.Description + "\n\n" : "") +
                    (version != null ? $"Version {version}" + (m != null && m.Author.Length > 0 ? $" by {m.Author}. " : ". ") : "") +
@@ -1268,7 +1274,7 @@ namespace SanctuaryHud
             FillPluginGroup(plugin, group);
             group.gameObject.SetActive(_expanded.Contains(plugin.Guid));
             if (_sectionLabels.TryGetValue(plugin.Guid, out var label) && label != null)
-                label.text = SectionLabel(plugin.Name, _expanded.Contains(plugin.Guid));
+                label.text = SectionLabel(PluginTitle(plugin), _expanded.Contains(plugin.Guid));
             _pluginSignature = PluginSignature();
         }
 

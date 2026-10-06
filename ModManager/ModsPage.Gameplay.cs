@@ -70,7 +70,7 @@ namespace SanctuaryHud
             {
                 var m = mod;
                 DescribeNext(m.Name, GameplayDescription(m));
-                InfoRow(_gameList, $"{m.Name} {m.Version}", GameplayFiles(m));
+                InfoRow(_gameList, Titled(m.Name, m.Manifest.Synthesised ? null : m.Version), GameplayFiles(m));
                 UpdateRow(_gameList, m.FolderName, m.Name, true);
             }
 

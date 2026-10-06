@@ -83,6 +83,16 @@ namespace SanctuaryHud
         public string FailureOf(string folder) => folder != null && _failed.TryGetValue(folder, out var f) ? f : null;
         public bool RestartPending(string folder) => folder != null && _restartPending.Contains(folder);
 
+        /// The release being installed into the folder, or null.
+        public Release InstallingRelease(string folder) =>
+            folder != null && string.Equals(Installing, folder, StringComparison.OrdinalIgnoreCase) && _latest.TryGetValue(folder, out var r) ? r : null;
+
+        // Installed since the page last opened: the page says so under the
+        // mod until it is next opened, so an update never passes unnoticed.
+        private readonly Dictionary<string, Release> _justInstalled = new Dictionary<string, Release>(StringComparer.OrdinalIgnoreCase);
+        public Release JustInstalled(string folder) => folder != null && _justInstalled.TryGetValue(folder, out var r) ? r : null;
+        public void ForgetJustInstalled() => _justInstalled.Clear();
+
         /// A newer release than the installed version, or null.
         public Release Available(string folder, string installedVersion)
         {
@@ -93,8 +103,10 @@ namespace SanctuaryHud
             return have == null || r.Version > have ? r : null;
         }
 
-        public int AvailableCount(Func<string, string> installedVersionOf) =>
-            _latest.Keys.Count(f => installedVersionOf(f) != null && Available(f, installedVersionOf(f)) != null);
+        /// The folders with a newer release than what is installed.
+        public List<string> AvailableFolders(Func<string, string> installedVersionOf) =>
+            _latest.Keys.Where(f => { var v = installedVersionOf(f); return v != null && Available(f, v) != null; })
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
 
         public void CheckIfStale()
         {
@@ -111,6 +123,7 @@ namespace SanctuaryHud
         {
             Checking = true;
             Changes++;
+            var started = Time.unscaledTime;
             try
             {
                 using (var req = UnityWebRequest.Get(ReleasesUrl))
@@ -119,6 +132,10 @@ namespace SanctuaryHud
                     req.SetRequestHeader("User-Agent", "SanctuaryModManager");
                     req.timeout = 20;
                     yield return req.SendWebRequest();
+                    // A click that comes straight back looks like nothing
+                    // happened: "Checking…" stays up for a moment at least.
+                    var shown = Time.unscaledTime - started;
+                    if (shown < 0.8f) yield return new WaitForSecondsRealtime(0.8f - shown);
                     _checkedAt = Time.unscaledTime;
                     if (req.result != UnityWebRequest.Result.Success)
                     {
@@ -191,6 +208,23 @@ namespace SanctuaryHud
             _host.StartCoroutine(InstallRoutine(folder, targetDir, release));
         }
 
+        /// Installs each of these folders' newest release, one after another.
+        /// The Mod Manager's own goes last: it may hand the rest of its
+        /// update to the next launch.
+        public void InstallAll(IEnumerable<(string folder, string targetDir)> mods)
+        {
+            if (Installing != null) return;
+            var queue = mods.Where(m => _latest.ContainsKey(m.folder))
+                .OrderBy(m => string.Equals(m.folder, "ModManager", StringComparison.OrdinalIgnoreCase)).ToList();
+            if (queue.Count > 0) _host.StartCoroutine(InstallAllRoutine(queue));
+        }
+
+        private IEnumerator InstallAllRoutine(List<(string folder, string targetDir)> queue)
+        {
+            foreach (var (folder, targetDir) in queue)
+                yield return _host.StartCoroutine(InstallRoutine(folder, targetDir, _latest[folder]));
+        }
+
         private IEnumerator InstallRoutine(string folder, string targetDir, Release release)
         {
             Installing = folder;
@@ -217,6 +251,7 @@ namespace SanctuaryHud
                     var restart = Apply(folder, targetDir, zip);
                     if (restart) _restartPending.Add(folder);
                     else _installed[folder] = release.Version;
+                    if (!restart) _justInstalled[folder] = release;
                     _log.LogInfo($"Updates: installed {release.Tag} into {targetDir}" +
                                  (restart ? "; the loader and mod API changed, so it finishes when the game restarts." : "."));
                     ModCatalog.Rescan();
