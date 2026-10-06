@@ -50,7 +50,7 @@ namespace SanctuaryHud
 
         // ---- updates --------------------------------------------------------
         internal Updates Updates { get; private set; }
-        internal bool CheckUpdatesOnOpen => _cfgCheckUpdates.Value;
+        internal bool CheckUpdatesAutomatically => _cfgCheckUpdates.Value;
         private ConfigEntry<bool> _cfgCheckUpdates;
 
         /// The version installed in a mod folder, as the mod reports it: its
@@ -142,10 +142,12 @@ namespace SanctuaryHud
             _cfgDisabledPlugins = Config.Bind("Plugins", "Disabled", "",
                 "Semicolon-separated GUIDs of C# plugins switched off on the Mods page. ModLoader 1.3+ never starts " +
                 "these; an older loader starts them and the manager stops them straight away.");
-            _cfgCheckUpdates = Config.Bind("Updates", "CheckWhenOpened", true,
-                "Look for newer releases of these mods on GitHub when the Mods page opens (at most every 30 minutes). " +
-                "Check for Updates, at the bottom of the page, looks whatever this says.");
+            _cfgCheckUpdates = Config.Bind("Updates", "CheckAutomatically", true,
+                "Look for newer releases of these mods on GitHub when the menu comes up and when the Mods page opens " +
+                "(at most every 30 minutes); the Mods icon shows how many have one. Check for Updates, at the bottom " +
+                "of the page, looks whatever this says.");
             MigrateLuaMods();
+            MigrateUpdateCheck();
             Updates.ApplyPending(_log);
             Updates = new Updates(this, _log);
 
@@ -166,6 +168,16 @@ namespace SanctuaryHud
                 _log.LogInfo($"Lua mods switched on before 0.7 ({old.Value}) are now picked per lobby by the host, in the lobby's Mods panel.");
             Config.Remove(old.Definition);
             Config.Remove(Config.Bind("Plugins", "VanillaMode", false, "").Definition);
+            Config.Save();
+        }
+
+        /// 0.14.0 checked only when the page opened, as [Updates]
+        /// CheckWhenOpened; its value carries over to CheckAutomatically.
+        private void MigrateUpdateCheck()
+        {
+            var old = Config.Bind("Updates", "CheckWhenOpened", true, "");
+            if (!old.Value) _cfgCheckUpdates.Value = false;
+            Config.Remove(old.Definition);
             Config.Save();
         }
 

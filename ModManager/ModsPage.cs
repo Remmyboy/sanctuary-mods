@@ -167,6 +167,7 @@ namespace SanctuaryHud
                 if (dimmer != null) dimmer.FetchButtons();
                 _sidebarRegistered = true;
             }
+            TickBadge();
 
             if (IsOpen)
             {
@@ -229,7 +230,7 @@ namespace SanctuaryHud
             RebuildGameplayTab();
             pm.OpenPanel(PanelName);
             _open = true;
-            if (_owner.CheckUpdatesOnOpen) _owner.Updates.CheckIfStale();
+            if (_owner.CheckUpdatesAutomatically) _owner.Updates.CheckIfStale();
         }
 
         public void Close()
@@ -257,6 +258,7 @@ namespace SanctuaryHud
             if (_icon != null) { Object.Destroy(_icon.texture); Object.Destroy(_icon); }
             if (_cover != null) { Object.Destroy(_cover.texture); Object.Destroy(_cover); }
             DestroySymbolArt();
+            DestroyBadge();
             _page = null;
             _sidebarButton = null;
             _icon = null;
