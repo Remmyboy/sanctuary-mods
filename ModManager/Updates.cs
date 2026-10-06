@@ -58,9 +58,14 @@ namespace SanctuaryHud
 
         // Newest release per mod folder name, from the last good check.
         private readonly Dictionary<string, Release> _latest = new Dictionary<string, Release>(StringComparer.OrdinalIgnoreCase);
-        // What this session installed: the folder's DLL may not have
-        // hot-reloaded yet, so its reported version still reads the old one.
-        private readonly Dictionary<string, Version> _installed = new Dictionary<string, Version>(StringComparer.OrdinalIgnoreCase);
+        // What was just installed, and when: until the loader reloads the
+        // DLL the mod still reports its old version, and the Update button
+        // would come back. Only until then (or a little while, if the reload
+        // never comes): after that the mod's own version is the truth, so a
+        // copy put back by hand gets its button again.
+        private readonly Dictionary<string, (Version version, float at)> _installed =
+            new Dictionary<string, (Version, float)>(StringComparer.OrdinalIgnoreCase);
+        private const float ReloadGrace = 30f;
         // Per folder: the last failure, said on its button until it is tried again.
         private readonly Dictionary<string, string> _failed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _restartPending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -99,7 +104,11 @@ namespace SanctuaryHud
             if (string.IsNullOrEmpty(folder) || !_latest.TryGetValue(folder, out var r)) return null;
             if (_restartPending.Contains(folder)) return null;
             var have = ParseVersion(installedVersion);
-            if (_installed.TryGetValue(folder, out var ours) && (have == null || ours > have)) have = ours;
+            if (_installed.TryGetValue(folder, out var ours))
+            {
+                if ((have != null && have >= ours.version) || Time.unscaledTime - ours.at > ReloadGrace) _installed.Remove(folder);
+                else have = ours.version;
+            }
             return have == null || r.Version > have ? r : null;
         }
 
@@ -250,7 +259,7 @@ namespace SanctuaryHud
                 {
                     var restart = Apply(folder, targetDir, zip);
                     if (restart) _restartPending.Add(folder);
-                    else _installed[folder] = release.Version;
+                    else _installed[folder] = (release.Version, Time.unscaledTime);
                     if (!restart) _justInstalled[folder] = release;
                     _log.LogInfo($"Updates: installed {release.Tag} into {targetDir}" +
                                  (restart ? "; the loader and mod API changed, so it finishes when the game restarts." : "."));
