@@ -52,25 +52,25 @@ Sections = {
                 why = "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more.",
                 tags = { "COMMAND" },
                 expect = { ["economy.production"] = { alloys = 5, energy = 50 } },
-                set = { ["economy.production"] = { alloys = 2, energy = 20 } },
+                set = { ["economy.production"] = { alloys = 2, energy = 30 } },
             },
             {
                 why = "T1 extractors make up the commander's lost alloy income, but only where you have taken the map.",
                 idPattern = "^u.s1601$",
                 expect = { ["economy.production.alloys"] = 1 },
-                set = { ["economy.production.alloys"] = 2 },
+                set = { ["economy.production.alloys"] = 1.5 },
             },
             {
-                why = "T2 extractors pay back their upgrade faster than before (240 s against 400 s) instead of being the worse deal.",
+                why = "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal.",
                 idPattern = "^u.s2601$",
                 expect = { ["economy.production.alloys"] = 4 },
-                set = { ["economy.production.alloys"] = 7 },
+                set = { ["economy.production.alloys"] = 6 },
             },
             {
-                why = "T3 extractors likewise (upgrade pays back in about 360 s, was 670 s).",
+                why = "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s).",
                 idPattern = "^u.s3601$",
                 expect = { ["economy.production.alloys"] = 10 },
-                set = { ["economy.production.alloys"] = 18 },
+                set = { ["economy.production.alloys"] = 16 },
             },
             {
                 why = "T2 generators give 1.5x the energy per cost of T1 (were exactly equal).",
@@ -213,7 +213,13 @@ Sections = {
                 why = "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage.",
                 ids = { "uga1201" },
                 expect = { ["movement.speed"] = 12, ["weapons.1.damage"] = 25 },
-                set = { ["movement.speed"] = 15, ["weapons.*.damage"] = 32 },
+                set = { ["movement.speed"] = 15, ["weapons.*.damage"] = 40 },
+            },
+            {
+                why = "The Guardian T3 fighter (Contrail) lost to both other T3 fighters even leading its shots: more damage per shot.",
+                ids = { "uga3201" },
+                expect = { ["weapons.1.damage"] = 500 },
+                set = { ["weapons.1.damage"] = 650 },
             },
             {
                 why = "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty).",
@@ -243,7 +249,7 @@ Sections = {
                 why = "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it.",
                 idPattern = "^u.s1001$",
                 expect = { ["defence.health.max"] = 1000 },
-                set = { ["defence.health.max"] = 1800, ["defence.health.value"] = 1800 },
+                set = { ["defence.health.max"] = 1900, ["defence.health.value"] = 1900 },
             },
             {
                 why = "T2 point defences likewise (saw 25, shoot 50).",
@@ -273,7 +279,7 @@ Sections = {
                 ids = { "ucl1001" },
                 round = true,
                 expect = { ["defence.health.max"] = 307 },
-                set = { ["defence.health.max"] = 295, ["defence.health.value"] = 295 },
+                set = { ["defence.health.max"] = 300, ["defence.health.value"] = 300 },
                 scale = { ["economy.cost.alloys"] = 1.07, ["economy.cost.energy"] = 1.07 },
             },
             {
@@ -295,10 +301,10 @@ Sections = {
                 set = { ["defence.health.max"] = 1800, ["defence.health.value"] = 1800 },
             },
             {
-                why = "Guardian T2 raider (Torque): likewise, more damage and health.",
+                why = "Guardian T2 raider (Torque): likewise, more damage.",
                 ids = { "ugl2002" },
-                expect = { ["weapons.1.damage"] = 51.39, ["defence.health.max"] = 1750 },
-                set = { ["weapons.1.damage"] = 80, ["defence.health.max"] = 1850, ["defence.health.value"] = 1850 },
+                expect = { ["weapons.1.damage"] = 51.39 },
+                set = { ["weapons.1.damage"] = 80 },
             },
             {
                 why = "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost.",

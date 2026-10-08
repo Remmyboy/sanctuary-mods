@@ -1669,13 +1669,14 @@ it doesn't replace any of the game's files.
 
 Each section is a lobby option, all on by default:
 
-- **Fixes:** the EDA T3 anti-air fighter no longer shoots the ground; the
-  Guardian TALEN gunship is labelled tier 3.
-- **Economy:** commanders make 2 alloys and 20 energy a second (were 5 and 50)
-  and T1 extractors 2 alloys (were 1), so expanding matters and going straight
-  to T2 off the commander takes longer. T2 and T3 extractors and generators
-  give more per cost than T1, so teching your economy pays; T1 generators have
-  less health.
+- **Fixes:** the EDA T3 anti-air fighter no longer shoots the ground; bombs
+  live long enough to land (the EDA T3 bomber fired all game and never hit);
+  the Guardian TALEN gunship is labelled tier 3.
+- **Economy:** commanders make 2 alloys and 30 energy a second (were 5 and 50)
+  and T1 extractors 1.5 alloys (were 1), so expanding matters and going
+  straight to T2 off the commander takes longer. T2 and T3 extractors and
+  generators give more per cost than T1, so teching your economy pays; T1
+  generators have less health.
 - **Unit costs:** land and naval units cost more alloys and less energy for
   the same total. Chosen aircraft cost as much energy as everyone else's.
 - **Engineers:** less than half their health, so raids on them work.
@@ -1683,11 +1684,14 @@ Each section is a lobby option, all on by default:
   steer at where the target is going, in smaller, faster volleys.
 - **Artillery:** leads moving targets; the T1 artillery of the three factions
   are brought closer together.
-- **Air:** bombers lead their targets and their bombs splash.
+- **Air:** bombers lead their targets and their bombs splash; T3 fighters
+  lead their shots; the Guardian fighters catch up.
 - **Defences:** point defences see as far as they shoot, and T1 point defences
-  are tougher.
-- **Unit tuning:** the Chosen Jager, the T1 tanks and the other T2 raiders
-  brought closer together.
+  are tougher: they beat their cost in T1 tanks, and T1 artillery still
+  outranges them.
+- **Unit tuning:** the Chosen Jager toned down and the other T2 raiders
+  brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
+  brought level.
 
 Every change, with the reason, is in
 [`lua/balancepatch/changes.lua`](BalancePatch/lua/balancepatch/changes.lua);
