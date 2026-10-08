@@ -4,7 +4,7 @@
   "name": "Balance Patch",
   "version": "0.1.0",
   "author": "Sanctuary Mods",
-  "description": "A community balance pass, measured in game: teching up pays, commanders earn less, land costs alloys and air costs energy, engineers can be raided, commanders' missiles and artillery hit moving targets, bombers that never hit now do, point defences see their range, and T2 units beat their cost in T1. Each section can be turned off in the lobby.",
+  "description": "A community balance pass, measured in game: teching up pays, commanders earn less, land costs alloys and air costs energy, engineers can be raided, commanders' missiles, artillery, bombers and anti-air hit moving targets, point defences see their range, and T2 units beat their cost in T1. Fixes a bug where one broken bomber froze other units' targeting, and aircraft can no longer fire from inside a shield at what it covers. Each section can be turned off in the lobby.",
   "kind": "gameplay",
   "luaRoot": "lua",
   "gameVersion": "0.0.1.20",
