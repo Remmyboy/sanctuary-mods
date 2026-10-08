@@ -1693,11 +1693,16 @@ Each section is a lobby option, all on by default:
   brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
   brought level.
 
-Every change, with the reason, is in
-[`lua/balancepatch/changes.lua`](BalancePatch/lua/balancepatch/changes.lua);
-`node BalancePatch/tools/preview.mjs` prints each one as before and after
-against the installed game. A change made against a number the game has since
-changed is skipped, so a game update can't stack with it.
+Every change, number by number, is in
+[`CHANGELOG.md`](BalancePatch/CHANGELOG.md), and as data in
+[`balancepatch.json`](BalancePatch/balancepatch.json): each change as before
+and after, plus the patched template of every unit it touches, for tools such
+as the unit database. Both come from
+[`lua/balancepatch/changes.lua`](BalancePatch/lua/balancepatch/changes.lua),
+which the mod applies: `node BalancePatch/tools/preview.mjs` prints the
+changes against the installed game, `--changelog` and `--json <file>` rebuild
+the two files. A change made against a number the game has since changed is
+skipped, so a game update can't stack with it.
 [`FINDINGS.md`](BalancePatch/FINDINGS.md) lists what the tests found that only
 the game can fix.
 
