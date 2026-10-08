@@ -118,6 +118,7 @@ function selects(c, tp, id) {
   if (c.idPattern && !new RegExp(c.idPattern.replace(/%\./g, '\\.')).test(id)) return false;
   if ((c.tags || []).some(t => !tags.includes(t))) return false;
   if ((c.notTags || []).some(t => tags.includes(t))) return false;
+  if ((c.notIds || []).includes(id)) return false;
   return true;
 }
 
@@ -175,7 +176,7 @@ Sections.forEach(section => {
 
 const FACTION = { e: 'EDA', c: 'Chosen', g: 'Guardian', w: 'Guardian' };
 const FACTION_ORDER = ['EDA', 'Chosen', 'Guardian'];
-const PROJECTILE_NAMES = { pei141: 'EDA and Guardian commander missile' };
+const PROJECTILE_NAMES = { pei141: 'EDA and Guardian commander missile', pca341: 'Chosen T3 anti-air missile' };
 
 function unitInfo(kind, id) {
   if (kind === 'projectile') return { kind: PROJECTILE_NAMES[id] || `Projectile ${id}`, nick: null, faction: null };
@@ -192,21 +193,32 @@ const WEAPON_FIELDS = {
 };
 const AIM_FIELDS = {
   leadTarget: 'leads its target', aimTolerance: 'aim tolerance (deg)', projectileSpeed: 'muzzle speed',
-  pitchBone: 'pitch bone', yawBone: 'yaw bone',
+  pitchBone: 'pitch bone', yawBone: 'yaw bone', solverType: 'aim (NoArc straight, LowArc for the fall)', pitchMax: 'max barrel elevation (deg)', pitchMin: 'max barrel depression (deg)',
+  defaultPitchAdjustment: 'rest barrel elevation (deg)', rotationSpeed: 'turn rate (deg/s)',
 };
+const ROLES = { AntiAir: 'anti-air', IndirectFire: 'artillery', DirectFire: 'direct-fire' };
+// "anti-air " in front of an aim change on a unit whose weapons have more than one role
+function role(id, n) {
+  const ws = (original.unit[id]?.weapons || []).filter(w => w.rangeRingType && w.rangeRingType !== 'DeathExplosion');
+  if (new Set(ws.map(w => w.rangeRingType)).size < 2) return '';
+  const t = original.unit[id].weapons[n - 1]?.rangeRingType;
+  if (t === 'DirectFire' && (original.unit[id].tags || []).includes('BOMBER')) return 'bomb ';
+  return ROLES[t] ? ROLES[t] + ' ' : '';
+}
 const STAGE_FIELDS = { speedMax: 'top speed', acceleration: 'acceleration', rotationSpeed: 'turn rate (deg/s)', delay: 'starts at (s)' };
 const PLAIN = {
   'economy.cost.alloys': 'alloys', 'economy.cost.energy': 'energy', 'economy.production': 'income',
   'economy.production.alloys': 'alloys/s', 'economy.production.energy': 'energy/s', 'defence.health.max': 'health',
   'intel.visionRadius': 'vision', 'movement.speed': 'speed', 'general.displayName': 'name', tags: 'tags',
   'movement.type': 'homing', 'movement.speedMax': 'top speed', 'movement.acceleration': 'acceleration',
+  'movement.preferredAltitude': 'flying height', 'movement.rotationSpeed': 'turn rate (deg/s)',
 };
 
 function fieldLabel(r) {
   if (PLAIN[r.field]) return PLAIN[r.field];
   const weapon = n => (r.kind === 'unit' && weaponCount(r.id) > 1 ? `weapon ${n} ` : '');
   let m = /^weapons\.(\d+)\.aimControllers\.\d+\.(\w+)$/.exec(r.field);
-  if (m) return AIM_FIELDS[m[2]] || m[2];
+  if (m) return (r.kind === 'unit' ? role(r.id, Number(m[1])) : '') + (AIM_FIELDS[m[2]] || m[2]);
   m = /^weapons\.(\d+)\.muzzleGroups/.exec(r.field);
   if (m) return weapon(m[1]) + 'muzzles';
   m = /^weapons\.(\d+)\.(\w+)$/.exec(r.field);
@@ -268,53 +280,101 @@ function preview() {
   for (const s of skipped) console.log(`SKIPPED ${s.section} ${s.id} ${s.fields.join(', ')}: the game's value changed`);
 }
 
+// One entry per changed field: the game's value against this release's final value. A field two
+// rules change (the land cost shift, then a unit's own tuning) is one entry with both reasons.
+function netChanges() {
+  const net = new Map();
+  for (const r of records) {
+    const key = `${r.kind}:${r.id}:${r.field}`;
+    if (!net.has(key)) net.set(key, { kind: r.kind, id: r.id, field: r.field, before: r.before, sections: [], why: [] });
+    const n = net.get(key);
+    n.after = r.after;
+    if (!n.sections.includes(r.section)) n.sections.push(r.section);
+    if (!n.why.includes(r.why)) n.why.push(r.why);
+  }
+  return [...net.values()].filter(n => !same(n.before, n.after));
+}
+
+const tierOf = (kind, id) => {
+  if (kind === 'projectile' || /^u.l0000$/.test(id)) return 0;
+  const m = /^T(\d)/.exec(unitInfo(kind, id).kind);
+  return m ? +m[1] : 9;
+};
+const CATEGORIES = [
+  ['Commanders', n => n.id === 'pei141' || /^u.l0000$/.test(n.id)],
+  ['Land', n => /^u.l/.test(n.id)],
+  ['Air', n => /^u.a/.test(n.id)],
+  ['Naval', n => /^u.n/.test(n.id)],
+  ['Structures', n => /^u.s/.test(n.id) || n.id === 'pca341'],
+];
+
+// Lines of "**kind** who: items", units of the same kind (u?l1001) with identical items grouped.
+function groupedLines(ns) {
+  const byUnit = new Map();
+  for (const n of ns) {
+    const key = `${n.kind}:${n.id}`;
+    if (!byUnit.has(key)) byUnit.set(key, []);
+    byUnit.get(key).push(n);
+  }
+  const groups = new Map();
+  for (const urs of byUnit.values()) {
+    const { kind, id } = urs[0];
+    const items = itemsOf(urs);
+    if (!items.length) continue;
+    const gkey = `${kind === 'projectile' ? id : id.replace(/^u./, 'u?')}|${items.join(';')}`;
+    if (!groups.has(gkey)) groups.set(gkey, { kind, info: unitInfo(kind, id), items, members: [] });
+    groups.get(gkey).members.push({ id, ...unitInfo(kind, id) });
+  }
+  const sorted = [...groups.values()].sort((a, b) =>
+    tierOf(a.kind, a.members[0].id) - tierOf(b.kind, b.members[0].id)
+    || a.info.kind.localeCompare(b.info.kind) || a.members[0].id.localeCompare(b.members[0].id));
+  return sorted.map(g => {
+    g.members.sort((a, b) => FACTION_ORDER.indexOf(a.faction) - FACTION_ORDER.indexOf(b.faction));
+    let who;
+    if (!g.members[0].faction) who = `**${g.info.kind}**`;
+    else if (g.members.every(m => !m.nick)) who = `**${g.info.kind}** (${g.members.length === 3 ? 'all factions' : g.members.map(m => m.faction).join(', ')})`;
+    else who = `**${g.info.kind}** ${g.members.map(m => `${m.nick || m.id} (${m.faction})`).join(', ')}`;
+    return `- ${who}: ${g.items.join('; ')}`;
+  });
+}
+
+// The one rule that isn't template data: BalancePatch/lua/balancepatch/shields.lua.
+const SHIELD_RULE = "an aircraft's projectile that starts inside an enemy shield's bubble and lands inside it hits the shield instead, and so does an aircraft's beam fired from inside one. Before, gunships and bombers flew inside T3 bubbles and hit everything under them. Units on the ground inside a bubble shoot as before.";
+
+const TARGETING_RULE = "a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider, the TALEN) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range.";
+
 function changelog() {
+  const net = netChanges();
   const out = [`# ${manifest.name} ${manifest.version}`, ''];
-  out.push(`Every change against game ${manifest.gameVersion} (Steam build ${steamBuild() || 'unknown'}). Each section`);
-  out.push('is a lobby option, on by default. Generated by `node BalancePatch/tools/preview.mjs --changelog`.', '');
+  out.push(`Against game ${manifest.gameVersion} (Steam build ${steamBuild() || 'unknown'}). Each change is the game's number,`);
+  out.push("then this release's. Factions share a line where their change is the same. Every section is a lobby");
+  out.push('option, on by default. Generated by `node BalancePatch/tools/preview.mjs --changelog`.', '');
+  out.push('## Sections', '');
+  for (const o of manifest.options || []) out.push(`- **${o.label}**: ${o.description}`);
+  out.push('');
+  const used = new Set();
+  for (const [title, test] of CATEGORIES) {
+    const ns = net.filter(n => !used.has(n) && test(n));
+    ns.forEach(n => used.add(n));
+    if (!ns.length) continue;
+    out.push(`## ${title}`, '', ...groupedLines(ns), '');
+  }
+  out.push('## Rules', '');
+  out.push(`- **Targeting** (with Fixes on): ${TARGETING_RULE}`);
+  out.push(`- **Aircraft inside shields** (with Fixes on): ${SHIELD_RULE}`, '');
+  out.push('## AI', '');
+  out.push('- **Stock AI**: builds generators to energy-to-alloy income targets x0.7 (20 -> 14 early; 13-15 -> 9.1-10.5 later), as land units cost 6 energy per alloy instead of 10 (with Unit costs on)', '');
+  out.push('## Why', '');
   for (const section of Sections) {
-    const rs = records.filter(r => r.section === section.key);
-    if (!rs.length) continue;
-    out.push(`## ${optionOf[section.key]?.label || section.key}`, '');
-    for (const rule of [...new Set(rs.map(r => r.rule))].sort((a, b) => a - b)) {
-      const rr = rs.filter(r => r.rule === rule);
-      out.push(`*${rr[0].why}*`, '');
-      // Each unit's items, then units of the same kind (u?l1001) with identical items grouped.
-      const byUnit = new Map();
-      for (const r of rr) {
-        const key = `${r.kind}:${r.id}`;
-        if (!byUnit.has(key)) byUnit.set(key, []);
-        byUnit.get(key).push(r);
-      }
-      const groups = new Map();
-      for (const urs of byUnit.values()) {
-        const { kind, id } = urs[0];
-        const items = itemsOf(urs);
-        if (!items.length) continue;
-        const gkey = `${kind === 'projectile' ? id : id.replace(/^u./, 'u?')}|${items.join(';')}`;
-        if (!groups.has(gkey)) groups.set(gkey, { info: unitInfo(kind, id), items, members: [] });
-        groups.get(gkey).members.push({ id, ...unitInfo(kind, id) });
-      }
-      const sorted = [...groups.values()].sort((a, b) =>
-        a.members[0].id.slice(2).localeCompare(b.members[0].id.slice(2)) || a.members[0].id.localeCompare(b.members[0].id));
-      for (const g of sorted) {
-        g.members.sort((a, b) => FACTION_ORDER.indexOf(a.faction) - FACTION_ORDER.indexOf(b.faction));
-        let who;
-        if (!g.members[0].faction) who = `**${g.info.kind}**`;
-        else if (g.members.every(m => !m.nick)) who = `**${g.info.kind}** (${g.members.length === 3 ? 'all factions' : g.members.map(m => m.faction).join(', ')})`;
-        else who = `**${g.info.kind}** ${g.members.map(m => `${m.nick || m.id} (${m.faction})`).join(', ')}`;
-        out.push(`- ${who}: ${g.items.join('; ')}`);
-      }
-      out.push('');
-    }
-    if (section.key === 'costs') {
-      out.push('*The stock AI builds generators until its energy income is a set multiple of its alloy income, a target made for units costing 10-20 energy per alloy.*', '');
-      out.push('- **AI**: energy-to-alloy income targets x0.7 (20 -> 14 early; 13-15 -> 9.1-10.5 later)', '');
-    }
+    const whys = [...new Set(records.filter(r => r.section === section.key).map(r => r.why))];
+    if (!whys.length) continue;
+    out.push(`**${optionOf[section.key]?.label || section.key}**`, '');
+    for (const w of whys) out.push(`- ${w}`);
+    out.push('');
   }
   if (skipped.length) {
     out.push('## Skipped', '', 'Made against numbers the installed game no longer has, so the mod leaves them out:', '');
-    for (const s of skipped) out.push(`- ${s.id}: ${s.fields.join(', ')}`);
+    for (const k of skipped) out.push(`- ${k.id}: ${k.fields.join(', ')}`);
     out.push('');
   }
   process.stdout.write(out.join('\n'));
@@ -336,29 +396,27 @@ function exportJson(file) {
     format: 'sanctuary-balance-patch/1',
     about: 'Every change the Balance Patch makes, with the patched template of every unit and projectile it changes, '
       + 'in the shape of the game\'s .santp tables minus visuals and sounds. Lua arrays are JSON arrays, but field '
-      + 'paths in "changes" count array items from 1, as Lua does. Values are as with every section on (the lobby default); '
-      + 'each change names its section so a viewer can show one section at a time. A field two sections change '
-      + '(the land cost shift, then a unit\'s own tuning) appears once per change, in order: the last "after" is the final value, '
-      + 'as in "units".',
+      + 'paths in "changes" count array items from 1, as Lua does. Values are as with every section on (the lobby default). '
+      + 'Each change is the game\'s value against this release\'s final one, with the sections and reasons behind it.',
     mod: { id: manifest.id, name: manifest.name, version: manifest.version },
     game: { version: manifest.gameVersion, steamBuild: steamBuild() },
     generated: new Date().toISOString(),
     sections: Sections.map(s => ({ key: s.key, label: optionOf[s.key]?.label || s.key, description: optionOf[s.key]?.description || '' })),
-    changes: records.map(r => {
-      const u = unitInfo(r.kind, r.id);
+    changes: netChanges().map(n => {
+      const u = unitInfo(n.kind, n.id);
       return {
-        section: r.section, kind: r.kind, id: r.id, name: u.nick,
-        displayName: original[r.kind][r.id]?.general?.displayName ?? null, faction: u.faction,
-        field: r.field, label: fieldLabel(r), before: r.before, after: r.after, why: r.why,
+        kind: n.kind, id: n.id, name: u.nick, displayName: original[n.kind][n.id]?.general?.displayName ?? null,
+        faction: u.faction, field: n.field, label: fieldLabel(n), before: n.before, after: n.after,
+        sections: n.sections, why: n.why,
       };
     }),
     skipped,
-    notes: ['AI: the stock AI\'s energy-to-alloy income targets (LessThan/MoreThanEnergyToResourceRatioIncome in AI/AIFunctions.lua) are scaled by 0.7 when the "costs" section is on. Not a template change.'],
+    notes: [`Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with "fixes" on): ${TARGETING_RULE} Not a template change.`, `Shields (balancepatch/shields.lua, with the "fixes" section on): ${SHIELD_RULE} Not a template change.`, 'AI: the stock AI\'s energy-to-alloy income targets (LessThan/MoreThanEnergyToResourceRatioIncome in AI/AIFunctions.lua) are scaled by 0.7 when the "costs" section is on. Not a template change.'],
     units: Object.fromEntries(changedUnits.map(id => [id, trimmed(units[id])])),
     projectiles: Object.fromEntries(changedProjectiles.map(id => [id, trimmed(projectiles[id])])),
   };
   fs.writeFileSync(file, JSON.stringify(data, null, 1) + '\n');
-  console.log(`${file}: ${records.length} changed fields on ${changedUnits.length} units and ${changedProjectiles.length} projectiles`);
+  console.log(`${file}: ${netChanges().length} changed fields on ${changedUnits.length} units and ${changedProjectiles.length} projectiles`);
 }
 
 if (args.includes('--changelog')) changelog();

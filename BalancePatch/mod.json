@@ -11,7 +11,7 @@
   "apiVersion": 1,
   "options": [
     { "key": "fixes", "label": "Fixes", "type": "toggle", "default": true,
-      "description": "Mistakes in the game's data: the EDA T3 anti-air fighter shooting the ground, bombs that expired before they could land (the EDA T3 bomber never hit anything), the Guardian TALEN gunship labelled tier 1." },
+      "description": "Bugs: a bomber with no muzzles stopped other units' targeting; aircraft inside a shield's bubble hit everything under it; the Chosen T2 point defence and the EDA T3 anti-air fighter shot the ground; bombs expired before they could land; the TALEN gunship was labelled tier 1." },
     { "key": "economy", "label": "Economy", "type": "toggle", "default": true,
       "description": "Commanders make 2 alloys and 30 energy a second (were 5 and 50) and T1 extractors 1.5 alloys (were 1), so expanding matters and T2 off the commander alone takes longer. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health." },
     { "key": "costs", "label": "Unit costs", "type": "toggle", "default": true,
@@ -23,7 +23,7 @@
     { "key": "artillery", "label": "Artillery", "type": "toggle", "default": true,
       "description": "Artillery leads moving targets (it couldn't hit anything moving in a straight line); the three factions' T1 artillery are brought level." },
     { "key": "air", "label": "Air", "type": "toggle", "default": true,
-      "description": "Bombers lead their targets and their bombs splash; T3 fighters lead their shots; the Guardian fighters catch up with the others." },
+      "description": "Bombers lead their targets and their bombs splash; anti-air leads its shots and the T3 anti-air towers reach their range; the Guardian fighters catch up with the others." },
     { "key": "defences", "label": "Defences", "type": "toggle", "default": true,
       "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them." },
     { "key": "units", "label": "Unit tuning", "type": "toggle", "default": true,

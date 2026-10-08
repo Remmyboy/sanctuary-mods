@@ -1,6 +1,6 @@
 {
  "format": "sanctuary-balance-patch/1",
- "about": "Every change the Balance Patch makes, with the patched template of every unit and projectile it changes, in the shape of the game's .santp tables minus visuals and sounds. Lua arrays are JSON arrays, but field paths in \"changes\" count array items from 1, as Lua does. Values are as with every section on (the lobby default); each change names its section so a viewer can show one section at a time. A field two sections change (the land cost shift, then a unit's own tuning) appears once per change, in order: the last \"after\" is the final value, as in \"units\".",
+ "about": "Every change the Balance Patch makes, with the patched template of every unit and projectile it changes, in the shape of the game's .santp tables minus visuals and sounds. Lua arrays are JSON arrays, but field paths in \"changes\" count array items from 1, as Lua does. Values are as with every section on (the lobby default). Each change is the game's value against this release's final one, with the sections and reasons behind it.",
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
@@ -10,12 +10,12 @@
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-08T14:33:50.410Z",
+ "generated": "2026-10-08T17:46:39.935Z",
  "sections": [
   {
    "key": "fixes",
    "label": "Fixes",
-   "description": "Mistakes in the game's data: the EDA T3 anti-air fighter shooting the ground, bombs that expired before they could land (the EDA T3 bomber never hit anything), the Guardian TALEN gunship labelled tier 1."
+   "description": "Bugs: a bomber with no muzzles stopped other units' targeting; aircraft inside a shield's bubble hit everything under it; the Chosen T2 point defence and the EDA T3 anti-air fighter shot the ground; bombs expired before they could land; the TALEN gunship was labelled tier 1."
   },
   {
    "key": "economy",
@@ -45,7 +45,7 @@
   {
    "key": "air",
    "label": "Air",
-   "description": "Bombers lead their targets and their bombs splash; T3 fighters lead their shots; the Guardian fighters catch up with the others."
+   "description": "Bombers lead their targets and their bombs splash; anti-air leads its shots and the T3 anti-air towers reach their range; the Guardian fighters catch up with the others."
   },
   {
    "key": "defences",
@@ -60,7 +60,6 @@
  ],
  "changes": [
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uea3201",
    "name": "Peregrine",
@@ -76,10 +75,14 @@
     "Air",
     "LandedAir"
    ],
-   "why": "The EDA T3 anti-air fighter's second launcher fired at land and sea. It now fires at aircraft like the first, which also puts its anti-air damage level with the other factions' T3 fighters."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "The EDA T3 anti-air fighter's second launcher fired at land and sea. It now fires at aircraft like the first, which also puts its anti-air damage level with the other factions' T3 fighters."
+   ]
   },
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uca3001",
    "name": "Meteor",
@@ -89,10 +92,14 @@
    "label": "projectile lifetime (s)",
    "before": 2,
    "after": 5,
-   "why": "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land."
+   ]
   },
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uea3001",
    "name": "Condor",
@@ -102,10 +109,14 @@
    "label": "projectile lifetime (s)",
    "before": 2,
    "after": 5,
-   "why": "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land."
+   ]
   },
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uga3001",
    "name": "Impulse",
@@ -115,10 +126,14 @@
    "label": "projectile lifetime (s)",
    "before": 2,
    "after": 5,
-   "why": "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land."
+   ]
   },
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uca1001",
    "name": "Comet",
@@ -128,10 +143,14 @@
    "label": "projectile lifetime (s)",
    "before": 2,
    "after": 4,
-   "why": "Likewise for T1 bombs."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "Likewise for T1 bombs."
+   ]
   },
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uga1001",
    "name": "Inertia",
@@ -141,10 +160,65 @@
    "label": "projectile lifetime (s)",
    "before": 2,
    "after": 4,
-   "why": "Likewise for T1 bombs."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "Likewise for T1 bombs."
+   ]
   },
   {
-   "section": "fixes",
+   "kind": "unit",
+   "id": "ucs2001",
+   "name": "Redoubt",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.1.yawBone",
+   "label": "yaw bone",
+   "before": "Turret01",
+   "after": "Turret01_Yaw01",
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now, rests level, and turns the model's real yaw bone (it named Turret01, which the model doesn't have)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2001",
+   "name": "Redoubt",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.1.pitchMax",
+   "label": "max barrel elevation (deg)",
+   "before": 45,
+   "after": 100,
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now, rests level, and turns the model's real yaw bone (it named Turret01, which the model doesn't have)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2001",
+   "name": "Redoubt",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.1.defaultPitchAdjustment",
+   "label": "rest barrel elevation (deg)",
+   "before": 0,
+   "after": 55,
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now, rests level, and turns the model's real yaw bone (it named Turret01, which the model doesn't have)."
+   ]
+  },
+  {
    "kind": "unit",
    "id": "uga3011",
    "name": "TALEN",
@@ -154,10 +228,14 @@
    "label": "name",
    "before": "Tier 1: Gunship",
    "after": "Tier 3: Gunship",
-   "why": "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1."
+   ]
   },
   {
-   "section": "fixes",
    "kind": "unit",
    "id": "uga3011",
    "name": "TALEN",
@@ -185,10 +263,14 @@
     "MOBILE",
     "TECH3"
    ],
-   "why": "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1."
+   "sections": [
+    "fixes"
+   ],
+   "why": [
+    "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucl0000",
    "name": null,
@@ -204,10 +286,14 @@
     "alloys": 2,
     "energy": 30
    },
-   "why": "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "uel0000",
    "name": null,
@@ -223,10 +309,14 @@
     "alloys": 2,
     "energy": 30
    },
-   "why": "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugl0000",
    "name": null,
@@ -242,10 +332,14 @@
     "alloys": 2,
     "energy": 30
    },
-   "why": "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs1601",
    "name": null,
@@ -255,10 +349,14 @@
    "label": "alloys/s",
    "before": 1,
    "after": 1.5,
-   "why": "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues1601",
    "name": null,
@@ -268,10 +366,14 @@
    "label": "alloys/s",
    "before": 1,
    "after": 1.5,
-   "why": "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs1601",
    "name": null,
@@ -281,10 +383,14 @@
    "label": "alloys/s",
    "before": 1,
    "after": 1.5,
-   "why": "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs2601",
    "name": null,
@@ -294,10 +400,14 @@
    "label": "alloys/s",
    "before": 4,
    "after": 6,
-   "why": "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues2601",
    "name": null,
@@ -307,10 +417,14 @@
    "label": "alloys/s",
    "before": 4,
    "after": 6,
-   "why": "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs2601",
    "name": null,
@@ -320,10 +434,14 @@
    "label": "alloys/s",
    "before": 4,
    "after": 6,
-   "why": "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs3601",
    "name": null,
@@ -333,10 +451,14 @@
    "label": "alloys/s",
    "before": 10,
    "after": 16,
-   "why": "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues3601",
    "name": null,
@@ -346,10 +468,14 @@
    "label": "alloys/s",
    "before": 10,
    "after": 16,
-   "why": "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs3601",
    "name": null,
@@ -359,10 +485,14 @@
    "label": "alloys/s",
    "before": 10,
    "after": 16,
-   "why": "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs2611",
    "name": null,
@@ -372,10 +502,14 @@
    "label": "energy/s",
    "before": 200,
    "after": 300,
-   "why": "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues2611",
    "name": null,
@@ -385,10 +519,14 @@
    "label": "energy/s",
    "before": 200,
    "after": 300,
-   "why": "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs2611",
    "name": null,
@@ -398,10 +536,14 @@
    "label": "energy/s",
    "before": 200,
    "after": 300,
-   "why": "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs3611",
    "name": null,
@@ -411,10 +553,14 @@
    "label": "energy/s",
    "before": 1000,
    "after": 2000,
-   "why": "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues3611",
    "name": null,
@@ -424,10 +570,14 @@
    "label": "energy/s",
    "before": 1000,
    "after": 2000,
-   "why": "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs3611",
    "name": null,
@@ -437,10 +587,14 @@
    "label": "energy/s",
    "before": 1000,
    "after": 2000,
-   "why": "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs1611",
    "name": null,
@@ -450,10 +604,14 @@
    "label": "health",
    "before": 800,
    "after": 500,
-   "why": "T1 generators had 10x the health per energy of T2 and T3 ones."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators had 10x the health per energy of T2 and T3 ones."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ucs1611",
    "name": null,
@@ -463,10 +621,14 @@
    "label": "defence.health.value",
    "before": 800,
    "after": 500,
-   "why": "T1 generators had 10x the health per energy of T2 and T3 ones."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators had 10x the health per energy of T2 and T3 ones."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues1611",
    "name": null,
@@ -476,10 +638,14 @@
    "label": "health",
    "before": 800,
    "after": 500,
-   "why": "T1 generators had 10x the health per energy of T2 and T3 ones."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators had 10x the health per energy of T2 and T3 ones."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ues1611",
    "name": null,
@@ -489,10 +655,14 @@
    "label": "defence.health.value",
    "before": 800,
    "after": 500,
-   "why": "T1 generators had 10x the health per energy of T2 and T3 ones."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators had 10x the health per energy of T2 and T3 ones."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs1611",
    "name": null,
@@ -502,10 +672,14 @@
    "label": "health",
    "before": 800,
    "after": 500,
-   "why": "T1 generators had 10x the health per energy of T2 and T3 ones."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators had 10x the health per energy of T2 and T3 ones."
+   ]
   },
   {
-   "section": "economy",
    "kind": "unit",
    "id": "ugs1611",
    "name": null,
@@ -515,10 +689,14 @@
    "label": "defence.health.value",
    "before": 800,
    "after": 500,
-   "why": "T1 generators had 10x the health per energy of T2 and T3 ones."
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators had 10x the health per energy of T2 and T3 ones."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1001",
    "name": "Gladius",
@@ -527,11 +705,17 @@
    "field": "economy.cost.alloys",
    "label": "alloys",
    "before": 29,
-   "after": 36,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "after": 39,
+   "sections": [
+    "costs",
+    "units"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value.",
+    "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1001",
    "name": "Gladius",
@@ -540,11 +724,17 @@
    "field": "economy.cost.energy",
    "label": "energy",
    "before": 290,
-   "after": 218,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "after": 233,
+   "sections": [
+    "costs",
+    "units"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value.",
+    "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1002",
    "name": "Peltast",
@@ -554,10 +744,14 @@
    "label": "alloys",
    "before": 19,
    "after": 24,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1002",
    "name": "Peltast",
@@ -567,10 +761,14 @@
    "label": "energy",
    "before": 190,
    "after": 143,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1101",
    "name": "Slinger",
@@ -580,10 +778,14 @@
    "label": "alloys",
    "before": 31,
    "after": 39,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1101",
    "name": "Slinger",
@@ -593,10 +795,14 @@
    "label": "energy",
    "before": 310,
    "after": 233,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1201",
    "name": "Dart",
@@ -606,10 +812,14 @@
    "label": "alloys",
    "before": 20,
    "after": 25,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1201",
    "name": "Dart",
@@ -619,10 +829,14 @@
    "label": "energy",
    "before": 200,
    "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1701",
    "name": "Monocle",
@@ -632,10 +846,14 @@
    "label": "alloys",
    "before": 10,
    "after": 13,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl1701",
    "name": "Monocle",
@@ -645,10 +863,14 @@
    "label": "energy",
    "before": 100,
    "after": 75,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2002",
    "name": "Jager",
@@ -658,10 +880,14 @@
    "label": "alloys",
    "before": 113,
    "after": 141,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2002",
    "name": "Jager",
@@ -671,10 +897,14 @@
    "label": "energy",
    "before": 1130,
    "after": 848,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2101",
    "name": "Daimyo",
@@ -684,10 +914,14 @@
    "label": "alloys",
    "before": 150,
    "after": 188,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2101",
    "name": "Daimyo",
@@ -697,10 +931,14 @@
    "label": "energy",
    "before": 1500,
    "after": 1125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2201",
    "name": "Javelin",
@@ -710,10 +948,14 @@
    "label": "alloys",
    "before": 100,
    "after": 125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2201",
    "name": "Javelin",
@@ -723,10 +965,14 @@
    "label": "energy",
    "before": 1000,
    "after": 750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2806",
    "name": "Paladin",
@@ -736,10 +982,14 @@
    "label": "alloys",
    "before": 180,
    "after": 225,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl2806",
    "name": "Paladin",
@@ -749,10 +999,14 @@
    "label": "energy",
    "before": 1800,
    "after": 1350,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3001",
    "name": "Glaive",
@@ -762,10 +1016,14 @@
    "label": "alloys",
    "before": 782,
    "after": 978,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3001",
    "name": "Glaive",
@@ -775,10 +1033,14 @@
    "label": "energy",
    "before": 7820,
    "after": 5865,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3101",
    "name": "Catapault",
@@ -788,10 +1050,14 @@
    "label": "alloys",
    "before": 241,
    "after": 301,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3101",
    "name": "Catapault",
@@ -801,10 +1067,14 @@
    "label": "energy",
    "before": 2410,
    "after": 1808,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3701",
    "name": "Emissary",
@@ -814,10 +1084,14 @@
    "label": "alloys",
    "before": 8,
    "after": 10,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3701",
    "name": "Emissary",
@@ -827,10 +1101,14 @@
    "label": "energy",
    "before": 80,
    "after": 60,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3801",
    "name": "Longbow",
@@ -840,10 +1118,14 @@
    "label": "alloys",
    "before": 458,
    "after": 573,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl3801",
    "name": "Longbow",
@@ -853,10 +1135,14 @@
    "label": "energy",
    "before": 4580,
    "after": 3435,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4001",
    "name": "Ares",
@@ -866,10 +1152,14 @@
    "label": "alloys",
    "before": 6812,
    "after": 8515,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4001",
    "name": "Ares",
@@ -879,10 +1169,14 @@
    "label": "energy",
    "before": 68120,
    "after": 51090,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4002",
    "name": null,
@@ -892,10 +1186,14 @@
    "label": "alloys",
    "before": 5012,
    "after": 6265,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4002",
    "name": null,
@@ -905,10 +1203,14 @@
    "label": "energy",
    "before": 50120,
    "after": 37590,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4003",
    "name": "Djinn",
@@ -918,10 +1220,14 @@
    "label": "alloys",
    "before": 10167,
    "after": 12709,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4003",
    "name": "Djinn",
@@ -931,10 +1237,14 @@
    "label": "energy",
    "before": 101670,
    "after": 76253,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4004",
    "name": null,
@@ -944,10 +1254,14 @@
    "label": "alloys",
    "before": 11136,
    "after": 13920,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4004",
    "name": null,
@@ -957,10 +1271,14 @@
    "label": "energy",
    "before": 111360,
    "after": 83520,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4005",
    "name": null,
@@ -970,10 +1288,14 @@
    "label": "alloys",
    "before": 400000,
    "after": 500000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4005",
    "name": null,
@@ -983,10 +1305,14 @@
    "label": "energy",
    "before": 4000000,
    "after": 3000000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4401",
    "name": "Athena",
@@ -996,10 +1322,14 @@
    "label": "alloys",
    "before": 18000,
    "after": 22500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucl4401",
    "name": "Athena",
@@ -1009,10 +1339,14 @@
    "label": "energy",
    "before": 180000,
    "after": 135000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn1001",
    "name": "Escort",
@@ -1022,10 +1356,14 @@
    "label": "alloys",
    "before": 150,
    "after": 188,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn1001",
    "name": "Escort",
@@ -1035,10 +1373,14 @@
    "label": "energy",
    "before": 1500,
    "after": 1125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn1304",
    "name": "Silt Viper",
@@ -1048,10 +1390,14 @@
    "label": "alloys",
    "before": 350,
    "after": 438,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn1304",
    "name": "Silt Viper",
@@ -1061,10 +1407,14 @@
    "label": "energy",
    "before": 3500,
    "after": 2625,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn2001",
    "name": "Ash Lance",
@@ -1074,10 +1424,14 @@
    "label": "alloys",
    "before": 1200,
    "after": 1500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn2001",
    "name": "Ash Lance",
@@ -1087,10 +1441,14 @@
    "label": "energy",
    "before": 12000,
    "after": 9000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn3001",
    "name": "Dreadnought",
@@ -1100,10 +1458,14 @@
    "label": "alloys",
    "before": 5000,
    "after": 6250,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn3001",
    "name": "Dreadnought",
@@ -1113,10 +1475,14 @@
    "label": "energy",
    "before": 50000,
    "after": 37500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn3304",
    "name": "Deep Chorus",
@@ -1126,10 +1492,14 @@
    "label": "alloys",
    "before": 2500,
    "after": 3125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn3304",
    "name": "Deep Chorus",
@@ -1139,10 +1509,14 @@
    "label": "energy",
    "before": 25000,
    "after": 18750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn9001",
    "name": "DevSub",
@@ -1152,10 +1526,14 @@
    "label": "alloys",
    "before": 300,
    "after": 375,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ucn9001",
    "name": "DevSub",
@@ -1165,10 +1543,14 @@
    "label": "energy",
    "before": 3000,
    "after": 2250,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1001",
    "name": "Puma",
@@ -1178,10 +1560,14 @@
    "label": "alloys",
    "before": 31,
    "after": 39,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1001",
    "name": "Puma",
@@ -1191,10 +1577,14 @@
    "label": "energy",
    "before": 310,
    "after": 233,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1002",
    "name": "Dingo",
@@ -1204,10 +1594,14 @@
    "label": "alloys",
    "before": 21,
    "after": 26,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1002",
    "name": "Dingo",
@@ -1217,10 +1611,14 @@
    "label": "energy",
    "before": 210,
    "after": 158,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1101",
    "name": "Bison",
@@ -1229,11 +1627,17 @@
    "field": "economy.cost.alloys",
    "label": "alloys",
    "before": 20,
-   "after": 25,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "after": 39,
+   "sections": [
+    "costs",
+    "units"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value.",
+    "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1101",
    "name": "Bison",
@@ -1242,11 +1646,17 @@
    "field": "economy.cost.energy",
    "label": "energy",
    "before": 200,
-   "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "after": 233,
+   "sections": [
+    "costs",
+    "units"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value.",
+    "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1201",
    "name": "Cobra",
@@ -1256,10 +1666,14 @@
    "label": "alloys",
    "before": 20,
    "after": 25,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1201",
    "name": "Cobra",
@@ -1269,10 +1683,14 @@
    "label": "energy",
    "before": 200,
    "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1701",
    "name": "Greyhound",
@@ -1282,10 +1700,14 @@
    "label": "alloys",
    "before": 10,
    "after": 13,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1701",
    "name": "Greyhound",
@@ -1295,10 +1717,14 @@
    "label": "energy",
    "before": 100,
    "after": 75,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1801",
    "name": "Tick",
@@ -1308,10 +1734,14 @@
    "label": "alloys",
    "before": 30,
    "after": 38,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel1801",
    "name": "Tick",
@@ -1321,10 +1751,14 @@
    "label": "energy",
    "before": 300,
    "after": 225,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2002",
    "name": "Jackal",
@@ -1334,10 +1768,14 @@
    "label": "alloys",
    "before": 120,
    "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2002",
    "name": "Jackal",
@@ -1347,10 +1785,14 @@
    "label": "energy",
    "before": 1200,
    "after": 900,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2101",
    "name": "Termite",
@@ -1360,10 +1802,14 @@
    "label": "alloys",
    "before": 150,
    "after": 188,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2101",
    "name": "Termite",
@@ -1373,10 +1819,14 @@
    "label": "energy",
    "before": 1500,
    "after": 1125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2201",
    "name": "Komodo",
@@ -1386,10 +1836,14 @@
    "label": "alloys",
    "before": 100,
    "after": 125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2201",
    "name": "Komodo",
@@ -1399,10 +1853,14 @@
    "label": "energy",
    "before": 1000,
    "after": 750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2806",
    "name": "Capybara",
@@ -1412,10 +1870,14 @@
    "label": "alloys",
    "before": 180,
    "after": 225,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel2806",
    "name": "Capybara",
@@ -1425,10 +1887,14 @@
    "label": "energy",
    "before": 1800,
    "after": 1350,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3001",
    "name": "Kodiak",
@@ -1438,10 +1904,14 @@
    "label": "alloys",
    "before": 906,
    "after": 1133,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3001",
    "name": "Kodiak",
@@ -1451,10 +1921,14 @@
    "label": "energy",
    "before": 9060,
    "after": 6795,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3002",
    "name": "Hyena",
@@ -1464,10 +1938,14 @@
    "label": "alloys",
    "before": 120,
    "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3002",
    "name": "Hyena",
@@ -1477,10 +1955,14 @@
    "label": "energy",
    "before": 1200,
    "after": 900,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3101",
    "name": "Longhorn",
@@ -1490,10 +1972,14 @@
    "label": "alloys",
    "before": 236,
    "after": 295,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3101",
    "name": "Longhorn",
@@ -1503,10 +1989,14 @@
    "label": "energy",
    "before": 2360,
    "after": 1770,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3401",
    "name": "Chameleon",
@@ -1516,10 +2006,14 @@
    "label": "alloys",
    "before": 400,
    "after": 500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3401",
    "name": "Chameleon",
@@ -1529,10 +2023,14 @@
    "label": "energy",
    "before": 4000,
    "after": 3000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3801",
    "name": "Scorpion",
@@ -1542,10 +2040,14 @@
    "label": "alloys",
    "before": 404,
    "after": 505,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel3801",
    "name": "Scorpion",
@@ -1555,10 +2057,14 @@
    "label": "energy",
    "before": 4040,
    "after": 3030,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel4001",
    "name": "Centaur",
@@ -1568,10 +2074,14 @@
    "label": "alloys",
    "before": 4295,
    "after": 5369,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel4001",
    "name": "Centaur",
@@ -1581,10 +2091,14 @@
    "label": "energy",
    "before": 42950,
    "after": 32213,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel4002",
    "name": "Behemoth",
@@ -1594,10 +2108,14 @@
    "label": "alloys",
    "before": 3696,
    "after": 4620,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel4002",
    "name": "Behemoth",
@@ -1607,10 +2125,14 @@
    "label": "energy",
    "before": 36960,
    "after": 27720,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel4511",
    "name": "Grendel",
@@ -1620,10 +2142,14 @@
    "label": "alloys",
    "before": 15000,
    "after": 18750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uel4511",
    "name": "Grendel",
@@ -1633,10 +2159,14 @@
    "label": "energy",
    "before": 150000,
    "after": 112500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen1001",
    "name": "Sea Lion",
@@ -1646,10 +2176,14 @@
    "label": "alloys",
    "before": 150,
    "after": 188,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen1001",
    "name": "Sea Lion",
@@ -1659,10 +2193,14 @@
    "label": "energy",
    "before": 1500,
    "after": 1125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen1304",
    "name": "Needlefish",
@@ -1672,10 +2210,14 @@
    "label": "alloys",
    "before": 350,
    "after": 438,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen1304",
    "name": "Needlefish",
@@ -1685,10 +2227,14 @@
    "label": "energy",
    "before": 3500,
    "after": 2625,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen2001",
    "name": "Halberd",
@@ -1698,10 +2244,14 @@
    "label": "alloys",
    "before": 1200,
    "after": 1500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen2001",
    "name": "Halberd",
@@ -1711,10 +2261,14 @@
    "label": "energy",
    "before": 12000,
    "after": 9000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen3001",
    "name": "Sovereign",
@@ -1724,10 +2278,14 @@
    "label": "alloys",
    "before": 6000,
    "after": 7500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen3001",
    "name": "Sovereign",
@@ -1737,10 +2295,14 @@
    "label": "energy",
    "before": 60000,
    "after": 45000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen3304",
    "name": "Leviathan",
@@ -1750,10 +2312,14 @@
    "label": "alloys",
    "before": 2500,
    "after": 3125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uen3304",
    "name": "Leviathan",
@@ -1763,10 +2329,14 @@
    "label": "energy",
    "before": 25000,
    "after": 18750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1001",
    "name": "Gimlet",
@@ -1776,10 +2346,14 @@
    "label": "alloys",
    "before": 30,
    "after": 38,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1001",
    "name": "Gimlet",
@@ -1789,10 +2363,14 @@
    "label": "energy",
    "before": 300,
    "after": 225,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1002",
    "name": "Vector",
@@ -1802,10 +2380,14 @@
    "label": "alloys",
    "before": 20,
    "after": 25,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1002",
    "name": "Vector",
@@ -1815,10 +2397,14 @@
    "label": "energy",
    "before": 200,
    "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1101",
    "name": "Parabola",
@@ -1828,10 +2414,14 @@
    "label": "alloys",
    "before": 38,
    "after": 48,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1101",
    "name": "Parabola",
@@ -1841,10 +2431,14 @@
    "label": "energy",
    "before": 380,
    "after": 285,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1201",
    "name": "Pulse",
@@ -1854,10 +2448,14 @@
    "label": "alloys",
    "before": 20,
    "after": 25,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1201",
    "name": "Pulse",
@@ -1867,10 +2465,14 @@
    "label": "energy",
    "before": 200,
    "after": 150,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1701",
    "name": "Monocycle",
@@ -1880,10 +2482,14 @@
    "label": "alloys",
    "before": 10,
    "after": 13,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl1701",
    "name": "Monocycle",
@@ -1893,10 +2499,14 @@
    "label": "energy",
    "before": 100,
    "after": 75,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2002",
    "name": "Torque",
@@ -1906,10 +2516,14 @@
    "label": "alloys",
    "before": 131,
    "after": 164,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2002",
    "name": "Torque",
@@ -1919,10 +2533,14 @@
    "label": "energy",
    "before": 1310,
    "after": 983,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2101",
    "name": "Wrecker",
@@ -1932,10 +2550,14 @@
    "label": "alloys",
    "before": 151,
    "after": 189,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2101",
    "name": "Wrecker",
@@ -1945,10 +2567,14 @@
    "label": "energy",
    "before": 1510,
    "after": 1133,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2201",
    "name": "Perforator",
@@ -1958,10 +2584,14 @@
    "label": "alloys",
    "before": 100,
    "after": 125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2201",
    "name": "Perforator",
@@ -1971,10 +2601,14 @@
    "label": "energy",
    "before": 1000,
    "after": 750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2806",
    "name": "Relay",
@@ -1984,10 +2618,14 @@
    "label": "alloys",
    "before": 180,
    "after": 225,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl2806",
    "name": "Relay",
@@ -1997,10 +2635,14 @@
    "label": "energy",
    "before": 1800,
    "after": 1350,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl3001",
    "name": "Auger",
@@ -2010,10 +2652,14 @@
    "label": "alloys",
    "before": 849,
    "after": 1061,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl3001",
    "name": "Auger",
@@ -2023,10 +2669,14 @@
    "label": "energy",
    "before": 8490,
    "after": 6368,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl3002",
    "name": "Nitro",
@@ -2036,10 +2686,14 @@
    "label": "alloys",
    "before": 353,
    "after": 441,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl3002",
    "name": "Nitro",
@@ -2049,10 +2703,14 @@
    "label": "energy",
    "before": 3530,
    "after": 2648,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl3101",
    "name": "Malware",
@@ -2062,10 +2720,14 @@
    "label": "alloys",
    "before": 489,
    "after": 611,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl3101",
    "name": "Malware",
@@ -2075,10 +2737,14 @@
    "label": "energy",
    "before": 4890,
    "after": 3668,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl4001",
    "name": null,
@@ -2088,10 +2754,14 @@
    "label": "alloys",
    "before": 5233,
    "after": 6541,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl4001",
    "name": null,
@@ -2101,10 +2771,14 @@
    "label": "energy",
    "before": 52330,
    "after": 39248,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl4011",
    "name": "Quasar",
@@ -2114,10 +2788,14 @@
    "label": "alloys",
    "before": 3407,
    "after": 4259,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugl4011",
    "name": "Quasar",
@@ -2127,10 +2805,14 @@
    "label": "energy",
    "before": 34070,
    "after": 25553,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn1001",
    "name": "Ballast",
@@ -2140,10 +2822,14 @@
    "label": "alloys",
    "before": 150,
    "after": 188,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn1001",
    "name": "Ballast",
@@ -2153,10 +2839,14 @@
    "label": "energy",
    "before": 1500,
    "after": 1125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn1304",
    "name": "Undertow",
@@ -2166,10 +2856,14 @@
    "label": "alloys",
    "before": 350,
    "after": 438,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn1304",
    "name": "Undertow",
@@ -2179,10 +2873,14 @@
    "label": "energy",
    "before": 3500,
    "after": 2625,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn2001",
    "name": "Bulwark",
@@ -2192,10 +2890,14 @@
    "label": "alloys",
    "before": 1200,
    "after": 1500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn2001",
    "name": "Bulwark",
@@ -2205,10 +2907,14 @@
    "label": "energy",
    "before": 12000,
    "after": 9000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn2304",
    "name": "Keelbreaker",
@@ -2218,10 +2924,14 @@
    "label": "alloys",
    "before": 900,
    "after": 1125,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn2304",
    "name": "Keelbreaker",
@@ -2231,10 +2941,14 @@
    "label": "energy",
    "before": 9000,
    "after": 6750,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn3001",
    "name": "Aegis",
@@ -2244,10 +2958,14 @@
    "label": "alloys",
    "before": 6000,
    "after": 7500,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "ugn3001",
    "name": "Aegis",
@@ -2257,10 +2975,14 @@
    "label": "energy",
    "before": 60000,
    "after": 45000,
-   "why": "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca1001",
    "name": "Comet",
@@ -2270,10 +2992,14 @@
    "label": "energy",
    "before": 600,
    "after": 1200,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca1201",
    "name": "Zephyr",
@@ -2283,10 +3009,14 @@
    "label": "energy",
    "before": 250,
    "after": 500,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca1502",
    "name": "Courier",
@@ -2296,10 +3026,14 @@
    "label": "energy",
    "before": 800,
    "after": 1600,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca1701",
    "name": "Seer",
@@ -2309,10 +3043,14 @@
    "label": "energy",
    "before": 200,
    "after": 400,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca2011",
    "name": "Thunderbolt",
@@ -2322,10 +3060,14 @@
    "label": "energy",
    "before": 1500,
    "after": 3000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca2101",
    "name": "Consort",
@@ -2335,10 +3077,14 @@
    "label": "energy",
    "before": 3000,
    "after": 6000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca2301",
    "name": "Typhoon",
@@ -2348,10 +3094,14 @@
    "label": "energy",
    "before": 3000,
    "after": 6000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca2502",
    "name": "Envoy",
@@ -2361,10 +3111,14 @@
    "label": "energy",
    "before": 4000,
    "after": 8000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca2701",
    "name": "Oracle",
@@ -2374,10 +3128,14 @@
    "label": "energy",
    "before": 1000,
    "after": 2000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca2806",
    "name": "Cleric",
@@ -2387,10 +3145,14 @@
    "label": "energy",
    "before": 3000,
    "after": 6000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca3001",
    "name": "Meteor",
@@ -2400,10 +3162,14 @@
    "label": "energy",
    "before": 9000,
    "after": 18000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca3011",
    "name": "Tempest",
@@ -2413,10 +3179,14 @@
    "label": "energy",
    "before": 9000,
    "after": 18000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca3201",
    "name": "Mistral",
@@ -2426,10 +3196,14 @@
    "label": "energy",
    "before": 2500,
    "after": 5000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca3701",
    "name": "Prophet",
@@ -2439,10 +3213,14 @@
    "label": "energy",
    "before": 1100,
    "after": 2200,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "costs",
    "kind": "unit",
    "id": "uca4011",
    "name": "Zeus",
@@ -2452,10 +3230,14 @@
    "label": "energy",
    "before": 150000,
    "after": 300000,
-   "why": "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   "sections": [
+    "costs"
+   ],
+   "why": [
+    "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ucl1501",
    "name": null,
@@ -2465,10 +3247,14 @@
    "label": "health",
    "before": 750,
    "after": 300,
-   "why": "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ucl1501",
    "name": null,
@@ -2478,10 +3264,14 @@
    "label": "defence.health.value",
    "before": 750,
    "after": 300,
-   "why": "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "uel1501",
    "name": null,
@@ -2491,10 +3281,14 @@
    "label": "health",
    "before": 750,
    "after": 300,
-   "why": "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "uel1501",
    "name": null,
@@ -2504,10 +3298,14 @@
    "label": "defence.health.value",
    "before": 750,
    "after": 300,
-   "why": "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ugl1501",
    "name": null,
@@ -2517,10 +3315,14 @@
    "label": "health",
    "before": 750,
    "after": 300,
-   "why": "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ugl1501",
    "name": null,
@@ -2530,10 +3332,14 @@
    "label": "defence.health.value",
    "before": 750,
    "after": 300,
-   "why": "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ucl2501",
    "name": null,
@@ -2543,10 +3349,14 @@
    "label": "health",
    "before": 1500,
    "after": 650,
-   "why": "T2 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T2 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ucl2501",
    "name": null,
@@ -2556,10 +3366,14 @@
    "label": "defence.health.value",
    "before": 1500,
    "after": 650,
-   "why": "T2 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T2 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "uel2501",
    "name": null,
@@ -2569,10 +3383,14 @@
    "label": "health",
    "before": 1500,
    "after": 650,
-   "why": "T2 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T2 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "uel2501",
    "name": null,
@@ -2582,10 +3400,14 @@
    "label": "defence.health.value",
    "before": 1500,
    "after": 650,
-   "why": "T2 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T2 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ugl2501",
    "name": null,
@@ -2595,10 +3417,14 @@
    "label": "health",
    "before": 1500,
    "after": 650,
-   "why": "T2 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T2 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ugl2501",
    "name": null,
@@ -2608,10 +3434,14 @@
    "label": "defence.health.value",
    "before": 1500,
    "after": 650,
-   "why": "T2 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T2 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ucl3501",
    "name": null,
@@ -2621,10 +3451,14 @@
    "label": "health",
    "before": 3000,
    "after": 1300,
-   "why": "T3 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T3 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ucl3501",
    "name": null,
@@ -2634,10 +3468,14 @@
    "label": "defence.health.value",
    "before": 3000,
    "after": 1300,
-   "why": "T3 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T3 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "uel3501",
    "name": null,
@@ -2647,10 +3485,14 @@
    "label": "health",
    "before": 3000,
    "after": 1300,
-   "why": "T3 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T3 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "uel3501",
    "name": null,
@@ -2660,10 +3502,14 @@
    "label": "defence.health.value",
    "before": 3000,
    "after": 1300,
-   "why": "T3 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T3 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ugl3501",
    "name": null,
@@ -2673,10 +3519,14 @@
    "label": "health",
    "before": 3000,
    "after": 1300,
-   "why": "T3 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T3 engineers in proportion."
+   ]
   },
   {
-   "section": "engineers",
    "kind": "unit",
    "id": "ugl3501",
    "name": null,
@@ -2686,10 +3536,14 @@
    "label": "defence.health.value",
    "before": 3000,
    "after": 1300,
-   "why": "T3 engineers in proportion."
+   "sections": [
+    "engineers"
+   ],
+   "why": [
+    "T3 engineers in proportion."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "unit",
    "id": "uel0000",
    "name": null,
@@ -2699,10 +3553,14 @@
    "label": "damage",
    "before": 100,
    "after": 50,
-   "why": "EDA commander: half the damage per missile, twice as often (same damage per second), so less of it is wasted on targets that are already dead."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "EDA commander: half the damage per missile, twice as often (same damage per second), so less of it is wasted on targets that are already dead."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "unit",
    "id": "uel0000",
    "name": null,
@@ -2712,10 +3570,14 @@
    "label": "reload (s)",
    "before": 2,
    "after": 1,
-   "why": "EDA commander: half the damage per missile, twice as often (same damage per second), so less of it is wasted on targets that are already dead."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "EDA commander: half the damage per missile, twice as often (same damage per second), so less of it is wasted on targets that are already dead."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "unit",
    "id": "ugl0000",
    "name": null,
@@ -2725,10 +3587,14 @@
    "label": "damage",
    "before": 100,
    "after": 50,
-   "why": "Guardian commander: the same."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "Guardian commander: the same."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "unit",
    "id": "ugl0000",
    "name": null,
@@ -2738,10 +3604,14 @@
    "label": "reload (s)",
    "before": 3,
    "after": 1.5,
-   "why": "Guardian commander: the same."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "Guardian commander: the same."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2751,10 +3621,14 @@
    "label": "homing",
    "before": "TargetEntity",
    "after": "LeadTargetEntity",
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2764,10 +3638,14 @@
    "label": "top speed",
    "before": 10,
    "after": 15,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2777,10 +3655,14 @@
    "label": "acceleration",
    "before": 5,
    "after": 20,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2790,10 +3672,14 @@
    "label": "stage 1 top speed",
    "before": 5,
    "after": 15,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2803,10 +3689,14 @@
    "label": "stage 1 turn rate (deg/s)",
    "before": 100,
    "after": 360,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2816,10 +3706,14 @@
    "label": "stage 2 starts at (s)",
    "before": 2.7,
    "after": 0.4,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2829,10 +3723,14 @@
    "label": "stage 2 acceleration",
    "before": 15,
    "after": 30,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "commanders",
    "kind": "projectile",
    "id": "pei141",
    "name": null,
@@ -2842,10 +3740,14 @@
    "label": "stage 2 turn rate (deg/s)",
    "before": 50,
    "after": 360,
-   "why": "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   "sections": [
+    "commanders"
+   ],
+   "why": [
+    "The EDA and Guardian commanders' missile hung at speed 5 for about three seconds before flying, so anything moving walked out of its way (measured: 23-43% of its damage landed on moving T1 tanks, the Chosen commander's 72%). It now flies at once and steers at where its target is going."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl1101",
    "name": "Slinger",
@@ -2855,10 +3757,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl3101",
    "name": "Catapault",
@@ -2868,62 +3774,82 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl4002",
    "name": null,
    "displayName": "Tier 4: Tripod Bot",
    "faction": "Chosen",
    "field": "weapons.1.aimControllers.2.leadTarget",
-   "label": "leads its target",
+   "label": "artillery leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl4002",
    "name": null,
    "displayName": "Tier 4: Tripod Bot",
    "faction": "Chosen",
    "field": "weapons.1.aimControllers.3.leadTarget",
-   "label": "leads its target",
+   "label": "artillery leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl4004",
    "name": null,
    "displayName": "Tier 4: Bot Big",
    "faction": "Chosen",
    "field": "weapons.4.aimControllers.1.leadTarget",
-   "label": "leads its target",
+   "label": "artillery leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl4004",
    "name": null,
    "displayName": "Tier 4: Bot Big",
    "faction": "Chosen",
    "field": "weapons.5.aimControllers.1.leadTarget",
-   "label": "leads its target",
+   "label": "artillery leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucs2101",
    "name": "Ballista",
@@ -2933,10 +3859,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucs3101",
    "name": "Onager",
@@ -2946,10 +3876,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "uel1101",
    "name": "Bison",
@@ -2959,10 +3893,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "uel3101",
    "name": "Longhorn",
@@ -2972,10 +3910,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ues2101",
    "name": "Spitter",
@@ -2985,10 +3927,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugl1101",
    "name": "Parabola",
@@ -2998,10 +3944,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugl2101",
    "name": "Wrecker",
@@ -3011,10 +3961,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugl3101",
    "name": "Malware",
@@ -3024,10 +3978,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugl4011",
    "name": "Quasar",
@@ -3037,10 +3995,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugs2101",
    "name": "Cycler",
@@ -3050,10 +4012,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugs3101",
    "name": "Grinder",
@@ -3063,10 +4029,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Artillery aims where a moving target will be instead of where it was. Its spread still makes it miss sometimes."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ugl1101",
    "name": "Parabola",
@@ -3076,10 +4046,14 @@
    "label": "damage",
    "before": 360,
    "after": 220,
-   "why": "Guardian T1 artillery's single big shell lands most often once it leads (66% of its damage on crossing tanks, against Chosen's 31%), so less per shell."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Guardian T1 artillery's single big shell lands most often once it leads (66% of its damage on crossing tanks, against Chosen's 31%), so less per shell."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "ucl1101",
    "name": "Slinger",
@@ -3089,10 +4063,14 @@
    "label": "splash radius",
    "before": 1,
    "after": 1.5,
-   "why": "Chosen T1 artillery lost every fight against its own value in T1 tanks once the others were tuned: a little more splash."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "Chosen T1 artillery lost every fight against its own value in T1 tanks once the others were tuned: a little more splash."
+   ]
   },
   {
-   "section": "artillery",
    "kind": "unit",
    "id": "uel1101",
    "name": "Bison",
@@ -3102,10 +4080,14 @@
    "label": "splash radius",
    "before": 0.5,
    "after": 1,
-   "why": "EDA T1 artillery's rocket salvo had almost no splash (0.5), so its spread shells mostly hit nothing (7% on crossing tanks)."
+   "sections": [
+    "artillery"
+   ],
+   "why": [
+    "EDA T1 artillery's rocket salvo had almost no splash (0.5), so its spread shells mostly hit nothing (7% on crossing tanks)."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uca1001",
    "name": "Comet",
@@ -3115,10 +4097,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uca3001",
    "name": "Meteor",
@@ -3128,10 +4114,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea1001",
    "name": "Vulture",
@@ -3141,10 +4131,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea3001",
    "name": "Condor",
@@ -3154,62 +4148,82 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea4001",
    "name": "Roc / Phoenix",
    "displayName": "Tier 5: Cluster Bomber",
    "faction": "EDA",
    "field": "weapons.1.aimControllers.1.leadTarget",
-   "label": "leads its target",
+   "label": "bomb leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea4001",
    "name": "Roc / Phoenix",
    "displayName": "Tier 5: Cluster Bomber",
    "faction": "EDA",
    "field": "weapons.2.aimControllers.1.leadTarget",
-   "label": "leads its target",
+   "label": "bomb leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea4001",
    "name": "Roc / Phoenix",
    "displayName": "Tier 5: Cluster Bomber",
    "faction": "EDA",
    "field": "weapons.3.aimControllers.1.leadTarget",
-   "label": "leads its target",
+   "label": "bomb leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea4001",
    "name": "Roc / Phoenix",
    "displayName": "Tier 5: Cluster Bomber",
    "faction": "EDA",
    "field": "weapons.4.aimControllers.1.leadTarget",
-   "label": "leads its target",
+   "label": "bomb leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga1001",
    "name": "Inertia",
@@ -3219,10 +4233,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga3001",
    "name": "Impulse",
@@ -3232,10 +4250,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uca3201",
    "name": "Mistral",
@@ -3245,10 +4267,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uca3201",
    "name": "Mistral",
@@ -3258,10 +4284,65 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
   },
   {
-   "section": "air",
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "weapons.2.aimControllers.1.leadTarget",
+   "label": "anti-air leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "weapons.3.aimControllers.1.leadTarget",
+   "label": "anti-air leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3201",
+   "name": "Guardian",
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
    "kind": "unit",
    "id": "uea3201",
    "name": "Peregrine",
@@ -3271,10 +4352,14 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea3201",
    "name": "Peregrine",
@@ -3284,10 +4369,82 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
   },
   {
-   "section": "air",
+   "kind": "unit",
+   "id": "uea3701",
+   "name": "Raven",
+   "displayName": "Tier 3: Air Scout",
+   "faction": "EDA",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.4.aimControllers.1.leadTarget",
+   "label": "anti-air leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2201",
+   "name": null,
+   "displayName": "Tier 2: Anti-Air",
+   "faction": "EDA",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3201",
+   "name": null,
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "EDA",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
    "kind": "unit",
    "id": "uga3201",
    "name": "Contrail",
@@ -3297,10 +4454,252 @@
    "label": "leads its target",
    "before": false,
    "after": true,
-   "why": "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
   },
   {
-   "section": "air",
+   "kind": "unit",
+   "id": "ugl1201",
+   "name": "Pulse",
+   "displayName": "Tier 1: Mobile Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs1201",
+   "name": "Emitter",
+   "displayName": "Tier 1: Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3201",
+   "name": "Engraver",
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.leadTarget",
+   "label": "leads its target",
+   "before": false,
+   "after": true,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.4.projectileLifetime",
+   "label": "weapon 4 projectile lifetime (s)",
+   "before": 5,
+   "after": 8,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The EDA T3 anti-air tower and the Behemoth's anti-air fired speed-10 shells that lived 5 seconds: 50 range out of 60. They now reach their full range."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3201",
+   "name": null,
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "EDA",
+   "field": "weapons.1.projectileLifetime",
+   "label": "projectile lifetime (s)",
+   "before": 5,
+   "after": 8,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The EDA T3 anti-air tower and the Behemoth's anti-air fired speed-10 shells that lived 5 seconds: 50 range out of 60. They now reach their full range."
+   ]
+  },
+  {
+   "kind": "projectile",
+   "id": "pca341",
+   "name": null,
+   "displayName": null,
+   "faction": null,
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 10,
+   "after": 60,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Chosen T3 anti-air tower's missile turned at 10 degrees a second and lived 2 seconds (about 45 range out of 60), so it landed 9% on weaving T1 bombers. It turns like the EDA one (60) and reaches its range: 16-18%."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3201",
+   "name": "Guardian",
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "Chosen",
+   "field": "weapons.1.projectileLifetime",
+   "label": "projectile lifetime (s)",
+   "before": 2,
+   "after": 4,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Likewise for its missile's lifetime."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3201",
+   "name": "Engraver",
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.projectileSpeed",
+   "label": "muzzle speed",
+   "before": 20,
+   "after": 40,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T3 anti-air tower aimed its slow, falling shells (speed 20) straight at its target and hit nothing: 0% on weaving T1 bombers, 3% on a hovering gunship. It fires faster shells and aims for their fall: 18% and 13%. Still the weakest T3 anti-air tower."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3201",
+   "name": "Engraver",
+   "displayName": "Tier 3: Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.solverType",
+   "label": "aim (NoArc straight, LowArc for the fall)",
+   "before": "NoArc",
+   "after": "LowArc",
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T3 anti-air tower aimed its slow, falling shells (speed 20) straight at its target and hit nothing: 0% on weaving T1 bombers, 3% on a hovering gunship. It fires faster shells and aims for their fall: 18% and 13%. Still the weakest T3 anti-air tower."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uca1201",
+   "name": "Zephyr",
+   "displayName": "Tier 1: Anti-Air Fighter",
+   "faction": "Chosen",
+   "field": "weapons.1.projectileLifetime",
+   "label": "weapon 1 projectile lifetime (s)",
+   "before": 0.5,
+   "after": 0.75,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uca1201",
+   "name": "Zephyr",
+   "displayName": "Tier 1: Anti-Air Fighter",
+   "faction": "Chosen",
+   "field": "weapons.2.projectileLifetime",
+   "label": "weapon 2 projectile lifetime (s)",
+   "before": 0.5,
+   "after": 0.75,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uea1201",
+   "name": "Shrike",
+   "displayName": "Tier 1: Anti-Air Fighter",
+   "faction": "EDA",
+   "field": "weapons.1.projectileLifetime",
+   "label": "projectile lifetime (s)",
+   "before": 0.5,
+   "after": 0.75,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uga1201",
+   "name": "Aerofoil",
+   "displayName": "Tier 1: Anti-Air Fighter",
+   "faction": "Guardian",
+   "field": "weapons.1.projectileLifetime",
+   "label": "weapon 1 projectile lifetime (s)",
+   "before": 0.5,
+   "after": 0.75,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uga1201",
+   "name": "Aerofoil",
+   "displayName": "Tier 1: Anti-Air Fighter",
+   "faction": "Guardian",
+   "field": "weapons.2.projectileLifetime",
+   "label": "weapon 2 projectile lifetime (s)",
+   "before": 0.5,
+   "after": 0.75,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them."
+   ]
+  },
+  {
    "kind": "unit",
    "id": "uga1201",
    "name": "Aerofoil",
@@ -3310,10 +4709,14 @@
    "label": "speed",
    "before": 12,
    "after": 15,
-   "why": "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga1201",
    "name": "Aerofoil",
@@ -3323,10 +4726,14 @@
    "label": "weapon 1 damage",
    "before": 25,
    "after": 40,
-   "why": "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga1201",
    "name": "Aerofoil",
@@ -3336,10 +4743,14 @@
    "label": "weapon 2 damage",
    "before": 25,
    "after": 40,
-   "why": "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga3201",
    "name": "Contrail",
@@ -3349,10 +4760,14 @@
    "label": "damage",
    "before": 500,
    "after": 650,
-   "why": "The Guardian T3 fighter (Contrail) lost to both other T3 fighters even leading its shots: more damage per shot."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T3 fighter (Contrail) lost to both other T3 fighters even leading its shots: more damage per shot."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uca1001",
    "name": "Comet",
@@ -3362,10 +4777,14 @@
    "label": "splash radius",
    "before": 0,
    "after": 3,
-   "why": "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty)."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty)."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga1001",
    "name": "Inertia",
@@ -3375,10 +4794,14 @@
    "label": "splash radius",
    "before": 0,
    "after": 3,
-   "why": "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty)."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty)."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uca3001",
    "name": "Meteor",
@@ -3388,10 +4811,14 @@
    "label": "splash radius",
    "before": 0,
    "after": 4,
-   "why": "And T3 bombs a little more."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "And T3 bombs a little more."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uea3001",
    "name": "Condor",
@@ -3401,10 +4828,14 @@
    "label": "splash radius",
    "before": 0,
    "after": 4,
-   "why": "And T3 bombs a little more."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "And T3 bombs a little more."
+   ]
   },
   {
-   "section": "air",
    "kind": "unit",
    "id": "uga3001",
    "name": "Impulse",
@@ -3414,10 +4845,14 @@
    "label": "splash radius",
    "before": 0,
    "after": 4,
-   "why": "And T3 bombs a little more."
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "And T3 bombs a little more."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ucs1001",
    "name": "Watchtower",
@@ -3427,10 +4862,14 @@
    "label": "vision",
    "before": 15,
    "after": 25,
-   "why": "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ues1001",
    "name": "Hedgehog",
@@ -3440,10 +4879,14 @@
    "label": "vision",
    "before": 15,
    "after": 25,
-   "why": "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ugs1001",
    "name": "Stitcher",
@@ -3453,10 +4896,14 @@
    "label": "vision",
    "before": 15,
    "after": 25,
-   "why": "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ucs1001",
    "name": "Watchtower",
@@ -3466,10 +4913,14 @@
    "label": "health",
    "before": 1000,
    "after": 1900,
-   "why": "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ucs1001",
    "name": "Watchtower",
@@ -3479,10 +4930,14 @@
    "label": "defence.health.value",
    "before": 1000,
    "after": 1900,
-   "why": "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ues1001",
    "name": "Hedgehog",
@@ -3492,10 +4947,14 @@
    "label": "health",
    "before": 1000,
    "after": 1900,
-   "why": "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ues1001",
    "name": "Hedgehog",
@@ -3505,10 +4964,14 @@
    "label": "defence.health.value",
    "before": 1000,
    "after": 1900,
-   "why": "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ugs1001",
    "name": "Stitcher",
@@ -3518,10 +4981,14 @@
    "label": "health",
    "before": 1000,
    "after": 1900,
-   "why": "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ugs1001",
    "name": "Stitcher",
@@ -3531,10 +4998,14 @@
    "label": "defence.health.value",
    "before": 1000,
    "after": 1900,
-   "why": "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ucs2001",
    "name": "Redoubt",
@@ -3544,10 +5015,14 @@
    "label": "vision",
    "before": 25,
    "after": 50,
-   "why": "T2 point defences likewise (saw 25, shoot 50)."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T2 point defences likewise (saw 25, shoot 50)."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ues2001",
    "name": "Snapper",
@@ -3557,10 +5032,14 @@
    "label": "vision",
    "before": 25,
    "after": 50,
-   "why": "T2 point defences likewise (saw 25, shoot 50)."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T2 point defences likewise (saw 25, shoot 50)."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ugs2001",
    "name": "Nailer",
@@ -3570,10 +5049,14 @@
    "label": "vision",
    "before": 25,
    "after": 50,
-   "why": "T2 point defences likewise (saw 25, shoot 50)."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T2 point defences likewise (saw 25, shoot 50)."
+   ]
   },
   {
-   "section": "defences",
    "kind": "unit",
    "id": "ucs3001",
    "name": "Bastion",
@@ -3583,10 +5066,14 @@
    "label": "vision",
    "before": 30,
    "after": 70,
-   "why": "T3 point defences likewise (saw 30, shoot 70)."
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T3 point defences likewise (saw 30, shoot 70)."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ucl2002",
    "name": "Jager",
@@ -3596,10 +5083,14 @@
    "label": "health",
    "before": 2173,
    "after": 2100,
-   "why": "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ucl2002",
    "name": "Jager",
@@ -3609,10 +5100,14 @@
    "label": "defence.health.value",
    "before": 2173,
    "after": 2100,
-   "why": "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ucl2002",
    "name": "Jager",
@@ -3622,10 +5117,14 @@
    "label": "damage",
    "before": 50.4,
    "after": 47,
-   "why": "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ucl1001",
    "name": "Gladius",
@@ -3635,10 +5134,14 @@
    "label": "health",
    "before": 307,
    "after": 300,
-   "why": "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ucl1001",
    "name": "Gladius",
@@ -3648,36 +5151,14 @@
    "label": "defence.health.value",
    "before": 307,
    "after": 300,
-   "why": "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
+   ]
   },
   {
-   "section": "units",
-   "kind": "unit",
-   "id": "ucl1001",
-   "name": "Gladius",
-   "displayName": "Tier 1: Tank",
-   "faction": "Chosen",
-   "field": "economy.cost.alloys",
-   "label": "alloys",
-   "before": 36,
-   "after": 39,
-   "why": "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
-  },
-  {
-   "section": "units",
-   "kind": "unit",
-   "id": "ucl1001",
-   "name": "Gladius",
-   "displayName": "Tier 1: Tank",
-   "faction": "Chosen",
-   "field": "economy.cost.energy",
-   "label": "energy",
-   "before": 218,
-   "after": 233,
-   "why": "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health."
-  },
-  {
-   "section": "units",
    "kind": "unit",
    "id": "uel1001",
    "name": "Puma",
@@ -3687,10 +5168,14 @@
    "label": "health",
    "before": 275,
    "after": 320,
-   "why": "The EDA Puma gets more health."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The EDA Puma gets more health."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "uel1001",
    "name": "Puma",
@@ -3700,10 +5185,14 @@
    "label": "defence.health.value",
    "before": 275,
    "after": 320,
-   "why": "The EDA Puma gets more health."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The EDA Puma gets more health."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ugl1001",
    "name": "Gimlet",
@@ -3713,10 +5202,14 @@
    "label": "health",
    "before": 285,
    "after": 300,
-   "why": "The Guardian Gimlet landed the fewest shots on moving tanks (69% against 86-88%): more health and damage."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Gimlet landed the fewest shots on moving tanks (69% against 86-88%): more health and damage."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ugl1001",
    "name": "Gimlet",
@@ -3726,10 +5219,14 @@
    "label": "defence.health.value",
    "before": 285,
    "after": 300,
-   "why": "The Guardian Gimlet landed the fewest shots on moving tanks (69% against 86-88%): more health and damage."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Gimlet landed the fewest shots on moving tanks (69% against 86-88%): more health and damage."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ugl1001",
    "name": "Gimlet",
@@ -3739,10 +5236,14 @@
    "label": "damage",
    "before": 23.53,
    "after": 26,
-   "why": "The Guardian Gimlet landed the fewest shots on moving tanks (69% against 86-88%): more health and damage."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Gimlet landed the fewest shots on moving tanks (69% against 86-88%): more health and damage."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "uel3002",
    "name": "Hyena",
@@ -3752,10 +5253,14 @@
    "label": "health",
    "before": 1428,
    "after": 1800,
-   "why": "EDA T2 raider (Hyena): T2 raiders other than the Jager lost every fight against their own value in T1 tanks; T2 should win those. More health."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA T2 raider (Hyena): T2 raiders other than the Jager lost every fight against their own value in T1 tanks; T2 should win those. More health."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "uel3002",
    "name": "Hyena",
@@ -3765,10 +5270,14 @@
    "label": "defence.health.value",
    "before": 1428,
    "after": 1800,
-   "why": "EDA T2 raider (Hyena): T2 raiders other than the Jager lost every fight against their own value in T1 tanks; T2 should win those. More health."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA T2 raider (Hyena): T2 raiders other than the Jager lost every fight against their own value in T1 tanks; T2 should win those. More health."
+   ]
   },
   {
-   "section": "units",
    "kind": "unit",
    "id": "ugl2002",
    "name": "Torque",
@@ -3778,37 +5287,18 @@
    "label": "damage",
    "before": 51.39,
    "after": 80,
-   "why": "Guardian T2 raider (Torque): likewise, more damage."
-  },
-  {
-   "section": "units",
-   "kind": "unit",
-   "id": "uel1101",
-   "name": "Bison",
-   "displayName": "Tier 1: Mobile Artillery",
-   "faction": "EDA",
-   "field": "economy.cost.alloys",
-   "label": "alloys",
-   "before": 25,
-   "after": 39,
-   "why": "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost."
-  },
-  {
-   "section": "units",
-   "kind": "unit",
-   "id": "uel1101",
-   "name": "Bison",
-   "displayName": "Tier 1: Mobile Artillery",
-   "faction": "EDA",
-   "field": "economy.cost.energy",
-   "label": "energy",
-   "before": 150,
-   "after": 233,
-   "why": "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost."
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian T2 raider (Torque): likewise, more damage."
+   ]
   }
  ],
  "skipped": [],
  "notes": [
+  "Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with \"fixes\" on): a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider, the TALEN) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range. Not a template change.",
+  "Shields (balancepatch/shields.lua, with the \"fixes\" section on): an aircraft's projectile that starts inside an enemy shield's bubble and lands inside it hits the shield instead, and so does an aircraft's beam fired from inside one. Before, gunships and bombers flew inside T3 bubbles and hit everything under them. Units on the ground inside a bubble shoot as before. Not a template change.",
   "AI: the stock AI's energy-to-alloy income targets (LessThan/MoreThanEnergyToResourceRatioIncome in AI/AIFunctions.lua) are scaled by 0.7 when the \"costs\" section is on. Not a template change."
  ],
  "units": {
@@ -4109,7 +5599,7 @@
      ],
      "muzzleSalvoDelay": 0.2,
      "muzzleSalvoSize": 2,
-     "projectileLifetime": 0.5,
+     "projectileLifetime": 0.75,
      "projectileTemplate": "pca111",
      "rangeMax": 25,
      "rangeMin": 0,
@@ -4161,7 +5651,7 @@
      ],
      "muzzleSalvoDelay": 0.2,
      "muzzleSalvoSize": 2,
-     "projectileLifetime": 0.5,
+     "projectileLifetime": 0.75,
      "projectileTemplate": "pca111",
      "rangeMax": 25,
      "rangeMin": 0,
@@ -9241,7 +10731,7 @@
        "aimTolerance": 0.2,
        "defaultPitchAdjustment": 0,
        "defaultYawAdjustment": 0,
-       "leadTarget": false,
+       "leadTarget": true,
        "pitchBone": "Turret02_Pitch01",
        "pitchMax": 45,
        "pitchMin": -45,
@@ -9303,7 +10793,7 @@
        "aimTolerance": 0.2,
        "defaultPitchAdjustment": 0,
        "defaultYawAdjustment": 0,
-       "leadTarget": false,
+       "leadTarget": true,
        "pitchBone": "Turret03_Pitch01",
        "pitchMax": 45,
        "pitchMin": -45,
@@ -12172,17 +13662,17 @@
       {
        "aimBone": "Turret01_Muzzle01",
        "aimTolerance": 2,
-       "defaultPitchAdjustment": 0,
+       "defaultPitchAdjustment": 55,
        "defaultYawAdjustment": 0,
        "leadTarget": true,
        "pitchBone": "Turret01_Pitch01",
-       "pitchMax": 45,
+       "pitchMax": 100,
        "pitchMin": -25,
        "pitchSpeed": 50,
        "poseResetTime": -1,
        "projectileSpeed": 35,
        "solverType": "LowArc",
-       "yawBone": "Turret01",
+       "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
        "yawSpeed": 90
@@ -12806,6 +14296,136 @@
     }
    ]
   },
+  "ucs3201": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.6,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1.25,
+     "y": 1.25,
+     "z": 1.25
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 5000,
+     "value": 5000
+    }
+   },
+   "economy": {
+    "buildTime": 450,
+    "cost": {
+     "alloys": 450,
+     "energy": 4500
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenStructure"
+    ],
+    "displayName": "Tier 3: Anti-Air",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "aa",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_antiAir.png",
+    "iconUIBuildSortPriority": 310,
+    "iconUIType": "amphibious",
+    "name": "Guardian",
+    "orders": {
+     "Attack": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 2400.9,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "ucs3201",
+    "unitTypeName": "ChosenT3AA"
+   },
+   "intel": {
+    "visionRadius": 30
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ANTI_AIR",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "DEFENCE",
+    "STRUCTURE",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_Pitch01",
+       "aimTolerance": 2,
+       "defaultPitchAdjustment": 0,
+       "defaultYawAdjustment": 0,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 90,
+       "pitchMin": -90,
+       "pitchSpeed": 20,
+       "poseResetTime": -1,
+       "projectileSpeed": 20,
+       "solverType": "NoArc",
+       "yawBone": "Turret01_Yaw01",
+       "yawMax": 180,
+       "yawMin": -180,
+       "yawSpeed": 90
+      }
+     ],
+     "damage": 55.555555555556,
+     "damageRadius": 0,
+     "damageType": "Normal",
+     "firingRandomness": 0,
+     "layerTargetLimits": [
+      "Air"
+     ],
+     "layerWeaponLimits": [
+      "Land"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01",
+        "Turret01_Muzzle02",
+        "Turret01_Muzzle03",
+        "Turret01_Muzzle04",
+        "Turret01_Muzzle05",
+        "Turret01_Muzzle06"
+       ]
+      }
+     ],
+     "muzzleSalvoSize": 1,
+     "projectileLifetime": 4,
+     "projectileTemplate": "pca341",
+     "rangeMax": 60,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 1,
+     "targetWaterLimits": "Above"
+    }
+   ]
+  },
   "ucs3601": {
    "additions": {
     "rotators": [
@@ -13201,6 +14821,223 @@
     }
    ]
   },
+  "uea1201": {
+   "additions": {
+    "meshes": [
+     {
+      "boneName": "Wing01_Left",
+      "materials": [
+       "uea1201_decal_01"
+      ],
+      "mesh": "Sanctuary EDA T5 Substation Mesh 8x1",
+      "offset": {
+       "x": -0.05085408,
+       "y": -0.0021007075,
+       "z": 0.233590543
+      },
+      "rotation": {
+       "x": 90,
+       "y": 90,
+       "z": 0
+      },
+      "scale": {
+       "x": 0.2670856,
+       "y": 0.267085582,
+       "z": 0.267085582
+      }
+     },
+     {
+      "boneName": "Wing01_Right",
+      "materials": [
+       "uea1201_decal_01"
+      ],
+      "mesh": "Sanctuary EDA T5 Substation Mesh 8x1",
+      "offset": {
+       "x": 0.0483081266,
+       "y": -0.00110068417,
+       "z": 0.2357398
+      },
+      "rotation": {
+       "x": 270,
+       "y": 90,
+       "z": 0
+      },
+      "scale": {
+       "x": 0.267085671,
+       "y": 0.267085642,
+       "z": 0.267085642
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 0.5,
+     "z": 1
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 250,
+     "value": 250
+    }
+   },
+   "economy": {
+    "buildTime": 100,
+    "cost": {
+     "alloys": 25,
+     "energy": 500
+    }
+   },
+   "footprint": {
+    "x": 1.4,
+    "y": 1.4
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAAirUnit"
+    ],
+    "displayName": "Tier 1: Anti-Air Fighter",
+    "icon": {
+     "shape": "air1",
+     "symbol": "aa",
+     "tech": "t1"
+    },
+    "iconUI": "tech1_air1_antiAir.png",
+    "iconUIBuildSortPriority": 90,
+    "iconUIType": "air",
+    "name": "Shrike",
+    "orders": {
+     "Assist": true,
+     "Attack": true,
+     "AttackMove": true,
+     "Move": true,
+     "Patrol": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 131.1,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "uea1201",
+    "unitTypeName": "EDAT1AAFighter"
+   },
+   "intel": {
+    "visionRadius": 15
+   },
+   "movement": {
+    "acceleration": 15,
+    "air": true,
+    "airHover": false,
+    "altitudeJitterFactor": 1,
+    "bankFactor": 1,
+    "collisionMaskDefault": [
+     "Air"
+    ],
+    "collisionMaskSpawn": [
+     "LandSmall"
+    ],
+    "landWhenIdleSeconds": 5,
+    "minSpeed": 5,
+    "orbitRange": 3.183,
+    "orbitSpeed": 5,
+    "preferredAltitude": 10,
+    "referenceAltitude": "GroundOrWater",
+    "rotationSpeed": 90,
+    "sortOrder": 1,
+    "speed": 15,
+    "terrainAlignmentFactor": 0,
+    "type": "Plane"
+   },
+   "tags": [
+    "AIR",
+    "ANTI_AIR",
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_FACTORY",
+    "BUILDABLE_BY_T3_FACTORY",
+    "EDA",
+    "FIGHTER",
+    "MOBILE",
+    "TECH1"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_Muzzle01",
+       "aimTolerance": 2,
+       "defaultPitchAdjustment": 0,
+       "defaultYawAdjustment": 0,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 55,
+       "pitchMin": -55,
+       "pitchSpeed": 100,
+       "poseResetTime": 3,
+       "projectileSpeed": 50,
+       "solverType": "NoArc",
+       "yawBone": "Turret01_Yaw01",
+       "yawMax": 55,
+       "yawMin": -55,
+       "yawSpeed": 100
+      }
+     ],
+     "damage": 15,
+     "damageRadius": 0,
+     "damageType": "Normal",
+     "firingRandomness": 0,
+     "layerTargetLimits": [
+      "Air",
+      "LandedAir"
+     ],
+     "layerWeaponLimits": [
+      "Air"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle02"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle03"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle04"
+       ]
+      }
+     ],
+     "muzzleSalvoDelay": 0.1,
+     "muzzleSalvoSize": 4,
+     "projectileLifetime": 0.75,
+     "projectileTemplate": "pea131",
+     "rangeMax": 25,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 1.2,
+     "targetWaterLimits": "Above"
+    }
+   ]
+  },
   "uea3001": {
    "collisionInfo": {
     "centerOffset": {
@@ -13557,6 +15394,257 @@
      "projectileLifetime": 2,
      "projectileTemplate": "pea341",
      "rangeMax": 30,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 3,
+     "targetWaterLimits": "Above"
+    }
+   ]
+  },
+  "uea3701": {
+   "additions": {
+    "meshes": [
+     {
+      "boneName": "FoldingRadar02_Flap01",
+      "materials": [
+       "uea3701_decal_04"
+      ],
+      "mesh": "Sanctuary EDA T5 Substation Mesh 4X1",
+      "offset": {
+       "x": 0.06970207,
+       "y": 0.0596923754,
+       "z": 0.00429929048
+      },
+      "rotation": {
+       "x": -0.00000683019152,
+       "y": -0.0000445353944,
+       "z": 180
+      },
+      "scale": {
+       "x": 0.5488165,
+       "y": 0.548816562,
+       "z": 0.548816562
+      }
+     },
+     {
+      "boneName": "FoldingRadar02_Flap01",
+      "materials": [
+       "uea3701_decal_03"
+      ],
+      "mesh": "Sanctuary EDA T5 Substation Mesh 8x1",
+      "offset": {
+       "x": 0.354705721,
+       "y": 0.0497130863,
+       "z": 0.006799802
+      },
+      "rotation": {
+       "x": -0.00000683018925,
+       "y": -0.00000217511433,
+       "z": 180
+      },
+      "scale": {
+       "x": 0.5488165,
+       "y": 0.548816562,
+       "z": 0.548816562
+      }
+     },
+     {
+      "boneName": "FoldingRadar04_Flap01",
+      "materials": [
+       "uea3701_decal_03"
+      ],
+      "mesh": "Sanctuary EDA T5 Substation Mesh 8x1",
+      "offset": {
+       "x": -0.373290926,
+       "y": 0.0497131422,
+       "z": 0.00679986924
+      },
+      "rotation": {
+       "x": 0.0000170754738,
+       "y": 180,
+       "z": 180
+      },
+      "scale": {
+       "x": 0.5488166,
+       "y": 0.548816562,
+       "z": 0.548816562
+      }
+     },
+     {
+      "boneName": "FoldingRadar04_Flap01",
+      "materials": [
+       "uea3701_decal_04"
+      ],
+      "mesh": "Sanctuary EDA T5 Substation Mesh 4X1",
+      "offset": {
+       "x": -0.0726927742,
+       "y": 0.0596923456,
+       "z": 0.004299313
+      },
+      "rotation": {
+       "x": 0.0000170754738,
+       "y": 180,
+       "z": 180
+      },
+      "scale": {
+       "x": 0.5488166,
+       "y": 0.548816562,
+       "z": 0.548816562
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 0.5,
+     "z": 1
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 1050,
+     "value": 1050
+    }
+   },
+   "economy": {
+    "buildTime": 440,
+    "cost": {
+     "alloys": 110,
+     "energy": 2200
+    }
+   },
+   "footprint": {
+    "x": 1.4,
+    "y": 1.4
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAAirUnit"
+    ],
+    "displayName": "Tier 3: Air Scout",
+    "icon": {
+     "shape": "air1",
+     "symbol": "intel",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_air1_intel.png",
+    "iconUIBuildSortPriority": 100,
+    "iconUIType": "air",
+    "name": "Raven",
+    "orders": {
+     "Assist": true,
+     "Move": true,
+     "Patrol": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "uea3701",
+    "unitTypeName": "EDAT3AirScout"
+   },
+   "intel": {
+    "radarRadius": 90,
+    "sonarRadius": 80,
+    "visionRadius": 50
+   },
+   "movement": {
+    "acceleration": 25,
+    "air": true,
+    "airHover": true,
+    "altitudeJitterFactor": 1,
+    "bankFactor": 0,
+    "collisionMaskDefault": [
+     "Air"
+    ],
+    "collisionMaskSpawn": [
+     "LandSmall"
+    ],
+    "landWhenIdleSeconds": 5,
+    "minSpeed": 0,
+    "orbitRange": 15.915,
+    "orbitSpeed": 25,
+    "preferredAltitude": 8.5,
+    "referenceAltitude": "GroundOrWater",
+    "rotationSpeed": 90,
+    "sortOrder": 2,
+    "speed": 27,
+    "terrainAlignmentFactor": 0,
+    "type": "Gunship"
+   },
+   "tags": [
+    "AIR",
+    "ANTI_AIR",
+    "BUILDABLE_BY_T3_FACTORY",
+    "EDA",
+    "GUNSHIP",
+    "INTEL",
+    "MOBILE",
+    "RADAR",
+    "SCOUT",
+    "SONAR",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_Muzzle01",
+       "aimTolerance": 0.2,
+       "defaultPitchAdjustment": 0,
+       "defaultYawAdjustment": 0,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 90,
+       "pitchMin": -90,
+       "pitchSpeed": 20,
+       "poseResetTime": 3,
+       "projectileSpeed": 20,
+       "solverType": "NoArc",
+       "yawBone": "Turret01_Yaw01",
+       "yawMax": 180,
+       "yawMin": -180,
+       "yawSpeed": 360
+      }
+     ],
+     "damage": 0,
+     "damageRadius": 0,
+     "damageType": "Normal",
+     "firingRandomness": 0,
+     "layerTargetLimits": [
+      "Land",
+      "WaterSurface"
+     ],
+     "layerWeaponLimits": [
+      "Air"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01",
+        "Turret01_Muzzle02",
+        "Turret01_Muzzle03",
+        "Turret01_Muzzle04",
+        "Turret01_Muzzle05"
+       ]
+      }
+     ],
+     "muzzleSalvoSize": 1,
+     "projectileLifetime": 2,
+     "projectileTemplate": "pea341",
+     "rangeMax": 25,
      "rangeMin": 0,
      "rangeRingType": "AntiAir",
      "rangeTracking": 1.1,
@@ -18248,7 +20336,7 @@
        "aimTolerance": 45,
        "defaultPitchAdjustment": -30,
        "defaultYawAdjustment": 0,
-       "leadTarget": false,
+       "leadTarget": true,
        "pitchBone": "Turret04_Pitch01",
        "pitchMax": 90,
        "pitchMin": -25,
@@ -18288,7 +20376,7 @@
      ],
      "muzzleSalvoDelay": 0.1,
      "muzzleSalvoSize": 2,
-     "projectileLifetime": 5,
+     "projectileLifetime": 8,
      "projectileTemplate": "pea341",
      "rangeMax": 60,
      "rangeMin": 0,
@@ -19940,6 +22028,133 @@
     }
    ]
   },
+  "ues2201": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.8,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 0.3,
+     "y": 1.6,
+     "z": 0.4
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 2500,
+     "value": 2500
+    }
+   },
+   "economy": {
+    "buildTime": 250,
+    "cost": {
+     "alloys": 250,
+     "energy": 2500
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAStructure"
+    ],
+    "displayName": "Tier 2: Anti-Air",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "aa",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure1_antiAir.png",
+    "iconUIBuildSortPriority": 310,
+    "iconUIType": "amphibious",
+    "name": "",
+    "orders": {
+     "Attack": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 804.3,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "ues2201",
+    "unitTypeName": "EDAT2AA"
+   },
+   "intel": {
+    "visionRadius": 25
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ANTI_AIR",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "DEFENCE",
+    "EDA",
+    "STRUCTURE",
+    "TECH2"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_Muzzle01",
+       "aimTolerance": 0.2,
+       "defaultPitchAdjustment": 0,
+       "defaultYawAdjustment": 0,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 90,
+       "pitchMin": -25,
+       "pitchSpeed": 20,
+       "poseResetTime": -1,
+       "projectileSpeed": 100,
+       "solverType": "NoArc",
+       "yawBone": "Turret01_Yaw01",
+       "yawMax": 180,
+       "yawMin": -180,
+       "yawSpeed": 90
+      }
+     ],
+     "beamLifetime": 1,
+     "damage": 300,
+     "damageRadius": 5,
+     "damageType": "Normal",
+     "firingRandomness": 10,
+     "layerTargetLimits": [
+      "Air"
+     ],
+     "layerWeaponLimits": [
+      "Land",
+      "WaterSurface"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01"
+       ]
+      }
+     ],
+     "muzzleSalvoSize": 1,
+     "projectileTemplate": "pea271",
+     "rangeMax": 50,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 2,
+     "targetWaterLimits": "Above"
+    }
+   ]
+  },
   "ues2601": {
    "adjacency": "AlloyExtractorAdjacencyBuff",
    "collisionInfo": {
@@ -20131,6 +22346,199 @@
      "damageFriendly": true,
      "damageRadius": 5,
      "damageType": "Normal"
+    }
+   ]
+  },
+  "ues3201": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Rotator01",
+      "speed": {
+       "x": 0,
+       "y": 15,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.55,
+     "z": -0.1
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 1.1,
+     "z": 1
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 5000,
+     "value": 5000
+    }
+   },
+   "economy": {
+    "buildTime": 450,
+    "cost": {
+     "alloys": 450,
+     "energy": 4500
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAStructure"
+    ],
+    "displayName": "Tier 3: Anti-Air",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "aa",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_antiAir.png",
+    "iconUIBuildSortPriority": 310,
+    "iconUIType": "amphibious",
+    "name": "",
+    "orders": {
+     "Attack": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 4158.5,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "ues3201",
+    "unitTypeName": "EDAT3AA"
+   },
+   "intel": {
+    "visionRadius": 30
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ANTI_AIR",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "DEFENCE",
+    "EDA",
+    "STRUCTURE",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_AimBone01",
+       "aimTolerance": 45,
+       "defaultPitchAdjustment": -25,
+       "defaultYawAdjustment": 0,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 90,
+       "pitchMin": -25,
+       "pitchSpeed": 90,
+       "poseResetTime": -1,
+       "projectileSpeed": 10,
+       "solverType": "NoArc",
+       "yawBone": "Turret01_Yaw01",
+       "yawMax": 180,
+       "yawMin": -180,
+       "yawSpeed": 90
+      }
+     ],
+     "damage": 555.55555555556,
+     "damageRadius": 2,
+     "damageType": "Normal",
+     "firingRandomness": 0,
+     "layerTargetLimits": [
+      "Air"
+     ],
+     "layerWeaponLimits": [
+      "Land"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle02"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle03"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle04"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle05"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle06"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle07"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle08"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle09"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle10"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle11"
+       ]
+      },
+      {
+       "muzzles": [
+        "Turret01_Muzzle12"
+       ]
+      }
+     ],
+     "muzzleSalvoDelay": 0.1,
+     "muzzleSalvoSize": 3,
+     "projectileLifetime": 8,
+     "projectileTemplate": "pea341",
+     "rangeMax": 60,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 5,
+     "targetWaterLimits": "Above"
     }
    ]
   },
@@ -20615,7 +23023,7 @@
       }
      ],
      "muzzleSalvoSize": 1,
-     "projectileLifetime": 0.5,
+     "projectileLifetime": 0.75,
      "projectileTemplate": "pxd002",
      "rangeMax": 25,
      "rangeMin": 0,
@@ -20666,7 +23074,7 @@
       }
      ],
      "muzzleSalvoSize": 1,
-     "projectileLifetime": 0.5,
+     "projectileLifetime": 0.75,
      "projectileTemplate": "pxd002",
      "rangeMax": 25,
      "rangeMin": 0,
@@ -22105,7 +24513,7 @@
        "aimTolerance": 0.2,
        "defaultPitchAdjustment": 0,
        "defaultYawAdjustment": 0,
-       "leadTarget": false,
+       "leadTarget": true,
        "pitchBone": "Turret01_Pitch01",
        "pitchMax": 80,
        "pitchMin": -25,
@@ -25299,6 +27707,136 @@
     }
    ]
   },
+  "ugs1201": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.4,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 0.5,
+     "y": 0.8,
+     "z": 0.5
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 1000,
+     "regen": 1,
+     "value": 1000
+    }
+   },
+   "economy": {
+    "buildTime": 100,
+    "cost": {
+     "alloys": 100,
+     "energy": 1000
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardStructure"
+    ],
+    "displayName": "Tier 1: Anti-Air",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "aa",
+     "tech": "t1"
+    },
+    "iconUI": "tech1_structure1_antiAir.png",
+    "iconUIBuildSortPriority": 310,
+    "iconUIType": "amphibious",
+    "name": "Emitter",
+    "orders": {
+     "Attack": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 414,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "ugs1201",
+    "unitTypeName": "GuardT1AA"
+   },
+   "intel": {
+    "visionRadius": 15
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ANTI_AIR",
+    "BUILDABLE_BY_T1_ENGINEER",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "DEFENCE",
+    "GUARD",
+    "STRUCTURE",
+    "TECH1"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_Muzzle01",
+       "aimTolerance": 0.2,
+       "defaultPitchAdjustment": 0,
+       "defaultYawAdjustment": -35,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 60,
+       "pitchMin": -55,
+       "pitchSpeed": 90,
+       "poseResetTime": -1,
+       "projectileSpeed": 30,
+       "solverType": "NoArc",
+       "yawBone": "Turret01",
+       "yawMax": 180,
+       "yawMin": -180,
+       "yawSpeed": 90
+      }
+     ],
+     "beamLifetime": -1,
+     "beamMaxLenghtMultiplier": 1.1,
+     "damage": 8,
+     "damageRadius": 0,
+     "damageType": "Normal",
+     "firingRandomness": 0,
+     "layerTargetLimits": [
+      "Air"
+     ],
+     "layerWeaponLimits": [
+      "Land"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01"
+       ]
+      }
+     ],
+     "muzzleSalvoSize": 1,
+     "projectileLifetime": 2,
+     "projectileTemplate": "pga171",
+     "rangeMax": 40,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 1,
+     "targetWaterLimits": "Above"
+    }
+   ]
+  },
   "ugs1601": {
    "adjacency": "AlloyExtractorAdjacencyBuff",
    "collisionInfo": {
@@ -26104,6 +28642,133 @@
     }
    ]
   },
+  "ugs3201": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.55,
+     "z": -0.1
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 1.1,
+     "z": 1
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 5000,
+     "regen": 3,
+     "value": 5000
+    }
+   },
+   "economy": {
+    "buildTime": 450,
+    "cost": {
+     "alloys": 450,
+     "energy": 4500
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardStructure"
+    ],
+    "displayName": "Tier 3: Anti-Air",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "aa",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_antiAir.png",
+    "iconUIBuildSortPriority": 310,
+    "iconUIType": "amphibious",
+    "name": "Engraver",
+    "orders": {
+     "Attack": true,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 1861.9,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "ugs3201",
+    "unitTypeName": "GuardT3AA"
+   },
+   "intel": {
+    "visionRadius": 30
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ANTI_AIR",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "DEFENCE",
+    "GUARD",
+    "STRUCTURE",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "aimControllers": [
+      {
+       "aimBone": "Turret01_Muzzle01",
+       "aimTolerance": 0.2,
+       "defaultPitchAdjustment": 0,
+       "defaultYawAdjustment": 0,
+       "leadTarget": true,
+       "pitchBone": "Turret01_Pitch01",
+       "pitchMax": 90,
+       "pitchMin": -25,
+       "pitchSpeed": 20,
+       "poseResetTime": -1,
+       "projectileSpeed": 40,
+       "solverType": "LowArc",
+       "yawBone": "Turret01_Yaw01",
+       "yawMax": 180,
+       "yawMin": -180,
+       "yawSpeed": 90
+      }
+     ],
+     "beamLifetime": -1,
+     "damage": 333.33333333333,
+     "damageRadius": 0,
+     "damageType": "Normal",
+     "firingRandomness": 0,
+     "layerTargetLimits": [
+      "Air"
+     ],
+     "layerWeaponLimits": [
+      "Land"
+     ],
+     "muzzleGroupChargeDelay": 0,
+     "muzzleGroupTimeOut": -1,
+     "muzzleGroups": [
+      {
+       "muzzles": [
+        "Turret01_Muzzle01"
+       ]
+      }
+     ],
+     "muzzleSalvoSize": 1,
+     "projectileLifetime": 2,
+     "projectileTemplate": "pga371",
+     "rangeMax": 60,
+     "rangeMin": 0,
+     "rangeRingType": "AntiAir",
+     "rangeTracking": 1.1,
+     "reloadTime": 1,
+     "targetWaterLimits": "Above"
+    }
+   ]
+  },
   "ugs3601": {
    "adjacency": "AlloyExtractorAdjacencyBuff",
    "collisionInfo": {
@@ -26300,6 +28965,46 @@
   }
  },
  "projectiles": {
+  "pca341": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.5,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 1,
+     "z": 1
+    }
+   },
+   "extraStages": [
+    {
+     "delay": 0.1,
+     "acceleration": 1,
+     "speedMax": 30,
+     "rotationSpeed": 60,
+     "gravityMultiplier": 0
+    }
+   ],
+   "general": {
+    "name": "Chosen_Missile_AntiAir_Large",
+    "tpId": "pca341"
+   },
+   "nonUniformScale": {
+    "x": 1,
+    "y": 1,
+    "z": 1
+   },
+   "movement": {
+    "acceleration": 2,
+    "alignToVelocity": true,
+    "gravityMultiplier": 0,
+    "rotationSpeed": 60,
+    "speedMax": 25,
+    "type": "TargetEntity"
+   }
+  },
   "pei141": {
    "collisionInfo": {
     "centerOffset": {

@@ -3,7 +3,7 @@
 -- everything built from a template afterwards (colliders, range rings, the
 -- build menus, the AI's cost sums) sees the new numbers.
 --
--- A change selects templates (ids, idPattern, tags, notTags) and edits fields
+-- A change selects templates (ids, idPattern, tags, notTags, notIds) and edits fields
 -- by path: "weapons.2.damage", "weapons.*.damage" (every weapon except death
 -- explosions; where = { rangeRingType = "IndirectFire" } narrows them),
 -- "economy.cost.alloys". expect = { path = value } skips the
@@ -92,6 +92,9 @@ local function selects(change, tp, tpId)
     end
     for _, tag in ipairs(change.notTags or {}) do
         if hasTag(tp, tag) then return false end
+    end
+    for _, id in ipairs(change.notIds or {}) do
+        if id == tpId then return false end
     end
     return true
 end

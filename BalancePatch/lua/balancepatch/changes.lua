@@ -35,6 +35,16 @@ Sections = {
                 set = { ["weapons.1.projectileLifetime"] = 4 },
             },
             {
+                why = "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now, rests level, and turns the model's real yaw bone (it named Turret01, which the model doesn't have).",
+                ids = { "ucs2001" },
+                expect = { ["weapons.1.aimControllers.1.yawBone"] = "Turret01", ["weapons.1.aimControllers.1.pitchMax"] = 45, ["weapons.1.aimControllers.1.defaultPitchAdjustment"] = 0 },
+                set = {
+                    ["weapons.1.aimControllers.1.yawBone"] = "Turret01_Yaw01",
+                    ["weapons.1.aimControllers.1.pitchMax"] = 100,
+                    ["weapons.1.aimControllers.1.defaultPitchAdjustment"] = 55,
+                },
+            },
+            {
                 why = "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1.",
                 ids = { "uga3011" },
                 expect = { ["general.displayName"] = "Tier 1: Gunship" },
@@ -204,10 +214,44 @@ Sections = {
                 set = { ["weapons.*.aimControllers.*.leadTarget"] = true },
             },
             {
-                why = "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%.",
-                tags = { "FIGHTER", "TECH3" },
+                why = "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%.",
                 where = { rangeRingType = "AntiAir" },
+                notIds = { "uel2201" },
                 set = { ["weapons.*.aimControllers.*.leadTarget"] = true },
+            },
+            {
+                why = "The EDA T3 anti-air tower and the Behemoth's anti-air fired speed-10 shells that lived 5 seconds: 50 range out of 60. They now reach their full range.",
+                ids = { "ues3201", "uel4002" },
+                where = { rangeRingType = "AntiAir" },
+                expect = { ["weapons.*.projectileLifetime"] = 5 },
+                set = { ["weapons.*.projectileLifetime"] = 8 },
+            },
+            {
+                why = "The Chosen T3 anti-air tower's missile turned at 10 degrees a second and lived 2 seconds (about 45 range out of 60), so it landed 9% on weaving T1 bombers. It turns like the EDA one (60) and reaches its range: 16-18%.",
+                kind = "projectile",
+                ids = { "pca341" },
+                expect = { ["movement.rotationSpeed"] = 10 },
+                set = { ["movement.rotationSpeed"] = 60 },
+            },
+            {
+                why = "Likewise for its missile's lifetime.",
+                ids = { "ucs3201" },
+                where = { rangeRingType = "AntiAir" },
+                expect = { ["weapons.*.projectileLifetime"] = 2 },
+                set = { ["weapons.*.projectileLifetime"] = 4 },
+            },
+            {
+                why = "The Guardian T3 anti-air tower aimed its slow, falling shells (speed 20) straight at its target and hit nothing: 0% on weaving T1 bombers, 3% on a hovering gunship. It fires faster shells and aims for their fall: 18% and 13%. Still the weakest T3 anti-air tower.",
+                ids = { "ugs3201" },
+                where = { rangeRingType = "AntiAir" },
+                expect = { ["weapons.*.aimControllers.*.projectileSpeed"] = 20, ["weapons.*.aimControllers.*.solverType"] = "NoArc" },
+                set = { ["weapons.*.aimControllers.*.projectileSpeed"] = 40, ["weapons.*.aimControllers.*.solverType"] = "LowArc" },
+            },
+            {
+                why = "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them.",
+                tags = { "FIGHTER", "TECH1" },
+                expect = { ["weapons.1.projectileLifetime"] = 0.5 },
+                set = { ["weapons.*.projectileLifetime"] = 0.75 },
             },
             {
                 why = "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage.",
