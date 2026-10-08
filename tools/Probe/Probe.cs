@@ -68,6 +68,7 @@ public class Probe : BaseUnityPlugin
   replay <path|latest>        play a .sanreplay
   seek <tick> | speed <x> | pause | resume | replaystate   ReplayManager's player
   lobby [maxPlayers] [map]    private Steam lobby (default 2 players, The Forge)
+  lan [port]                  later lobbies use the LAN backend (no Steam needed; default port 7777)
   maps [text|*]               stock maps; installed map folders matching <text> (* = all)
   ai <slot> | army <slot> <id> | team <slot> <id> | faction <slot> <n>
   ready | start | lobbystate | select <modId;modId> | seat <slot> <mod> <key>|default
@@ -391,6 +392,13 @@ public class Probe : BaseUnityPlugin
                 Wait("lobby created", 20f, () => LobbyManager.CurrentState != null);
                 break;
             }
+            case "lan":
+                // lan [port]: lobbies from now on use the game's LAN (TCP) backend, which needs
+                // no Steam - for when the game was started without Steam's session.
+                EM.Network.TcpLobbyBackend.Instance.SetListenPort(a.Length > 0 ? ushort.Parse(a[0]) : (ushort)7777);
+                LobbyManager.Backend = EM.Network.TcpLobbyBackend.Instance;
+                Out("lobby backend: LAN as " + LobbyManager.CurrentUserName);
+                break;
             case "maps":
             {
                 // maps [text]: the stock four, plus installed map folders whose name
