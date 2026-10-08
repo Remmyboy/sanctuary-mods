@@ -119,6 +119,14 @@ local function apply(change, tp, tpId)
             end
         end, change.where)
     end
+    for _, path in ipairs(change.clear or {}) do
+        each(tp, split(path), 1, function(t, k)
+            if t[k] ~= nil then
+                t[k] = nil
+                n = n + 1
+            end
+        end, change.where)
+    end
     for path, factor in pairs(change.scale or {}) do
         each(tp, split(path), 1, function(t, k)
             if type(t[k]) == "number" then

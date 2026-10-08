@@ -70,7 +70,7 @@ function loadTemplates(dir, top) {
   const out = {};
   for (const d of fs.readdirSync(dir)) {
     const f = path.join(dir, d, d + '.santp');
-    if (fs.existsSync(f)) out[d] = parseLiteral(fs.readFileSync(f, 'utf8'), top);
+    if (fs.existsSync(f)) out[d.toLowerCase()] = parseLiteral(fs.readFileSync(f, 'utf8'), top);
   }
   return out;
 }
@@ -140,6 +140,8 @@ for (const section of Sections) {
       const record = (t, k, label, v) => { const from = get(t, k); if (!same(from, v)) lines.push({ id: nameOf(tp, id), field: label.slice(1), from: show(from), to: show(v), why: c.why }); put(t, k, v); };
       for (const [p, v] of Object.entries(c.set || {}))
         each(tp, split(p), 0, (t, k, label) => { if (get(t, k) !== undefined || !p.includes('*')) record(t, k, label, JSON.parse(JSON.stringify(v))); }, c.where, '');
+      for (const p of c.clear || [])
+        each(tp, split(p), 0, (t, k, label) => { const from = get(t, k); if (from !== undefined) { lines.push({ id: nameOf(tp, id), field: label.slice(1), from: show(from), to: "(removed)", why: c.why }); if (Array.isArray(t)) t[k - 1] = undefined; else delete t[k]; } }, c.where, '');
       for (const [p, f] of Object.entries(c.scale || {}))
         each(tp, split(p), 0, (t, k, label) => { const v0 = get(t, k); if (typeof v0 === 'number') { let v = v0 * f; if (c.round) v = Math.floor(v + 0.5); record(t, k, label, v); } }, c.where, '');
     }

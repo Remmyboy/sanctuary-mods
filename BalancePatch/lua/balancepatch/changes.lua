@@ -4,7 +4,8 @@
 -- A change: why (shown in the preview), a selector (ids, idPattern, tags,
 -- notTags; all must hold), then set = { path = value } and/or
 -- scale = { path = factor } (round = true rounds the results), and
--- expect = { path = value } for what the game had when the change was made.
+-- clear = { path, ... } removes fields, and expect = { path = value } is what the
+-- game had when the change was made.
 -- kind = "projectile" for projectile templates. Paths: see patch.lua.
 --
 -- Unit ids: ue/uc/ug = EDA/Chosen/Guardians, then l/a/n/s = land, air,
@@ -19,6 +20,19 @@ Sections = {
                 ids = { "uea3201" },
                 expect = { ["weapons.2.layerTargetLimits"] = { "Land", "WaterSurface" } },
                 set = { ["weapons.2.layerTargetLimits"] = { "Air", "LandedAir" } },
+            },
+            {
+                why = "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land.",
+                tags = { "BOMBER", "TECH3" },
+                expect = { ["weapons.1.projectileLifetime"] = 2 },
+                set = { ["weapons.1.projectileLifetime"] = 5 },
+            },
+            {
+                why = "Likewise for T1 bombs.",
+                tags = { "BOMBER", "TECH1" },
+                notTags = { "EDA" },
+                expect = { ["weapons.1.projectileLifetime"] = 2 },
+                set = { ["weapons.1.projectileLifetime"] = 4 },
             },
             {
                 why = "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1.",
@@ -177,7 +191,7 @@ Sections = {
                 why = "EDA T1 artillery's rocket salvo had almost no splash (0.5), so its spread shells mostly hit nothing (7% on crossing tanks).",
                 ids = { "uel1101" },
                 expect = { ["weapons.1.damageRadius"] = 0.5 },
-                set = { ["weapons.1.damageRadius"] = 1.25 },
+                set = { ["weapons.1.damageRadius"] = 1 },
             },
         },
     },
@@ -188,6 +202,18 @@ Sections = {
                 why = "Bombers aim where a moving target will be. Without it the Chosen T1 bomber landed 77% of its bombs on still tanks and none on moving ones.",
                 tags = { "BOMBER" },
                 set = { ["weapons.*.aimControllers.*.leadTarget"] = true },
+            },
+            {
+                why = "T3 anti-air fighters lead their targets. The Guardian one fires a single slow, heavy shot that landed 24% on weaving bombers, the EDA volley 80%.",
+                tags = { "FIGHTER", "TECH3" },
+                where = { rangeRingType = "AntiAir" },
+                set = { ["weapons.*.aimControllers.*.leadTarget"] = true },
+            },
+            {
+                why = "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage.",
+                ids = { "uga1201" },
+                expect = { ["movement.speed"] = 12, ["weapons.1.damage"] = 25 },
+                set = { ["movement.speed"] = 15, ["weapons.*.damage"] = 32 },
             },
             {
                 why = "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty).",
@@ -237,15 +263,17 @@ Sections = {
         key = "units",
         changes = {
             {
-                why = "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage.",
+                why = "The Chosen Jager (T2 raider) beat every other T2 raider and its own value in T1 tanks with most of its force left. Less health and damage: T2 should beat its own value in T1, but not with most of its force left.",
                 ids = { "ucl2002" },
                 expect = { ["defence.health.max"] = 2173, ["weapons.1.damage"] = 50.4 },
-                set = { ["defence.health.max"] = 1900, ["defence.health.value"] = 1900, ["weapons.1.damage"] = 45 },
+                set = { ["defence.health.max"] = 2100, ["defence.health.value"] = 2100, ["weapons.1.damage"] = 47 },
             },
             {
-                why = "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more.",
+                why = "T1 tanks: the Chosen Gladius won 10 against 10 Pumas or Gimlets every time with almost half left, being tougher and cheaper. It costs a little more and has a little less health.",
                 ids = { "ucl1001" },
                 round = true,
+                expect = { ["defence.health.max"] = 307 },
+                set = { ["defence.health.max"] = 295, ["defence.health.value"] = 295 },
                 scale = { ["economy.cost.alloys"] = 1.07, ["economy.cost.energy"] = 1.07 },
             },
             {
@@ -261,16 +289,16 @@ Sections = {
                 set = { ["defence.health.max"] = 300, ["defence.health.value"] = 300, ["weapons.1.damage"] = 26 },
             },
             {
-                why = "EDA T2 raider (Hyena): T2 raiders other than the Jager lost every fight against their own value in T1 tanks. More health.",
+                why = "EDA T2 raider (Hyena): T2 raiders other than the Jager lost every fight against their own value in T1 tanks; T2 should win those. More health.",
                 ids = { "uel3002" },
                 expect = { ["defence.health.max"] = 1428 },
-                set = { ["defence.health.max"] = 1550, ["defence.health.value"] = 1550 },
+                set = { ["defence.health.max"] = 1800, ["defence.health.value"] = 1800 },
             },
             {
-                why = "Guardian T2 raider (Torque): likewise, more damage.",
+                why = "Guardian T2 raider (Torque): likewise, more damage and health.",
                 ids = { "ugl2002" },
-                expect = { ["weapons.1.damage"] = 51.39 },
-                set = { ["weapons.1.damage"] = 80 },
+                expect = { ["weapons.1.damage"] = 51.39, ["defence.health.max"] = 1750 },
+                set = { ["weapons.1.damage"] = 80, ["defence.health.max"] = 1850, ["defence.health.value"] = 1850 },
             },
             {
                 why = "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost.",

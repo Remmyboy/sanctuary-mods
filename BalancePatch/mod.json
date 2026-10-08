@@ -15,7 +15,7 @@
     { "key": "economy", "label": "Economy", "type": "toggle", "default": true,
       "description": "Commanders make 2 alloys and 20 energy a second (were 5 and 50), T1 extractors 2 alloys (were 1), and T2/T3 extractors and generators give more per cost than T1." },
     { "key": "costs", "label": "Unit costs", "type": "toggle", "default": true,
-      "description": "Land and naval units cost more alloys and less energy; Chosen aircraft cost as much energy as the other factions'." },
+      "description": "Land and naval units cost more alloys and less energy, and the AI builds less power to match; Chosen aircraft cost as much energy as the other factions'." },
     { "key": "engineers", "label": "Engineers", "type": "toggle", "default": true,
       "description": "Engineers have less than half their health, so raids on them work." },
     { "key": "commanders", "label": "Commanders", "type": "toggle", "default": true,

@@ -1,52 +1,63 @@
 # Findings for the Sanctuary developers
 
-Issues found while making the Balance Patch (game 0.0.1.20, build 25474094).
-Each was measured in game with scripted unit tests unless it says otherwise.
-"Fixed in the mod" means the patch works around it with data; the rest need
-the game itself.
+Core issues found while making the Balance Patch (game 0.0.1.20, build
+25474094): bugs in the game's data or units, not balance opinions. Each was
+measured in game with scripted host-side tests (spawned units, the game's own
+orders, damage counted in `HostUnit:TakeDamage`, weapon state read from
+`HostWeapon`). "Worked around in the mod" means the Balance Patch fixes it
+with data; the rest need the game.
 
-## Units that never deal damage
+## Bombers that never deal damage
 
-- **EDA T1 bomber (uea1001), EDA T3 bomber (uea3001), Guardian T1 bomber
-  (uga1001), Guardian T3 bomber (uga3001)** dealt no damage at all in 40 to
-  60 s against stationary T1 tanks, with a scout giving vision. The Chosen T1
-  bomber (uca1001) in the same test landed 77% of its damage.
-  `common/units/availableUnits.lua` marks all four `BONE_MISSMATCH`, so
-  their weapon bones are probably missing from the model. They are still in
-  the build menus for players (AvailableUnits only steers the AI).
+Tested with attack-move and attack-unit orders against T1 tanks (which can't
+shoot back at aircraft) and against T1 generators, for 40-90 s. In the same
+test 4 Chosen T1 bombers (uca1001) killed 6 tanks in 33 s.
+
+| Bomber | Result | Cause |
+| --- | --- | --- |
+| Guardian T1 Inertia (uga1001) | never fires | the model has none of the bones the weapon names (`Turret01_Muzzle01`, `Turret01_Pitch01`, `Turret01`), and the weapon's muzzle list is empty |
+| Guardian T3 Impulse (uga3001) | never fires | the same: no `Turret01_Muzzle01`, `Turret01_Pitch01` or `Turret01_Yaw01`, empty muzzle list |
+| Chosen T3 Meteor (uca3001) | never fires | the same (marked `NO_MODEL` in `availableUnits.lua`) |
+| EDA T1 Vulture (uea1001) | aims rarely; never hits | its aim was on target on 3 of 400 ticks: the bay has `yawMin/yawMax = 0`, `projectileSpeed = 0.0001`, `aimTolerance = 2` at 60 range, and the model has no `Turret01_Pitch01` or `Turret01_Yaw01`. With the aim opened up (tolerance 180, speed 20, range 12) it releases every reload, but its bombs still never damage anything, with its own bomb (pxd003) or the working pxd002 |
+| EDA T3 Condor (uea3001) | fires constantly, never hits | `projectileLifetime = 2` at projectile speed 20 is about 40 range, but the weapon fires from up to 90. **Worked around in the mod** (lifetime 5): one Condor then killed 10 T1 tanks in 7-65 s |
+
+All bombers have the same short `projectileLifetime` against their range
+(T1: 2 s, range 60). The mod lengthens it for all of them.
+
+`common/units/availableUnits.lua` already marks most of these
+`BONE_MISSMATCH` or `NO_MODEL`, but that list only steers the AI: players can
+still build them.
 
 ## Data that looks like a mistake
 
 - **EDA T3 anti-air fighter (uea3201)**: its second weapon has
-  `layerTargetLimits = { "Land", "WaterSurface" }`, so it shoots the ground.
-  The other factions' T3 fighters have both weapons on air. Fixed in the mod.
+  `layerTargetLimits = { "Land", "WaterSurface" }`, so one of its two
+  launchers shoots the ground. The other factions' T3 fighters have both on
+  air. Worked around in the mod. (It is marked `BONE_MISSMATCH` too, but it
+  fires and hits fine.)
 - **Guardian TALEN gunship (uga3011)**: built by T3 air factories at T3 cost
-  and stats, but tagged `TECH1` and named "Tier 1: Gunship". Fixed in the mod.
+  and stats, but tagged `TECH1` and named "Tier 1: Gunship". Worked around in
+  the mod.
 - **Chosen aircraft cost 10 energy per alloy**, EDA and Guardian aircraft 20,
-  with identical stats, so Chosen air is about a third cheaper. Fixed in the
-  mod.
-- **Every point defence and anti-air structure sees half its range or less**:
-  T1 point defence vision 15, range 25; T2 25 / 50; T3 30 / 70; T1 anti-air
-  15 / 40. T1 tanks (vision 20, range 20) killed a lone T1 point defence
-  without losing a tank, because it could not see them. Point defences fixed
+  with the same stats, so Chosen air is about a third cheaper. Worked around
   in the mod.
-- **The EDA and Guardian commanders' missile (pei141)** slows to speed 5 at
-  0.3 s and only speeds up at 2.7 s, so it loiters for about three seconds.
-  Against moving T1 tanks it landed 23-43% of its damage, against the Chosen
-  commander's 72%; much of the rest hit nothing, or hit targets already dead.
-  Fixed in the mod (faster stages, `LeadTargetEntity`).
-- **Artillery never leads**: every indirect-fire weapon has
-  `leadTarget = false`. Against tanks crossing in a straight line, every
-  artillery unit landed 0%. With `leadTarget = true` (the aim solver already
-  supports it for high arcs) T1 artillery landed 7-66%. Fixed in the mod.
-- **Bombers never lead either**, and most bombs have no splash, so a bomb that
-  lands beside its target does nothing (`collisionUpdate.lua` only applies
-  splash with `damageRadius > 0`). The Chosen T1 bomber landed 77% on still
-  tanks and 0% on moving ones; with lead and a 3 splash radius, 84-104%.
-  Fixed in the mod.
+- **EDA and Guardian commander missile (pei141)**: its first stage drops to
+  speed 5 at 0.3 s and the next only speeds up at 2.7 s, so the missile
+  loiters for about three seconds. On moving T1 tanks it landed 23-43% of its
+  damage, against the Chosen commander's 72%. Worked around in the mod (fast
+  stages, `LeadTargetEntity`): 83-88%.
+- **Nothing that lobs leads its target**: every indirect-fire weapon and every
+  bomber has `leadTarget = false`, so against a target moving in a straight
+  line all artillery landed 0%. The aim solver already supports leading high
+  arcs (`UpdateAimControllersJob`); with `leadTarget = true` T1 artillery
+  landed 7-66%. Worked around in the mod.
+- **Most bombs have no splash** (`damageRadius = 0`), and a projectile without
+  splash that hits the ground does nothing (`collisionUpdate.lua`), so a bomb
+  landing beside its target is wasted.
 
 ## Economy
 
-- Generators and extractors are exactly linear across tiers: T1, T2 and T3
-  generators give the same energy per cost and per build time, and T1 has ten
-  times the health per energy. Not a bug, but it makes teching up pointless.
+- Generators are exactly linear across tiers: T1, T2 and T3 give the same
+  energy per cost and per build time, and T1 has ten times the health per
+  energy. With nothing gained per tier, teching power is only a space and
+  click saving.
