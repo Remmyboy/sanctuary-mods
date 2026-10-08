@@ -59,7 +59,7 @@ Sections = {
         key = "economy",
         changes = {
             {
-                why = "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. At 2 and 30 (0.1.0) the commander couldn't pay for much of its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. Now they don't, and the T1 army at 5:00 is as big as before (in a build-order simulation).",
+                why = "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. Lower (2 and 30 was tried) and the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 3 and 40, with the cheaper extractors and stronger generators, no opening stalls and the T1 army at 5:00 is a little bigger than the game's (in a build-order simulation).",
                 tags = { "COMMAND" },
                 expect = { ["economy.production"] = { alloys = 5, energy = 50 } },
                 set = { ["economy.production"] = { alloys = 3, energy = 40 } },
