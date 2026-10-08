@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
+  "id": "sanctuarymods.balancepatch",
+  "name": "Balance Patch",
+  "version": "0.1.0",
+  "author": "Sanctuary Mods",
+  "description": "A community balance pass: tiered economy that rewards teching up, less commander income, alloy-heavy land and energy-heavy air, raidable engineers, commanders that waste less damage, artillery that leads its target, and fixes such as the EDA T3 fighter shooting the ground. Each section can be turned off in the lobby.",
+  "kind": "gameplay",
+  "luaRoot": "lua",
+  "gameVersion": "0.0.1.20",
+  "apiVersion": 1,
+  "options": [
+    { "key": "fixes", "label": "Fixes", "type": "toggle", "default": true,
+      "description": "Clear mistakes in the game's data: the EDA T3 anti-air fighter shooting land, the Guardian TALEN gunship labelled tier 1." },
+    { "key": "economy", "label": "Economy", "type": "toggle", "default": true,
+      "description": "Commanders make 2 alloys and 20 energy a second (were 5 and 50), T1 extractors 2 alloys (were 1), and T2/T3 extractors and generators give more per cost than T1." },
+    { "key": "costs", "label": "Unit costs", "type": "toggle", "default": true,
+      "description": "Land and naval units cost more alloys and less energy; Chosen aircraft cost as much energy as the other factions'." },
+    { "key": "engineers", "label": "Engineers", "type": "toggle", "default": true,
+      "description": "Engineers have less than half their health, so raids on them work." },
+    { "key": "commanders", "label": "Commanders", "type": "toggle", "default": true,
+      "description": "EDA and Guardian commanders fire smaller missiles more often: the same damage, less of it wasted." },
+    { "key": "artillery", "label": "Artillery", "type": "toggle", "default": true,
+      "description": "Artillery leads moving targets." },
+    { "key": "air", "label": "Air", "type": "toggle", "default": true,
+      "description": "Bomber accuracy and splash." },
+    { "key": "defences", "label": "Defences", "type": "toggle", "default": true,
+      "description": "Point defences." },
+    { "key": "units", "label": "Unit tuning", "type": "toggle", "default": true,
+      "description": "Single units that were out of line, such as the Chosen Jager." }
+  ]
+}

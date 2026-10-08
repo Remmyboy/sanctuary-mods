@@ -53,6 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
+| [BalancePatch](BalancePatch/) | — | Gameplay mod: a community balance pass. Teching up pays, commanders earn less, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, point defences see their range, and fixes such as the EDA T3 fighter shooting the ground |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -1658,6 +1659,43 @@ needs a Mod Manager with Mod API 1.7.0 or later, for every player.
   open the grid to see the pick.
 - Restricted units leave every build menu, and the host refuses them if
   anything queues or places one anyway, AI armies included.
+
+## BalancePatch
+
+A **gameplay mod**: the lobby host picks it, and every player needs the same
+copy. It is Lua only. It changes unit and projectile numbers as the game loads
+them, so the build menus, the unit card and the AI all see the new values, and
+it doesn't replace any of the game's files.
+
+Each section is a lobby option, all on by default:
+
+- **Fixes:** the EDA T3 anti-air fighter no longer shoots the ground; the
+  Guardian TALEN gunship is labelled tier 3.
+- **Economy:** commanders make 2 alloys and 20 energy a second (were 5 and 50)
+  and T1 extractors 2 alloys (were 1), so expanding matters and going straight
+  to T2 off the commander takes longer. T2 and T3 extractors and generators
+  give more per cost than T1, so teching your economy pays; T1 generators have
+  less health.
+- **Unit costs:** land and naval units cost more alloys and less energy for
+  the same total. Chosen aircraft cost as much energy as everyone else's.
+- **Engineers:** less than half their health, so raids on them work.
+- **Commanders:** the EDA and Guardian commanders' missiles fly at once and
+  steer at where the target is going, in smaller, faster volleys.
+- **Artillery:** leads moving targets; the T1 artillery of the three factions
+  are brought closer together.
+- **Air:** bombers lead their targets and their bombs splash.
+- **Defences:** point defences see as far as they shoot, and T1 point defences
+  are tougher.
+- **Unit tuning:** the Chosen Jager, the T1 tanks and the other T2 raiders
+  brought closer together.
+
+Every change, with the reason, is in
+[`lua/balancepatch/changes.lua`](BalancePatch/lua/balancepatch/changes.lua);
+`node BalancePatch/tools/preview.mjs` prints each one as before and after
+against the installed game. A change made against a number the game has since
+changed is skipped, so a game update can't stack with it.
+[`FINDINGS.md`](BalancePatch/FINDINGS.md) lists what the tests found that only
+the game can fix.
 
 ## PhantomX
 
