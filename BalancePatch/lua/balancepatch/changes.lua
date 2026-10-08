@@ -59,10 +59,16 @@ Sections = {
         key = "economy",
         changes = {
             {
-                why = "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more.",
+                why = "A little less commander income, so expanding matters more. At 2 alloys and 30 energy (0.1.0) the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 4 and 45 they don't, and with 1.5-alloy extractors the T1 army at 5:00 is as big as before (in a build-order simulation).",
                 tags = { "COMMAND" },
                 expect = { ["economy.production"] = { alloys = 5, energy = 50 } },
-                set = { ["economy.production"] = { alloys = 2, energy = 30 } },
+                set = { ["economy.production"] = { alloys = 4, energy = 45 } },
+            },
+            {
+                why = "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening.",
+                idPattern = "^u.s251[123]$",
+                expect = { ["economy.buildTime"] = 800 },
+                set = { ["economy.buildTime"] = 1100 },
             },
             {
                 why = "T1 extractors make up the commander's lost alloy income, but only where you have taken the map.",

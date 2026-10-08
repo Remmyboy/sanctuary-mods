@@ -1676,9 +1676,10 @@ Each section is a lobby option, all on by default:
   the Chosen T2 point defence and the EDA T3 anti-air fighter no longer shoot
   the ground; bombs live long enough to land (the EDA T3 bomber fired all game
   and never hit); the Guardian TALEN gunship is labelled tier 3.
-- **Economy:** commanders make 2 alloys and 30 energy a second (were 5 and 50)
-  and T1 extractors 1.5 alloys (were 1), so expanding matters and going
-  straight to T2 off the commander takes longer. T2 and T3 extractors and
+- **Economy:** commanders make 4 alloys and 45 energy a second (were 5 and 50)
+  and T1 extractors 1.5 alloys (were 1), so expanding matters; upgrading a
+  factory to T2 takes longer (same cost), so going straight to T2 at the start
+  does too, without slowing the T1 opening. T2 and T3 extractors and
   generators give more per cost than T1, so teching your economy pays; T1
   generators have less health.
 - **Unit costs:** land and naval units cost more alloys and less energy for
