@@ -10,7 +10,7 @@
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-08T17:46:39.935Z",
+ "generated": "2026-10-08T20:25:46.338Z",
  "sections": [
   {
    "key": "fixes",
@@ -20,7 +20,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 2 alloys and 30 energy a second (were 5 and 50) and T1 extractors 1.5 alloys (were 1), so expanding matters and T2 off the commander alone takes longer. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health."
+   "description": "Commanders make 3 alloys and 40 energy a second (were 5 and 50), T1 extractors make 2 alloys (were 1) and cost 400 energy (were 500), and T1 generators make 15 energy (were 10), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health."
   },
   {
    "key": "costs",
@@ -283,14 +283,14 @@
     "energy": 50
    },
    "after": {
-    "alloys": 2,
-    "energy": 30
+    "alloys": 3,
+    "energy": 40
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+    "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. Lower (2 and 30 was tried) and the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 3 and 40, with the cheaper extractors and stronger generators, no opening stalls and the T1 army at 5:00 is a little bigger than the game's (in a build-order simulation)."
    ]
   },
   {
@@ -306,14 +306,14 @@
     "energy": 50
    },
    "after": {
-    "alloys": 2,
-    "energy": 30
+    "alloys": 3,
+    "energy": 40
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+    "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. Lower (2 and 30 was tried) and the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 3 and 40, with the cheaper extractors and stronger generators, no opening stalls and the T1 army at 5:00 is a little bigger than the game's (in a build-order simulation)."
    ]
   },
   {
@@ -329,14 +329,167 @@
     "energy": 50
    },
    "after": {
-    "alloys": 2,
-    "energy": 30
+    "alloys": 3,
+    "energy": 40
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Less commander income, so going straight to T2 off the commander alone takes longer and expanding matters more."
+    "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. Lower (2 and 30 was tried) and the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 3 and 40, with the cheaper extractors and stronger generators, no opening stalls and the T1 army at 5:00 is a little bigger than the game's (in a build-order simulation)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2511",
+   "name": null,
+   "displayName": "Tier 2: Land Factory",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2512",
+   "name": null,
+   "displayName": "Tier 2: Air Factory",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2513",
+   "name": null,
+   "displayName": "Tier 2: Naval Factory",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2511",
+   "name": null,
+   "displayName": "Tier 2: Land Factory",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2512",
+   "name": null,
+   "displayName": "Tier 2: Air Factory",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2513",
+   "name": null,
+   "displayName": "Tier 2: Naval Factory",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2511",
+   "name": null,
+   "displayName": "Tier 2: Land Factory",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2512",
+   "name": null,
+   "displayName": "Tier 2: Air Factory",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2513",
+   "name": null,
+   "displayName": "Tier 2: Naval Factory",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 1100,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening."
    ]
   },
   {
@@ -348,12 +501,29 @@
    "field": "economy.production.alloys",
    "label": "alloys/s",
    "before": 1,
-   "after": 1.5,
+   "after": 2,
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs1601",
+   "name": null,
+   "displayName": "Tier 1: Alloy Extractor",
+   "faction": "Chosen",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 500,
+   "after": 400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
    ]
   },
   {
@@ -365,12 +535,29 @@
    "field": "economy.production.alloys",
    "label": "alloys/s",
    "before": 1,
-   "after": 1.5,
+   "after": 2,
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues1601",
+   "name": null,
+   "displayName": "Tier 1: Alloy Extractor",
+   "faction": "EDA",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 500,
+   "after": 400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
    ]
   },
   {
@@ -382,12 +569,29 @@
    "field": "economy.production.alloys",
    "label": "alloys/s",
    "before": 1,
-   "after": 1.5,
+   "after": 2,
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs1601",
+   "name": null,
+   "displayName": "Tier 1: Alloy Extractor",
+   "faction": "Guardian",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 500,
+   "after": 400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
    ]
   },
   {
@@ -404,7 +608,7 @@
     "economy"
    ],
    "why": [
-    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+    "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal."
    ]
   },
   {
@@ -421,7 +625,7 @@
     "economy"
    ],
    "why": [
-    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+    "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal."
    ]
   },
   {
@@ -438,7 +642,7 @@
     "economy"
    ],
    "why": [
-    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+    "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal."
    ]
   },
   {
@@ -494,6 +698,57 @@
   },
   {
    "kind": "unit",
+   "id": "ucs1611",
+   "name": null,
+   "displayName": "Tier 1: Energy Generator",
+   "faction": "Chosen",
+   "field": "economy.production.energy",
+   "label": "energy/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators give 15 energy a second (were 10), so early power comes quicker."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues1611",
+   "name": null,
+   "displayName": "Tier 1: Energy Generator",
+   "faction": "EDA",
+   "field": "economy.production.energy",
+   "label": "energy/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators give 15 energy a second (were 10), so early power comes quicker."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs1611",
+   "name": null,
+   "displayName": "Tier 1: Energy Generator",
+   "faction": "Guardian",
+   "field": "economy.production.energy",
+   "label": "energy/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators give 15 energy a second (were 10), so early power comes quicker."
+   ]
+  },
+  {
+   "kind": "unit",
    "id": "ucs2611",
    "name": null,
    "displayName": "Tier 2: Energy Generator",
@@ -501,12 +756,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 200,
-   "after": 300,
+   "after": 400,
    "sections": [
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+    "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second."
    ]
   },
   {
@@ -518,12 +773,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 200,
-   "after": 300,
+   "after": 400,
    "sections": [
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+    "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second."
    ]
   },
   {
@@ -535,12 +790,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 200,
-   "after": 300,
+   "after": 400,
    "sections": [
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+    "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second."
    ]
   },
   {
@@ -552,12 +807,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 2000,
+   "after": 2700,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+    "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second."
    ]
   },
   {
@@ -569,12 +824,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 2000,
+   "after": 2700,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+    "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second."
    ]
   },
   {
@@ -586,12 +841,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 2000,
+   "after": 2700,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+    "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second."
    ]
   },
   {
@@ -7464,8 +7719,8 @@
      "energy": 2500
     },
     "production": {
-     "alloys": 2,
-     "energy": 30
+     "alloys": 3,
+     "energy": 40
     },
     "storage": {
      "alloys": 500,
@@ -13429,10 +13684,10 @@
     "buildTime": 50,
     "cost": {
      "alloys": 50,
-     "energy": 500
+     "energy": 400
     },
     "production": {
-     "alloys": 1.5
+     "alloys": 2
     }
    },
    "footprint": {
@@ -13524,7 +13779,7 @@
      "energy": 500
     },
     "production": {
-     "energy": 10
+     "energy": 15
     }
    },
    "footprint": {
@@ -13841,6 +14096,369 @@
     }
    ]
   },
+  "ucs2511": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Build_ring_spinner",
+      "speed": {
+       "x": 0,
+       "y": 30,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 2,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 4,
+     "z": 5
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.CHOSEN * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.LAND * Tags.MOBILE) + Tags.LAND_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": -3.5,
+       "y": -0.85,
+       "z": 2
+      },
+      "platformOffset": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "rollOffTime": 2,
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 3.5,
+       "y": -0.85,
+       "z": -2
+      },
+      "platformOffset": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "rollOffTime": 2,
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ucs3511"
+   },
+   "defence": {
+    "health": {
+     "max": 10000,
+     "value": 10000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 5
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenLandFactory"
+    ],
+    "displayName": "Tier 2: Land Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "land",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_land.png",
+    "iconUIBuildSortPriority": 400,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ucs2511",
+    "unitTypeName": "ChosenT2LandFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 8
+   },
+   "tags": [
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "CONSTRUCTION",
+    "FACTORY",
+    "LAND",
+    "LAND_FACTORY",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
+  "ucs2512": {
+   "additions": {
+    "buildBeamBones": [
+     "Build_emitter01",
+     "Build_emitter02",
+     "Build_emitter03"
+    ],
+    "buildBeamEffectName": "beam1",
+    "rotators": [
+     {
+      "boneName": "Build_ring_spinner",
+      "speed": {
+       "x": 0,
+       "y": 320,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 2,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 4,
+     "z": 5
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.CHOSEN * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.AIR * Tags.MOBILE) + (Tags.LAND * Tags.MOBILE * Tags.ENGINEER) + Tags.AIR_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "rollOffTime": 2,
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "rollOffTime": 2,
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ucs3512"
+   },
+   "defence": {
+    "health": {
+     "max": 8000,
+     "value": 8000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenAirFactory"
+    ],
+    "displayName": "Tier 2: Air Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "air",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_air.png",
+    "iconUIBuildSortPriority": 390,
+    "iconUIType": "air",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ucs2512",
+    "unitTypeName": "ChosenT2LandFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 8
+   },
+   "tags": [
+    "AIR_FACTORY",
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "CONSTRUCTION",
+    "FACTORY",
+    "LAND",
+    "STRUCTURE",
+    "TECH2"
+   ],
+   "transport": {
+    "storage": 25
+   }
+  },
+  "ucs2513": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": -0.5,
+     "y": 1.5,
+     "z": -0.5
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 3,
+     "z": 5
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.CHOSEN * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.NAVAL * Tags.MOBILE) + (Tags.LAND * Tags.MOBILE * Tags.ENGINEER) + Tags.NAVAL_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": 10
+      },
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": -10
+      },
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ucs3513"
+   },
+   "defence": {
+    "health": {
+     "max": 12000,
+     "value": 12000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenNavalFactory"
+    ],
+    "displayName": "Tier 2: Naval Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "naval",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_naval.png",
+    "iconUIBuildSortPriority": 390,
+    "iconUIType": "water",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ucs2513",
+    "unitTypeName": "ChosenT2NavalFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "CONSTRUCTION",
+    "DEMO_UI_ONLY",
+    "FACTORY",
+    "NAVAL",
+    "NAVAL_FACTORY",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
   "ucs2601": {
    "additions": {
     "rotators": [
@@ -13979,7 +14597,7 @@
      "energy": 10000
     },
     "production": {
-     "energy": 300
+     "energy": 400
     }
    },
    "footprint": {
@@ -14555,7 +15173,7 @@
      "energy": 50000
     },
     "production": {
-     "energy": 2000
+     "energy": 2700
     }
    },
    "footprint": {
@@ -16613,8 +17231,8 @@
      "energy": 2500
     },
     "production": {
-     "alloys": 2,
-     "energy": 30
+     "alloys": 3,
+     "energy": 40
     },
     "storage": {
      "alloys": 500,
@@ -21603,10 +22221,10 @@
     "buildTime": 50,
     "cost": {
      "alloys": 50,
-     "energy": 500
+     "energy": 400
     },
     "production": {
-     "alloys": 1.5
+     "alloys": 2
     }
    },
    "footprint": {
@@ -21710,7 +22328,7 @@
      "energy": 500
     },
     "production": {
-     "energy": 10
+     "energy": 15
     }
    },
    "footprint": {
@@ -22155,6 +22773,371 @@
     }
    ]
   },
+  "ues2511": {
+   "additions": {
+    "buildBeamBones": [
+     "BuildArm01",
+     "BuildArm02"
+    ],
+    "buildBeamEffectName": "beam1"
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 1.5,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 3,
+     "z": 6
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.EDA * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.LAND * Tags.MOBILE) + Tags.LAND_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": 4
+      },
+      "platformOffset": {
+       "x": 0,
+       "y": 0,
+       "z": 2
+      },
+      "rollOffTime": 2,
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": -5
+      },
+      "platformOffset": {
+       "x": 0,
+       "y": 0,
+       "z": -2
+      },
+      "rollOffTime": 2,
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ues3511"
+   },
+   "defence": {
+    "health": {
+     "max": 10000,
+     "value": 10000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    },
+    "storage": {
+     "energy": 2000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDALandFactory"
+    ],
+    "displayName": "Tier 2: Land Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "land",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_land.png",
+    "iconUIBuildSortPriority": 400,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ues2511",
+    "unitTypeName": "EDAT2LandFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "EDA",
+    "ENERGY_STORAGE",
+    "FACTORY",
+    "LAND",
+    "LAND_FACTORY",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
+  "ues2512": {
+   "additions": {
+    "buildBeamBones": [
+     "BuildArm01",
+     "BuildArm02"
+    ],
+    "buildBeamEffectName": "beam1"
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": -0.5,
+     "y": 1.5,
+     "z": -0.5
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 3,
+     "z": 5
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.EDA * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.AIR * Tags.MOBILE) + (Tags.LAND * Tags.MOBILE * Tags.ENGINEER) + Tags.AIR_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": -5,
+       "y": 5,
+       "z": 0
+      },
+      "platformOffset": {
+       "x": -2,
+       "y": 0,
+       "z": 0
+      },
+      "rollOffTime": 2,
+      "unitSpin": -90
+     },
+     {
+      "offset": {
+       "x": 5,
+       "y": 5,
+       "z": 0
+      },
+      "platformOffset": {
+       "x": 2,
+       "y": 0,
+       "z": 0
+      },
+      "rollOffTime": 2,
+      "unitSpin": 90
+     }
+    ],
+    "upgradesTo": "ues3512"
+   },
+   "defence": {
+    "health": {
+     "max": 8000,
+     "value": 8000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    },
+    "storage": {
+     "energy": 2000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAAirFactory"
+    ],
+    "displayName": "Tier 2: Air Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "air",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_air.png",
+    "iconUIBuildSortPriority": 390,
+    "iconUIType": "air",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ues2512",
+    "unitTypeName": "EDAT2LandFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "AIR_FACTORY",
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "EDA",
+    "ENERGY_STORAGE",
+    "FACTORY",
+    "LAND",
+    "STRUCTURE",
+    "TECH2"
+   ],
+   "transport": {
+    "storage": 25
+   }
+  },
+  "ues2513": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": -0.5,
+     "y": 1.5,
+     "z": -0.5
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 3,
+     "z": 5
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.EDA * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.NAVAL * Tags.MOBILE) + (Tags.LAND * Tags.MOBILE * Tags.ENGINEER) + Tags.NAVAL_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": 10
+      },
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": -10
+      },
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ues3513"
+   },
+   "defence": {
+    "health": {
+     "max": 12000,
+     "value": 12000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDANavalFactory"
+    ],
+    "displayName": "Tier 2: Naval Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "naval",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_naval.png",
+    "iconUIBuildSortPriority": 390,
+    "iconUIType": "water",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ues2513",
+    "unitTypeName": "EDAT2NavalFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "DEMO_UI_ONLY",
+    "EDA",
+    "FACTORY",
+    "NAVAL",
+    "NAVAL_FACTORY",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
   "ues2601": {
    "adjacency": "AlloyExtractorAdjacencyBuff",
    "collisionInfo": {
@@ -22293,7 +23276,7 @@
      "energy": 10000
     },
     "production": {
-     "energy": 300
+     "energy": 400
     }
    },
    "footprint": {
@@ -22671,7 +23654,7 @@
      "energy": 50000
     },
     "production": {
-     "energy": 2000
+     "energy": 2700
     }
    },
    "footprint": {
@@ -23613,8 +24596,8 @@
      "energy": 2500
     },
     "production": {
-     "alloys": 2,
-     "energy": 30
+     "alloys": 3,
+     "energy": 40
     },
     "storage": {
      "alloys": 500,
@@ -27870,10 +28853,10 @@
     "buildTime": 50,
     "cost": {
      "alloys": 50,
-     "energy": 500
+     "energy": 400
     },
     "production": {
-     "alloys": 1.5
+     "alloys": 2
     }
    },
    "footprint": {
@@ -27986,7 +28969,7 @@
      "energy": 500
     },
     "production": {
-     "energy": 10
+     "energy": 15
     }
    },
    "footprint": {
@@ -28306,6 +29289,398 @@
     }
    ]
   },
+  "ugs2511": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Rotate Ring 1",
+      "speed": {
+       "x": 0,
+       "y": 220,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Rotate Ring 2",
+      "speed": {
+       "x": 0,
+       "y": 220,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 1.5,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 3,
+     "z": 6
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.GUARD * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.LAND * Tags.MOBILE) + Tags.LAND_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": -0.29,
+       "z": 5.5
+      },
+      "platformOffset": {
+       "x": 0,
+       "y": 0,
+       "z": 3.3
+      },
+      "rollOffTime": 2,
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": -0.29,
+       "z": -5.5
+      },
+      "platformOffset": {
+       "x": 0,
+       "y": 0,
+       "z": -3.3
+      },
+      "rollOffTime": 2,
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ugs3511"
+   },
+   "defence": {
+    "health": {
+     "max": 10000,
+     "regen": 2,
+     "value": 10000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardLandFactory"
+    ],
+    "displayName": "Tier 2: Land Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "land",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_land.png",
+    "iconUIBuildSortPriority": 400,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ugs2511",
+    "unitTypeName": "GuardT2LandFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "FACTORY",
+    "GUARD",
+    "LAND",
+    "LAND_FACTORY",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
+  "ugs2512": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Ring_T2_Rotator",
+      "speed": {
+       "x": 0,
+       "y": 0,
+       "z": -100
+      }
+     },
+     {
+      "boneName": "Ring_T2_Spin",
+      "speed": {
+       "x": 0,
+       "y": 300,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Ring_T1_Rotator",
+      "speed": {
+       "x": 0,
+       "y": 150,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Ring_T1_Spin",
+      "speed": {
+       "x": 0,
+       "y": 300,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 1.3,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 2.6,
+     "z": 6
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.GUARD * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.AIR * Tags.MOBILE) + (Tags.LAND * Tags.MOBILE * Tags.ENGINEER) + Tags.AIR_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": 5,
+       "z": 4
+      },
+      "rollOffTime": 2,
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": 5,
+       "z": -4
+      },
+      "rollOffTime": 2,
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ugs3512"
+   },
+   "defence": {
+    "health": {
+     "max": 8000,
+     "regen": 2,
+     "value": 8000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardAirFactory"
+    ],
+    "displayName": "Tier 2: Air Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "air",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_air.png",
+    "iconUIBuildSortPriority": 390,
+    "iconUIType": "air",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ugs2512",
+    "unitTypeName": "GuardT2LandFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "AIR_FACTORY",
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "FACTORY",
+    "GUARD",
+    "LAND",
+    "STRUCTURE",
+    "TECH2"
+   ],
+   "transport": {
+    "storage": 25
+   }
+  },
+  "ugs2513": {
+   "collisionInfo": {
+    "centerOffset": {
+     "x": -0.5,
+     "y": 1.5,
+     "z": -0.5
+    },
+    "collisionSize": {
+     "x": 5,
+     "y": 3,
+     "z": 5
+    }
+   },
+   "construction": {
+    "buildPower": 20,
+    "canBuild": "Tags.GUARD * Tags.BUILDABLE_BY_T2_FACTORY * ((Tags.NAVAL * Tags.MOBILE) + (Tags.LAND * Tags.MOBILE * Tags.ENGINEER) + Tags.NAVAL_FACTORY)",
+    "rollOffPoints": [
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": 10
+      },
+      "unitSpin": 0
+     },
+     {
+      "offset": {
+       "x": 0,
+       "y": 0,
+       "z": -10
+      },
+      "unitSpin": 180
+     }
+    ],
+    "upgradesTo": "ugs3513"
+   },
+   "defence": {
+    "health": {
+     "max": 12000,
+     "regen": 2,
+     "value": 12000
+    }
+   },
+   "economy": {
+    "buildTime": 1100,
+    "cost": {
+     "alloys": 500,
+     "energy": 5000
+    }
+   },
+   "footprint": {
+    "x": 5,
+    "y": 9
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardNavalFactory"
+    ],
+    "displayName": "Tier 2: Naval Factory",
+    "icon": {
+     "shape": "structure2",
+     "symbol": "naval",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure2_naval.png",
+    "iconUIBuildSortPriority": 390,
+    "iconUIType": "water",
+    "name": "",
+    "orders": {
+     "Assist": true,
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false,
+     "RepeatBuild": true
+    },
+    "tpId": "ugs2513",
+    "unitTypeName": "GuardT2NavalFactory"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 8,
+    "y": 12
+   },
+   "tags": [
+    "BUILDABLE_BY_T1_FACTORY",
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "DEMO_UI_ONLY",
+    "FACTORY",
+    "GUARD",
+    "NAVAL",
+    "NAVAL_FACTORY",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
   "ugs2601": {
    "adjacency": "AlloyExtractorAdjacencyBuff",
    "collisionInfo": {
@@ -28434,7 +29809,7 @@
      "energy": 10000
     },
     "production": {
-     "energy": 300
+     "energy": 400
     }
    },
    "footprint": {
@@ -28908,7 +30283,7 @@
      "energy": 50000
     },
     "production": {
-     "energy": 2000
+     "energy": 2700
     }
    },
    "footprint": {

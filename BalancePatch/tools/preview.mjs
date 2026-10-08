@@ -207,7 +207,7 @@ function role(id, n) {
 }
 const STAGE_FIELDS = { speedMax: 'top speed', acceleration: 'acceleration', rotationSpeed: 'turn rate (deg/s)', delay: 'starts at (s)' };
 const PLAIN = {
-  'economy.cost.alloys': 'alloys', 'economy.cost.energy': 'energy', 'economy.production': 'income',
+  'economy.cost.alloys': 'alloys', 'economy.cost.energy': 'energy', 'economy.buildTime': 'build time', 'economy.production': 'income',
   'economy.production.alloys': 'alloys/s', 'economy.production.energy': 'energy/s', 'defence.health.max': 'health',
   'intel.visionRadius': 'vision', 'movement.speed': 'speed', 'general.displayName': 'name', tags: 'tags',
   'movement.type': 'homing', 'movement.speedMax': 'top speed', 'movement.acceleration': 'acceleration',
