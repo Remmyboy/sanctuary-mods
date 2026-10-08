@@ -10,7 +10,7 @@
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-08T19:36:28.444Z",
+ "generated": "2026-10-08T19:44:15.275Z",
  "sections": [
   {
    "key": "fixes",
@@ -20,7 +20,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 4 alloys and 45 energy a second (were 5 and 50) and T1 extractors 1.5 alloys (were 1), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health."
+   "description": "Commanders make 3 alloys and 40 energy a second (were 5 and 50), T1 extractors make 2 alloys (were 1) and cost 400 energy (were 500), and T1 generators make 15 energy (were 10), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health."
   },
   {
    "key": "costs",
@@ -283,14 +283,14 @@
     "energy": 50
    },
    "after": {
-    "alloys": 4,
-    "energy": 45
+    "alloys": 3,
+    "energy": 40
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "A little less commander income, so expanding matters more. At 2 alloys and 30 energy (0.1.0) the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 4 and 45 they don't, and with 1.5-alloy extractors the T1 army at 5:00 is as big as before (in a build-order simulation)."
+    "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. At 2 and 30 (0.1.0) the commander couldn't pay for much of its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. Now they don't, and the T1 army at 5:00 is as big as before (in a build-order simulation)."
    ]
   },
   {
@@ -306,14 +306,14 @@
     "energy": 50
    },
    "after": {
-    "alloys": 4,
-    "energy": 45
+    "alloys": 3,
+    "energy": 40
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "A little less commander income, so expanding matters more. At 2 alloys and 30 energy (0.1.0) the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 4 and 45 they don't, and with 1.5-alloy extractors the T1 army at 5:00 is as big as before (in a build-order simulation)."
+    "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. At 2 and 30 (0.1.0) the commander couldn't pay for much of its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. Now they don't, and the T1 army at 5:00 is as big as before (in a build-order simulation)."
    ]
   },
   {
@@ -329,14 +329,14 @@
     "energy": 50
    },
    "after": {
-    "alloys": 4,
-    "energy": 45
+    "alloys": 3,
+    "energy": 40
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "A little less commander income, so expanding matters more. At 2 alloys and 30 energy (0.1.0) the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 4 and 45 they don't, and with 1.5-alloy extractors the T1 army at 5:00 is as big as before (in a build-order simulation)."
+    "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. At 2 and 30 (0.1.0) the commander couldn't pay for much of its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. Now they don't, and the T1 army at 5:00 is as big as before (in a build-order simulation)."
    ]
   },
   {
@@ -501,12 +501,29 @@
    "field": "economy.production.alloys",
    "label": "alloys/s",
    "before": 1,
-   "after": 1.5,
+   "after": 2,
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs1601",
+   "name": null,
+   "displayName": "Tier 1: Alloy Extractor",
+   "faction": "Chosen",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 500,
+   "after": 400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
    ]
   },
   {
@@ -518,12 +535,29 @@
    "field": "economy.production.alloys",
    "label": "alloys/s",
    "before": 1,
-   "after": 1.5,
+   "after": 2,
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues1601",
+   "name": null,
+   "displayName": "Tier 1: Alloy Extractor",
+   "faction": "EDA",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 500,
+   "after": 400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
    ]
   },
   {
@@ -535,12 +569,29 @@
    "field": "economy.production.alloys",
    "label": "alloys/s",
    "before": 1,
-   "after": 1.5,
+   "after": 2,
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map."
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs1601",
+   "name": null,
+   "displayName": "Tier 1: Alloy Extractor",
+   "faction": "Guardian",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 500,
+   "after": 400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500."
    ]
   },
   {
@@ -557,7 +608,7 @@
     "economy"
    ],
    "why": [
-    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+    "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal."
    ]
   },
   {
@@ -574,7 +625,7 @@
     "economy"
    ],
    "why": [
-    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+    "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal."
    ]
   },
   {
@@ -591,7 +642,7 @@
     "economy"
    ],
    "why": [
-    "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal."
+    "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal."
    ]
   },
   {
@@ -647,6 +698,57 @@
   },
   {
    "kind": "unit",
+   "id": "ucs1611",
+   "name": null,
+   "displayName": "Tier 1: Energy Generator",
+   "faction": "Chosen",
+   "field": "economy.production.energy",
+   "label": "energy/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators give 15 energy a second (were 10), so early power comes quicker."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues1611",
+   "name": null,
+   "displayName": "Tier 1: Energy Generator",
+   "faction": "EDA",
+   "field": "economy.production.energy",
+   "label": "energy/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators give 15 energy a second (were 10), so early power comes quicker."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs1611",
+   "name": null,
+   "displayName": "Tier 1: Energy Generator",
+   "faction": "Guardian",
+   "field": "economy.production.energy",
+   "label": "energy/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T1 generators give 15 energy a second (were 10), so early power comes quicker."
+   ]
+  },
+  {
+   "kind": "unit",
    "id": "ucs2611",
    "name": null,
    "displayName": "Tier 2: Energy Generator",
@@ -654,12 +756,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 200,
-   "after": 300,
+   "after": 400,
    "sections": [
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+    "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second."
    ]
   },
   {
@@ -671,12 +773,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 200,
-   "after": 300,
+   "after": 400,
    "sections": [
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+    "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second."
    ]
   },
   {
@@ -688,12 +790,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 200,
-   "after": 300,
+   "after": 400,
    "sections": [
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 (were exactly equal)."
+    "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second."
    ]
   },
   {
@@ -705,12 +807,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 2000,
+   "after": 2700,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+    "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second."
    ]
   },
   {
@@ -722,12 +824,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 2000,
+   "after": 2700,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+    "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second."
    ]
   },
   {
@@ -739,12 +841,12 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 2000,
+   "after": 2700,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2x the energy per cost of T1 (were exactly equal)."
+    "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second."
    ]
   },
   {
@@ -7617,8 +7719,8 @@
      "energy": 2500
     },
     "production": {
-     "alloys": 4,
-     "energy": 45
+     "alloys": 3,
+     "energy": 40
     },
     "storage": {
      "alloys": 500,
@@ -13582,10 +13684,10 @@
     "buildTime": 50,
     "cost": {
      "alloys": 50,
-     "energy": 500
+     "energy": 400
     },
     "production": {
-     "alloys": 1.5
+     "alloys": 2
     }
    },
    "footprint": {
@@ -13677,7 +13779,7 @@
      "energy": 500
     },
     "production": {
-     "energy": 10
+     "energy": 15
     }
    },
    "footprint": {
@@ -14495,7 +14597,7 @@
      "energy": 10000
     },
     "production": {
-     "energy": 300
+     "energy": 400
     }
    },
    "footprint": {
@@ -15071,7 +15173,7 @@
      "energy": 50000
     },
     "production": {
-     "energy": 2000
+     "energy": 2700
     }
    },
    "footprint": {
@@ -17129,8 +17231,8 @@
      "energy": 2500
     },
     "production": {
-     "alloys": 4,
-     "energy": 45
+     "alloys": 3,
+     "energy": 40
     },
     "storage": {
      "alloys": 500,
@@ -22119,10 +22221,10 @@
     "buildTime": 50,
     "cost": {
      "alloys": 50,
-     "energy": 500
+     "energy": 400
     },
     "production": {
-     "alloys": 1.5
+     "alloys": 2
     }
    },
    "footprint": {
@@ -22226,7 +22328,7 @@
      "energy": 500
     },
     "production": {
-     "energy": 10
+     "energy": 15
     }
    },
    "footprint": {
@@ -23174,7 +23276,7 @@
      "energy": 10000
     },
     "production": {
-     "energy": 300
+     "energy": 400
     }
    },
    "footprint": {
@@ -23552,7 +23654,7 @@
      "energy": 50000
     },
     "production": {
-     "energy": 2000
+     "energy": 2700
     }
    },
    "footprint": {
@@ -24494,8 +24596,8 @@
      "energy": 2500
     },
     "production": {
-     "alloys": 4,
-     "energy": 45
+     "alloys": 3,
+     "energy": 40
     },
     "storage": {
      "alloys": 500,
@@ -28751,10 +28853,10 @@
     "buildTime": 50,
     "cost": {
      "alloys": 50,
-     "energy": 500
+     "energy": 400
     },
     "production": {
-     "alloys": 1.5
+     "alloys": 2
     }
    },
    "footprint": {
@@ -28867,7 +28969,7 @@
      "energy": 500
     },
     "production": {
-     "energy": 10
+     "energy": 15
     }
    },
    "footprint": {
@@ -29707,7 +29809,7 @@
      "energy": 10000
     },
     "production": {
-     "energy": 300
+     "energy": 400
     }
    },
    "footprint": {
@@ -30181,7 +30283,7 @@
      "energy": 50000
     },
     "production": {
-     "energy": 2000
+     "energy": 2700
     }
    },
    "footprint": {

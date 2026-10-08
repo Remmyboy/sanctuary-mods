@@ -13,7 +13,7 @@
     { "key": "fixes", "label": "Fixes", "type": "toggle", "default": true,
       "description": "Bugs: a bomber with no muzzles stopped other units' targeting; aircraft inside a shield's bubble hit everything under it; the Chosen T2 point defence and the EDA T3 anti-air fighter shot the ground; bombs expired before they could land; the TALEN gunship was labelled tier 1." },
     { "key": "economy", "label": "Economy", "type": "toggle", "default": true,
-      "description": "Commanders make 4 alloys and 45 energy a second (were 5 and 50) and T1 extractors 1.5 alloys (were 1), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health." },
+      "description": "Commanders make 3 alloys and 40 energy a second (were 5 and 50), T1 extractors make 2 alloys (were 1) and cost 400 energy (were 500), and T1 generators make 15 energy (were 10), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health." },
     { "key": "costs", "label": "Unit costs", "type": "toggle", "default": true,
       "description": "Land and naval units cost more alloys and less energy for the same total, and the AI builds less power to match. Chosen aircraft cost as much energy as the other factions'." },
     { "key": "engineers", "label": "Engineers", "type": "toggle", "default": true,

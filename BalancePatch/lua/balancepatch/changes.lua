@@ -59,10 +59,10 @@ Sections = {
         key = "economy",
         changes = {
             {
-                why = "A little less commander income, so expanding matters more. At 2 alloys and 30 energy (0.1.0) the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 4 and 45 they don't, and with 1.5-alloy extractors the T1 army at 5:00 is as big as before (in a build-order simulation).",
+                why = "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. At 2 and 30 (0.1.0) the commander couldn't pay for much of its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. Now they don't, and the T1 army at 5:00 is as big as before (in a build-order simulation).",
                 tags = { "COMMAND" },
                 expect = { ["economy.production"] = { alloys = 5, energy = 50 } },
-                set = { ["economy.production"] = { alloys = 4, energy = 45 } },
+                set = { ["economy.production"] = { alloys = 3, energy = 40 } },
             },
             {
                 why = "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening.",
@@ -71,13 +71,13 @@ Sections = {
                 set = { ["economy.buildTime"] = 1100 },
             },
             {
-                why = "T1 extractors make up the commander's lost alloy income, but only where you have taken the map.",
+                why = "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500.",
                 idPattern = "^u.s1601$",
-                expect = { ["economy.production.alloys"] = 1 },
-                set = { ["economy.production.alloys"] = 1.5 },
+                expect = { ["economy.production.alloys"] = 1, ["economy.cost.energy"] = 500 },
+                set = { ["economy.production.alloys"] = 2, ["economy.cost.energy"] = 400 },
             },
             {
-                why = "T2 extractors pay back their upgrade faster than before (about 270 s against 400 s) instead of being the worse deal.",
+                why = "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal.",
                 idPattern = "^u.s2601$",
                 expect = { ["economy.production.alloys"] = 4 },
                 set = { ["economy.production.alloys"] = 6 },
@@ -89,16 +89,22 @@ Sections = {
                 set = { ["economy.production.alloys"] = 16 },
             },
             {
-                why = "T2 generators give 1.5x the energy per cost of T1 (were exactly equal).",
-                idPattern = "^u.s2611$",
-                expect = { ["economy.production.energy"] = 200 },
-                set = { ["economy.production.energy"] = 300 },
+                why = "T1 generators give 15 energy a second (were 10), so early power comes quicker.",
+                idPattern = "^u.s1611$",
+                expect = { ["economy.production.energy"] = 10 },
+                set = { ["economy.production.energy"] = 15 },
             },
             {
-                why = "T3 generators give 2x the energy per cost of T1 (were exactly equal).",
+                why = "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second.",
+                idPattern = "^u.s2611$",
+                expect = { ["economy.production.energy"] = 200 },
+                set = { ["economy.production.energy"] = 400 },
+            },
+            {
+                why = "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second.",
                 idPattern = "^u.s3611$",
                 expect = { ["economy.production.energy"] = 1000 },
-                set = { ["economy.production.energy"] = 2000 },
+                set = { ["economy.production.energy"] = 2700 },
             },
             {
                 why = "T1 generators had 10x the health per energy of T2 and T3 ones.",
