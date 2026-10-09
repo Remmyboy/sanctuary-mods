@@ -610,6 +610,21 @@ swaps the delete timer HostWreckage:__init starts). T4 walkers sped up by role
 Guardian beam bot); Djinn and Athena 3 (hull 60); Centaur, Quasar, Tripod and
 the Chosen big bot 2.5 (hull 50). Not modelled by the sim; not played.
 
+**0.2.4 (unreleased, 2026-10-09):** T4s as game enders for long 512 games,
+spammable as the game goes on (the user's brief: 10000 alloys minimum, 2-3x
+the old price, slightly more efficient per alloy than T3). Priced 10000-25000
+(energy 6 per alloy); health and damage raised so health and damage per alloy
+are 1.1x the average T3 tank's after the 0.2.2 discount (15.8 HP and 0.49
+DPS per alloy), 1.0x for the 60-100 range Djinn and Chosen big bot; the
+Quasar against T3 artillery, health kept. DPS counts muzzles per group and
+salvos (weaponsBaseClass: each salvo fires every muzzle of the current group),
+beams per tick; my arithmetic, not measured. The Centaur (railgun sniper) gets
+range 80 (was 40) at 0.9x damage per alloy. Athena (mobile shield, 18000 A,
+40k shield) untouched pending a decision. T1 factories 200 A / 2000 E (were 300 in
+0.2.0-0.2.3; the user's call). Simulated against 0.2.3: units built by 10:00
+72 -> 85 (256) and 104 -> 117 (512, now in target), alive 40 -> 47 and 58 ->
+65, factories 5.0 -> 5.6 and 6.8 -> 7.9; fastest T2 4:21 -> 4:04.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.3"
+  "version": "0.2.4"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-09T19:07:57.729Z",
+ "generated": "2026-10-09T19:21:17.059Z",
  "sections": [
   {
    "key": "fixes",
@@ -21,7 +21,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 300 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
+   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
    "default": true
   },
   {
@@ -51,7 +51,7 @@
   {
    "key": "units",
    "label": "Unit tuning",
-   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still but fragile; T4 bots move at 2.5-3.5 (were 2), brawlers fastest.",
+   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still but fragile; T4 bots move at 2.5-3.5 (were 2), brawlers fastest, and are game enders: 10000-25000 alloys with health and damage to match, slightly better per alloy than T3 tanks; the EDA railgun sniper reaches 80.",
    "default": true
   }
  ],
@@ -826,14 +826,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -849,14 +849,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -872,14 +872,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -895,14 +895,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -918,14 +918,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -941,14 +941,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -964,14 +964,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -987,14 +987,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -1010,14 +1010,14 @@
     "energy": 1500
    },
    "after": {
-    "alloys": 300,
-    "energy": 3000
+    "alloys": 200,
+    "energy": 2000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20."
+    "T1 factories cost 200 alloys and 2000 energy (were 150 and 1500): a factory is a decision, not something to spam, without making the opening drag."
    ]
   },
   {
@@ -5980,6 +5980,819 @@
    "why": [
     "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 3696,
+    "energy": 22176
+   },
+   "after": {
+    "alloys": 10000,
+    "energy": 60000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 72000,
+   "after": 175000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 72000,
+   "after": 175000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.1.damage",
+   "label": "weapon 1 damage",
+   "before": 480,
+   "after": 1584,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.2.damage",
+   "label": "weapon 2 damage",
+   "before": 345,
+   "after": 1139,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.3.damage",
+   "label": "weapon 3 damage",
+   "before": 345,
+   "after": 1139,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.4.damage",
+   "label": "weapon 4 damage",
+   "before": 100,
+   "after": 330,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot). The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 175000 health (was 72000) and 3.3x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 4295,
+    "energy": 25770
+   },
+   "after": {
+    "alloys": 10000,
+    "energy": 60000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 175000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2.5x weapon damage: about 0.9x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 55000,
+   "after": 175000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 175000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2.5x weapon damage: about 0.9x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 55000,
+   "after": 175000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 175000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2.5x weapon damage: about 0.9x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "weapons.1.rangeMax",
+   "label": "weapon 1 range",
+   "before": 40,
+   "after": 80,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 175000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2.5x weapon damage: about 0.9x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "weapons.1.damage",
+   "label": "weapon 1 damage",
+   "before": 4000,
+   "after": 10000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 175000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2.5x weapon damage: about 0.9x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "weapons.2.damage",
+   "label": "weapon 2 damage",
+   "before": 40,
+   "after": 100,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 175000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2.5x weapon damage: about 0.9x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 3407,
+    "energy": 20442
+   },
+   "after": {
+    "alloys": 10000,
+    "energy": 60000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian Quasar: 10000 alloys (was 3407) and 8.6x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 300,
+   "after": 2580,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian Quasar: 10000 alloys (was 3407) and 8.6x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 5233,
+    "energy": 31398
+   },
+   "after": {
+    "alloys": 12000,
+    "energy": 72000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian beam bot: 12000 alloys (was 5233), 210000 health (was 50000) and 6.5x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 50000,
+   "after": 210000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian beam bot: 12000 alloys (was 5233), 210000 health (was 50000) and 6.5x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 50000,
+   "after": 210000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian beam bot: 12000 alloys (was 5233), 210000 health (was 50000) and 6.5x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 50,
+   "after": 325,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian beam bot: 12000 alloys (was 5233), 210000 health (was 50000) and 6.5x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 5012,
+    "energy": 30072
+   },
+   "after": {
+    "alloys": 12000,
+    "energy": 72000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Tripod: 12000 alloys (was 5012), 210000 health (was 50000) and 3.25x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 50000,
+   "after": 210000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Tripod: 12000 alloys (was 5012), 210000 health (was 50000) and 3.25x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 50000,
+   "after": 210000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Tripod: 12000 alloys (was 5012), 210000 health (was 50000) and 3.25x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "weapons.1.damage",
+   "label": "weapon 1 damage",
+   "before": 1000,
+   "after": 3250,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Tripod: 12000 alloys (was 5012), 210000 health (was 50000) and 3.25x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "weapons.2.damage",
+   "label": "weapon 2 damage",
+   "before": 160,
+   "after": 520,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Tripod: 12000 alloys (was 5012), 210000 health (was 50000) and 3.25x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "weapons.3.damage",
+   "label": "weapon 3 damage",
+   "before": 160,
+   "after": 520,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Tripod: 12000 alloys (was 5012), 210000 health (was 50000) and 3.25x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 6812,
+    "energy": 40872
+   },
+   "after": {
+    "alloys": 15000,
+    "energy": 90000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Ares: 15000 alloys (was 6812), 260000 health (was 75000) and 5.4x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 75000,
+   "after": 260000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Ares: 15000 alloys (was 6812), 260000 health (was 75000) and 5.4x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 75000,
+   "after": 260000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Ares: 15000 alloys (was 6812), 260000 health (was 75000) and 5.4x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "weapons.1.damage",
+   "label": "weapon 1 damage",
+   "before": 4000,
+   "after": 21600,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Ares: 15000 alloys (was 6812), 260000 health (was 75000) and 5.4x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "weapons.2.damage",
+   "label": "weapon 2 damage",
+   "before": 100,
+   "after": 540,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Ares: 15000 alloys (was 6812), 260000 health (was 75000) and 5.4x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "weapons.3.damage",
+   "label": "weapon 3 damage",
+   "before": 100,
+   "after": 540,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Ares: 15000 alloys (was 6812), 260000 health (was 75000) and 5.4x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 10167,
+    "energy": 61002
+   },
+   "after": {
+    "alloys": 20000,
+    "energy": 120000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Djinn: 20000 alloys (was 10167), 320000 health (was 100000) and 7x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 100000,
+   "after": 320000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Djinn: 20000 alloys (was 10167), 320000 health (was 100000) and 7x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 100000,
+   "after": 320000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Djinn: 20000 alloys (was 10167), 320000 health (was 100000) and 7x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "weapons.1.damage",
+   "label": "weapon 1 damage",
+   "before": 1000,
+   "after": 7000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Djinn: 20000 alloys (was 10167), 320000 health (was 100000) and 7x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "weapons.2.damage",
+   "label": "weapon 2 damage",
+   "before": 150,
+   "after": 1050,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Djinn: 20000 alloys (was 10167), 320000 health (was 100000) and 7x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "weapons.3.damage",
+   "label": "weapon 3 damage",
+   "before": 150,
+   "after": 1050,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen Djinn: 20000 alloys (was 10167), 320000 health (was 100000) and 7x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 11136,
+    "energy": 66816
+   },
+   "after": {
+    "alloys": 25000,
+    "energy": 150000
+   },
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 100000,
+   "after": 400000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 100000,
+   "after": 400000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "weapons.1.damage",
+   "label": "weapon 1 damage",
+   "before": 1567.9442508711,
+   "after": 6429,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "weapons.2.damage",
+   "label": "weapon 2 damage",
+   "before": 31.358885017422,
+   "after": 129,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "weapons.3.damage",
+   "label": "weapon 3 damage",
+   "before": 31.358885017422,
+   "after": 129,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "weapons.4.damage",
+   "label": "weapon 4 damage",
+   "before": 836.23693379791,
+   "after": 3429,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "weapons.5.damage",
+   "label": "weapon 5 damage",
+   "before": 836.23693379791,
+   "after": 3429,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Chosen big bot: 25000 alloys (was 11136), 400000 health (was 100000) and 4.1x weapon damage."
+   ]
   }
  ],
  "optional": {},
@@ -10611,15 +11424,15 @@
    },
    "defence": {
     "health": {
-     "max": 75000,
-     "value": 75000
+     "max": 260000,
+     "value": 260000
     }
    },
    "economy": {
     "buildTime": 15000,
     "cost": {
-     "alloys": 6812,
-     "energy": 40872
+     "alloys": 15000,
+     "energy": 90000
     }
    },
    "footprint": {
@@ -10732,7 +11545,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 4000,
+     "damage": 21600,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -10784,7 +11597,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 100,
+     "damage": 540,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -10841,7 +11654,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 100,
+     "damage": 540,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -10905,15 +11718,15 @@
    },
    "defence": {
     "health": {
-     "max": 50000,
-     "value": 50000
+     "max": 210000,
+     "value": 210000
     }
    },
    "economy": {
     "buildTime": 15000,
     "cost": {
-     "alloys": 5012,
-     "energy": 30072
+     "alloys": 12000,
+     "energy": 72000
     }
    },
    "footprint": {
@@ -11049,7 +11862,7 @@
        "solverType": "HighArc"
       }
      ],
-     "damage": 1000,
+     "damage": 3250,
      "damageOverTimePulseCount": 10,
      "damageOverTimePulseDamage": 40,
      "damageRadius": 4,
@@ -11118,7 +11931,7 @@
       }
      ],
      "beamLifetime": 5,
-     "damage": 160,
+     "damage": 520,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -11169,7 +11982,7 @@
       }
      ],
      "beamLifetime": 5,
-     "damage": 160,
+     "damage": 520,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -11226,15 +12039,15 @@
    },
    "defence": {
     "health": {
-     "max": 100000,
-     "value": 100000
+     "max": 320000,
+     "value": 320000
     }
    },
    "economy": {
     "buildTime": 18000,
     "cost": {
-     "alloys": 10167,
-     "energy": 61002
+     "alloys": 20000,
+     "energy": 120000
     }
    },
    "footprint": {
@@ -11367,7 +12180,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 1000,
+     "damage": 7000,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 2,
@@ -11433,7 +12246,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 150,
+     "damage": 1050,
      "damageRadius": 5,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -11495,7 +12308,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 150,
+     "damage": 1050,
      "damageRadius": 5,
      "damageType": "Normal",
      "firingRandomness": 2,
@@ -11570,15 +12383,15 @@
    },
    "defence": {
     "health": {
-     "max": 100000,
-     "value": 100000
+     "max": 400000,
+     "value": 400000
     }
    },
    "economy": {
     "buildTime": 20000,
     "cost": {
-     "alloys": 11136,
-     "energy": 66816
+     "alloys": 25000,
+     "energy": 150000
     }
    },
    "footprint": {
@@ -11725,7 +12538,7 @@
        "yawSpeed": 60
       }
      ],
-     "damage": 1567.9442508711,
+     "damage": 6429,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 3,
@@ -11822,7 +12635,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 31.358885017422,
+     "damage": 129,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -11874,7 +12687,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 31.358885017422,
+     "damage": 129,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -11932,7 +12745,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 836.23693379791,
+     "damage": 3429,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -11990,7 +12803,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 836.23693379791,
+     "damage": 3429,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -14142,8 +14955,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
@@ -14267,8 +15080,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
@@ -14377,8 +15190,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
@@ -21482,15 +22295,15 @@
    },
    "defence": {
     "health": {
-     "max": 55000,
-     "value": 55000
+     "max": 175000,
+     "value": 175000
     }
    },
    "economy": {
     "buildTime": 15000,
     "cost": {
-     "alloys": 4295,
-     "energy": 25770
+     "alloys": 10000,
+     "energy": 60000
     }
    },
    "footprint": {
@@ -21587,7 +22400,7 @@
       }
      ],
      "beamLifetime": 1,
-     "damage": 4000,
+     "damage": 10000,
      "damageRadius": 2,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -21609,7 +22422,7 @@
      ],
      "muzzleSalvoSize": 1,
      "projectileTemplate": "ped471",
-     "rangeMax": 40,
+     "rangeMax": 80,
      "rangeMin": 0,
      "rangeRingType": "DirectFire",
      "rangeTracking": 1.1,
@@ -21638,7 +22451,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 40,
+     "damage": 100,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -21690,15 +22503,15 @@
    },
    "defence": {
     "health": {
-     "max": 72000,
-     "value": 72000
+     "max": 175000,
+     "value": 175000
     }
    },
    "economy": {
     "buildTime": 15000,
     "cost": {
-     "alloys": 3696,
-     "energy": 22176
+     "alloys": 10000,
+     "energy": 60000
     }
    },
    "footprint": {
@@ -21821,7 +22634,7 @@
        "solverType": "LowArc"
       }
      ],
-     "damage": 480,
+     "damage": 1584,
      "damageRadius": 0.5,
      "damageType": "Normal",
      "firingRandomness": 8,
@@ -21908,7 +22721,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 345,
+     "damage": 1139,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -21961,7 +22774,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 345,
+     "damage": 1139,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -22014,7 +22827,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 100,
+     "damage": 330,
      "damageRadius": 2,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -23306,8 +24119,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     },
     "storage": {
      "energy": 1000
@@ -23434,8 +24247,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     },
     "storage": {
      "energy": 1000
@@ -23548,8 +24361,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
@@ -28920,16 +29733,16 @@
    },
    "defence": {
     "health": {
-     "max": 50000,
+     "max": 210000,
      "regen": 10,
-     "value": 50000
+     "value": 210000
     }
    },
    "economy": {
     "buildTime": 16500,
     "cost": {
-     "alloys": 5233,
-     "energy": 31398
+     "alloys": 12000,
+     "energy": 72000
     }
    },
    "footprint": {
@@ -29077,7 +29890,7 @@
       }
      ],
      "beamLifetime": -1,
-     "damage": 50,
+     "damage": 325,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -29148,8 +29961,8 @@
    "economy": {
     "buildTime": 20000,
     "cost": {
-     "alloys": 3407,
-     "energy": 20442
+     "alloys": 10000,
+     "energy": 60000
     }
    },
    "footprint": {
@@ -29266,7 +30079,7 @@
        "yawSpeed": 30
       }
      ],
-     "damage": 300,
+     "damage": 2580,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 10,
@@ -30581,8 +31394,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
@@ -30709,8 +31522,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
@@ -30820,8 +31633,8 @@
    "economy": {
     "buildTime": 150,
     "cost": {
-     "alloys": 300,
-     "energy": 3000
+     "alloys": 200,
+     "energy": 2000
     }
    },
    "footprint": {
