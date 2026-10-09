@@ -191,7 +191,10 @@ thin dividers where pieces meet.
   in a TextMeshPro font, which are cloned; the clock is the HUD's. The time is the template's
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
-  counts. With the replacement off,
+  counts. `UnitCardStats` (off by default) adds a line of speed, damage per
+  second and weapon range, for a unit and for a build option alike, read
+  from the template (so a balance mod's figures show); damage per second is
+  the game's AI's own sum over the weapons. With the replacement off,
   `TidyGameUnitCard` (on by default) still hides the template id on the
   game's own card and rounds its income figures.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,

@@ -240,7 +240,17 @@ namespace SanctuaryHud
             if (Hovered == this) Hovered = null;
             if (_hoverOverlay != null) _hoverOverlay.SetActive(false);
             Forward(eventData, ExecuteEvents.pointerExitHandler);
+            // When a click takes its own option away (a factory's upgrade,
+            // once queued) the game pools that button, events off, before
+            // the leave arrives: Lua never hears it, and the game's card
+            // shows that template until some other build option is hovered.
+            // Its build and queue buttons both write the one field, so the
+            // leave clears it whatever the button did with it.
+            RunLua(ClearHoverChunk);
         }
+
+        private const string ClearHoverChunk =
+            "local p = Import('client/ui/panels.lua').ConstructionPanel if p then p.hoveredTemplate = nil end";
 
         private static bool _createLogged;
         private static bool _forwardLogged;
