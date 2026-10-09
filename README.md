@@ -727,6 +727,33 @@ are in the QoL section of the Mods page, and the first two are off by default:
 turn them on to use them. They work with the overlay hidden too:
 they are controls, not display.
 
+The same re-issuing serves three more, all off by default:
+
+- **Engineer queue** (`BottomPanels · EngineerQueue`, needs the build strip).
+  The game shows a factory's queue but nothing for an engineer, whose
+  buildings are orders. Selected builders that share one queue get its
+  buildings as a row of tiles where a factory's queue goes, runs of one
+  building as one tile with a count; right-click a tile to take one out and
+  keep the rest of the queue, before and after it.
+- **Assisting engineers keep building** (`QoL · AssistKeepsBuilding`). An
+  engineer assisting another builder helps with whatever that one builds,
+  and stops when it dies or moves on (`HostUnit:AssistBehaviorThread`). With
+  this on, a structure it was helping with that is left unfinished goes in
+  front of its own queue, as a repair (which builds an unfinished structure),
+  and it then carries on with the rest: back to helping, if the builder is
+  alive. The host only lets an engineer help build what it could build
+  itself, so a T1 engineer never picks up a T2 structure this way.
+- **Assist an unfinished factory** (`QoL · AssistUnfinishedFactories`). A
+  right-click from engineers on an unfinished building of yours is a repair,
+  which ends once the building is up, so Shift-clicking a factory you have
+  just placed, to assist it once built, left the engineers idle. On an
+  unfinished building that builds, the right-click is an assist instead: the
+  host's assist builds it first, then helps with what it produces.
+
+`QoL · UpgradeBadgeOnlyWhileUpgrading` shows a factory's upgrade badge only
+while the upgrade is under way; the game shows it as soon as an upgrade is
+anywhere in the queue (`IsUpgradeQueued`).
+
 ## IdleEngineers
 
 The idle panel, in the shape of the eco panels: one clickable tile per tech

@@ -187,6 +187,8 @@ namespace SanctuaryHud
             CursorHint.Bind(Config);
             SelectSameType.Bind(Config);
             Waypoints.Bind(Config);
+            OrderFixes.Bind(Config);
+            EngineerQueue.Bind(Config);
             QueueReorder.Bind(Config);
             GameClock.Bind(Config);
 
@@ -305,6 +307,7 @@ namespace SanctuaryHud
                 EcoStrip.Shutdown();
                 WorldOverlays.Shutdown();
                 Waypoints.Shutdown();
+                OrderFixes.Shutdown();
                 CursorHint.Shutdown();
                 SelectSameType.Shutdown();
                 QueueRightClick.Shutdown();
@@ -382,6 +385,7 @@ namespace SanctuaryHud
             Alerts.Tick();
             // Controls, not display: on whether the overlay is showing or not.
             Waypoints.Tick();
+            OrderFixes.Tick();
             GameClock.Tick();
             CursorHint.Tick();
             SelectSameType.Tick();

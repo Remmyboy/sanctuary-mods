@@ -75,6 +75,7 @@ namespace SanctuaryHud
             _optionsRow = null;
             _queueRow = null;
             _tabRow = null;
+            EngineerQueue.Shutdown();
             InfoCard.SetHover(null);
         }
 
@@ -108,6 +109,7 @@ namespace SanctuaryHud
             _optionsRow?.Show(false);
             _queueRow?.Show(false);
             _tabRow?.Show(false);
+            EngineerQueue.Hide();
             InfoCard.SetHover(null);
         }
 
@@ -177,8 +179,18 @@ namespace SanctuaryHud
                 _queueRow.Sync(options, _queue, s, size.x - ax - Margin, 1);
                 _queueRow.Place(new Vector2(ax, above));
                 BottomDock.Add(new Rect(ax, above, _queueRow.Width, _queueRow.Height), _queueRow.Rect);
+                EngineerQueue.Hide();
             }
-            else _queueRow.Show(false);
+            else
+            {
+                _queueRow.Show(false);
+                // Engineers have no queue on the game's panel: their buildings, if wanted.
+                if (EngineerQueue.Sync(root, UnitTile.NativeSize(options), s, size.x - ax - Margin))
+                {
+                    EngineerQueue.Place(new Vector2(ax, above));
+                    BottomDock.Add(new Rect(ax, above, EngineerQueue.Width, EngineerQueue.Height), EngineerQueue.Rect);
+                }
+            }
 
             // A build option under the mouse turns the unit card into a
             // build card: cost and time for that template.

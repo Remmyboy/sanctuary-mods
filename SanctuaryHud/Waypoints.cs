@@ -31,6 +31,7 @@ namespace SanctuaryHud
     internal static class Waypoints
     {
         private static ConfigEntry<bool> _cfgRally;
+        private static ConfigEntry<bool> _cfgKeep;
         private static ConfigEntry<bool> _cfgDrag;
         private static ConfigEntry<float> _cfgGrabPixels;
 
@@ -62,7 +63,13 @@ namespace SanctuaryHud
                 "Draw a line from each factory to the rally point you gave it, the way move orders are drawn: for " +
                 "the selected factories, and for all of your factories while Shift is held. The game keeps rally " +
                 "points on the host only, so this shows the ones set since the match (or the mod) started.");
+            _cfgKeep = config.Bind("QoL", "AssistKeepsBuilding", false,
+                "An engineer assisting another builder carries on with the structure it was helping with when that " +
+                "builder dies or moves on to something else, then goes back to its own queue (or back to helping). " +
+                "Only structures it was already helping to build, which the game only allows if it could build them itself.");
         }
+
+        internal static bool Live => Hook.Live && LuaReady;
 
         internal static void Shutdown() => Hook.Remove();
 
@@ -79,13 +86,14 @@ namespace SanctuaryHud
         private static string Chunk()
         {
             var grab = Mathf.Clamp(_cfgGrabPixels.Value, 4f, 60f).ToString(CultureInfo.InvariantCulture);
-            var signature = (_cfgRally.Value ? "r" : "-") + (_cfgDrag.Value ? "d" : "-") + grab;
+            var signature = (_cfgRally.Value ? "r" : "-") + (_cfgDrag.Value ? "d" : "-") + (_cfgKeep.Value ? "k" : "-") + grab;
             if (_chunk == null || signature != _chunkSignature)
             {
                 _chunkSignature = signature;
                 _chunk = InstallChunk
                     .Replace("__RALLY__", _cfgRally.Value ? "true" : "false")
                     .Replace("__DRAG__", _cfgDrag.Value ? "true" : "false")
+                    .Replace("__KEEP__", _cfgKeep.Value ? "true" : "false")
                     .Replace("__GRAB__", grab);
             }
             return _chunk;
@@ -99,7 +107,21 @@ namespace SanctuaryHud
                           (_cfgDrag.Value ? (_cfgRally.Value ? ", " : ": ") + "waypoints draggable" : "") + ".");
         }
 
-        private static float _accum;
+        private static float _accum, _watch;
+
+        /// The selected builders' shared queue of buildings, as
+        /// 'index:icon:plate' items joined by ';'; empty when there is none.
+        internal static string Queue()
+        {
+            if (!Live || !Hook.Call("__SdbWaypoints.Queue()")) return "";
+            return GetLuaGlobal("__SdbEngQueue") ?? "";
+        }
+
+        /// Takes the building at that place in their queue out of it.
+        internal static void RemoveAt(int index)
+        {
+            if (Live) Hook.Call("__SdbWaypoints.RemoveAt(" + index.ToString(CultureInfo.InvariantCulture) + ")");
+        }
 
         internal static void Tick()
         {
@@ -107,8 +129,18 @@ namespace SanctuaryHud
             // is the whole gate, as in BuildHotkeys. LuaHook checks once a
             // second, puts it back in a new VM, and swaps it for a settings
             // change; a failed install waits before it is tried again.
-            Hook.Tick(_cfgRally.Value || _cfgDrag.Value);
+            Hook.Tick(_cfgRally.Value || _cfgDrag.Value || _cfgKeep.Value || (EngineerQueue.Enabled != null && EngineerQueue.Enabled.Value));
             if (!Hook.Live) return;
+
+            if (_cfgKeep.Value)
+            {
+                _watch += Time.unscaledDeltaTime;
+                if (_watch >= 0.25f)
+                {
+                    _watch = 0f;
+                    Hook.Call("__SdbWaypoints.Watch()");
+                }
+            }
 
             _accum += Time.unscaledDeltaTime;
             if (_accum < 1f) return;
@@ -511,10 +543,11 @@ if not __SdbWaypoints then
   -- just check it can be done). Units with the same queue go as one group,
   -- so a shared order stays one order; a building shared across groups is
   -- placed once and the other groups assist it. nil and a reason if any
-  -- order in the way cannot be reproduced.
-  W.Plan = function(order, newPos, remove)
+  -- order in the way cannot be reproduced. Or, with `units` (order nil),
+  -- those units' queues as they are with `first` (a spec) put in front.
+  W.Plan = function(order, newPos, remove, units, first)
     local focus = GetFocusArmy()
-    local U = unitsOf(order)
+    local U = units or unitsOf(order)
     if #U == 0 then return nil, 'no units' end
     local inU = {}
     for _, u in ipairs(U) do
@@ -579,6 +612,8 @@ if not __SdbWaypoints then
         -- beats the one it was issued at. Reclaim can target a wreck, which
         -- that lookup cannot see.
         local pl
+        -- A target that has died takes its order with it on the host.
+        if task ~= OT.RECLAIM and o.targetUnit and not live(o.targetUnit) then return 'skip' end
         if task ~= OT.RECLAIM and live(o.targetUnit) then pl = { targetGlobalId = o.targetUnit.id } end
         pl = pl or (r and r.payload)
         if not pl then return false end
@@ -598,7 +633,7 @@ if not __SdbWaypoints then
       local key = table.concat(ids, '|')
       local grp = byKey[key]
       if not grp then
-        local list = {}
+        local list = { first }
         for _, o in ipairs(seq) do
           local s = specFor(o)
           if s == false then return nil, 'queue holds an order that cannot be re-issued' end
@@ -1002,6 +1037,132 @@ if not __SdbWaypoints then
     end
     return res
   end end)
+
+  ---------------------------------------------------------- keep building
+  -- An engineer assisting another builder helps with whatever that one is
+  -- building, and stops when it dies or moves on to something else
+  -- (HostUnit:AssistBehaviorThread). With this on, the structure it was
+  -- helping with, if left unfinished, goes in front of its own queue:
+  -- repair builds an unfinished structure, and the host only let it help
+  -- build what it can build itself.
+  W.keepOn = __KEEP__
+  W.keep = {}
+  local function paused(v) return v.GetPause and v:GetPause() end
+
+  local function finishFirst(u, x)
+    local first = { task = OT.REPAIR, pos = copy3(x:GetPosition()), payload = { targetGlobalId = x.id } }
+    local plan, why = W.Plan(nil, nil, false, { u }, first)
+    if plan then
+      W.Start(plan)
+      __SdbWaypointsCount = __SdbWaypointsCount + 1
+    else
+      Warn('Waypoints: an assisting engineer could not keep building (' .. tostring(why) .. ')')
+    end
+  end
+
+  -- A few times a second. One re-issue at a time: the rest wait for the next.
+  W.Watch = function()
+    if not W.keepOn or IsObserver() then
+      W.keep = {}
+      return
+    end
+    if W.job then return end
+    local seen = {}
+    for _, u in pairs(ownUnits()) do
+      local o = live(u) and u.tp.construction and u.tp.movement and u.orderState and u.orderState.activeOrder
+      if o and o.orderTask == OT.ASSISTUNIT then
+        seen[u] = true
+        local a, x, k = o.targetUnit, u.buildTarget, W.keep[u]
+        if live(a) and a.tp.movement then
+          if u.isBuilding and live(x) and not x:IsCompleted() and a.buildTarget == x then
+            W.keep[u] = { x = x, a = a, o = o }
+          elseif k and k.o == o and a.buildTarget ~= k.x and not paused(a) and not paused(u) then
+            -- Moved on: finish this first, then back to helping.
+            W.keep[u] = nil
+            if live(k.x) and not k.x:IsCompleted() then return finishFirst(u, k.x) end
+          end
+        elseif k and k.o == o and not live(a) then
+          W.keep[u] = nil
+          if live(k.x) and not k.x:IsCompleted() then return finishFirst(u, k.x) end
+        end
+      end
+    end
+    -- An assist the host has dropped: its unit died. The drop can arrive a
+    -- little before the death does, so it is kept a couple of seconds to
+    -- see. Any other end (new orders, stop) leaves the engineer to what it
+    -- was told.
+    local now = _G.Tick or 0
+    for u, k in pairs(W.keep) do
+      if not seen[u] then
+        k.lost = k.lost or now
+        if live(u) and not live(k.a) and live(k.x) and not k.x:IsCompleted() then
+          W.keep[u] = nil
+          return finishFirst(u, k.x)
+        end
+        if not live(u) or now - k.lost > 20 then W.keep[u] = nil end
+      end
+    end
+  end
+
+  --------------------------------------------------------- engineer queue
+  -- The selected builders' queue, when they share one: the buildings in
+  -- it, as a factory's queue shows its units, for a row of tiles to show.
+  -- Removing one re-issues the queue without it, as deleting its waypoint
+  -- does.
+  local function art(tpId)
+    local t = __Templates.Units[tpId]
+    local g = t and t.general
+    return (g and g.foregroundIconID and tonumber(g.foregroundIconID.index) or 0) .. ':' ..
+           (g and g.backgroundIconID and tonumber(g.backgroundIconID.index) or 0)
+  end
+
+  local function queueUnits()
+    local sel, key = {}, nil
+    for _, u in pairs(SS.GetSelectedUnits()) do
+      if not (live(u) and u.armyId == GetFocusArmy() and u.tp.construction and u.tp.movement) then return nil end
+      local ids = {}
+      for i, o in ipairs(seqOf(u)) do ids[i] = o.id end
+      local k = table.concat(ids, '|')
+      if key and k ~= key then return nil end
+      key = k
+      table.insert(sel, u)
+    end
+    if #sel > 0 then return sel end
+  end
+
+  -- Into __SdbEngQueue: 'index:icon:plate' per building, ';' between.
+  W.Queue = function()
+    if W.job then return end -- mid re-issue: keep showing what was there
+    local out = {}
+    local sel = not IsObserver() and queueUnits()
+    if sel then
+      for i, o in ipairs(seqOf(sel[1])) do
+        local tpId
+        if o.orderTask == OT.BUILD then
+          local r = W.rec[o.id]
+          tpId = r and r.payload and r.payload.tpId
+        elseif o.orderTask == OT.REPAIR and live(o.targetUnit) and not o.targetUnit:IsCompleted() then
+          tpId = o.targetUnit.tpId
+        end
+        if tpId and not o.isDeletePredicted then out[#out + 1] = i .. ':' .. art(tpId) end
+      end
+    end
+    __SdbEngQueue = table.concat(out, ';')
+  end
+
+  W.RemoveAt = function(i)
+    local sel = not W.job and queueUnits()
+    local o = sel and seqOf(sel[1])[i]
+    if not o then return end
+    local plan, why = W.Plan(o, nil, true)
+    if plan then
+      W.Start(plan)
+      __SdbWaypointsCount = __SdbWaypointsCount + 1
+      W.Queue()
+    else
+      Warn('Waypoints: could not take that building out of the queue (' .. tostring(why) .. ')')
+    end
+  end
 
   W.Remove = function()
     W.drag = nil
