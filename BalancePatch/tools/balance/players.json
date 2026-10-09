@@ -25,18 +25,18 @@
   },
   "expand": {
    "policy": {
-    "react": 5.827,
-    "eMargin": 1.6,
-    "expandFrac0": 0.13,
-    "expandRate": 0.084,
-    "engPerSpot": 0,
+    "react": 5.42,
+    "eMargin": 1.501,
+    "expandFrac0": 0.382,
+    "expandRate": 0.02,
+    "engPerSpot": 0.426,
     "engFirst": 4,
-    "engRate": 1.015,
+    "engRate": 1.483,
     "engMax": 4,
-    "facBank": 108.866,
-    "facRatio": 1.227,
-    "adjPgen": 1,
-    "facFirstAt": 361.255
+    "facBank": 110.414,
+    "facRatio": 1.262,
+    "adjPgen": 4,
+    "facFirstAt": 362.899
    },
    "survival10": 0.68,
    "fittedOn": [
@@ -45,7 +45,7 @@
     "2026-10-09_12-09-42 army 1 (Chosen)",
     "2026-10-09_12-09-42 army 2 (EDA)"
    ],
-   "error": 0.941
+   "error": 0.979
   }
  }
 }

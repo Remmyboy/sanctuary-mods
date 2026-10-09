@@ -48,11 +48,12 @@ export const DEFAULT_POLICY = {
   adjFactories: 2,
   adjMexFirst: 2,      // extractors touching the first factory (it goes beside spawn spots)
   assist: true,        // idle builders assist the nearest job
-  // Teching: ASSUMED, not calibrated (the replays it was fitted to had almost no T2).
-  t2MexAt: 480,        // from this time, idle builders upgrade extractors to T2 ...
+  // Teching: fitted to one solo 0.2.0 game on There Is Time (2026-10-09; first T2 extractor ~8:30,
+  // 9 by 17:00, T2 factory 11:27). One game, unopposed: treat as a first estimate.
+  t2MexAt: 420,        // from this time, idle builders upgrade extractors to T2 ...
   t2MexIncome: 0,      // ... once alloy income reaches this
   t3MexAt: 900,        // and T2 extractors to T3
-  upgradesAtOnce: 2,   // extractor upgrades running at the same time
+  upgradesAtOnce: 3,   // extractor upgrades running at the same time
   t2FacAt: 540,        // from this time, upgrade a factory to T2 ...
   t2FacIncome: 25,     // ... once alloy income reaches this
   t2FacMax: 2,         // how many T2 factories to aim for
@@ -101,7 +102,8 @@ export function simulate({ T, adjacency = {}, faction = 'e', map, spawn, enemies
   res.alloys.cur = res.alloys.storage * startShare;
   res.energy.cur = res.energy.storage * startShare;
 
-  const spots = territory(map, spawn, [spawn, ...enemies]).map(s => ({ ...s, taken: false }));
+  // rules.solo: nobody else on the map, so every spot is available (an unopposed test game).
+  const spots = territory(map, spawn, rules.solo ? [spawn] : [spawn, ...enemies]).map(s => ({ ...s, taken: false }));
   const enemyDist = Math.min(...enemies.map(e => Math.hypot(e.x - spawn.x, e.z - spawn.z)));
   const structures = [];      // { tp, x, z, kind, tier, adjPgen, adjMex, job }
   const builders = [];        // { kind, x, z, speed, range, bp, task, wait, structure }
