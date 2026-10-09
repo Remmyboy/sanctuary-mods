@@ -1,61 +1,82 @@
 {
  "format": "sanctuary-balance-patch/1",
- "about": "Every change the Balance Patch makes, with the patched template of every unit and projectile it changes, in the shape of the game's .santp tables minus visuals and sounds. Lua arrays are JSON arrays, but field paths in \"changes\" count array items from 1, as Lua does. Values are as with every section on (the lobby default). Each change is the game's value against this release's final one, with the sections and reasons behind it.",
+ "about": "Every change the Balance Patch makes, with the patched template of every unit and projectile it changes, in the shape of the game's .santp tables minus visuals and sounds. Lua arrays are JSON arrays, but field paths in \"changes\" count array items from 1, as Lua does. Values are as with the default sections on (the lobby default); \"optional\" lists what each off-by-default section changes on top. Each change is the game's value against this release's final one, with the sections and reasons behind it.",
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.1.0"
+  "version": "0.1.1"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-08T20:25:46.338Z",
+ "generated": "2026-10-09T09:55:17.234Z",
  "sections": [
   {
    "key": "fixes",
    "label": "Fixes",
-   "description": "Bugs: a bomber with no muzzles stopped other units' targeting; aircraft inside a shield's bubble hit everything under it; the Chosen T2 point defence and the EDA T3 anti-air fighter shot the ground; bombs expired before they could land; the TALEN gunship was labelled tier 1."
+   "description": "Bugs: a bomber with no muzzles stopped other units' targeting; aircraft inside a shield's bubble hit everything under it; the Chosen T2 point defence and the EDA T3 anti-air fighter shot the ground; bombs expired before they could land; the TALEN gunship was labelled tier 1.",
+   "default": true
   },
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 40 energy a second (were 5 and 50), T1 extractors make 2 alloys (were 1) and cost 400 energy (were 500), and T1 generators make 15 energy (were 10), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health."
+   "description": "Commanders make 3 alloys and 40 energy a second (were 5 and 50), T1 extractors make 2 alloys (were 1) and cost 400 energy (were 500), and T1 generators make 15 energy (were 10), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health.",
+   "default": true
   },
   {
    "key": "costs",
    "label": "Unit costs",
-   "description": "Land and naval units cost more alloys and less energy for the same total, and the AI builds less power to match. Chosen aircraft cost as much energy as the other factions'."
+   "description": "Land and naval units cost more alloys and less energy for the same total, and the AI builds less power to match. Chosen aircraft cost as much energy as the other factions'.",
+   "default": true
   },
   {
    "key": "engineers",
    "label": "Engineers",
-   "description": "Engineers have less than half their health, so raids on them work."
+   "description": "Engineers have less than half their health, so raids on them work.",
+   "default": true
   },
   {
    "key": "commanders",
    "label": "Commanders",
-   "description": "The EDA and Guardian commanders' missiles fly at once and steer at where the target is going, in smaller, faster volleys: they hit moving units as often as the Chosen commander does."
+   "description": "The EDA and Guardian commanders' missiles fly at once and steer at where the target is going, in smaller, faster volleys: they hit moving units as often as the Chosen commander does.",
+   "default": true
   },
   {
    "key": "artillery",
    "label": "Artillery",
-   "description": "Artillery leads moving targets (it couldn't hit anything moving in a straight line); the three factions' T1 artillery are brought level."
+   "description": "Artillery leads moving targets (it couldn't hit anything moving in a straight line); the three factions' T1 artillery are brought level.",
+   "default": true
   },
   {
    "key": "air",
    "label": "Air",
-   "description": "Bombers lead their targets and their bombs splash; anti-air leads its shots and the T3 anti-air towers reach their range; the Guardian fighters catch up with the others."
+   "description": "Bombers lead their targets and their bombs splash; anti-air leads its shots and the T3 anti-air towers reach their range; the Guardian fighters catch up with the others.",
+   "default": true
   },
   {
    "key": "defences",
    "label": "Defences",
-   "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them."
+   "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them.",
+   "default": true
   },
   {
    "key": "units",
    "label": "Unit tuning",
-   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level."
+   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level.",
+   "default": true
+  },
+  {
+   "key": "startbank",
+   "label": "Slower: 1-alloy extractors, bigger start",
+   "description": "Off by default. T1 extractors make 1 alloy a second (2 with Economy on), and you start with 400 alloys and 4000 energy (were 250 and 2500); storage stays 500 and 5000. In a build-order simulation the most tanks by 7:00 fall from about 98 to 55 (the game: 72).",
+   "default": false
+  },
+  {
+   "key": "costs15",
+   "label": "Slower: everything costs 1.5x",
+   "description": "Off by default. Every unit and building costs 1.5 times as much (build times unchanged), so the same income builds two thirds as much. In a build-order simulation the most tanks by 7:00 fall from about 98 to 49 (the game: 72), and the fastest T2 factory comes about 35 s later. With the other Slower option too, they stack.",
+   "default": false
   }
  ],
  "changes": [
@@ -5550,6 +5571,4718 @@
    ]
   }
  ],
+ "optional": {
+  "startbank": {
+   "label": "Slower: 1-alloy extractors, bigger start",
+   "about": "Off by default. before is the value with the default sections on, after is with this one on too.",
+   "rule": "Starting resources: armies start with 80% of their commander's storage, 400 alloys and 4000 energy (were half, 250 and 2500); storage stays 500 and 5000. A one-off gift as the commander spawns (append to host/units/unitsClasses/unitsDefault.lua).",
+   "changes": [
+    {
+     "kind": "unit",
+     "id": "ucs1601",
+     "field": "economy.production.alloys",
+     "label": "alloys/s",
+     "before": 2,
+     "after": 1
+    },
+    {
+     "kind": "unit",
+     "id": "ues1601",
+     "field": "economy.production.alloys",
+     "label": "alloys/s",
+     "before": 2,
+     "after": 1
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1601",
+     "field": "economy.production.alloys",
+     "label": "alloys/s",
+     "before": 2,
+     "after": 1
+    }
+   ]
+  },
+  "costs15": {
+   "label": "Slower: everything costs 1.5x",
+   "about": "Off by default. before is the value with the default sections on, after is with this one on too.",
+   "rule": null,
+   "changes": [
+    {
+     "kind": "unit",
+     "id": "uca1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "uca1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "uca1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "uca1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "uca1502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "uca1502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1600,
+     "after": 2400
+    },
+    {
+     "kind": "unit",
+     "id": "uca1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 20,
+     "after": 30
+    },
+    {
+     "kind": "unit",
+     "id": "uca1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "uca2011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uca2011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uca2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "uca2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "uca2301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uca2301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "uca2502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "uca2502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 8000,
+     "after": 12000
+    },
+    {
+     "kind": "unit",
+     "id": "uca2701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 100,
+     "after": 150
+    },
+    {
+     "kind": "unit",
+     "id": "uca2701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "uca2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uca2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "uca3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uca3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18000,
+     "after": 27000
+    },
+    {
+     "kind": "unit",
+     "id": "uca3011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uca3011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18000,
+     "after": 27000
+    },
+    {
+     "kind": "unit",
+     "id": "uca3201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "uca3201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "uca3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 110,
+     "after": 165
+    },
+    {
+     "kind": "unit",
+     "id": "uca3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2200,
+     "after": 3300
+    },
+    {
+     "kind": "unit",
+     "id": "uca4011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 15000,
+     "after": 22500
+    },
+    {
+     "kind": "unit",
+     "id": "uca4011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 300000,
+     "after": 450000
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 39,
+     "after": 59
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 233,
+     "after": 350
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 24,
+     "after": 36
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 143,
+     "after": 215
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 39,
+     "after": 59
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 233,
+     "after": 350
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 13,
+     "after": 20
+    },
+    {
+     "kind": "unit",
+     "id": "ucl1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 141,
+     "after": 212
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 848,
+     "after": 1272
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 188,
+     "after": 282
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1125,
+     "after": 1688
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 125,
+     "after": 188
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 225,
+     "after": 338
+    },
+    {
+     "kind": "unit",
+     "id": "ucl2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1350,
+     "after": 2025
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 978,
+     "after": 1467
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5865,
+     "after": 8798
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 301,
+     "after": 452
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1808,
+     "after": 2712
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 10,
+     "after": 15
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 573,
+     "after": 860
+    },
+    {
+     "kind": "unit",
+     "id": "ucl3801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3435,
+     "after": 5153
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 8515,
+     "after": 12773
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 51090,
+     "after": 76635
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 6265,
+     "after": 9398
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 37590,
+     "after": 56385
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4003",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 12709,
+     "after": 19064
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4003",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 76253,
+     "after": 114380
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4004",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 13920,
+     "after": 20880
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4004",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 83520,
+     "after": 125280
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4005",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500000,
+     "after": 750000
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4005",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000000,
+     "after": 4500000
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 22500,
+     "after": 33750
+    },
+    {
+     "kind": "unit",
+     "id": "ucl4401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 135000,
+     "after": 202500
+    },
+    {
+     "kind": "unit",
+     "id": "ucn1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 188,
+     "after": 282
+    },
+    {
+     "kind": "unit",
+     "id": "ucn1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1125,
+     "after": 1688
+    },
+    {
+     "kind": "unit",
+     "id": "ucn1304",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 438,
+     "after": 657
+    },
+    {
+     "kind": "unit",
+     "id": "ucn1304",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2625,
+     "after": 3938
+    },
+    {
+     "kind": "unit",
+     "id": "ucn2001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucn2001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 9000,
+     "after": 13500
+    },
+    {
+     "kind": "unit",
+     "id": "ucn3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 6250,
+     "after": 9375
+    },
+    {
+     "kind": "unit",
+     "id": "ucn3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 37500,
+     "after": 56250
+    },
+    {
+     "kind": "unit",
+     "id": "ucn3304",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 3125,
+     "after": 4688
+    },
+    {
+     "kind": "unit",
+     "id": "ucn3304",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18750,
+     "after": 28125
+    },
+    {
+     "kind": "unit",
+     "id": "ucn9001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 375,
+     "after": 563
+    },
+    {
+     "kind": "unit",
+     "id": "ucn9001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2250,
+     "after": 3375
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 200,
+     "after": 300
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 100,
+     "after": 150
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 200,
+     "after": 300
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1602",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1602",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 800,
+     "after": 1200
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1612",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1612",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 800,
+     "after": 1200
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1614",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1614",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1802",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1802",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1803",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1803",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1804",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ucs1804",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 572,
+     "after": 858
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5720,
+     "after": 8580
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 10000,
+     "after": 15000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4000,
+     "after": 6000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2402",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2402",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2510",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2510",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 9000,
+     "after": 13500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 10000,
+     "after": 15000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2711",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2711",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2802",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2802",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2803",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2803",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ucs2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1469,
+     "after": 2204
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 14690,
+     "after": 22035
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 40000,
+     "after": 60000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400000,
+     "after": 600000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 8000,
+     "after": 12000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 80000,
+     "after": 120000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3402",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 3500,
+     "after": 5250
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3402",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 35000,
+     "after": 52500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3603",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3603",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 700,
+     "after": 1050
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 7000,
+     "after": 10500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 700,
+     "after": 1050
+    },
+    {
+     "kind": "unit",
+     "id": "ucs3702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 7000,
+     "after": 10500
+    },
+    {
+     "kind": "unit",
+     "id": "ucs4102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ucs4102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500000,
+     "after": 750000
+    },
+    {
+     "kind": "unit",
+     "id": "uea1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "uea1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "uea1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "uea1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "uea1502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "uea1502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1600,
+     "after": 2400
+    },
+    {
+     "kind": "unit",
+     "id": "uea1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 20,
+     "after": 30
+    },
+    {
+     "kind": "unit",
+     "id": "uea1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "uea2011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uea2011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uea2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "uea2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "uea2301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uea2301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uea2502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "uea2502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 8000,
+     "after": 12000
+    },
+    {
+     "kind": "unit",
+     "id": "uea2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uea2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uea3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uea3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18000,
+     "after": 27000
+    },
+    {
+     "kind": "unit",
+     "id": "uea3011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uea3011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18000,
+     "after": 27000
+    },
+    {
+     "kind": "unit",
+     "id": "uea3201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "uea3201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "uea3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 110,
+     "after": 165
+    },
+    {
+     "kind": "unit",
+     "id": "uea3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2200,
+     "after": 3300
+    },
+    {
+     "kind": "unit",
+     "id": "uea4001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 15000,
+     "after": 22500
+    },
+    {
+     "kind": "unit",
+     "id": "uea4001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150000,
+     "after": 225000
+    },
+    {
+     "kind": "unit",
+     "id": "uel1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 39,
+     "after": 59
+    },
+    {
+     "kind": "unit",
+     "id": "uel1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 233,
+     "after": 350
+    },
+    {
+     "kind": "unit",
+     "id": "uel1002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 26,
+     "after": 39
+    },
+    {
+     "kind": "unit",
+     "id": "uel1002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 158,
+     "after": 237
+    },
+    {
+     "kind": "unit",
+     "id": "uel1101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 39,
+     "after": 59
+    },
+    {
+     "kind": "unit",
+     "id": "uel1101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 233,
+     "after": 350
+    },
+    {
+     "kind": "unit",
+     "id": "uel1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "uel1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uel1501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "uel1501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "uel1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 13,
+     "after": 20
+    },
+    {
+     "kind": "unit",
+     "id": "uel1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "uel1801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 38,
+     "after": 57
+    },
+    {
+     "kind": "unit",
+     "id": "uel1801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 225,
+     "after": 338
+    },
+    {
+     "kind": "unit",
+     "id": "uel2002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uel2002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uel2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 188,
+     "after": 282
+    },
+    {
+     "kind": "unit",
+     "id": "uel2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1125,
+     "after": 1688
+    },
+    {
+     "kind": "unit",
+     "id": "uel2201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 125,
+     "after": 188
+    },
+    {
+     "kind": "unit",
+     "id": "uel2201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "uel2501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uel2501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "uel2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 225,
+     "after": 338
+    },
+    {
+     "kind": "unit",
+     "id": "uel2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1350,
+     "after": 2025
+    },
+    {
+     "kind": "unit",
+     "id": "uel3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1133,
+     "after": 1700
+    },
+    {
+     "kind": "unit",
+     "id": "uel3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6795,
+     "after": 10193
+    },
+    {
+     "kind": "unit",
+     "id": "uel3002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uel3002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uel3101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 295,
+     "after": 443
+    },
+    {
+     "kind": "unit",
+     "id": "uel3101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1770,
+     "after": 2655
+    },
+    {
+     "kind": "unit",
+     "id": "uel3401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "uel3401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uel3501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "uel3501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uel3801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 505,
+     "after": 758
+    },
+    {
+     "kind": "unit",
+     "id": "uel3801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3030,
+     "after": 4545
+    },
+    {
+     "kind": "unit",
+     "id": "uel4001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 5369,
+     "after": 8054
+    },
+    {
+     "kind": "unit",
+     "id": "uel4001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 32213,
+     "after": 48320
+    },
+    {
+     "kind": "unit",
+     "id": "uel4002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 4620,
+     "after": 6930
+    },
+    {
+     "kind": "unit",
+     "id": "uel4002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 27720,
+     "after": 41580
+    },
+    {
+     "kind": "unit",
+     "id": "uel4511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 18750,
+     "after": 28125
+    },
+    {
+     "kind": "unit",
+     "id": "uel4511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 112500,
+     "after": 168750
+    },
+    {
+     "kind": "unit",
+     "id": "uen1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 188,
+     "after": 282
+    },
+    {
+     "kind": "unit",
+     "id": "uen1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1125,
+     "after": 1688
+    },
+    {
+     "kind": "unit",
+     "id": "uen1304",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 438,
+     "after": 657
+    },
+    {
+     "kind": "unit",
+     "id": "uen1304",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2625,
+     "after": 3938
+    },
+    {
+     "kind": "unit",
+     "id": "uen2001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "uen2001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 9000,
+     "after": 13500
+    },
+    {
+     "kind": "unit",
+     "id": "uen3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 7500,
+     "after": 11250
+    },
+    {
+     "kind": "unit",
+     "id": "uen3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 45000,
+     "after": 67500
+    },
+    {
+     "kind": "unit",
+     "id": "uen3304",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 3125,
+     "after": 4688
+    },
+    {
+     "kind": "unit",
+     "id": "uen3304",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18750,
+     "after": 28125
+    },
+    {
+     "kind": "unit",
+     "id": "ues1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 180,
+     "after": 270
+    },
+    {
+     "kind": "unit",
+     "id": "ues1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1800,
+     "after": 2700
+    },
+    {
+     "kind": "unit",
+     "id": "ues1111",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 15000,
+     "after": 22500
+    },
+    {
+     "kind": "unit",
+     "id": "ues1111",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150000,
+     "after": 225000
+    },
+    {
+     "kind": "unit",
+     "id": "ues1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 100,
+     "after": 150
+    },
+    {
+     "kind": "unit",
+     "id": "ues1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ues1301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ues1301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ues1501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 200,
+     "after": 300
+    },
+    {
+     "kind": "unit",
+     "id": "ues1501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ues1511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ues1511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ues1512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ues1512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ues1513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ues1513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ues1601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ues1601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "ues1602",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "ues1602",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 800,
+     "after": 1200
+    },
+    {
+     "kind": "unit",
+     "id": "ues1611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ues1611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ues1612",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "ues1612",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 800,
+     "after": 1200
+    },
+    {
+     "kind": "unit",
+     "id": "ues1614",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ues1614",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ues1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ues1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ues1702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ues1702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ues1801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ues1801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ues1802",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ues1802",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ues1803",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ues1803",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ues1804",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ues1804",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 456,
+     "after": 684
+    },
+    {
+     "kind": "unit",
+     "id": "ues2001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4560,
+     "after": 6840
+    },
+    {
+     "kind": "unit",
+     "id": "ues2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ues2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 10000,
+     "after": 15000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "ues2102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4000,
+     "after": 6000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ues2201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ues2301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ues2401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ues2402",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ues2402",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ues2501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ues2501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2510",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "ues2510",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 9000,
+     "after": 13500
+    },
+    {
+     "kind": "unit",
+     "id": "ues2511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ues2512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ues2513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ues2601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ues2601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ues2611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 10000,
+     "after": 15000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ues2701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ues2702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ues2801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ues2801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2802",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ues2802",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2803",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ues2803",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ues2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ues2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ues3102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 8000,
+     "after": 12000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 80000,
+     "after": 120000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ues3201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ues3401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ues3401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3402",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 3500,
+     "after": 5250
+    },
+    {
+     "kind": "unit",
+     "id": "ues3402",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 35000,
+     "after": 52500
+    },
+    {
+     "kind": "unit",
+     "id": "ues3501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ues3501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3603",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3603",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ues3611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ues3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 700,
+     "after": 1050
+    },
+    {
+     "kind": "unit",
+     "id": "ues3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 7000,
+     "after": 10500
+    },
+    {
+     "kind": "unit",
+     "id": "ues3702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 700,
+     "after": 1050
+    },
+    {
+     "kind": "unit",
+     "id": "ues3702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 7000,
+     "after": 10500
+    },
+    {
+     "kind": "unit",
+     "id": "ues4101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 30000,
+     "after": 45000
+    },
+    {
+     "kind": "unit",
+     "id": "ues4101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 300000,
+     "after": 450000
+    },
+    {
+     "kind": "unit",
+     "id": "uga1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "uga1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "uga1011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 70,
+     "after": 105
+    },
+    {
+     "kind": "unit",
+     "id": "uga1011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1400,
+     "after": 2100
+    },
+    {
+     "kind": "unit",
+     "id": "uga1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "uga1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "uga1502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "uga1502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1600,
+     "after": 2400
+    },
+    {
+     "kind": "unit",
+     "id": "uga1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 20,
+     "after": 30
+    },
+    {
+     "kind": "unit",
+     "id": "uga1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "uga2011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uga2011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uga2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "uga2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "uga2301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uga2301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uga2502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "uga2502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 8000,
+     "after": 12000
+    },
+    {
+     "kind": "unit",
+     "id": "uga2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "uga2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "uga3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uga3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18000,
+     "after": 27000
+    },
+    {
+     "kind": "unit",
+     "id": "uga3011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "uga3011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 18000,
+     "after": 27000
+    },
+    {
+     "kind": "unit",
+     "id": "uga3201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "uga3201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "uga3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 110,
+     "after": 165
+    },
+    {
+     "kind": "unit",
+     "id": "uga3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2200,
+     "after": 3300
+    },
+    {
+     "kind": "unit",
+     "id": "uga4001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 30000,
+     "after": 45000
+    },
+    {
+     "kind": "unit",
+     "id": "uga4001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 300000,
+     "after": 450000
+    },
+    {
+     "kind": "unit",
+     "id": "uga4801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 15000,
+     "after": 22500
+    },
+    {
+     "kind": "unit",
+     "id": "uga4801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150000,
+     "after": 225000
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 38,
+     "after": 57
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 225,
+     "after": 338
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 48,
+     "after": 72
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 285,
+     "after": 428
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 25,
+     "after": 38
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 13,
+     "after": 20
+    },
+    {
+     "kind": "unit",
+     "id": "ugl1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 164,
+     "after": 246
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 983,
+     "after": 1475
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 189,
+     "after": 284
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1133,
+     "after": 1700
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 125,
+     "after": 188
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 225,
+     "after": 338
+    },
+    {
+     "kind": "unit",
+     "id": "ugl2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1350,
+     "after": 2025
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1061,
+     "after": 1592
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6368,
+     "after": 9552
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3002",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 441,
+     "after": 662
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3002",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2648,
+     "after": 3972
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 611,
+     "after": 917
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3668,
+     "after": 5502
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3502",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugl3502",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ugl4001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 6541,
+     "after": 9812
+    },
+    {
+     "kind": "unit",
+     "id": "ugl4001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 39248,
+     "after": 58872
+    },
+    {
+     "kind": "unit",
+     "id": "ugl4011",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 4259,
+     "after": 6389
+    },
+    {
+     "kind": "unit",
+     "id": "ugl4011",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 25553,
+     "after": 38330
+    },
+    {
+     "kind": "unit",
+     "id": "ugn1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 188,
+     "after": 282
+    },
+    {
+     "kind": "unit",
+     "id": "ugn1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1125,
+     "after": 1688
+    },
+    {
+     "kind": "unit",
+     "id": "ugn1304",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 438,
+     "after": 657
+    },
+    {
+     "kind": "unit",
+     "id": "ugn1304",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2625,
+     "after": 3938
+    },
+    {
+     "kind": "unit",
+     "id": "ugn2001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugn2001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 9000,
+     "after": 13500
+    },
+    {
+     "kind": "unit",
+     "id": "ugn2304",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1125,
+     "after": 1688
+    },
+    {
+     "kind": "unit",
+     "id": "ugn2304",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6750,
+     "after": 10125
+    },
+    {
+     "kind": "unit",
+     "id": "ugn3001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 7500,
+     "after": 11250
+    },
+    {
+     "kind": "unit",
+     "id": "ugn3001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 45000,
+     "after": 67500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 180,
+     "after": 270
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1800,
+     "after": 2700
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 100,
+     "after": 150
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 200,
+     "after": 300
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1602",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1602",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 800,
+     "after": 1200
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1612",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 80,
+     "after": 120
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1612",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 800,
+     "after": 1200
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1614",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1614",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 60,
+     "after": 90
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1802",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1802",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1803",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 360,
+     "after": 540
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1803",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3600,
+     "after": 5400
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1804",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50,
+     "after": 75
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1804",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1805",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 75,
+     "after": 113
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1805",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 750,
+     "after": 1125
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs1806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2001",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 488,
+     "after": 732
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2001",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4880,
+     "after": 7320
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 10000,
+     "after": 15000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 400,
+     "after": 600
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4000,
+     "after": 6000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2301",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2301",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2402",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2402",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2510",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 900,
+     "after": 1350
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2510",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 9000,
+     "after": 13500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1000,
+     "after": 1500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 10000,
+     "after": 15000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 250,
+     "after": 375
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 2500,
+     "after": 3750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2711",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 150,
+     "after": 225
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2711",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 1500,
+     "after": 2250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2801",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2801",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2802",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2802",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2803",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2803",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2805",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 300,
+     "after": 450
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2805",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 3000,
+     "after": 4500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2806",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2806",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2807",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ugs2807",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3101",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 40000,
+     "after": 60000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3101",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 400000,
+     "after": 600000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 8000,
+     "after": 12000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 80000,
+     "after": 120000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3201",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 450,
+     "after": 675
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3201",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 4500,
+     "after": 6750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3401",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 600,
+     "after": 900
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3401",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 6000,
+     "after": 9000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3402",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 3500,
+     "after": 5250
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3402",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 35000,
+     "after": 52500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3501",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 1200,
+     "after": 1800
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3501",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 12000,
+     "after": 18000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3511",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3511",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3512",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3512",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3513",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3513",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3601",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3601",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3603",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 2000,
+     "after": 3000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3603",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 20000,
+     "after": 30000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3611",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3611",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3701",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 700,
+     "after": 1050
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3701",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 7000,
+     "after": 10500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3702",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 700,
+     "after": 1050
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3702",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 7000,
+     "after": 10500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3805",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 500,
+     "after": 750
+    },
+    {
+     "kind": "unit",
+     "id": "ugs3805",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 5000,
+     "after": 7500
+    },
+    {
+     "kind": "unit",
+     "id": "ugs4012",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs4012",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500000,
+     "after": 750000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs4102",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs4102",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500000,
+     "after": 750000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs4621",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "ugs4621",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500000,
+     "after": 750000
+    },
+    {
+     "kind": "unit",
+     "id": "uws1000",
+     "field": "economy.cost.alloys",
+     "label": "alloys",
+     "before": 50000,
+     "after": 75000
+    },
+    {
+     "kind": "unit",
+     "id": "uws1000",
+     "field": "economy.cost.energy",
+     "label": "energy",
+     "before": 500000,
+     "after": 750000
+    }
+   ]
+  }
+ },
  "skipped": [],
  "notes": [
   "Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with \"fixes\" on): a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider, the TALEN) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range. Not a template change.",

@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Sanctuary Mods",
   "description": "A community balance pass, measured in game: teching up pays, commanders earn less, land costs alloys and air costs energy, engineers can be raided, commanders' missiles, artillery, bombers and anti-air hit moving targets, point defences see their range, and T2 units beat their cost in T1. Fixes a bug where one broken bomber froze other units' targeting, and aircraft can no longer fire from inside a shield at what it covers. Each section can be turned off in the lobby.",
   "kind": "gameplay",
@@ -27,6 +27,10 @@
     { "key": "defences", "label": "Defences", "type": "toggle", "default": true,
       "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them." },
     { "key": "units", "label": "Unit tuning", "type": "toggle", "default": true,
-      "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level." }
+      "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level." },
+    { "key": "startbank", "label": "Slower: 1-alloy extractors, bigger start", "type": "toggle", "default": false,
+      "description": "Off by default. T1 extractors make 1 alloy a second (2 with Economy on), and you start with 400 alloys and 4000 energy (were 250 and 2500); storage stays 500 and 5000. In a build-order simulation the most tanks by 7:00 fall from about 98 to 55 (the game: 72)." },
+    { "key": "costs15", "label": "Slower: everything costs 1.5x", "type": "toggle", "default": false,
+      "description": "Off by default. Every unit and building costs 1.5 times as much (build times unchanged), so the same income builds two thirds as much. In a build-order simulation the most tanks by 7:00 fall from about 98 to 49 (the game: 72), and the fastest T2 factory comes about 35 s later. With the other Slower option too, they stack." }
   ]
 }
