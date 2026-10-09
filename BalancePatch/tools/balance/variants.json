@@ -1,0 +1,7 @@
+{
+  "about": "Rulesets the balance tool knows. changes: a changes.lua (path relative to this file); options: \"vanilla\", \"defaults\" (mod.json's defaults) or {key: bool} over the defaults; rules: what the dump can't show (startShare: share of commander storage an army starts with; the game gives 0.5).",
+  "vanilla": { "options": "vanilla" },
+  "0.1.1": { "changes": "../../lua/balancepatch/changes.lua", "options": "defaults" },
+  "0.1.1-startbank": { "changes": "../../lua/balancepatch/changes.lua", "options": { "startbank": true }, "rules": { "startShare": 0.8 } },
+  "0.1.1-costs15": { "changes": "../../lua/balancepatch/changes.lua", "options": { "costs15": true } }
+}

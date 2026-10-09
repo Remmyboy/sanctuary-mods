@@ -12,6 +12,10 @@
 //       their members, reflection by string, enum values baked into built
 //       DLLs - and reports the ones the snapshot lacks, marking what the
 //       previous snapshot still had (a rename or removal in the patch).
+//
+//   GameRef lua <lua51.dll> <paths...>      syntax/lint check (tools/lua-check.ps1)
+//   GameRef luarun <lua51.dll> <script.lua> [args...]
+//       runs a script with the game's LuaJIT outside the game (LuaRun.cs)
 using System.Text;
 using System.Text.RegularExpressions;
 using Mono.Cecil;
@@ -30,8 +34,9 @@ static class GameRef
                 case "api": Api(args[1], args[2], args.Length > 3 ? args[3] : null); return 0;
                 case "check": return Check(args[1], args[2], args.Length > 3 ? args[3] : null);
                 case "lua": return LuaCheck.Run(args[1], args.Skip(2));
+                case "luarun": return LuaRun.Run(args[1], args[2], args.Skip(3));
                 default:
-                    Console.Error.WriteLine("usage: GameRef api <ManagedDir> <outDir> | check <repoRoot> <snapshot> [<previous>]");
+                    Console.Error.WriteLine("usage: GameRef api <ManagedDir> <outDir> | check <repoRoot> <snapshot> [<previous>] | lua <lua51.dll> <paths> | luarun <lua51.dll> <script.lua> [args]");
                     return 2;
             }
         }

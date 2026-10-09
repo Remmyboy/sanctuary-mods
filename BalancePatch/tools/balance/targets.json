@@ -1,0 +1,33 @@
+{
+  "about": "Pacing targets agreed 2026-10-09 (REDESIGN-PLAN.md section 3), per player in a 1v1. Ranges are [min, max]; null = no bound. combatAlive is combatBuilt x the player style's measured survival at 10:00.",
+  "classes": {
+    "256": {
+      "length": "5-15 min",
+      "maps": [
+        { "map": "~TEAM-1v1_Tropical_256_92536", "spawns": ["ARMY_1", "ARMY_2"] },
+        { "map": "~TEAM-1v1_Tropical_256_47940", "spawns": ["ARMY_1", "ARMY_2"] },
+        { "map": "~TEAM-2v2_Frozen_256_25896", "spawns": ["ARMY_1", "ARMY_2"] }
+      ],
+      "at": {
+        "5": { "alloyIncome": [12, 16] },
+        "10": { "alloyIncome": [18, 24], "combatAlive": [60, 80], "combatBuilt": [100, 130], "factories": [4, 7] }
+      },
+      "fastestT2Factory": [420, null]
+    },
+    "512": {
+      "length": "20-30 min",
+      "maps": [
+        { "map": "~TEAM-1v1_Desert_512_89065", "spawns": ["ARMY_1", "ARMY_2"] },
+        { "map": "~TEAM-1v1_Forest_512_28589", "spawns": ["ARMY_1", "ARMY_2"] },
+        { "map": "~TEAM-1v1_Tropical_512_11446", "spawns": ["ARMY_1", "ARMY_2"] },
+        { "map": "~TEAM-2v2_Frozen_512_23540", "spawns": ["ARMY_1", "ARMY_2"] }
+      ],
+      "at": {
+        "5": { "alloyIncome": [12, 16] },
+        "10": { "alloyIncome": [25, 30], "combatAlive": [60, 80], "combatBuilt": [110, 140], "factories": [5, 8] },
+        "15": { "alloyIncome": [40, 50] }
+      },
+      "fastestT2Factory": [420, null]
+    }
+  }
+}

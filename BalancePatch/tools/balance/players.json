@@ -1,0 +1,51 @@
+{
+ "about": "Stand-in players fitted by `balance.mjs calibrate` to replays read with the dev-only BalanceCal. survival10: combat units alive / built at 10:00 in those games.",
+ "styles": {
+  "spam": {
+   "policy": {
+    "react": 1.872,
+    "eMargin": 1.572,
+    "expandFrac0": 0.523,
+    "expandRate": 0.095,
+    "engPerSpot": 0.981,
+    "engFirst": 2,
+    "engRate": 0.1,
+    "engMax": 4,
+    "facBank": 371.682,
+    "facRatio": 0.797,
+    "adjPgen": 2,
+    "facFirstAt": 17.057
+   },
+   "survival10": 0.48,
+   "fittedOn": [
+    "2026-10-09_10-29-06 army 1 (EDA)",
+    "2026-10-09_10-29-06 army 2 (Guardians)"
+   ],
+   "error": 0.582
+  },
+  "expand": {
+   "policy": {
+    "react": 5.827,
+    "eMargin": 1.6,
+    "expandFrac0": 0.13,
+    "expandRate": 0.084,
+    "engPerSpot": 0,
+    "engFirst": 4,
+    "engRate": 1.015,
+    "engMax": 4,
+    "facBank": 108.866,
+    "facRatio": 1.227,
+    "adjPgen": 1,
+    "facFirstAt": 361.255
+   },
+   "survival10": 0.68,
+   "fittedOn": [
+    "2026-10-09_11-39-17 army 3 (EDA)",
+    "2026-10-09_11-39-17 army 4 (EDA)",
+    "2026-10-09_12-09-42 army 1 (Chosen)",
+    "2026-10-09_12-09-42 army 2 (EDA)"
+   ],
+   "error": 0.941
+  }
+ }
+}
