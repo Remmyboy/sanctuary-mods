@@ -53,7 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.0) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.1) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -1677,8 +1677,8 @@ Each section is a lobby option, all on by default:
   the ground; bombs live long enough to land (the EDA T3 bomber fired all game
   and never hit); the Guardian TALEN gunship is labelled tier 3.
 - **Economy:** commanders make 3 alloys and 30 energy a second (were 5 and 50)
-  and start you with 750 alloys and 7500 energy (were 250 and 2500), so income
-  comes from taking the map. T2 extractors make 5 alloys (were 4);
+  and you start with full storage, 500 alloys and 5000 energy (was half),
+  so income comes from taking the map. T2 extractors make 5 alloys (were 4);
   generators make 20, 600 and 4500 energy (were 10, 200 and 1000). Factories
   cost 300 alloys (were 150) and upgrading one to T2 costs 2500 (was 500), so
   T2 has to be paid for. Land and naval units cost 6 energy per alloy (were
@@ -1702,7 +1702,7 @@ The 0.2 numbers come from a top-down redesign
 ([`REDESIGN-PLAN.md`](BalancePatch/REDESIGN-PLAN.md)): match-pacing targets
 first, then an economy simulation by the game's rules
 ([`tools/balance`](BalancePatch/tools/balance/)), calibrated on real games,
-to choose numbers that meet them. Those are simulated, not yet played; 0.2.0 is
+to choose numbers that meet them. Those are simulated, not yet played; 0.2.x is
 for playtesting them.
 
 Every change, number by number, is in

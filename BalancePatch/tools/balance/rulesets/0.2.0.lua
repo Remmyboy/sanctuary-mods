@@ -62,10 +62,10 @@ Sections = {
         key = "economy",
         changes = {
             {
-                why = "The commander makes 3 alloys and 30 energy a second (was 5 and 50): about three extractors' worth instead of five, so income comes from taking the map. Its storage stays 500 alloys and 5000 energy, but an army starts with it full (was half, 250 and 2500), so the opening isn't starved.",
+                why = "The commander makes 3 alloys and 30 energy a second (was 5 and 50): about three extractors' worth instead of five, so income comes from taking the map. It stores 1500 alloys and 15000 energy (was 500 and 5000), and an army starts with half of that, 750 and 7500 (was 250 and 2500), so the opening isn't starved.",
                 tags = { "COMMAND" },
                 expect = { ["economy.production"] = { alloys = 5, energy = 50 }, ["economy.storage"] = { alloys = 500, energy = 5000 } },
-                set = { ["economy.production"] = { alloys = 3, energy = 30 } },
+                set = { ["economy.production"] = { alloys = 3, energy = 30 }, ["economy.storage"] = { alloys = 1500, energy = 15000 } },
             },
             {
                 why = "T2 extractors make 5 alloys a second (were 4): the upgrade (600 alloys) pays back in 150 s instead of 200 s, so small maps can grow by upgrading once their spots are taken.",

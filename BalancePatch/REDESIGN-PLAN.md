@@ -569,6 +569,19 @@ The last two rows miss, and both depend on when players tech, which the sim
 assumes (8:00) rather than knows. Real players teched later: in the 17-minute
 256 game both held every spot from ~7:00 and never upgraded an extractor.
 
+**0.2.1 (unreleased, 2026-10-09):** commander storage back to 500/5000, and an
+army starts with it full (append to `unitsDefault.lua`, `economy` option); the
+user's call. Simulated against 0.2.0 (`diff 0.2.0 0.2.1`): fastest T2 5:55 →
+6:37, about 6 fewer units alive at 10:00 on both classes, income unchanged.
+
+**The Forge, user vs AI (2026-10-09, 0.2.0, 2048 map, 67 spots, 2 of 8
+spawns):** 12.5 minutes, no T2 factory and one T2 extractor (at 11:00). The user
+took 36 extractors by 10:00 and 41 by 13:00 (T1 extractors pay back in 50 s,
+so every free spot beats any upgrade), built 12 T1 factories and had 116 units
+alive at 10:00 (131 built). Income 39 at 10:00, 49 at 13:00. The AI stalled on
+alloys from 5:00 to 7:00 and never recovered. The sim on the same spawns built
+a similar number of units (124 by 10:00) but took about 21 spots, not 36.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;
