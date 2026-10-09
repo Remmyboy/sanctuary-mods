@@ -582,6 +582,26 @@ alive at 10:00 (131 built). Income 39 at 10:00, 49 at 13:00. The AI stalled on
 alloys from 5:00 to 7:00 and never recovered. The sim on the same spawns built
 a similar number of units (124 by 10:00) but took about 21 spots, not 36.
 
+**0.2.2 (2026-10-09, the user's call after the T3 discussion):** T3
+extractors make 15 A/s (upgrade payback 200 s, was 400 s). T3 generators make
+2500 E/s and cost 2800 A / 28000 E with build time 2800 (were 4500 E/s for
+5000 A / 50000 E, bt 5000): about the same energy per cost, in a smaller step.
+The sim can't judge either: its fitted players never build a T3 extractor or
+generator (they still have T1 spots to upgrade at 30:00), so `diff 0.2.1
+0.2.2` is identical. Needs replays with T3 in them.
+
+Also in 0.2.2 (the user's call): the T2 factory upgrade costs 1500 / 15000 (was
+2500) and T3 4000 / 40000 (was 6000). T3 tanks (Kodiak, Glaive, Auger) and the
+Guardian Nitro cost 30% less (alloys and energy, same build time); other T3
+units keep their cost, and sniper bots stay slow on purpose. T3 tanks move at
+3.3 (were 2.5-2.7), hull turn 90, gun yaw 180 / pitch 90 deg/s. The Nitro moves
+at 4.5 (was 3.3), gun yaw 180, health 1500 (was 2250: one Kodiak volley, 3 x
+697, kills it); range stays 24 against the tanks' 34. Simulated against 0.2.1: the
+fastest T2 factory moves from 6:37 to 4:21, facing 7-8 spam units (target 25),
+so the rush target now misses on both classes; 512 income at 15:00 rises from
+39 to 45. A longer T2 build time doesn't restore it (bt 1600-3200 at 1500 A:
+3:51-4:26): the rush is gated by cost, not time.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

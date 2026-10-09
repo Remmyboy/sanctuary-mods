@@ -53,7 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.1) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.2) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -1678,10 +1678,11 @@ Each section is a lobby option, all on by default:
   and never hit); the Guardian TALEN gunship is labelled tier 3.
 - **Economy:** commanders make 3 alloys and 30 energy a second (were 5 and 50)
   and you start with full storage, 500 alloys and 5000 energy (was half),
-  so income comes from taking the map. T2 extractors make 5 alloys (were 4);
-  generators make 20, 600 and 4500 energy (were 10, 200 and 1000). Factories
-  cost 300 alloys (were 150) and upgrading one to T2 costs 2500 (was 500), so
-  T2 has to be paid for. Land and naval units cost 6 energy per alloy (were
+  so income comes from taking the map. T2 and T3 extractors make 5 and 15
+  alloys (were 4 and 10); generators make 20, 600 and 2500 energy (were 10,
+  200 and 1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 300
+  alloys (were 150); upgrading one to T2 costs 1500 (was 500) and to T3 4000
+  (was 2000). T3 tanks and the Guardian T3 raider cost 30% less. Land and naval units cost 6 energy per alloy (were
   10), Chosen aircraft as much energy as everyone else's, and engineers have
   less than half their health, so raids on them work.
 - **Commanders:** the EDA and Guardian commanders' missiles fly at once and
@@ -1696,7 +1697,8 @@ Each section is a lobby option, all on by default:
   outranges them.
 - **Unit tuning:** the Chosen Jager toned down and the other T2 raiders
   brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
-  brought level.
+  brought level. T3 tanks move as fast as T1 tanks with quicker guns; the
+  Guardian Nitro (T3 raider) is faster still but dies to one T3 tank volley.
 
 The 0.2 numbers come from a top-down redesign
 ([`REDESIGN-PLAN.md`](BalancePatch/REDESIGN-PLAN.md)): match-pacing targets

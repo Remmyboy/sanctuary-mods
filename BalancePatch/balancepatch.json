@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.1"
+  "version": "0.2.2"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-09T18:24:13.977Z",
+ "generated": "2026-10-09T18:57:45.582Z",
  "sections": [
   {
    "key": "fixes",
@@ -21,7 +21,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 extractors make 5 (were 4); generators make 20/600/4500 energy (were 10/200/1000). Factories cost 300 alloys (were 150), and upgrading one to T2 costs 2500 (was 500). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
+   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 300 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
    "default": true
   },
   {
@@ -51,7 +51,7 @@
   {
    "key": "units",
    "label": "Unit tuning",
-   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level.",
+   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still but fragile.",
    "default": true
   }
  ],
@@ -600,12 +600,52 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 4500,
+   "after": 2500,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2.25x the energy per cost of T1 ones (were equal): 4500 a second."
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3611",
+   "name": null,
+   "displayName": "Tier 3: Energy Generator",
+   "faction": "Chosen",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 5000,
+    "energy": 50000
+   },
+   "after": {
+    "alloys": 2800,
+    "energy": 28000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3611",
+   "name": null,
+   "displayName": "Tier 3: Energy Generator",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 5000,
+   "after": 2800,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
    ]
   },
   {
@@ -617,12 +657,52 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 4500,
+   "after": 2500,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2.25x the energy per cost of T1 ones (were equal): 4500 a second."
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3611",
+   "name": null,
+   "displayName": "Tier 3: Energy Generator",
+   "faction": "EDA",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 5000,
+    "energy": 50000
+   },
+   "after": {
+    "alloys": 2800,
+    "energy": 28000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3611",
+   "name": null,
+   "displayName": "Tier 3: Energy Generator",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 5000,
+   "after": 2800,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
    ]
   },
   {
@@ -634,12 +714,103 @@
    "field": "economy.production.energy",
    "label": "energy/s",
    "before": 1000,
-   "after": 4500,
+   "after": 2500,
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 generators give 2.25x the energy per cost of T1 ones (were equal): 4500 a second."
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3611",
+   "name": null,
+   "displayName": "Tier 3: Energy Generator",
+   "faction": "Guardian",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 5000,
+    "energy": 50000
+   },
+   "after": {
+    "alloys": 2800,
+    "energy": 28000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3611",
+   "name": null,
+   "displayName": "Tier 3: Energy Generator",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 5000,
+   "after": 2800,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3601",
+   "name": null,
+   "displayName": "Tier 3: Alloy Extractor",
+   "faction": "Chosen",
+   "field": "economy.production.alloys",
+   "label": "alloys/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 extractors make 15 alloys a second (were 10): the upgrade (2000 alloys) pays back in 200 s instead of 400 s, so T3 economy pays for itself inside a 20-30 minute game."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3601",
+   "name": null,
+   "displayName": "Tier 3: Alloy Extractor",
+   "faction": "EDA",
+   "field": "economy.production.alloys",
+   "label": "alloys/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 extractors make 15 alloys a second (were 10): the upgrade (2000 alloys) pays back in 200 s instead of 400 s, so T3 economy pays for itself inside a 20-30 minute game."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3601",
+   "name": null,
+   "displayName": "Tier 3: Alloy Extractor",
+   "faction": "Guardian",
+   "field": "economy.production.alloys",
+   "label": "alloys/s",
+   "before": 10,
+   "after": 15,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 extractors make 15 alloys a second (were 10): the upgrade (2000 alloys) pays back in 200 s instead of 400 s, so T3 economy pays for itself inside a 20-30 minute game."
    ]
   },
   {
@@ -862,14 +1033,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -885,14 +1056,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -908,14 +1079,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -931,14 +1102,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -954,14 +1125,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -977,14 +1148,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -1000,14 +1171,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -1023,14 +1194,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -1046,14 +1217,14 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 2500,
-    "energy": 25000
+    "alloys": 1500,
+    "energy": 15000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander."
+    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
    ]
   },
   {
@@ -1069,14 +1240,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1092,14 +1263,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1115,14 +1286,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1138,14 +1309,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1161,14 +1332,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1184,14 +1355,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1207,14 +1378,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1230,14 +1401,14 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
    ]
   },
   {
@@ -1253,14 +1424,154 @@
     "energy": 20000
    },
    "after": {
-    "alloys": 6000,
-    "energy": 60000
+    "alloys": 4000,
+    "energy": 40000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2."
+    "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "economy.cost.alloys",
+   "label": "alloys",
+   "before": 782,
+   "after": 547,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 7820,
+   "after": 3284,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game.",
+    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "economy.cost.alloys",
+   "label": "alloys",
+   "before": 906,
+   "after": 634,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 9060,
+   "after": 3805,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game.",
+    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "economy.cost.alloys",
+   "label": "alloys",
+   "before": 849,
+   "after": 594,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 8490,
+   "after": 3566,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game.",
+    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "economy.cost.alloys",
+   "label": "alloys",
+   "before": 353,
+   "after": 247,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "economy.cost.energy",
+   "label": "energy",
+   "before": 3530,
+   "after": 1483,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game.",
+    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
    ]
   },
   {
@@ -1411,23 +1722,6 @@
    "label": "energy",
    "before": 1800,
    "after": 1080,
-   "sections": [
-    "economy"
-   ],
-   "why": [
-    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
-   ]
-  },
-  {
-   "kind": "unit",
-   "id": "ucl3001",
-   "name": "Glaive",
-   "displayName": "Tier 3: Tank",
-   "faction": "Chosen",
-   "field": "economy.cost.energy",
-   "label": "energy",
-   "before": 7820,
-   "after": 4692,
    "sections": [
     "economy"
    ],
@@ -1864,23 +2158,6 @@
   },
   {
    "kind": "unit",
-   "id": "uel3001",
-   "name": "Kodiak",
-   "displayName": "Tier 3: Tank",
-   "faction": "EDA",
-   "field": "economy.cost.energy",
-   "label": "energy",
-   "before": 9060,
-   "after": 5436,
-   "sections": [
-    "economy"
-   ],
-   "why": [
-    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
-   ]
-  },
-  {
-   "kind": "unit",
    "id": "uel3002",
    "name": "Hyena",
    "displayName": "Tier 2: Raider",
@@ -2229,40 +2506,6 @@
    "label": "energy",
    "before": 1800,
    "after": 1080,
-   "sections": [
-    "economy"
-   ],
-   "why": [
-    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
-   ]
-  },
-  {
-   "kind": "unit",
-   "id": "ugl3001",
-   "name": "Auger",
-   "displayName": "Tier 3: Tank",
-   "faction": "Guardian",
-   "field": "economy.cost.energy",
-   "label": "energy",
-   "before": 8490,
-   "after": 5094,
-   "sections": [
-    "economy"
-   ],
-   "why": [
-    "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base."
-   ]
-  },
-  {
-   "kind": "unit",
-   "id": "ugl3002",
-   "name": "Nitro",
-   "displayName": "Tier 3: Raider",
-   "faction": "Guardian",
-   "field": "economy.cost.energy",
-   "label": "energy",
-   "before": 3530,
-   "after": 2118,
    "sections": [
     "economy"
    ],
@@ -4750,6 +4993,414 @@
    ],
    "why": [
     "EDA T1 artillery (Bison) cost 40 against 62 and 76 for the Chosen and Guardian ones, for the same job. Now about the Chosen cost."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2.5,
+   "after": 3.3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3.3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 60,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 70,
+   "after": 180,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.2.yawSpeed",
+   "label": "yawSpeed",
+   "before": 90,
+   "after": 180,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.3.yawSpeed",
+   "label": "yawSpeed",
+   "before": 90,
+   "after": 180,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.2.pitchSpeed",
+   "label": "pitchSpeed",
+   "before": 70,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl3001",
+   "name": "Glaive",
+   "displayName": "Tier 3: Tank",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.3.pitchSpeed",
+   "label": "pitchSpeed",
+   "before": 70,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2.5,
+   "after": 3.3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3.3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 70,
+   "after": 180,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel3001",
+   "name": "Kodiak",
+   "displayName": "Tier 3: Tank",
+   "faction": "EDA",
+   "field": "weapons.1.aimControllers.1.pitchSpeed",
+   "label": "pitchSpeed",
+   "before": 40,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2.7,
+   "after": 3.3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3.3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 60,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 70,
+   "after": 180,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3001",
+   "name": "Auger",
+   "displayName": "Tier 3: Tank",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.pitchSpeed",
+   "label": "pitchSpeed",
+   "before": 20,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T3 tanks move at 3.3 like T1 tanks (were 2.5-2.7), turn their hull at 90 degrees a second (was 45-60) and their guns at 180 (were 70), so they keep up with an army and track what they shoot at."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 3.3,
+   "after": 4.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 3.3,
+   "after": 4.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 70,
+   "after": 180,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.pitchSpeed",
+   "label": "pitchSpeed",
+   "before": 20,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 2250,
+   "after": 1500,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 2250,
+   "after": 1500,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
    ]
   }
  ],
@@ -8664,8 +9315,8 @@
    "economy": {
     "buildTime": 2400,
     "cost": {
-     "alloys": 782,
-     "energy": 4692
+     "alloys": 547,
+     "energy": 3284
     }
    },
    "footprint": {
@@ -8707,7 +9358,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3.3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -8721,9 +9372,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 60,
+    "rotationSpeed": 90,
     "sortOrder": 1,
-    "speed": 2.5,
+    "speed": 3.3,
     "terrainAlignmentFactor": 1,
     "type": "LegsLand",
     "walkAnimation": {
@@ -8754,7 +9405,7 @@
        "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 70
+       "yawSpeed": 180
       },
       {
        "aimBone": "Turret01_Muzzle01",
@@ -8765,14 +9416,14 @@
        "pitchBone": "Turret01_Pitch01",
        "pitchMax": 45,
        "pitchMin": -25,
-       "pitchSpeed": 70,
+       "pitchSpeed": 90,
        "poseResetTime": 3,
        "projectileSpeed": 30,
        "solverType": "LowArc",
        "yawBone": "Turret01_Yaw02",
        "yawMax": 45,
        "yawMin": -45,
-       "yawSpeed": 90
+       "yawSpeed": 180
       },
       {
        "aimBone": "Turret01_Muzzle02",
@@ -8783,14 +9434,14 @@
        "pitchBone": "Turret01_Pitch02",
        "pitchMax": 90,
        "pitchMin": -90,
-       "pitchSpeed": 70,
+       "pitchSpeed": 90,
        "poseResetTime": 3,
        "projectileSpeed": 30,
        "solverType": "LowArc",
        "yawBone": "Turret01_Yaw03",
        "yawMax": 45,
        "yawMin": -45,
-       "yawSpeed": 90
+       "yawSpeed": 180
       }
      ],
      "damage": 268.8,
@@ -13625,8 +14276,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -13750,8 +14401,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -13858,8 +14509,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -14572,8 +15223,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -14695,8 +15346,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -14801,8 +15452,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -14861,6 +15512,108 @@
     "TECH3"
    ]
   },
+  "ucs3601": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Spinner",
+      "speed": {
+       "x": 0,
+       "y": 20,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "adjacency": "AlloyExtractorAdjacencyBuff",
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.5,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1.3,
+     "y": 1,
+     "z": 1.3
+    }
+   },
+   "construction": {
+    "buildableOnResources": [
+     "alloys"
+    ]
+   },
+   "defence": {
+    "health": {
+     "max": 8000,
+     "value": 8000
+    }
+   },
+   "economy": {
+    "buildTime": 2000,
+    "cost": {
+     "alloys": 2000,
+     "energy": 20000
+    },
+    "production": {
+     "alloys": 15
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenAlloyExtractor"
+    ],
+    "displayName": "Tier 3: Alloy Extractor",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "alloy",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_alloy.png",
+    "iconUIBuildSortPriority": 370,
+    "iconUIType": "amphibious",
+    "name": "",
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false
+    },
+    "tpId": "ucs3601",
+    "unitTypeName": "ChosenT3AlloyExtractor"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ALLOYS_EXTRACTION",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "ECONOMIC",
+    "STRUCTURE",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "category": "DeathExplosion",
+     "damage": 1600,
+     "damageFriendly": true,
+     "damageRadius": 4,
+     "damageType": "Normal"
+    }
+   ]
+  },
   "ucs3611": {
    "adjacency": "T3EnergyGeneratorAdjacencyBuff",
    "collisionInfo": {
@@ -14882,13 +15635,13 @@
     }
    },
    "economy": {
-    "buildTime": 5000,
+    "buildTime": 2800,
     "cost": {
-     "alloys": 5000,
-     "energy": 50000
+     "alloys": 2800,
+     "energy": 28000
     },
     "production": {
-     "energy": 4500
+     "energy": 2500
     }
    },
    "footprint": {
@@ -19069,8 +19822,8 @@
    "economy": {
     "buildTime": 2400,
     "cost": {
-     "alloys": 906,
-     "energy": 5436
+     "alloys": 634,
+     "energy": 3805
     }
    },
    "footprint": {
@@ -19112,7 +19865,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3.3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -19125,9 +19878,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 45,
+    "rotationSpeed": 90,
     "sortOrder": 1,
-    "speed": 2.5,
+    "speed": 3.3,
     "terrainAlignmentFactor": 1,
     "type": "TracksLand"
    },
@@ -19153,14 +19906,14 @@
        "pitchBone": "Turret01_Pitch01",
        "pitchMax": 45,
        "pitchMin": -25,
-       "pitchSpeed": 40,
+       "pitchSpeed": 90,
        "poseResetTime": 3,
        "projectileSpeed": 30,
        "solverType": "LowArc",
        "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 70
+       "yawSpeed": 180
       }
      ],
      "damage": 697.25,
@@ -22829,8 +23582,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     },
     "storage": {
      "energy": 2000
@@ -22957,8 +23710,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     },
     "storage": {
      "energy": 2000
@@ -23069,8 +23822,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -23581,8 +24334,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     },
     "storage": {
      "energy": 5000
@@ -23707,8 +24460,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     },
     "storage": {
      "energy": 5000
@@ -23817,8 +24570,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -23877,6 +24630,96 @@
     "TECH3"
    ]
   },
+  "ues3601": {
+   "adjacency": "AlloyExtractorAdjacencyBuff",
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.25,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1.5,
+     "y": 0.5,
+     "z": 1.5
+    }
+   },
+   "construction": {
+    "buildableOnResources": [
+     "alloys"
+    ]
+   },
+   "defence": {
+    "health": {
+     "max": 8000,
+     "value": 8000
+    }
+   },
+   "economy": {
+    "buildTime": 2000,
+    "cost": {
+     "alloys": 2000,
+     "energy": 20000
+    },
+    "production": {
+     "alloys": 15
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAAlloyExtractor"
+    ],
+    "displayName": "Tier 3: Alloy Extractor",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "alloy",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_alloy.png",
+    "iconUIBuildSortPriority": 370,
+    "iconUIType": "amphibious",
+    "name": "",
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false
+    },
+    "tpId": "ues3601",
+    "unitTypeName": "EDAT3AlloyExtractor"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ALLOYS_EXTRACTION",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "ECONOMIC",
+    "EDA",
+    "STRUCTURE",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "category": "DeathExplosion",
+     "damage": 1600,
+     "damageFriendly": true,
+     "damageRadius": 4,
+     "damageType": "Normal"
+    }
+   ]
+  },
   "ues3611": {
    "additions": {
     "rotators": [
@@ -23910,13 +24753,13 @@
     }
    },
    "economy": {
-    "buildTime": 5000,
+    "buildTime": 2800,
     "cost": {
-     "alloys": 5000,
-     "energy": 50000
+     "alloys": 2800,
+     "energy": 28000
     },
     "production": {
-     "energy": 4500
+     "energy": 2500
     }
    },
    "footprint": {
@@ -26835,8 +27678,8 @@
    "economy": {
     "buildTime": 2400,
     "cost": {
-     "alloys": 849,
-     "energy": 5094
+     "alloys": 594,
+     "energy": 3566
     }
    },
    "footprint": {
@@ -26878,7 +27721,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3.3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -26905,9 +27748,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 60,
+    "rotationSpeed": 90,
     "sortOrder": 1,
-    "speed": 2.7,
+    "speed": 3.3,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed",
     "walkAnimation": {
@@ -26937,14 +27780,14 @@
        "pitchBone": "Turret01_Pitch01",
        "pitchMax": 45,
        "pitchMin": -25,
-       "pitchSpeed": 20,
+       "pitchSpeed": 90,
        "poseResetTime": 3,
        "projectileSpeed": 30,
        "solverType": "NoArc",
        "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 70
+       "yawSpeed": 180
       }
      ],
      "beamLifetime": -1,
@@ -27034,16 +27877,16 @@
    },
    "defence": {
     "health": {
-     "max": 2250,
+     "max": 1500,
      "regen": 5,
-     "value": 2250
+     "value": 1500
     }
    },
    "economy": {
     "buildTime": 1000,
     "cost": {
-     "alloys": 353,
-     "energy": 2118
+     "alloys": 247,
+     "energy": 1483
     }
    },
    "footprint": {
@@ -27085,7 +27928,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 3.3,
+    "acceleration": 4.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -27100,7 +27943,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 60,
     "sortOrder": 1,
-    "speed": 3.3,
+    "speed": 4.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsLand"
    },
@@ -27127,14 +27970,14 @@
        "pitchBone": "Turret01_Pitch01",
        "pitchMax": 45,
        "pitchMin": -25,
-       "pitchSpeed": 20,
+       "pitchSpeed": 90,
        "poseResetTime": 3,
        "projectileSpeed": 25,
        "solverType": "LowArc",
        "yawBone": "Turret01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 70
+       "yawSpeed": 180
       }
      ],
      "damage": 148,
@@ -29909,8 +30752,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -30053,8 +30896,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -30162,8 +31005,8 @@
    "economy": {
     "buildTime": 800,
     "cost": {
-     "alloys": 2500,
-     "energy": 25000
+     "alloys": 1500,
+     "energy": 15000
     }
    },
    "footprint": {
@@ -30779,8 +31622,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -30937,8 +31780,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -31044,8 +31887,8 @@
    "economy": {
     "buildTime": 4200,
     "cost": {
-     "alloys": 6000,
-     "energy": 60000
+     "alloys": 4000,
+     "energy": 40000
     }
    },
    "footprint": {
@@ -31104,6 +31947,97 @@
     "TECH3"
    ]
   },
+  "ugs3601": {
+   "adjacency": "AlloyExtractorAdjacencyBuff",
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 0.25,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1.5,
+     "y": 0.5,
+     "z": 1.5
+    }
+   },
+   "construction": {
+    "buildableOnResources": [
+     "alloys"
+    ]
+   },
+   "defence": {
+    "health": {
+     "max": 8000,
+     "regen": 3,
+     "value": 8000
+    }
+   },
+   "economy": {
+    "buildTime": 2000,
+    "cost": {
+     "alloys": 2000,
+     "energy": 20000
+    },
+    "production": {
+     "alloys": 15
+    }
+   },
+   "footprint": {
+    "x": 1,
+    "y": 1
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardAlloyExtractor"
+    ],
+    "displayName": "Tier 3: Alloy Extractor",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "alloy",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_alloy.png",
+    "iconUIBuildSortPriority": 370,
+    "iconUIType": "amphibious",
+    "name": "",
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Pause": false
+    },
+    "tpId": "ugs3601",
+    "unitTypeName": "GuardT3AlloyExtractor"
+   },
+   "intel": {
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 2,
+    "y": 2
+   },
+   "tags": [
+    "ALLOYS_EXTRACTION",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "ECONOMIC",
+    "GUARD",
+    "STRUCTURE",
+    "TECH3"
+   ],
+   "weapons": [
+    {
+     "category": "DeathExplosion",
+     "damage": 1600,
+     "damageFriendly": true,
+     "damageRadius": 4,
+     "damageType": "Normal"
+    }
+   ]
+  },
   "ugs3611": {
    "additions": {
     "rotators": [
@@ -31146,13 +32080,13 @@
     }
    },
    "economy": {
-    "buildTime": 5000,
+    "buildTime": 2800,
     "cost": {
-     "alloys": 5000,
-     "energy": 50000
+     "alloys": 2800,
+     "energy": 28000
     },
     "production": {
-     "energy": 4500
+     "energy": 2500
     }
    },
    "footprint": {

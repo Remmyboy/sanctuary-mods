@@ -7,5 +7,6 @@
   "stage1-base": { "changes": "rulesets/0.1.1.lua", "options": { "economy": false, "costs": false, "engineers": true, "startbank": false, "costs15": false },
     "about": "0.1.1 with its economy and unit-cost sections off: the base stage 1's sweep rebuilt the economy on" },
   "0.2.0": { "changes": "rulesets/0.2.0.lua", "options": "defaults", "about": "Released 0.2.0 (stage 1: economy): commander storage 1500/15000, half of it at the start" },
-  "0.2.1": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod: storage back to 500/5000, all of it at the start" }
+  "0.2.1": { "changes": "rulesets/0.2.1.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.1: storage back to 500/5000, all of it at the start" },
+  "0.2.2": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod: T3 generators 2500 E/s for 2800 A, T3 extractors 15 A/s" }
 }
