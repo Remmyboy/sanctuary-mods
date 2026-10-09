@@ -1677,18 +1677,18 @@ Each section is a lobby option, all on by default:
   the ground; bombs live long enough to land (the EDA T3 bomber fired all game
   and never hit); the Guardian TALEN gunship is labelled tier 3.
 - **Economy:** commanders make 3 alloys and 30 energy a second (were 5 and 50)
-  and you start with full storage, 500 alloys and 5000 energy (was half),
-  so income comes from taking the map. T2 and T3 extractors make 5 and 15
-  alloys (were 4 and 10); generators make 20, 600 and 2500 energy (were 10,
-  200 and 1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200
-  alloys (were 150); upgrading one to T2 costs 1500 (was 500) and to T3 4000
-  (was 2000). T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250 energy a second
-  (was 150); T3 radar costs 2800 alloys and 1400 energy a second (were 700
-  and 350), and the EDA and Chosen ones see 750 and 850 (were 450 and 550).
-  Wrecks
-  reclaim 3x as fast and last 6 minutes (were 3). Land and naval units cost 6 energy per alloy (were
-  10), Chosen aircraft as much energy as everyone else's, and engineers have
-  less than half their health, so raids on them work.
+  and you start with full storage, 500 alloys and 5000 energy (was half), so
+  income comes from taking the map. T2 and T3 extractors make 5 and 15 alloys
+  (were 4 and 10); generators make 20, 600 and 2500 energy (were 10, 200 and
+  1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys
+  (were 150); upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was
+  2000). T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250
+  energy a second (was 150); T3 radar costs 2800 alloys and 1400 energy a
+  second (were 700 and 350), and the EDA and Chosen ones see 750 and 850 (were
+  450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land
+  and naval units cost 6 energy per alloy (were 10), Chosen aircraft as much
+  energy as everyone else's, and engineers have less than half their health,
+  so raids on them work.
 - **Commanders:** the EDA and Guardian commanders' missiles fly at once and
   steer at where the target is going, in smaller, faster volleys.
 - **Artillery:** leads moving targets; the T1 artillery of the three factions
