@@ -122,30 +122,6 @@ Sections = {
                 set = { ["economy.cost"] = { alloys = 4000, energy = 40000 } },
             },
             {
-                why = "T2 radar uses 250 energy a second to run (was 150).",
-                idPattern = "^u.s2701$",
-                expect = { ["economy.maintenanceConsumption.energy"] = 150 },
-                set = { ["economy.maintenanceConsumption.energy"] = 250 },
-            },
-            {
-                why = "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment.",
-                idPattern = "^u.s3701$",
-                expect = { ["economy.cost"] = { alloys = 700, energy = 7000 }, ["economy.maintenanceConsumption.energy"] = 350 },
-                set = { ["economy.cost"] = { alloys = 2800, energy = 28000 }, ["economy.maintenanceConsumption.energy"] = 1400 },
-            },
-            {
-                why = "EDA T3 radar sees 750 (was 450) and Chosen 850 (was 550), closer to the Guardian one's 1000.",
-                ids = { "ues3701" },
-                expect = { ["intel.radarRadius"] = 450 },
-                set = { ["intel.radarRadius"] = 750 },
-            },
-            {
-                why = "EDA T3 radar sees 750 (was 450) and Chosen 850 (was 550), closer to the Guardian one's 1000.",
-                ids = { "ucs3701" },
-                expect = { ["intel.radarRadius"] = 550 },
-                set = { ["intel.radarRadius"] = 850 },
-            },
-            {
                 why = "T3 tanks and the Guardian Nitro (T3 raider) cost 30% less, alloys and energy (same build time): a T3 tank was about 29 T1 tanks' worth of alloys, and T3 should be within reach in a 20-30 minute game.",
                 ids = { "uel3001", "ucl3001", "ugl3001", "ugl3002" },
                 round = true,

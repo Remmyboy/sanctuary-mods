@@ -625,6 +625,11 @@ range 80 (was 40) at 0.9x damage per alloy. Athena (mobile shield, 18000 A,
 72 -> 85 (256) and 104 -> 117 (512, now in target), alive 40 -> 47 and 58 ->
 65, factories 5.0 -> 5.6 and 6.8 -> 7.9; fastest T2 4:21 -> 4:04.
 
+**0.2.5 (unreleased, 2026-10-09, the user's calls):** T2 radar upkeep 250
+E/s (was 150); T3 radar 2800 A / 28000 E (was 700 / 7000), build time kept, upkeep 1400 E/s
+(was 350). EDA T3 radar range 750 (was 450), Chosen 850 (was 550); Guardian
+stays 1000.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

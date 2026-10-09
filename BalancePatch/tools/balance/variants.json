@@ -9,5 +9,6 @@
   "0.2.0": { "changes": "rulesets/0.2.0.lua", "options": "defaults", "about": "Released 0.2.0 (stage 1: economy): commander storage 1500/15000, half of it at the start" },
   "0.2.1": { "changes": "rulesets/0.2.1.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.1: storage back to 500/5000, all of it at the start" },
   "0.2.3": { "changes": "rulesets/0.2.3.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.3: cheaper T2/T3, T3 economy, faster T3 tanks and T4 bots, reclaim 3x, wrecks 6 min" },
-  "0.2.4": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod: T4 repriced as game enders" }
+  "0.2.4": { "changes": "rulesets/0.2.4.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.4: T4 game enders, T1 factories 200" },
+  "0.2.5": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod" }
 }

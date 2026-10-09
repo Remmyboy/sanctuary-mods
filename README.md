@@ -53,7 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.4) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.5) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -1682,7 +1682,10 @@ Each section is a lobby option, all on by default:
   alloys (were 4 and 10); generators make 20, 600 and 2500 energy (were 10,
   200 and 1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200
   alloys (were 150); upgrading one to T2 costs 1500 (was 500) and to T3 4000
-  (was 2000). T3 tanks and the Guardian T3 raider cost 30% less. Wrecks
+  (was 2000). T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250 energy a second
+  (was 150); T3 radar costs 2800 alloys and 1400 energy a second (were 700
+  and 350), and the EDA and Chosen ones see 750 and 850 (were 450 and 550).
+  Wrecks
   reclaim 3x as fast and last 6 minutes (were 3). Land and naval units cost 6 energy per alloy (were
   10), Chosen aircraft as much energy as everyone else's, and engineers have
   less than half their health, so raids on them work.

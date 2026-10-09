@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.4"
+  "version": "0.2.5"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-09T19:21:17.059Z",
+ "generated": "2026-10-09T19:50:53.107Z",
  "sections": [
   {
    "key": "fixes",
@@ -21,7 +21,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
+   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250 energy a second (was 150) and T3 radar costs 2800 alloys (was 700) and 1400 energy a second (was 350); EDA and Chosen T3 radar see 750 and 850 (were 450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
    "default": true
   },
   {
@@ -1432,6 +1432,211 @@
    ],
    "why": [
     "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2701",
+   "name": null,
+   "displayName": "Tier 2: Radar",
+   "faction": "Chosen",
+   "field": "economy.maintenanceConsumption.energy",
+   "label": "economy.maintenanceConsumption.energy",
+   "before": 150,
+   "after": 250,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 radar uses 250 energy a second to run (was 150)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2701",
+   "name": null,
+   "displayName": "Tier 2: Radar",
+   "faction": "EDA",
+   "field": "economy.maintenanceConsumption.energy",
+   "label": "economy.maintenanceConsumption.energy",
+   "before": 150,
+   "after": 250,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 radar uses 250 energy a second to run (was 150)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2701",
+   "name": null,
+   "displayName": "Tier 2: Radar",
+   "faction": "Guardian",
+   "field": "economy.maintenanceConsumption.energy",
+   "label": "economy.maintenanceConsumption.energy",
+   "before": 150,
+   "after": 250,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T2 radar uses 250 energy a second to run (was 150)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "Chosen",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 700,
+    "energy": 7000
+   },
+   "after": {
+    "alloys": 2800,
+    "energy": 28000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "Chosen",
+   "field": "economy.maintenanceConsumption.energy",
+   "label": "economy.maintenanceConsumption.energy",
+   "before": 350,
+   "after": 1400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "EDA",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 700,
+    "energy": 7000
+   },
+   "after": {
+    "alloys": 2800,
+    "energy": 28000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "EDA",
+   "field": "economy.maintenanceConsumption.energy",
+   "label": "economy.maintenanceConsumption.energy",
+   "before": 350,
+   "after": 1400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "Guardian",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 700,
+    "energy": 7000
+   },
+   "after": {
+    "alloys": 2800,
+    "energy": 28000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "Guardian",
+   "field": "economy.maintenanceConsumption.energy",
+   "label": "economy.maintenanceConsumption.energy",
+   "before": 350,
+   "after": 1400,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "T3 radar costs 2800 alloys and 28000 energy (was 700 and 7000; same build time) and uses 1400 energy a second to run (was 350): it sees 450-1000 across the map, so it should be a real investment."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "EDA",
+   "field": "intel.radarRadius",
+   "label": "intel.radarRadius",
+   "before": 450,
+   "after": 750,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "EDA T3 radar sees 750 (was 450) and Chosen 850 (was 550), closer to the Guardian one's 1000."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3701",
+   "name": null,
+   "displayName": "Tier 3: Radar",
+   "faction": "Chosen",
+   "field": "intel.radarRadius",
+   "label": "intel.radarRadius",
+   "before": 550,
+   "after": 850,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "EDA T3 radar sees 750 (was 450) and Chosen 850 (was 550), closer to the Guardian one's 1000."
    ]
   },
   {
@@ -16155,6 +16360,106 @@
     }
    ]
   },
+  "ucs2701": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Radar_spinner_01",
+      "speed": {
+       "x": 0,
+       "y": 60,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 1.5,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1.5,
+     "y": 3,
+     "z": 1.5
+    }
+   },
+   "construction": {
+    "buildPower": 10,
+    "canBuild": "Tags.ucs3701",
+    "upgradesTo": "ucs3701"
+   },
+   "defence": {
+    "health": {
+     "max": 1250,
+     "value": 1250
+    }
+   },
+   "economy": {
+    "buildTime": 250,
+    "cost": {
+     "alloys": 250,
+     "energy": 2500
+    },
+    "maintenanceConsumption": {
+     "energy": 250
+    }
+   },
+   "footprint": {
+    "x": 2,
+    "y": 2
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenStructure"
+    ],
+    "displayName": "Tier 2: Radar",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "intel",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure1_intel.png",
+    "iconUIBuildSortPriority": 290,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Intel": true,
+     "Pause": false
+    },
+    "tpId": "ucs2701",
+    "unitTypeName": "ChosenT2Radar"
+   },
+   "intel": {
+    "radarRadius": 220,
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 4,
+    "y": 4
+   },
+   "tags": [
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "CONSTRUCTION",
+    "INTEL",
+    "RADAR",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
   "ucs3001": {
    "collisionInfo": {
     "centerOffset": {
@@ -17085,6 +17390,105 @@
      "damageRadius": 10,
      "damageType": "Normal"
     }
+   ]
+  },
+  "ucs3701": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Radar_spinner_01",
+      "speed": {
+       "x": 0,
+       "y": 30,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Radar_spinner_02",
+      "speed": {
+       "x": 0,
+       "y": 90,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 2,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1.5,
+     "y": 4,
+     "z": 1.5
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 3500,
+     "value": 3500
+    }
+   },
+   "economy": {
+    "buildTime": 700,
+    "cost": {
+     "alloys": 2800,
+     "energy": 28000
+    },
+    "maintenanceConsumption": {
+     "energy": 1400
+    }
+   },
+   "footprint": {
+    "x": 2,
+    "y": 2
+   },
+   "general": {
+    "class": [
+     "unitsDefaultChosen",
+     "ChosenStructure"
+    ],
+    "displayName": "Tier 3: Radar",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "intel",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_intel.png",
+    "iconUIBuildSortPriority": 290,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Pause": false
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Intel": true
+    },
+    "tpId": "ucs3701",
+    "unitTypeName": "ChosenT3Radar"
+   },
+   "intel": {
+    "radarRadius": 850,
+    "visionRadius": 25
+   },
+   "skirtSize": {
+    "x": 4,
+    "y": 4
+   },
+   "tags": [
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CHOSEN",
+    "INTEL",
+    "RADAR",
+    "STRUCTURE",
+    "TECH3"
    ]
   },
   "uea1001": {
@@ -25468,6 +25872,106 @@
     }
    ]
   },
+  "ues2701": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Rotator01",
+      "speed": {
+       "x": 0,
+       "y": 25,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 2.3,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 4.6,
+     "z": 1
+    }
+   },
+   "construction": {
+    "buildPower": 10,
+    "canBuild": "Tags.ues3701",
+    "upgradesTo": "ues3701"
+   },
+   "defence": {
+    "health": {
+     "max": 1250,
+     "value": 1250
+    }
+   },
+   "economy": {
+    "buildTime": 250,
+    "cost": {
+     "alloys": 250,
+     "energy": 2500
+    },
+    "maintenanceConsumption": {
+     "energy": 250
+    }
+   },
+   "footprint": {
+    "x": 2,
+    "y": 2
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAStructure"
+    ],
+    "displayName": "Tier 2: Radar",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "intel",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure1_intel.png",
+    "iconUIBuildSortPriority": 290,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Intel": true,
+     "Pause": false
+    },
+    "tpId": "ues2701",
+    "unitTypeName": "EDAT2Radar"
+   },
+   "intel": {
+    "radarRadius": 180,
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 4,
+    "y": 4
+   },
+   "tags": [
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "EDA",
+    "INTEL",
+    "RADAR",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
   "ues3201": {
    "additions": {
     "rotators": [
@@ -26203,6 +26707,97 @@
      "damageRadius": 10,
      "damageType": "Normal"
     }
+   ]
+  },
+  "ues3701": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Rotator01",
+      "speed": {
+       "x": 0,
+       "y": 20,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 3.2,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 6.4,
+     "z": 1
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 3500,
+     "value": 3500
+    }
+   },
+   "economy": {
+    "buildTime": 700,
+    "cost": {
+     "alloys": 2800,
+     "energy": 28000
+    },
+    "maintenanceConsumption": {
+     "energy": 1400
+    }
+   },
+   "footprint": {
+    "x": 2,
+    "y": 2
+   },
+   "general": {
+    "class": [
+     "unitsDefaultEDA",
+     "EDAStructure"
+    ],
+    "displayName": "Tier 3: Radar",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "intel",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_intel.png",
+    "iconUIBuildSortPriority": 290,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Pause": false
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Intel": true
+    },
+    "tpId": "ues3701",
+    "unitTypeName": "EDAT3Radar"
+   },
+   "intel": {
+    "radarRadius": 750,
+    "visionRadius": 25
+   },
+   "skirtSize": {
+    "x": 4,
+    "y": 4
+   },
+   "tags": [
+    "BUILDABLE_BY_T3_ENGINEER",
+    "EDA",
+    "INTEL",
+    "RADAR",
+    "STRUCTURE",
+    "TECH3"
    ]
   },
   "uga1001": {
@@ -32641,6 +33236,107 @@
     }
    ]
   },
+  "ugs2701": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Base_Support",
+      "speed": {
+       "x": 0,
+       "y": 45,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 2.3,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 4.6,
+     "z": 1
+    }
+   },
+   "construction": {
+    "buildPower": 10,
+    "canBuild": "Tags.ugs3701",
+    "upgradesTo": "ugs3701"
+   },
+   "defence": {
+    "health": {
+     "max": 1250,
+     "regen": 2,
+     "value": 1250
+    }
+   },
+   "economy": {
+    "buildTime": 250,
+    "cost": {
+     "alloys": 250,
+     "energy": 2500
+    },
+    "maintenanceConsumption": {
+     "energy": 250
+    }
+   },
+   "footprint": {
+    "x": 2,
+    "y": 2
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardStructure"
+    ],
+    "displayName": "Tier 2: Radar",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "intel",
+     "tech": "t2"
+    },
+    "iconUI": "tech2_structure1_intel.png",
+    "iconUIBuildSortPriority": 290,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Pause": false,
+     "Stop": true
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Intel": true,
+     "Pause": false
+    },
+    "tpId": "ugs2701",
+    "unitTypeName": "GuardT2Radar"
+   },
+   "intel": {
+    "radarRadius": 250,
+    "visionRadius": 20
+   },
+   "skirtSize": {
+    "x": 4,
+    "y": 4
+   },
+   "tags": [
+    "BUILDABLE_BY_T2_ENGINEER",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "CONSTRUCTION",
+    "GUARD",
+    "INTEL",
+    "RADAR",
+    "STRUCTURE",
+    "TECH2"
+   ]
+  },
   "ugs3101": {
    "additions": {
     "rotators": [
@@ -33530,6 +34226,106 @@
      "damageRadius": 10,
      "damageType": "Normal"
     }
+   ]
+  },
+  "ugs3701": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Base_Support",
+      "speed": {
+       "x": 0,
+       "y": 45,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Bottom_Antena_Rotator",
+      "speed": {
+       "x": 0,
+       "y": -200,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 3.2,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 1,
+     "y": 6.4,
+     "z": 1
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 3500,
+     "regen": 3,
+     "value": 3500
+    }
+   },
+   "economy": {
+    "buildTime": 700,
+    "cost": {
+     "alloys": 2800,
+     "energy": 28000
+    },
+    "maintenanceConsumption": {
+     "energy": 1400
+    }
+   },
+   "footprint": {
+    "x": 2,
+    "y": 2
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardStructure"
+    ],
+    "displayName": "Tier 3: Radar",
+    "icon": {
+     "shape": "structure1",
+     "symbol": "intel",
+     "tech": "t3"
+    },
+    "iconUI": "tech3_structure1_intel.png",
+    "iconUIBuildSortPriority": 290,
+    "iconUIType": "land",
+    "name": "",
+    "orders": {
+     "Pause": false
+    },
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "toggles": {
+     "Intel": true
+    },
+    "tpId": "ugs3701",
+    "unitTypeName": "GuardT3Radar"
+   },
+   "intel": {
+    "radarRadius": 1000,
+    "visionRadius": 25
+   },
+   "skirtSize": {
+    "x": 4,
+    "y": 4
+   },
+   "tags": [
+    "BUILDABLE_BY_T3_ENGINEER",
+    "GUARD",
+    "INTEL",
+    "RADAR",
+    "STRUCTURE",
+    "TECH3"
    ]
   }
  },
