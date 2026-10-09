@@ -25,6 +25,9 @@ on first use).
 | `players.json` | The fitted player styles: `spam` (early factories) and `expand` (expand first). Rewritten by `balance.mjs calibrate`. |
 | `variants.json` | Named rulesets: a `changes.lua`, lobby options, and rules a template can't show (`startShare`). |
 | `targets.json` | The agreed pacing targets per map class (256, 512), with the reference maps. |
+| `check.mjs` | Runs a ruleset for each style, map and faction against the targets; the score `sweep.mjs` minimises (average player plus the rush rows). |
+| `sweep.mjs`, `proposed/*-levers.mjs` | Searches round-number lever settings against the targets: `node sweep.mjs proposed/stage1-levers.mjs --evals 1500`. A levers file lists each lever's choices, how it edits the templates, and `valid()` design rules the sim can't enforce itself (e.g. extractor upgrade payback). Exploration only: winners go into `changes.lua` and are re-checked through the real patch engine. |
+| `variants.mjs`, `rulesets/` | Loading rulesets; `rulesets/0.1.1.lua` keeps the released 0.1.1 patch to compare against. |
 
 ## What the numbers are
 

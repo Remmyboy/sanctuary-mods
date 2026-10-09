@@ -213,7 +213,7 @@ function role(id, n) {
 }
 const STAGE_FIELDS = { speedMax: 'top speed', acceleration: 'acceleration', rotationSpeed: 'turn rate (deg/s)', delay: 'starts at (s)' };
 const PLAIN = {
-  'economy.cost.alloys': 'alloys', 'economy.cost.energy': 'energy', 'economy.buildTime': 'build time', 'economy.production': 'income',
+  'economy.cost.alloys': 'alloys', 'economy.cost.energy': 'energy', 'economy.buildTime': 'build time', 'economy.production': 'income', 'economy.storage': 'storage', 'economy.cost': 'cost',
   'economy.production.alloys': 'alloys/s', 'economy.production.energy': 'energy/s', 'defence.health.max': 'health',
   'intel.visionRadius': 'vision', 'movement.speed': 'speed', 'general.displayName': 'name', tags: 'tags',
   'movement.type': 'homing', 'movement.speedMax': 'top speed', 'movement.acceleration': 'acceleration',
@@ -235,12 +235,13 @@ function fieldLabel(r) {
 }
 
 const num = v => (Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100));
-function show(v) {
+// Resource tables are rates (alloys/s) except storage and cost, which are amounts.
+function show(v, field = '') {
   if (v === null || v === undefined) return '(none)';
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   if (typeof v === 'number') return num(v);
   if (Array.isArray(v)) return v.length ? v.join(', ') : '(empty)';
-  if (typeof v === 'object') return Object.entries(v).map(([k, x]) => `${num(x)} ${k}/s`).join(' + ');
+  if (typeof v === 'object') return Object.entries(v).map(([k, x]) => `${num(x)} ${k}${/storage|cost/.test(field) ? '' : '/s'}`).join(' + ');
   return String(v);
 }
 
@@ -257,7 +258,7 @@ function itemsOf(rs) {
       text = `tag ${gone.join(', ')} -> ${added.join(', ')}`;
     } else {
       const label = fieldLabel(r);
-      text = r.after === null ? `${label} ${show(r.before)} removed` : `${label} ${show(r.before)} -> ${show(r.after)}`;
+      text = r.after === null ? `${label} ${show(r.before, r.field)} removed` : `${label} ${show(r.before, r.field)} -> ${show(r.after, r.field)}`;
     }
     if (!items.includes(text)) items.push(text);
   }
@@ -280,7 +281,7 @@ function preview() {
     for (const r of rs) {
       const u = unitInfo(r.kind, r.id);
       const name = `${r.id} ${u.nick ? u.nick + ' ' : ''}(${u.kind})`;
-      console.log(`  ${name.padEnd(48)} ${r.field.padEnd(42)} ${show(r.before)} -> ${show(r.after)}`);
+      console.log(`  ${name.padEnd(48)} ${r.field.padEnd(42)} ${show(r.before, r.field)} -> ${show(r.after, r.field)}`);
     }
   }
   for (const s of skipped) console.log(`SKIPPED ${s.section} ${s.id} ${s.fields.join(', ')}: the game's value changed`);
@@ -383,7 +384,7 @@ function changelog() {
   out.push(`- **Targeting** (with Fixes on): ${TARGETING_RULE}`);
   out.push(`- **Aircraft inside shields** (with Fixes on): ${SHIELD_RULE}`, '');
   out.push('## AI', '');
-  out.push('- **Stock AI**: builds generators to energy-to-alloy income targets x0.7 (20 -> 14 early; 13-15 -> 9.1-10.5 later), as land units cost 6 energy per alloy instead of 10 (with Unit costs on)', '');
+  out.push('- **Stock AI**: builds generators to energy-to-alloy income targets x0.7 (20 -> 14 early; 13-15 -> 9.1-10.5 later), as land units cost 6 energy per alloy instead of 10 (with Economy on)', '');
   out.push('## Why', '');
   for (const section of Sections) {
     const whys = [...new Set(records.filter(r => r.section === section.key).map(r => r.why))];
@@ -437,7 +438,7 @@ function exportJson(file) {
       changes: netChanges(records.filter(r => r.section === section.key)).map(n => ({ kind: n.kind, id: n.id, field: n.field, label: fieldLabel(n), before: n.before, after: n.after })),
     }])),
     skipped,
-    notes: [`Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with "fixes" on): ${TARGETING_RULE} Not a template change.`, `Shields (balancepatch/shields.lua, with the "fixes" section on): ${SHIELD_RULE} Not a template change.`, 'AI: the stock AI\'s energy-to-alloy income targets (LessThan/MoreThanEnergyToResourceRatioIncome in AI/AIFunctions.lua) are scaled by 0.7 when the "costs" section is on. Not a template change.'],
+    notes: [`Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with "fixes" on): ${TARGETING_RULE} Not a template change.`, `Shields (balancepatch/shields.lua, with the "fixes" section on): ${SHIELD_RULE} Not a template change.`, 'AI: the stock AI\'s energy-to-alloy income targets (LessThan/MoreThanEnergyToResourceRatioIncome in AI/AIFunctions.lua) are scaled by 0.7 when the "economy" section is on. Not a template change.'],
     units: Object.fromEntries(changedUnits.map(id => [id, trimmed(units[id])])),
     projectiles: Object.fromEntries(changedProjectiles.map(id => [id, trimmed(projectiles[id])])),
   };

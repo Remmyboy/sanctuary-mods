@@ -17,95 +17,20 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execFileSync } from 'child_process';
-import { simulate, DEFAULT_POLICY, FACTION_TAG } from './sim.mjs';
-import { readMap } from './maps.mjs';
+import { DEFAULT_POLICY, FACTION_TAG } from './sim.mjs';
+import { variants, loadVariant } from './variants.mjs';
+import { players, playersPath, styleNames, runStyle, fastestT2, checkVariant, fmtT, sum } from './check.mjs';
 import { cases, fit, runCase, error } from './calibrate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repo = path.resolve(here, '../../..');
-const modDir = path.resolve(here, '../..');
-const GAME = 'C:/Program Files (x86)/Steam/steamapps/common/Sanctuary Shattered Sun Playtest/engine';
-const LUA_DLL = `${GAME}/Sanctuary_Data/Plugins/x86_64/lua51.dll`;
 const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 
 const argv = process.argv.slice(2);
 const cmd = argv.shift();
 const flag = name => { const i = argv.indexOf(name); if (i < 0) return undefined; const v = argv[i + 1]; argv.splice(i, v && !v.startsWith('--') ? 2 : 1); return v && !v.startsWith('--') ? v : true; };
 
-// ---------------------------------------------------------------- rulesets
-
-const variants = readJson(path.join(here, 'variants.json'));
-const manifest = readJson(path.join(modDir, 'mod.json'));
-
-function optionString(spec) {
-  if (spec === 'vanilla') return 'vanilla';
-  const opts = Object.fromEntries(manifest.options.map(o => [o.key, o.default !== false]));
-  if (spec && typeof spec === 'object') Object.assign(opts, spec);
-  return Object.entries(opts).map(([k, v]) => `${k}=${v ? 1 : 0}`).join(',');
-}
-
-function gameRef() {
-  const dll = path.join(repo, 'tools/GameRef/bin/Release/net8.0/GameRef.dll');
-  if (!fs.existsSync(dll)) execFileSync('dotnet', ['build', path.join(repo, 'tools/GameRef/GameRef.csproj'), '-c', 'Release', '-v:quiet', '--nologo'], { stdio: 'inherit' });
-  return dll;
-}
-
-// A variant's dump, rebuilt when its changes file, the patch engine or the dumper are newer.
-export function loadVariant(name) {
-  const v = variants[name];
-  if (!v) throw new Error(`unknown variant ${name} (variants.json has ${Object.keys(variants).filter(k => k !== 'about').join(', ')})`);
-  const changes = path.resolve(here, v.changes || '../../lua/balancepatch/changes.lua');
-  const cacheDir = path.join(here, '.cache');
-  fs.mkdirSync(cacheDir, { recursive: true });
-  const out = path.join(cacheDir, name + '.json');
-  const opts = optionString(v.options);
-  const inputs = [changes, path.join(modDir, 'lua/balancepatch/patch.lua'), path.join(here, 'dump.lua'), path.join(here, 'variants.json')];
-  const stale = !fs.existsSync(out) || inputs.some(f => fs.statSync(f).mtimeMs > fs.statSync(out).mtimeMs);
-  if (stale) {
-    const msg = execFileSync('dotnet', [gameRef(), 'luarun', LUA_DLL, path.join(here, 'dump.lua'), `${GAME}/LJ/lua`, path.join(modDir, 'lua'), changes, opts, out]).toString().trim();
-    console.error(`dump ${name}: ${msg}`);
-  }
-  return { name, dump: readJson(out), rules: v.rules || {} };
-}
-
-// ---------------------------------------------------------------- players
-
-const playersPath = path.join(here, 'players.json');
-const players = fs.existsSync(playersPath) ? readJson(playersPath) : { styles: { default: { policy: {}, survival10: 0.6 } } };
-const styleNames = s => (s && s !== true ? s.split(',') : Object.keys(players.styles));
-
-function setup(variant, mapName, spawnNames, faction) {
-  const map = readMap(mapName);
-  const names = spawnNames || Object.keys(map.spawns).sort().slice(0, 2);
-  const [a, b] = names.map(n => { const s = map.spawns[n.toUpperCase()]; if (!s) throw new Error(`${mapName} has no ${n} (has ${Object.keys(map.spawns).join(' ')})`); return s; });
-  return { T: variant.dump.units, adjacency: variant.dump.adjacency, faction, map, spawn: a, enemies: [b], rules: variant.rules };
-}
-
-function runStyle(variant, mapName, spawns, style, faction, minutes) {
-  const st = players.styles[style];
-  const r = simulate({ ...setup(variant, mapName, spawns, faction), policy: { ...DEFAULT_POLICY, ...st.policy }, until: minutes * 60 });
-  for (const m of r.minutes) m.combatAlive = Math.round(m.combatBuilt * (st.survival10 ?? 1));
-  return r;
-}
-
-// Fastest T2 factory: the commander opens with k extractors and m generators, then a factory
-// that upgrades at once, with the commander assisting it or not.
-function fastestT2(variant, mapName, spawns, faction) {
-  let best = null;
-  for (let k = 0; k <= 3; k++) for (let m = 0; m <= 4; m++) for (const assist of [true, false]) {
-    const policy = { ...DEFAULT_POLICY, opening: [...Array(k).fill('mex'), ...Array(m).fill('pgen'), 'factory'], cmdRadius: 40,
-      engFirst: 0, engRate: 0, engPerSpot: 0, engMax: 0, facMax: 1, t2FacAt: 0, t2FacIncome: 0, assist, eMargin: 1.2, react: 0.5 };
-    const r = simulate({ ...setup(variant, mapName, spawns, faction), policy, until: 600 });
-    if (r.firstT2Factory != null && (!best || r.firstT2Factory < best.t)) best = { t: r.firstT2Factory, opening: `${k} mex, ${m} gen, factory${assist ? ', commander assists' : ''}` };
-  }
-  return best;
-}
-
 // ---------------------------------------------------------------- reports
 
-const fmtT = s => (s == null ? '-' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`);
-const sum = a => a.reduce((x, y) => x + y, 0);
 
 function ecoReport(variant) {
   const T = variant.dump.units;
@@ -148,37 +73,6 @@ function simReport(variant, mapName, spawns, styles, faction, minutes, trace) {
   }
 }
 
-function checkVariant(variant, styles, factions) {
-  const targets = readJson(path.join(here, 'targets.json')).classes;
-  const rows = [];
-  for (const [cls, tc] of Object.entries(targets)) {
-    const maxMin = Math.max(...Object.keys(tc.at).map(Number));
-    for (const style of styles) {
-      const agg = {};
-      let n = 0;
-      for (const { map, spawns } of tc.maps) for (const faction of factions) for (const order of [spawns, [...spawns].reverse()]) {
-        const r = runStyle(variant, map, order, style, faction, maxMin);
-        n++;
-        for (const [min, want] of Object.entries(tc.at)) for (const k of Object.keys(want)) {
-          const m = r.minutes.find(x => x.minute === +min);
-          const v = k === 'factories' ? sum(m.factories) : m[k];
-          (agg[`${min}|${k}`] ||= []).push(v);
-        }
-      }
-      for (const [min, want] of Object.entries(tc.at)) for (const [k, [lo, hi]] of Object.entries(want)) {
-        const vs = agg[`${min}|${k}`]; const avg = sum(vs) / vs.length;
-        const ok = (lo == null || avg >= lo) && (hi == null || avg <= hi);
-        rows.push({ cls, style, what: `${k} at ${min}:00`, want: `${lo ?? ''}-${hi ?? ''}`, got: `${avg.toFixed(avg < 100 ? 1 : 0)} (${Math.min(...vs).toFixed(0)}-${Math.max(...vs).toFixed(0)})`, ok, n });
-      }
-    }
-    // Fastest T2 factory: the best opening on any map of the class.
-    let fast = null;
-    for (const { map, spawns } of tc.maps) for (const faction of factions) { const b = fastestT2(variant, map, spawns, faction); if (b && (!fast || b.t < fast.t)) fast = { ...b, map }; }
-    const [lo, hi] = tc.fastestT2Factory;
-    rows.push({ cls, style: 'rush', what: 'fastest T2 factory', want: `${fmtT(lo)}-${fmtT(hi)}`, got: fast ? `${fmtT(fast.t)} (${fast.opening})` : 'none', ok: fast ? ((lo == null || fast.t >= lo) && (hi == null || fast.t <= hi)) : true });
-  }
-  return rows;
-}
 
 // ---------------------------------------------------------------- commands
 
@@ -207,7 +101,8 @@ if (cmd === 'dump') {
   console.log('class style  what                       target     ' + results.map(r => r.name.padEnd(30)).join(''));
   for (let i = 0; i < base.length; i++) {
     const b = base[i];
-    console.log(`${b.cls.padEnd(5)} ${b.style.padEnd(6)} ${b.what.padEnd(26)} ${b.want.padEnd(10)} ` + results.map(r => `${r.rows[i].ok ? 'ok  ' : 'MISS'} ${r.rows[i].got}`.padEnd(30)).join(''));
+    const want = b.what === 'fastest T2 factory' ? `${fmtT(b.lo)}-${fmtT(b.hi)}` : `${b.lo ?? ''}-${b.hi ?? ''}`;
+    console.log(`${b.cls.padEnd(5)} ${b.style.padEnd(6)} ${b.what.padEnd(26)} ${want.padEnd(10)} ` + results.map(r => `${r.rows[i].ok ? 'ok  ' : 'MISS'} ${r.rows[i].got}`.padEnd(34)).join(''));
   }
 } else if (cmd === 'calibrate') {
   const [calPath, rsPath] = argv;

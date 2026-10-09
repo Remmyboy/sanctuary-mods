@@ -2,9 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "Sanctuary Mods",
-  "description": "A community balance pass, measured in game: teching up pays, commanders earn less, land costs alloys and air costs energy, engineers can be raided, commanders' missiles, artillery, bombers and anti-air hit moving targets, point defences see their range, and T2 units beat their cost in T1. Fixes a bug where one broken bomber froze other units' targeting, and aircraft can no longer fire from inside a shield at what it covers. Each section can be turned off in the lobby.",
+  "description": "A rebalance designed from target match pacing: territory pays, the commander starts the game rather than carrying it, land costs alloys and air costs energy, T2 has to be paid for, engineers can be raided, and commanders' missiles, artillery, bombers and anti-air hit moving targets. Fixes a bug where one broken bomber froze other units' targeting, and aircraft can no longer fire from inside a shield at what it covers. Each section can be turned off in the lobby.",
   "kind": "gameplay",
   "luaRoot": "lua",
   "gameVersion": "0.0.1.20",
@@ -13,11 +13,7 @@
     { "key": "fixes", "label": "Fixes", "type": "toggle", "default": true,
       "description": "Bugs: a bomber with no muzzles stopped other units' targeting; aircraft inside a shield's bubble hit everything under it; the Chosen T2 point defence and the EDA T3 anti-air fighter shot the ground; bombs expired before they could land; the TALEN gunship was labelled tier 1." },
     { "key": "economy", "label": "Economy", "type": "toggle", "default": true,
-      "description": "Commanders make 3 alloys and 40 energy a second (were 5 and 50), T1 extractors make 2 alloys (were 1) and cost 400 energy (were 500), and T1 generators make 15 energy (were 10), so expanding matters; upgrading a factory to T2 takes longer (same cost), so rushing T2 at the start does too. T2 and T3 extractors and generators give more per cost than T1; T1 generators have less health." },
-    { "key": "costs", "label": "Unit costs", "type": "toggle", "default": true,
-      "description": "Land and naval units cost more alloys and less energy for the same total, and the AI builds less power to match. Chosen aircraft cost as much energy as the other factions'." },
-    { "key": "engineers", "label": "Engineers", "type": "toggle", "default": true,
-      "description": "Engineers have less than half their health, so raids on them work." },
+      "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with 750 alloys and 7500 energy (were 250 and 2500). T2 extractors make 5 (were 4); generators make 20/600/4500 energy (were 10/200/1000). Factories cost 300 alloys (were 150), and upgrading one to T2 costs 2500 (was 500). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health." },
     { "key": "commanders", "label": "Commanders", "type": "toggle", "default": true,
       "description": "The EDA and Guardian commanders' missiles fly at once and steer at where the target is going, in smaller, faster volleys: they hit moving units as often as the Chosen commander does." },
     { "key": "artillery", "label": "Artillery", "type": "toggle", "default": true,
@@ -27,10 +23,6 @@
     { "key": "defences", "label": "Defences", "type": "toggle", "default": true,
       "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them." },
     { "key": "units", "label": "Unit tuning", "type": "toggle", "default": true,
-      "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level." },
-    { "key": "startbank", "label": "Slower: 1-alloy extractors, bigger start", "type": "toggle", "default": false,
-      "description": "Off by default. T1 extractors make 1 alloy a second (2 with Economy on), and you start with 400 alloys and 4000 energy (were 250 and 2500); storage stays 500 and 5000. In a build-order simulation the most tanks by 7:00 fall from about 98 to 55 (the game: 72)." },
-    { "key": "costs15", "label": "Slower: everything costs 1.5x", "type": "toggle", "default": false,
-      "description": "Off by default. Every unit and building costs 1.5 times as much (build times unchanged), so the same income builds two thirds as much. In a build-order simulation the most tanks by 7:00 fall from about 98 to 49 (the game: 72), and the fastest T2 factory comes about 35 s later. With the other Slower option too, they stack." }
+      "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level." }
   ]
 }

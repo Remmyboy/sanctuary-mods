@@ -1,5 +1,5 @@
 {
-  "about": "Pacing targets agreed 2026-10-09 (REDESIGN-PLAN.md section 3), per player in a 1v1. Ranges are [min, max]; null = no bound. combatAlive is combatBuilt x the player style's measured survival at 10:00.",
+  "about": "Pacing targets agreed 2026-10-09 (REDESIGN-PLAN.md section 3), per player in a 1v1. Ranges are [min, max]; null = no bound. combatAlive is combatBuilt x the player style's measured survival at 10:00. A T2 rush is allowed but should be overrun: fastestT2Factory is the earliest T2 factory any opening reaches (seconds), rushFacing (25: about what kills a lone commander, from its health and DPS against T1 tanks) the combat units a factory-spamming opponent has alive at that moment (2026-10-09 reading of \"nobody really goes T2 before ~7 min because they'd be overrun\").",
   "classes": {
     "256": {
       "length": "5-15 min",
@@ -12,7 +12,8 @@
         "5": { "alloyIncome": [12, 16] },
         "10": { "alloyIncome": [18, 24], "combatAlive": [60, 80], "combatBuilt": [100, 130], "factories": [4, 7] }
       },
-      "fastestT2Factory": [420, null]
+      "fastestT2Factory": [240, null],
+      "rushFacing": [25, null]
     },
     "512": {
       "length": "20-30 min",
@@ -27,7 +28,8 @@
         "10": { "alloyIncome": [25, 30], "combatAlive": [60, 80], "combatBuilt": [110, 140], "factories": [5, 8] },
         "15": { "alloyIncome": [40, 50] }
       },
-      "fastestT2Factory": [420, null]
+      "fastestT2Factory": [240, null],
+      "rushFacing": [25, null]
     }
   }
 }

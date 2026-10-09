@@ -1,7 +1,10 @@
 {
-  "about": "Rulesets the balance tool knows. changes: a changes.lua (path relative to this file); options: \"vanilla\", \"defaults\" (mod.json's defaults) or {key: bool} over the defaults; rules: what the dump can't show (startShare: share of commander storage an army starts with; the game gives 0.5).",
+  "about": "Rulesets the balance tool knows. changes: a changes.lua (path relative to this file; default the mod's own); options: \"vanilla\", \"defaults\" (the mod's mod.json defaults) or {key: bool} over those defaults (a section the mod.json doesn't list is on unless set false here); rules: what the dump can't show (startShare: share of commander storage an army starts with; the game gives 0.5).",
   "vanilla": { "options": "vanilla" },
-  "0.1.1": { "changes": "../../lua/balancepatch/changes.lua", "options": "defaults" },
-  "0.1.1-startbank": { "changes": "../../lua/balancepatch/changes.lua", "options": { "startbank": true }, "rules": { "startShare": 0.8 } },
-  "0.1.1-costs15": { "changes": "../../lua/balancepatch/changes.lua", "options": { "costs15": true } }
+  "0.1.1": { "changes": "rulesets/0.1.1.lua", "options": { "costs": true, "engineers": true, "startbank": false, "costs15": false } },
+  "0.1.1-startbank": { "changes": "rulesets/0.1.1.lua", "options": { "costs": true, "engineers": true, "startbank": true, "costs15": false }, "rules": { "startShare": 0.8 } },
+  "0.1.1-costs15": { "changes": "rulesets/0.1.1.lua", "options": { "costs": true, "engineers": true, "startbank": false, "costs15": true } },
+  "stage1-base": { "changes": "rulesets/0.1.1.lua", "options": { "economy": false, "costs": false, "engineers": true, "startbank": false, "costs15": false },
+    "about": "0.1.1 with its economy and unit-cost sections off: the base stage 1's sweep rebuilt the economy on" },
+  "0.2.0": { "options": "defaults", "about": "The redesign as it stands in the mod (stage 1: economy)" }
 }

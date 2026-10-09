@@ -56,28 +56,55 @@ Sections = {
         },
     },
     {
-        -- Stage 1 of the 0.2 redesign (REDESIGN-PLAN.md): the economy as one section, so it is
-        -- never half on. Numbers from tools/balance (sweep.mjs, proposed/stage1-levers.mjs)
-        -- against tools/balance/targets.json; "simulated" in a note means that tool, not the game.
         key = "economy",
         changes = {
             {
-                why = "The commander makes 3 alloys and 30 energy a second (was 5 and 50): about three extractors' worth instead of five, so income comes from taking the map. It stores 1500 alloys and 15000 energy (was 500 and 5000), and an army starts with half of that, 750 and 7500 (was 250 and 2500), so the opening isn't starved.",
+                why = "Less commander income, so expanding matters more: the commander makes 3 alloys and 40 energy, and each T1 extractor 2. Lower (2 and 30 was tried) and the commander couldn't pay for its own building (5 and 50 a second), so factory-first openings stalled to about 55-70% speed from 1:00 to 3:00. At 3 and 40, with the cheaper extractors and stronger generators, no opening stalls and the T1 army at 5:00 is a little bigger than the game's (in a build-order simulation).",
                 tags = { "COMMAND" },
-                expect = { ["economy.production"] = { alloys = 5, energy = 50 }, ["economy.storage"] = { alloys = 500, energy = 5000 } },
-                set = { ["economy.production"] = { alloys = 3, energy = 30 }, ["economy.storage"] = { alloys = 1500, energy = 15000 } },
+                expect = { ["economy.production"] = { alloys = 5, energy = 50 } },
+                set = { ["economy.production"] = { alloys = 3, energy = 40 } },
             },
             {
-                why = "T2 extractors make 5 alloys a second (were 4): the upgrade (600 alloys) pays back in 150 s instead of 200 s, so small maps can grow by upgrading once their spots are taken.",
+                why = "Upgrading a factory to T2 takes longer (build time 800 to 1100, same cost), so going straight to T2 at the start takes longer: the fastest T2 land factory comes at about 2:20 instead of 1:50 (simulated), without starving the T1 opening.",
+                idPattern = "^u.s251[123]$",
+                expect = { ["economy.buildTime"] = 800 },
+                set = { ["economy.buildTime"] = 1100 },
+            },
+            {
+                why = "T1 extractors make up the commander's lost alloy income, but only where you have taken the map: 2 alloys a second (the game's panels already showed 1.5 as 2), and 400 energy to build instead of 500.",
+                idPattern = "^u.s1601$",
+                expect = { ["economy.production.alloys"] = 1, ["economy.cost.energy"] = 500 },
+                set = { ["economy.production.alloys"] = 2, ["economy.cost.energy"] = 400 },
+            },
+            {
+                why = "T2 extractors pay back their upgrade faster than before (about 300 s against 400 s) instead of being the worse deal.",
                 idPattern = "^u.s2601$",
                 expect = { ["economy.production.alloys"] = 4 },
-                set = { ["economy.production.alloys"] = 5 },
+                set = { ["economy.production.alloys"] = 6 },
             },
             {
-                why = "T1 generators make 20 energy a second (were 10): power is half of what everything costs, and a generator now supports a factory and a bit more.",
+                why = "T3 extractors likewise (upgrade pays back in about 400 s, was 670 s).",
+                idPattern = "^u.s3601$",
+                expect = { ["economy.production.alloys"] = 10 },
+                set = { ["economy.production.alloys"] = 16 },
+            },
+            {
+                why = "T1 generators give 15 energy a second (were 10), so early power comes quicker.",
                 idPattern = "^u.s1611$",
                 expect = { ["economy.production.energy"] = 10 },
-                set = { ["economy.production.energy"] = 20 },
+                set = { ["economy.production.energy"] = 15 },
+            },
+            {
+                why = "T2 generators give about 1.33x the energy per cost of T1 (were exactly equal): 400 a second.",
+                idPattern = "^u.s2611$",
+                expect = { ["economy.production.energy"] = 200 },
+                set = { ["economy.production.energy"] = 400 },
+            },
+            {
+                why = "T3 generators give 1.8x the energy per cost of T1 (were exactly equal): 2700 a second.",
+                idPattern = "^u.s3611$",
+                expect = { ["economy.production.energy"] = 1000 },
+                set = { ["economy.production.energy"] = 2700 },
             },
             {
                 why = "T1 generators had 10x the health per energy of T2 and T3 ones.",
@@ -85,42 +112,17 @@ Sections = {
                 expect = { ["defence.health.max"] = 800 },
                 set = { ["defence.health.max"] = 500, ["defence.health.value"] = 500 },
             },
+        },
+    },
+    {
+        key = "costs",
+        changes = {
             {
-                why = "T2 generators give 1.5x the energy per cost of T1 ones (were equal): 600 a second.",
-                idPattern = "^u.s2611$",
-                expect = { ["economy.production.energy"] = 200 },
-                set = { ["economy.production.energy"] = 600 },
-            },
-            {
-                why = "T3 generators give 2.25x the energy per cost of T1 ones (were equal): 4500 a second.",
-                idPattern = "^u.s3611$",
-                expect = { ["economy.production.energy"] = 1000 },
-                set = { ["economy.production.energy"] = 4500 },
-            },
-            {
-                why = "T1 factories cost 300 alloys and 3000 energy (were 150 and 1500), so a factory is a decision, not something to spam: in a simulated 10 minutes players end with 5-7 instead of 10-20.",
-                idPattern = "^u.s151[123]$",
-                expect = { ["economy.cost"] = { alloys = 150, energy = 1500 } },
-                set = { ["economy.cost"] = { alloys = 300, energy = 3000 } },
-            },
-            {
-                why = "Upgrading a factory to T2 costs 2500 alloys and 25000 energy (was 500 and 5000; same build time). The fastest T2 factory any opening reaches moves from about 1:50 to about 6:00 (simulated), and a player who rushes it faces an army of 20-25 T1 units with nothing but a commander.",
-                idPattern = "^u.s251[123]$",
-                expect = { ["economy.cost"] = { alloys = 500, energy = 5000 } },
-                set = { ["economy.cost"] = { alloys = 2500, energy = 25000 } },
-            },
-            {
-                why = "T3 factory upgrades in proportion: 6000 alloys and 60000 energy (were 2000 and 20000). Not yet simulated past 15 minutes; checked again in stage 2.",
-                idPattern = "^u.s351[123]$",
-                expect = { ["economy.cost"] = { alloys = 2000, energy = 20000 } },
-                set = { ["economy.cost"] = { alloys = 6000, energy = 60000 } },
-            },
-            {
-                why = "Land and naval units cost 6 energy per alloy (were 10), same alloys: land units are paid for with the map, aircraft with the base.",
+                why = "Land and naval units cost more alloys and less energy (energy per alloy 10 -> 6) for the same total value.",
                 tags = { "MOBILE" },
                 notTags = { "AIR", "COMMAND", "CONSTRUCTION", "COMBAT_ENGINEER" },
                 round = true,
-                scale = { ["economy.cost.energy"] = 0.6 },
+                scale = { ["economy.cost.alloys"] = 1.25, ["economy.cost.energy"] = 0.75 },
             },
             {
                 why = "Chosen aircraft cost half the energy of EDA and Guardian ones with the same stats. Now 20 energy per alloy like theirs.",
@@ -128,6 +130,11 @@ Sections = {
                 round = true,
                 scale = { ["economy.cost.energy"] = 2 },
             },
+        },
+    },
+    {
+        key = "engineers",
+        changes = {
             {
                 why = "T1 engineers had 750 health, five to ten times a T1 raider's, so raiding them barely worked.",
                 tags = { "ENGINEER", "TECH1" },
@@ -360,6 +367,32 @@ Sections = {
                 ids = { "uel1101" },
                 round = true,
                 scale = { ["economy.cost.alloys"] = 1.55, ["economy.cost.energy"] = 1.55 },
+            },
+        },
+    },
+    -- The two sections below are off by default (their lobby options default to false). Each
+    -- slows the economy above a different way; with both on they stack.
+    {
+        key = "startbank",
+        changes = {
+            {
+                why = "Slower economy, a bigger start: T1 extractors make 1 alloy a second again (2 in the default economy).",
+                idPattern = "^u.s1601$",
+                expect = { ["economy.production.alloys"] = 2 },
+                set = { ["economy.production.alloys"] = 1 },
+            },
+            -- With this option on, armies also start with 80% of their commander's storage
+            -- (400 alloys, 4000 energy) instead of half: append to host/units/unitsClasses/unitsDefault.lua.
+        },
+    },
+    {
+        key = "costs15",
+        changes = {
+            {
+                why = "Slower economy, dearer everything: every unit and building costs 1.5 times as much, so the same income builds two thirds as much. Build times are unchanged, so each builder drains 1.5 times as much while it works.",
+                notTags = { "COMMAND" },
+                round = true,
+                scale = { ["economy.cost.alloys"] = 1.5, ["economy.cost.energy"] = 1.5 },
             },
         },
     },

@@ -542,8 +542,39 @@ Ranges run from the expand style to the spam style. Read in the sim:
 - Vanilla's weak T2 extractors leave its 15-minute income short.
 - **Nothing stops a ~2:00 T2 factory.** That is the first economy fix.
 
-Next: stage 1. Write `proposed/changes.lua`, sweep the economy levers in
-§5 against `targets.json`, then you play one medium game.
+### Stage 1: economy (2026-10-09, simulated; not yet played)
+
+The sweep (`sweep.mjs proposed/stage1-levers.mjs`, 1500 evaluations, then all
+factions) chose these, now in the mod as 0.2.0's `economy` section:
+
+- **Commander:** 3 A and 30 E/s; storage 1500/15000, so the start is 750/7500.
+- **Extractors:** 1 / 5 / 10 A/s. T2 upgrades pay back in 150 s, T3 in 400 s.
+- **Generators:** 20 / 600 / 4500 E/s.
+- **Land units:** same alloys, 6 energy per alloy.
+- **Factories:** T1 300 A. The T2 upgrade costs 2500 A, same build time. T3
+  6000 A (unswept).
+- Engineers' health cut, and the Chosen air fix, as in 0.1.1.
+
+| Target | vanilla | 0.1.1 | 0.2.0 |
+| --- | --- | --- | --- |
+| Fastest T2 factory (≥ 4:00) | 1:48 | 1:58 | 5:55 |
+| Spam units alive at that moment (≥ 25) | 0 | 0 | 20–24 |
+| 256: units built by 10:00, average player (100–130) | 117 | 149 | 102 |
+| 512: income at 10:00 (25–30) | 27.8 | 48.0 | 27.8 |
+| 512: units built by 10:00 (110–140) | 115 | 147 | 112 |
+| 256: income at 10:00 (18–24) | 17.7 | 28.2 | 16.3 |
+| 512: income at 15:00 (40–50) | 33.0 | 56.7 | 36.0 |
+
+The last two rows miss, and both depend on when players tech, which the sim
+assumes (8:00) rather than knows. Real players teched later: in the 17-minute
+256 game both held every spot from ~7:00 and never upgraded an extractor.
+
+**Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
+
+- when you first upgrade an extractor and a factory, and why;
+- whether 3 alloys from the commander plus 750 in the bank feels right
+  through the first two minutes;
+- whether factories at 300 hold back spam without making the opening drag.
 
 ---
 
