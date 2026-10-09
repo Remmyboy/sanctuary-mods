@@ -1700,6 +1700,15 @@ Each section is a lobby option, all on by default:
   brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
   brought level.
 
+Two more options slow the economy down and are **off** by default; with both
+on they stack:
+
+- **Slower: 1-alloy extractors, bigger start:** T1 extractors make 1 alloy a
+  second, and armies start with 400 alloys and 4000 energy (storage stays
+  500 and 5000).
+- **Slower: everything costs 1.5x:** every unit and building costs 1.5 times
+  as much; build times are unchanged.
+
 Every change, number by number, is in
 [`CHANGELOG.md`](BalancePatch/CHANGELOG.md), and as data in
 [`balancepatch.json`](BalancePatch/balancepatch.json): each change as before

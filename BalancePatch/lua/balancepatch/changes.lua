@@ -370,4 +370,30 @@ Sections = {
             },
         },
     },
+    -- The two sections below are off by default (their lobby options default to false). Each
+    -- slows the economy above a different way; with both on they stack.
+    {
+        key = "startbank",
+        changes = {
+            {
+                why = "Slower economy, a bigger start: T1 extractors make 1 alloy a second again (2 in the default economy).",
+                idPattern = "^u.s1601$",
+                expect = { ["economy.production.alloys"] = 2 },
+                set = { ["economy.production.alloys"] = 1 },
+            },
+            -- With this option on, armies also start with 80% of their commander's storage
+            -- (400 alloys, 4000 energy) instead of half: append to host/units/unitsClasses/unitsDefault.lua.
+        },
+    },
+    {
+        key = "costs15",
+        changes = {
+            {
+                why = "Slower economy, dearer everything: every unit and building costs 1.5 times as much, so the same income builds two thirds as much. Build times are unchanged, so each builder drains 1.5 times as much while it works.",
+                notTags = { "COMMAND" },
+                round = true,
+                scale = { ["economy.cost.alloys"] = 1.5, ["economy.cost.energy"] = 1.5 },
+            },
+        },
+    },
 }
