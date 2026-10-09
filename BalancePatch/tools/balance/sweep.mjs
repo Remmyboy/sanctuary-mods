@@ -1,10 +1,11 @@
 // Searches lever settings (a levers module, e.g. proposed/stage1-levers.mjs) for the ones that
 // meet targets.json best, by simulation. Random starts, then one-lever-at-a-time improvement.
 //
-//   node sweep.mjs <levers.mjs> [--evals N] [--seed S] [--top K] [--fix lever=value,...]
+//   node sweep.mjs <levers.mjs> [--evals N] [--seed S] [--top K] [--fix lever=value,...] [--dump all.json]
 //
 // Fast settings while searching (EDA only, the quick rush openings); the best few are then
 // re-checked with all factions and every rush opening. Output: the best settings and their rows.
+import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { loadVariant } from './variants.mjs';
@@ -12,7 +13,8 @@ import { checkVariant, score, fmtT } from './check.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, d) => { const i = argv.indexOf(name); if (i < 0) return d; const v = argv[i + 1]; argv.splice(i, 2); return v; };
-const evals = +flag('--evals', 200), seed0 = +flag('--seed', 7), top = +flag('--top', 3);
+const evals = +flag('--evals', 200), seed0 = +flag('--seed', 7), top = +flag('--top', 3), dumpTo = flag('--dump');
+const all = []; // every ruleset evaluated, for --dump
 const fixed = Object.fromEntries((flag('--fix', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); return [k, +v]; }));
 const mod = await import(pathToFileURL(path.resolve(argv[0])).href);
 const { levers } = mod;
@@ -37,6 +39,7 @@ function evaluate(settings, full = false) {
   const rows = checkVariant(variantFor(settings), undefined, full ? ['e', 'c', 'g'] : ['e'], { quickRush: !full });
   const r = { settings, rows, score: score(rows, WEIGHTS) };
   cache.set(key, r);
+  if (!full) all.push({ settings, score: r.score, metrics: Object.fromEntries(rows.filter(x => x.style === 'avg' || x.style === 'rush').map(x => [`${x.cls} ${x.what}`, x.value === Infinity ? null : +x.value.toFixed(2)])) });
   return r;
 }
 
@@ -66,6 +69,7 @@ while (n < evals) {
   results.push(cur);
   console.error(`${n}/${evals} evaluations, ${((Date.now() - t0) / 1000).toFixed(0)} s, best so far ${Math.min(...results.map(r => r.score)).toFixed(4)}`);
 }
+if (dumpTo) fs.writeFileSync(dumpTo, JSON.stringify({ levers: Object.fromEntries(names.map(k => [k, levers[k].choices])), evaluations: all }));
 const uniq = [...new Map(results.map(r => [JSON.stringify(r.settings), r])).values()].sort((a, b) => a.score - b.score).slice(0, top);
 for (const r of uniq) {
   const full = evaluate(r.settings, true);
