@@ -384,6 +384,34 @@ Sections = {
                 expect = { ["defence.health.max"] = 2250 },
                 set = { ["movement.speed"] = 4.5, ["movement.acceleration"] = 4.5, ["weapons.*.aimControllers.*.yawSpeed"] = 180, ["weapons.*.aimControllers.*.pitchSpeed"] = 90, ["defence.health.max"] = 1500, ["defence.health.value"] = 1500 },
             },
+            {
+                why = "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in.",
+                ids = { "uel4002", "ucl4001", "ugl4001" },
+                expect = { ["movement.speed"] = 2 },
+                set = { ["movement.speed"] = 3.5, ["movement.acceleration"] = 3.5, ["movement.rotationSpeed"] = 70 },
+            },
+            {
+                why = "Ares main and side guns swing at 90 degrees a second (were 45).",
+                ids = { "ucl4001" },
+                set = { ["weapons.1.aimControllers.*.yawSpeed"] = 90, ["weapons.2.aimControllers.*.yawSpeed"] = 90, ["weapons.3.aimControllers.*.yawSpeed"] = 90 },
+            },
+            {
+                why = "Behemoth and Guardian beam bot main guns swing at 90 degrees a second (were 45).",
+                ids = { "uel4002", "ugl4001" },
+                set = { ["weapons.1.aimControllers.*.yawSpeed"] = 90 },
+            },
+            {
+                why = "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it.",
+                ids = { "ucl4003", "ucl4401" },
+                expect = { ["movement.speed"] = 2 },
+                set = { ["movement.speed"] = 3, ["movement.acceleration"] = 3, ["movement.rotationSpeed"] = 60 },
+            },
+            {
+                why = "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should.",
+                ids = { "uel4001", "ugl4011", "ucl4002", "ucl4004" },
+                expect = { ["movement.speed"] = 2 },
+                set = { ["movement.speed"] = 2.5, ["movement.acceleration"] = 2.5, ["movement.rotationSpeed"] = 50 },
+            },
         },
     },
 }

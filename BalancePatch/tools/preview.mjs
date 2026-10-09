@@ -382,7 +382,10 @@ function changelog() {
   }
   out.push('## Rules', '');
   out.push(`- **Targeting** (with Fixes on): ${TARGETING_RULE}`);
-  out.push(`- **Aircraft inside shields** (with Fixes on): ${SHIELD_RULE}`, '');
+  out.push(`- **Aircraft inside shields** (with Fixes on): ${SHIELD_RULE}`);
+  out.push('- **Start** (with Economy on): an army starts with its commander\'s storage full, 500 alloys and 5000 energy (the game gives half)');
+  out.push('- **Reclaim** (with Economy on): wrecks reclaim 3x as fast (the game takes the unit\'s build time); a wreck still holds half the unit\'s alloys');
+  out.push('- **Wrecks** (with Economy on): last 6 minutes before they disappear (were 3)', '');
   out.push('## AI', '');
   out.push('- **Stock AI**: builds generators to energy-to-alloy income targets x0.7 (20 -> 14 early; 13-15 -> 9.1-10.5 later), as land units cost 6 energy per alloy instead of 10 (with Economy on)', '');
   out.push('## Why', '');

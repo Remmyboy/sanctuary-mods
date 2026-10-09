@@ -12,6 +12,19 @@ function ReadProjectileTemplate(tp, tpId, ...)
     return balancePatchReadProjectileTemplate(tp, tpId, ...)
 end
 
+-- "economy" section: wrecks reclaim 3x as fast. GenerateUnitWreckage gives a wreck its
+-- unit's build time as harvestTime; reclaim progress and income both run off it, so a
+-- third of it is three times the rate for the same total.
+local balancePatchReclaimSpeed = 3
+local balancePatchReadPropTemplate = ReadPropTemplate
+function ReadPropTemplate(tp, tpId, ...)
+    if tp and tp.general and tp.general.unitTpId and tp.economy and tp.economy.harvestTime
+        and Import("modoptions/sanctuarymods.balancepatch.lua").Options.economy ~= false then
+        tp.economy.harvestTime = math.max(1, tp.economy.harvestTime / balancePatchReclaimSpeed)
+    end
+    return balancePatchReadPropTemplate(tp, tpId, ...)
+end
+
 local balancePatchLoadAllTemplates = LoadAllTemplates
 function LoadAllTemplates(...)
     local result = { balancePatchLoadAllTemplates(...) }

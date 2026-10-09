@@ -602,6 +602,14 @@ so the rush target now misses on both classes; 512 income at 15:00 rises from
 39 to 45. A longer T2 build time doesn't restore it (bt 1600-3200 at 1500 A:
 3:51-4:26): the rush is gated by cost, not time.
 
+**0.2.3 (unreleased, 2026-10-09, the user's calls):** wrecks reclaim 3x as
+fast (ReadPropTemplate append divides a wreck's harvestTime, the unit's build
+time, by 3; same total) and last 360 s instead of 180 (wreckageClass append
+swaps the delete timer HostWreckage:__init starts). T4 walkers sped up by role
+(were all 2): brawlers 3.5 with hull 70 and main-gun yaw 90 (Behemoth, Ares,
+Guardian beam bot); Djinn and Athena 3 (hull 60); Centaur, Quasar, Tripod and
+the Chosen big bot 2.5 (hull 50). Not modelled by the sim; not played.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

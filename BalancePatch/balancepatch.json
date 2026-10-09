@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.2"
+  "version": "0.2.3"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-09T18:57:45.582Z",
+ "generated": "2026-10-09T19:07:57.729Z",
  "sections": [
   {
    "key": "fixes",
@@ -21,7 +21,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 300 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
+   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 300 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
    "default": true
   },
   {
@@ -51,7 +51,7 @@
   {
    "key": "units",
    "label": "Unit tuning",
-   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still but fragile.",
+   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still but fragile; T4 bots move at 2.5-3.5 (were 2), brawlers fastest.",
    "default": true
   }
  ],
@@ -5402,6 +5402,584 @@
    "why": [
     "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
    ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 3.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 70,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 3.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 70,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 3.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 70,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Ares main and side guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "weapons.2.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Ares main and side guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4001",
+   "name": "Ares",
+   "displayName": "Tier 4: Bot",
+   "faction": "Chosen",
+   "field": "weapons.3.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Ares main and side guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4002",
+   "name": "Behemoth",
+   "displayName": "Tier 4: Mech",
+   "faction": "EDA",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "artillery yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Behemoth and Guardian beam bot main guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.1.yawSpeed",
+   "label": "yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Behemoth and Guardian beam bot main guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.2.yawSpeed",
+   "label": "yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Behemoth and Guardian beam bot main guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4001",
+   "name": null,
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "weapons.1.aimControllers.3.yawSpeed",
+   "label": "yawSpeed",
+   "before": 45,
+   "after": 90,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Behemoth and Guardian beam bot main guns swing at 90 degrees a second (were 45)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4003",
+   "name": "Djinn",
+   "displayName": "Tier 4: Bot Hover",
+   "faction": "Chosen",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 60,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4401",
+   "name": "Athena",
+   "displayName": "Tier 4: Mobile Shield",
+   "faction": "Chosen",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4401",
+   "name": "Athena",
+   "displayName": "Tier 4: Mobile Shield",
+   "faction": "Chosen",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 3,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4401",
+   "name": "Athena",
+   "displayName": "Tier 4: Mobile Shield",
+   "faction": "Chosen",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 60,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4002",
+   "name": null,
+   "displayName": "Tier 4: Tripod Bot",
+   "faction": "Chosen",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 50,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucl4004",
+   "name": null,
+   "displayName": "Tier 4: Bot Big",
+   "faction": "Chosen",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 50,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "uel4001",
+   "name": "Centaur",
+   "displayName": "Tier 4: Railgun Sniper",
+   "faction": "EDA",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 50,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "movement.speed",
+   "label": "speed",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "movement.acceleration",
+   "label": "acceleration",
+   "before": 2,
+   "after": 2.5,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "movement.rotationSpeed",
+   "label": "turn rate (deg/s)",
+   "before": 40,
+   "after": 50,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+   ]
   }
  ],
  "optional": {},
@@ -10083,7 +10661,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -10111,9 +10689,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 70,
     "sortOrder": 1,
-    "speed": 2,
+    "speed": 3.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed"
    },
@@ -10151,7 +10729,7 @@
        "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 45
+       "yawSpeed": 90
       }
      ],
      "damage": 4000,
@@ -10203,7 +10781,7 @@
        "yawBone": "Turret02_Yaw01",
        "yawMax": 180,
        "yawMin": -20,
-       "yawSpeed": 45
+       "yawSpeed": 90
       }
      ],
      "damage": 100,
@@ -10260,7 +10838,7 @@
        "yawBone": "Turret03_Yaw01",
        "yawMax": 20,
        "yawMin": -180,
-       "yawSpeed": 45
+       "yawSpeed": 90
       }
      ],
      "damage": 100,
@@ -10377,7 +10955,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 2.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -10405,9 +10983,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 50,
     "sortOrder": 1,
-    "speed": 2,
+    "speed": 2.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed"
    },
@@ -10698,7 +11276,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -10714,9 +11292,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0.35,
     "referenceAltitude": "GroundOrWater",
-    "rotationSpeed": 40,
+    "rotationSpeed": 60,
     "sortOrder": 1,
-    "speed": 2,
+    "speed": 3,
     "terrainAlignmentFactor": 0,
     "type": "Hover"
    },
@@ -11042,7 +11620,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 2.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -11070,9 +11648,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 50,
     "sortOrder": 1,
-    "speed": 2,
+    "speed": 2.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed"
    },
@@ -12183,7 +12761,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -12199,9 +12777,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0.35,
     "referenceAltitude": "GroundOrWater",
-    "rotationSpeed": 40,
+    "rotationSpeed": 60,
     "sortOrder": 4,
-    "speed": 2,
+    "speed": 3,
     "terrainAlignmentFactor": 0,
     "type": "Hover"
    },
@@ -20954,7 +21532,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 2.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -20968,9 +21546,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 50,
     "sortOrder": 6,
-    "speed": 2,
+    "speed": 2.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsLand"
    },
@@ -21162,7 +21740,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -21176,9 +21754,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 70,
     "sortOrder": 6,
-    "speed": 2,
+    "speed": 3.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsLand"
    },
@@ -21210,7 +21788,7 @@
        "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 45
+       "yawSpeed": 90
       },
       {
        "aimBone": "Turret01_Pitch01",
@@ -28393,7 +28971,7 @@
     "visionRadius": 25
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 3.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -28421,9 +28999,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 70,
     "sortOrder": 1,
-    "speed": 2,
+    "speed": 3.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed",
     "walkAnimation": {
@@ -28459,7 +29037,7 @@
        "yawBone": "Turret01_Yaw01",
        "yawMax": 180,
        "yawMin": -180,
-       "yawSpeed": 45
+       "yawSpeed": 90
       },
       {
        "aimBone": "Turret01_Muzzle01",
@@ -28477,7 +29055,7 @@
        "yawBone": "Turret01_Yaw02",
        "yawMax": 10,
        "yawMin": -45,
-       "yawSpeed": 45
+       "yawSpeed": 90
       },
       {
        "aimBone": "Turret01_Muzzle03",
@@ -28495,7 +29073,7 @@
        "yawBone": "Turret01_Yaw03",
        "yawMax": 45,
        "yawMin": -10,
-       "yawSpeed": 45
+       "yawSpeed": 90
       }
      ],
      "beamLifetime": -1,
@@ -28613,7 +29191,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2,
+    "acceleration": 2.5,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -28641,9 +29219,9 @@
     "orbitSpeed": 0,
     "preferredAltitude": 0,
     "referenceAltitude": "Ground",
-    "rotationSpeed": 40,
+    "rotationSpeed": 50,
     "sortOrder": 3,
-    "speed": 2,
+    "speed": 2.5,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed",
     "walkAnimation": {
