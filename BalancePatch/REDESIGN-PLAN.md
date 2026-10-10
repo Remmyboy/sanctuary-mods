@@ -672,6 +672,17 @@ and rack timing): T1 1.68, T2 0.37-0.62, T3 Ravager 0.22. T2 raised to 0.65
 (health and damage together); the Chosen T3 to 7000 health (the user's cap)
 and 2.24x damage, about 0.3.
 
+**0.2.8 (unreleased, 2026-10-10, the user's call from a Fields of Isis game):**
+the T2 factory upgrade at 1500 alloys came too late to matter: by the time
+it was paid for the game was already won with T1 tanks. Now 1000 alloys and
+10000 energy over 90 s (build time 900, was 800; a T1 factory's build power
+is 10): about 11 alloys and 111 energy a second while it runs, was 19 and
+188. The user accepts an earlier T2 rush. The sim (`diff 0.2.7 0.2.8`)
+moves the fastest T2 factory from 4:04 to 2:45 on both reference maps
+(the 500-alloy start bank pays half of it), facing 2 spam units alive
+instead of 6; 512 alloy income at 15:00 rises 42 -> 46 with the assumed
+9:00 T2 factory. Nothing else in the pacing table moves.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

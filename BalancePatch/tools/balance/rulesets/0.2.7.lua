@@ -110,10 +110,10 @@ Sections = {
                 set = { ["economy.cost"] = { alloys = 200, energy = 2000 } },
             },
             {
-                why = "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first.",
+                why = "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach.",
                 idPattern = "^u.s251[123]$",
-                expect = { ["economy.cost"] = { alloys = 500, energy = 5000 }, ["economy.buildTime"] = 800 },
-                set = { ["economy.cost"] = { alloys = 1000, energy = 10000 }, ["economy.buildTime"] = 900 },
+                expect = { ["economy.cost"] = { alloys = 500, energy = 5000 } },
+                set = { ["economy.cost"] = { alloys = 1500, energy = 15000 } },
             },
             {
                 why = "Upgrading a factory to T3 costs 4000 alloys and 40000 energy (was 2000 and 20000; same build time).",

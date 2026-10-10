@@ -12,5 +12,6 @@
   "0.2.4": { "changes": "rulesets/0.2.4.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.4: T4 game enders, T1 factories 200" },
   "0.2.5": { "changes": "rulesets/0.2.5.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.5: radar costs" },
   "0.2.6": { "changes": "rulesets/0.2.6.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.6: AA hits, T4 0.8x" },
-  "0.2.7": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod" }
+  "0.2.7": { "changes": "rulesets/0.2.7.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.7: T4s re-scored, PDs, Nitro, Guardian T2 AA" },
+  "0.2.8": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod" }
 }

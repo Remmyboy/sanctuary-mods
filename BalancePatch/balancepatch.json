@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.7"
+  "version": "0.2.8"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-10T11:40:35.120Z",
+ "generated": "2026-10-10T18:25:52.654Z",
  "sections": [
   {
    "key": "fixes",
@@ -21,7 +21,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1500 (was 500) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250 energy a second (was 150) and T3 radar costs 2800 alloys (was 700) and 1400 energy a second (was 350); EDA and Chosen T3 radar see 750 and 850 (were 450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
+   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1000 (was 500) over 90 s (was 80) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250 energy a second (was 150) and T3 radar costs 2800 alloys (was 700) and 1400 energy a second (was 350); EDA and Chosen T3 radar see 750 and 850 (were 450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
    "default": true
   },
   {
@@ -1033,14 +1033,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2511",
+   "name": null,
+   "displayName": "Tier 2: Land Factory",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1056,14 +1073,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2512",
+   "name": null,
+   "displayName": "Tier 2: Air Factory",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1079,14 +1113,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2513",
+   "name": null,
+   "displayName": "Tier 2: Naval Factory",
+   "faction": "Chosen",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1102,14 +1153,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2511",
+   "name": null,
+   "displayName": "Tier 2: Land Factory",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1125,14 +1193,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2512",
+   "name": null,
+   "displayName": "Tier 2: Air Factory",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1148,14 +1233,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2513",
+   "name": null,
+   "displayName": "Tier 2: Naval Factory",
+   "faction": "EDA",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1171,14 +1273,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2511",
+   "name": null,
+   "displayName": "Tier 2: Land Factory",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1194,14 +1313,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2512",
+   "name": null,
+   "displayName": "Tier 2: Air Factory",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -1217,14 +1353,31 @@
     "energy": 5000
    },
    "after": {
-    "alloys": 1500,
-    "energy": 15000
+    "alloys": 1000,
+    "energy": 10000
    },
    "sections": [
     "economy"
    ],
    "why": [
-    "Upgrading a factory to T2 costs 1500 alloys and 15000 energy (was 500 and 5000; same build time), so T2 has to be paid for without being out of reach."
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2513",
+   "name": null,
+   "displayName": "Tier 2: Naval Factory",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 800,
+   "after": 900,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "Upgrading a factory to T2 costs 1000 alloys and 10000 energy (was 500 and 5000) and takes 90 s (was 80): about 11 alloys a second while it runs, so T2 has to be paid for without losing the game to T1 spam first."
    ]
   },
   {
@@ -19549,10 +19702,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
@@ -19674,10 +19827,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
@@ -19782,10 +19935,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
@@ -30249,10 +30402,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     },
     "storage": {
      "energy": 2000
@@ -30377,10 +30530,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     },
     "storage": {
      "energy": 2000
@@ -30489,10 +30642,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
@@ -39001,10 +39154,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
@@ -39145,10 +39298,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
@@ -39254,10 +39407,10 @@
     }
    },
    "economy": {
-    "buildTime": 800,
+    "buildTime": 900,
     "cost": {
-     "alloys": 1500,
-     "energy": 15000
+     "alloys": 1000,
+     "energy": 10000
     }
    },
    "footprint": {
