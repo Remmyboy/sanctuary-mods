@@ -67,6 +67,9 @@ public class Probe : BaseUnityPlugin
   pfield <plugin> <member> [value]   an instance field/property of the live plugin object
   replay <path|latest>        play a .sanreplay
   seek <tick> | speed <x> | pause | resume | replaystate   ReplayManager's player
+  simspeed <x>                the replay's raw sim speed, past ReplayManager's 16x cap
+  camera <0|1>                the main camera draws nothing / again (culling mask; UI stays)
+  waittick <tick> [secs]      hold until the replay reaches tick; prints time, ticks/s, fps
   lobby [maxPlayers] [map]    private Steam lobby (default 2 players, The Forge)
   lan [port]                  later lobbies use the LAN backend (no Steam needed; default port 7777)
   maps [text|*]               stock maps; installed map folders matching <text> (* = all)
@@ -90,6 +93,7 @@ public class Probe : BaseUnityPlugin
     private string _waitWhat;
     private float _poll, _alive;
     private int _depth = 2;
+    private int? _cameraMask;   // the main camera's culling mask while `camera 0` blanks it
     private string _instance;
 
     private void Awake()
@@ -370,6 +374,55 @@ public class Probe : BaseUnityPlugin
             case "pause": Out(Call("SanctuaryHud.Replays.ReplayPlayer.Paused", new[] { "true" })); break;
             case "resume": Out(Call("SanctuaryHud.Replays.ReplayPlayer.Paused", new[] { "false" })); break;
             case "replaystate": Out(ReplayState()); break;
+            // Past ReplayManager's 16x: the game clamps in SetReplaySpeed,
+            // the field underneath is plain.
+            case "simspeed":
+            {
+                var x = float.Parse(a[0], System.Globalization.CultureInfo.InvariantCulture);
+                ref var d = ref EM.Engine.ClientEngine.Data;
+                d.globalEngineData.globalTime.simSpeed = x;
+                d.localEngineData.localTime.globalTime.simSpeed = x;
+                Out("simspeed " + x);
+                break;
+            }
+            // Draws nothing rather than disabling the camera: the game's
+            // render systems read Camera.main every frame, and a disabled
+            // one is null to them (NREs, then a d3d11 crash, 2026-10-10).
+            case "camera":
+            {
+                var cam = Camera.main;
+                if (cam == null) { Out("(no main camera)"); break; }
+                if (a[0] == "0")
+                {
+                    if (_cameraMask == null) _cameraMask = cam.cullingMask;
+                    cam.cullingMask = 0;
+                }
+                else if (_cameraMask != null)
+                {
+                    cam.cullingMask = _cameraMask.Value;
+                    _cameraMask = null;
+                }
+                Out("camera " + (_cameraMask == null ? "on" : "drawing nothing"));
+                break;
+            }
+            case "waittick":
+            {
+                var target = int.Parse(a[0]);
+                var secs = a.Length > 1 ? float.Parse(a[1]) : 600f;
+                var t0 = Time.realtimeSinceStartup;
+                var f0 = Time.frameCount;
+                var tick0 = ReplayTick();
+                Wait("waittick " + target, secs, () =>
+                {
+                    var tick = ReplayTick();
+                    if (tick < target) return false;
+                    var dt = Time.realtimeSinceStartup - t0;
+                    Out(FormattableString.Invariant(
+                        $"  tick {tick0}->{tick} in {dt:0.0} s: {(tick - tick0) / dt:0} ticks/s ({(tick - tick0) / dt / 10:0.0}x), {(Time.frameCount - f0) / dt:0} fps"));
+                    return true;
+                });
+                break;
+            }
 
             case "lobby":
             {
@@ -571,6 +624,12 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
         try { parts.Add("lobby=" + (LobbyManager.CurrentState != null ? LobbyManager.CurrentState.players.Count + " players" : "none")); } catch { }
         try { parts.Add("replay=" + ReplayState()); } catch { }
         return string.Join("  ", parts);
+    }
+
+    private static int ReplayTick()
+    {
+        var p = NewestType("SanctuaryHud.Replays.ReplayPlayer")?.GetProperty("CurrentTick", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+        return p == null ? -1 : (int)p.GetValue(null);
     }
 
     private static string ReplayState()
