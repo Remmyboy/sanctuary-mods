@@ -42,7 +42,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.16.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.16.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.17.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.17.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
@@ -191,7 +191,10 @@ thin dividers where pieces meet.
   in a TextMeshPro font, which are cloned; the clock is the HUD's. The time is the template's
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
-  counts. With the replacement off,
+  counts. `UnitCardStats` (off by default) adds a line of speed, damage per
+  second and weapon range, for a unit and for a build option alike, read
+  from the template (so a balance mod's figures show); damage per second is
+  the game's AI's own sum over the weapons. With the replacement off,
   `TidyGameUnitCard` (on by default) still hides the template id on the
   game's own card and rounds its income figures.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,
@@ -723,6 +726,40 @@ changes, so it stays lobby-compatible. `QoL · ShowRallyPoints`,
 are in the QoL section of the Mods page, and the first two are off by default:
 turn them on to use them. They work with the overlay hidden too:
 they are controls, not display.
+
+The same re-issuing serves three more, all off by default:
+
+- **Engineer queue** (`BottomPanels · EngineerQueue`, needs the build strip).
+  The game shows a factory's queue but nothing for an engineer, whose
+  buildings are orders. Selected builders that share one queue get its
+  buildings as a row of tiles where a factory's queue goes, runs of one
+  building as one tile with a count; right-click a tile to take one out and
+  keep the rest of the queue, before and after it.
+- **Assisting engineers keep building** (`QoL · AssistKeepsBuilding`). An
+  engineer assisting another builder helps with whatever that one builds,
+  and stops when it dies or moves on (`HostUnit:AssistBehaviorThread`). With
+  this on, a structure it was helping with that is left unfinished goes in
+  front of its own queue, as a repair (which builds an unfinished structure),
+  and it then carries on with the rest: back to helping, if the builder is
+  alive. The host only lets an engineer help build what it could build
+  itself, so a T1 engineer never picks up a T2 structure this way.
+- **Assist an unfinished factory** (`QoL · AssistUnfinishedFactories`). A
+  right-click from engineers on an unfinished building of yours is a repair,
+  which ends once the building is up, so Shift-clicking a factory you have
+  just placed, to assist it once built, left the engineers idle. On an
+  unfinished building that builds, the right-click is an assist instead: the
+  host's assist builds it first, then helps with what it produces.
+
+- **Factory assist, then the queue** (`QoL · FactoryAssistThenQueue`). An
+  assist on a factory never ends, so orders queued after it never came. With
+  this on, an engineer with orders after its assist drops it once the unit it
+  was helping with is finished (or once the factory has had nothing to build
+  for a couple of seconds) and goes on with the rest. With nothing queued
+  after it, it assists for good, as before.
+
+`QoL · UpgradeBadgeOnlyWhileUpgrading` shows a factory's upgrade badge only
+while the upgrade is under way; the game shows it as soon as an upgrade is
+anywhere in the queue (`IsUpgradeQueued`).
 
 ## IdleEngineers
 

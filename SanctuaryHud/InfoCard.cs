@@ -30,7 +30,7 @@ namespace SanctuaryHud
     // game's own card can still be tidied: template id hidden, income rounded.
     internal static class InfoCard
     {
-        internal static ConfigEntry<bool> Enabled, TidyBuiltIn;
+        internal static ConfigEntry<bool> Enabled, TidyBuiltIn, Stats;
 
         internal static void Bind(ConfigFile config)
         {
@@ -40,6 +40,10 @@ namespace SanctuaryHud
                 "The game's card comes back whenever the overlay is hidden or the mod is unloaded.");
             TidyBuiltIn = config.Bind("BottomPanels", "TidyGameUnitCard", true,
                 "With the game's own card kept (UnitCard off): hide the unit's template id and round its income figures.");
+            Stats = config.Bind("BottomPanels", "UnitCardStats", false,
+                "On the unit card (UnitCard on): the unit's speed, damage per second and weapon range, for the unit selected " +
+                "or hovered and for a build option under the mouse. Damage per second is worked out from the template the way " +
+                "the game's AI does it: each weapon's damage times the muzzles a cycle fires, over its reload.");
         }
 
         // ---- the values ---------------------------------------------------------
@@ -47,7 +51,7 @@ namespace SanctuaryHud
         private static UIInformationValues _values;
         private static bool _haveValues;
         private static InformationPanelUI _source;
-        private static string _name = "", _display = "";
+        private static string _name = "", _display = "", _templateId = "";
 
         internal static void ApplyPatch(Harmony harmony)
         {
@@ -68,6 +72,7 @@ namespace SanctuaryHud
             _name = Text(__instance.unitName);
             _display = Text(__instance.unitDisplayName);
             if (_display == _name) _display = "";
+            _templateId = Text(__instance.unitTemplateId);
 
             if (Enabled != null && TidyBuiltIn != null && !Enabled.Value && TidyBuiltIn.Value) Tidy(__instance, _values);
         }
@@ -186,7 +191,74 @@ namespace SanctuaryHud
         private static readonly LuaHook Queries = new LuaHook("__SdbCard", "unit card queries", CardChunk)
         {
             LogInstalls = false,
+            // A new VM is a new match, whose templates a gameplay mod may
+            // have changed.
+            Installed = () => _stats.Clear(),
         };
+
+        // ---- a template's speed, damage and range ----------------------------------
+        //
+        // Read once per template per match from __Templates, so a balance
+        // mod's figures are the ones shown. Damage per second is the game's
+        // AI's sum (AIFunctions.lua, GetWeaponDamagePerSecond): damage times
+        // the muzzles one cycle fires, over the longer of the reload and the
+        // salvo; a beam's damage lands every tick it lives, and a continuous
+        // beam's every tick there is. Death explosions don't count.
+
+        private struct UnitStats
+        {
+            public float Speed, Dps, Range;
+        }
+
+        private static readonly Dictionary<string, UnitStats> _stats = new Dictionary<string, UnitStats>();
+        private static bool _statsLogged;
+
+        private static UnitStats StatsFor(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !id.All(char.IsLetterOrDigit)) return default;
+            if (_stats.TryGetValue(id, out var known)) return known;
+            var stats = default(UnitStats);
+            try
+            {
+                Queries.Tick();
+                if (!Queries.Call($"__SdbCard.Stats('{id}')")) return stats;
+                var f = (GetLuaGlobal("__SdbStats") ?? "").Split(',');
+                if (f.Length >= 3)
+                {
+                    float.TryParse(f[0], NumberStyles.Float, Inv, out stats.Speed);
+                    float.TryParse(f[1], NumberStyles.Float, Inv, out stats.Dps);
+                    float.TryParse(f[2], NumberStyles.Float, Inv, out stats.Range);
+                }
+            }
+            catch (Exception e)
+            {
+                if (!_statsLogged)
+                {
+                    _statsLogged = true;
+                    _log?.LogWarning($"Unit card: stats query failed (logged once): {e.Message}");
+                }
+                return stats;
+            }
+            _stats[id] = stats;
+            return stats;
+        }
+
+        private static string _statsKey, _statsText;
+
+        /// The stats line's words for a template, or null when it has none
+        /// (a structure with no weapon); made again only when the template changes.
+        private static string StatsText(string id)
+        {
+            if (id == _statsKey) return _statsText;
+            _statsKey = id;
+            var s = StatsFor(id);
+            string text = null;
+            void Add(string part) => text = text == null ? part : text + "    " + part;
+            if (s.Speed > 0f) Add("SPEED " + s.Speed.ToString("0.#", Inv));
+            if (s.Dps > 0f) Add("DPS " + SanctuaryHudPlugin.Fmt(s.Dps));
+            if (s.Dps > 0f && s.Range > 0f) Add("RANGE " + s.Range.ToString("0", Inv));
+            return _statsText = text;
+        }
 
         private const string CardChunk =
             "__SdbCard = { " +
@@ -210,6 +282,36 @@ namespace SanctuaryHud
             "  __SdbBuildSecs = string.format('%.1f,%.1f', secs, power) " +
             "end) " +
             "if not ok then __SdbBuildSecs = '' end " +
+            "end, " +
+            // A template's speed, damage per second and longest weapon range.
+            "Stats = function(id) " +
+            "local ok = pcall(function() " +
+            "  local tp = __Templates.Units[id] " +
+            "  local speed = tp and tp.movement and tonumber(tp.movement.speed) or 0 " +
+            "  local dps, range = 0, 0 " +
+            "  for _, w in ipairs(tp and tp.weapons or {}) do " +
+            "    if w.category ~= 'DeathExplosion' then " +
+            "      local dmg = tonumber(w.damage) or 0 " +
+            "      local salvo = tonumber(w.muzzleSalvoSize) or 1 " +
+            "      local groups = w.muzzleGroups or {} " +
+            "      local muzzles = 0 " +
+            "      if #groups < 1 then muzzles = salvo else " +
+            "        for i = 1, salvo do " +
+            "          local g = groups[((i - 1) % #groups) + 1] " +
+            "          muzzles = muzzles + #(g.muzzles or g) " +
+            "        end " +
+            "      end " +
+            "      local cycle = math.max(tonumber(w.reloadTime) or 1, (salvo - 1) * (tonumber(w.muzzleSalvoDelay) or 0)) " +
+            "      local life = w.beam and (tonumber(w.beamLifetime) or -1) or 0 " +
+            // TickRate is 10 (client/generated/lua/constants.lua).
+            "      if life < 0 then dps = dps + dmg * muzzles * 10 " +
+            "      elseif cycle > 0 then dps = dps + dmg * math.max(life, 1) * muzzles / cycle end " +
+            "      if dmg > 0 then range = math.max(range, tonumber(w.rangeMax) or 0) end " +
+            "    end " +
+            "  end " +
+            "  __SdbStats = string.format('%.2f,%.2f,%.1f', speed, dps, range) " +
+            "end) " +
+            "if not ok then __SdbStats = '' end " +
             "end }";
 
         // ---- a factory's queue and progress ----------------------------------------
@@ -514,7 +616,7 @@ namespace SanctuaryHud
             private RectTransform _rect;
             private TMP_Text _title, _aside;
             private readonly Gauge[] _gauges = new Gauge[5];   // shield, health, armour, bubble, building
-            private FigureLine _build, _income, _power;
+            private FigureLine _build, _income, _power, _statsLine;
             private GameObject _band;
             private RectTransform _left;
             private GameObject _queueBlock;
@@ -593,6 +695,9 @@ namespace SanctuaryHud
                 card._income = FigureLine.Create(card._left, "Income", 3, false);
                 card._income.Reserve(LineHeight);
                 card._power = FigureLine.Create(card._left, "Extras", 0, true);
+                // Speed, damage and range (UnitCardStats), in the room the
+                // band keeps for a queue, so the card stays one size.
+                card._statsLine = FigureLine.Create(card._left, "Stats", 0, true);
                 band.gameObject.AddComponent<LayoutElement>().minHeight = JobTile + 24f;
 
                 var queue = Row(band, "Queue", 6f, TextAnchor.UpperLeft);
@@ -732,6 +837,10 @@ namespace SanctuaryHud
                 var extras = Extras(v);
                 _power.SetExtras(extras);
                 _power.Show(!building && extras != null);
+
+                var stats = Stats.Value ? StatsText(_templateId) : null;
+                _statsLine.SetExtras(stats);
+                _statsLine.Show(stats != null);
 
                 // The current job, large, at the right edge of the band, the
                 // percentage under it; whatever is queued behind it as small
