@@ -395,6 +395,7 @@ UI.Toast("No rush", "Attacks are allowed in 10 minutes", { seconds = 6 })
 | `UI.Row(items, { spacing })`, `UI.Column(items, { spacing })` | Elements side by side, or one above another. |
 | `UI.Rule()`, `UI.Space(size)`, `UI.Swatch(color, size)` | A line across the panel, empty space, a square of colour. |
 | `UI.Fill()` | Stretchy space in a row: what comes after it lines up on the right, and rows with one line up with each other (Mod API 1.6). |
+| `UI.Bar(value, { color, width, height })` | A progress bar, `value` from 0 to 1, stretched across the width it sits in; `width` is the least it shrinks to (Mod API 1.9). Check `UI.Bar` exists before calling it, for players on an older Mod Manager. |
 | `UI.Toast(title, text, { seconds, color })` | A notice across the top of the screen for a few seconds. |
 
 Sizes are in canvas units: text is 20 by default, and the game's build-menu

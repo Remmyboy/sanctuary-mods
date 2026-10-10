@@ -113,6 +113,9 @@ local function PlayerRow(s, p)
         items[#items + 1] = UI.Text(p.ally and "ally" or "enemy", { size = 18, color = p.ally and Colours.innocent or Colours.phantom })
         if p.wants then items[#items + 1] = UI.Text("wants peace", { size = 18, color = Colours.paladin }) end
     end
+    if type(s.paying) == "table" and s.paying.target == p.id then
+        items[#items + 1] = UI.Text("marking " .. Thousands(s.paying.left) .. " left", { size = 18, color = Colours.paladin })
+    end
     items[#items + 1] = Fill()
     if p.canWar then
         items[#items + 1] = UI.Button("War", function() Request("war", p.id) end, { color = Colours.phantom, size = 18 })
@@ -145,9 +148,18 @@ local function Render(s)
             tostring(s.bonus.alloys), Thousands(s.bonus.energy), tostring(s.bonus.percent)), { size = 20 })
     end
     if s.marks then
-        local text = "Paladin marks: " .. s.marks
-        if s.paying then text = text .. "  |  paying " .. Thousands(s.paying) .. " alloys" end
-        items[#items + 1] = UI.Text(text, { size = 20, color = Colours.paladin })
+        items[#items + 1] = UI.Text("Paladin marks: " .. s.marks, { size = 20, color = Colours.paladin })
+    end
+    if type(s.paying) == "table" then
+        -- The mark lands once it's paid, from stored alloys only: what the
+        -- economy is spending never reaches it.
+        local pay = s.paying
+        local paid = pay.cost > 0 and (pay.cost - pay.left) / pay.cost or 0
+        items[#items + 1] = UI.Text(string.format("Marking %s: %s of %s alloys left",
+            pay.name, Thousands(pay.left), Thousands(pay.cost)), { size = 20, color = Colours.paladin })
+        -- UI.Bar is Mod API 1.9; an older one shows the text alone.
+        if UI.Bar then items[#items + 1] = UI.Bar(paid, { color = Colours.paladin }) end
+        items[#items + 1] = UI.Text("Paid from storage: spend less to finish sooner", { size = 18, color = Grey })
     end
     if s.counts then items[#items + 1] = UI.Text(s.counts, { size = 20, color = Grey }) end
 
