@@ -79,6 +79,13 @@ namespace SanctuaryHud
                 Hide();
                 return false;
             }
+            // A new match brings a new canvas, and the old row (tiles and
+            // all) goes with the old one: start again on this one.
+            if (_rect != null && _rect.parent != root)
+            {
+                UnityEngine.Object.Destroy(_rect.gameObject);
+                _rect = null;
+            }
             if (_rect == null) Create(root);
             if (!_rect.gameObject.activeSelf)
             {
@@ -104,6 +111,7 @@ namespace SanctuaryHud
                 // fit isn't shown.
                 var room = Mathf.Max(1, Mathf.FloorToInt((maxWidth / Mathf.Max(scale, 0.01f) - TileRow.Pad * 2f + TileRow.Gap) / (_tileSize.x + TileRow.Gap)));
                 var shown = Mathf.Min(_items.Count, room);
+                _tiles.RemoveAll(t => t == null);
                 while (_tiles.Count < shown) _tiles.Add(Tile.Create(_rect));
                 for (var i = 0; i < _tiles.Count; i++)
                 {
@@ -165,6 +173,10 @@ namespace SanctuaryHud
             group.childForceExpandWidth = false;
             group.childForceExpandHeight = false;
             HudCanvas.FitToContents(_rect);
+            // The old row's tiles were destroyed with it, and this one is
+            // not scaled yet.
+            _tiles.Clear();
+            _scale = -1f;
             _dirty = true;
         }
 

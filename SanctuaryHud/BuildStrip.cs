@@ -99,7 +99,7 @@ namespace SanctuaryHud
 
         private static TileRow _optionsRow, _queueRow;
         private static TabRow _tabRow;
-        private static bool _syncLogged;
+        private static bool _syncLogged, _engineerQueueLogged;
         private static readonly List<UnitRow.Entry> _options = new List<UnitRow.Entry>();
         private static readonly List<UnitRow.Entry> _queue = new List<UnitRow.Entry>();
         private static readonly List<ConstructionFilterToggleElement> _tabs = new List<ConstructionFilterToggleElement>();
@@ -184,11 +184,25 @@ namespace SanctuaryHud
             else
             {
                 _queueRow.Show(false);
-                // Engineers have no queue on the game's panel: their buildings, if wanted.
-                if (EngineerQueue.Sync(root, UnitTile.NativeSize(options), s, size.x - ax - Margin))
+                // Engineers have no queue on the game's panel: their buildings,
+                // if wanted. Whatever goes wrong there stays there: the build
+                // options must still show.
+                try
                 {
-                    EngineerQueue.Place(new Vector2(ax, above));
-                    BottomDock.Add(new Rect(ax, above, EngineerQueue.Width, EngineerQueue.Height), EngineerQueue.Rect);
+                    if (EngineerQueue.Sync(root, UnitTile.NativeSize(options), s, size.x - ax - Margin))
+                    {
+                        EngineerQueue.Place(new Vector2(ax, above));
+                        BottomDock.Add(new Rect(ax, above, EngineerQueue.Width, EngineerQueue.Height), EngineerQueue.Rect);
+                    }
+                }
+                catch (Exception e)
+                {
+                    EngineerQueue.Hide();
+                    if (!_engineerQueueLogged)
+                    {
+                        _engineerQueueLogged = true;
+                        _log?.LogWarning($"Engineer queue could not be laid out (logged once): {e}");
+                    }
                 }
             }
 
