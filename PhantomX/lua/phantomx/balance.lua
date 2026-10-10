@@ -33,10 +33,13 @@ PhantomShare = 1 / 3
 
 -- A paladin mark costs alloys, taken from storage as it comes in:
 -- (Base / p + Max * atan(Slope * minutes since the assignment)) * p, where
--- p is the chance a random innocent is a paladin. FA charged mass; alloys
--- are on the same scale.
-MarkBaseCost = 4000
-MarkMaxCost = 100000
+-- p is the chance a random innocent is a paladin. The p in the base cancels,
+-- so a mark costs Base plus a part that grows with the match. FA charged
+-- 4,000 and 100,000 mass; Sanctuary's economy is far smaller (a maxed-out
+-- alloy spot makes 16 a second with the balance patch, FAF's 27), so a
+-- quarter of that.
+MarkBaseCost = 1000
+MarkMaxCost = 25000
 MarkSlope = 0.05
 
 -- "Same as the previous reveal" means this many seconds after it.

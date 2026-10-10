@@ -648,6 +648,30 @@ aircraft at 82% straight / 75% micro / 71% weaving (0.2.5: 38 / 27 / 28), the
 worst weapon 59% under micro. Effective AA damage is about 2-3x 0.2.5's; air
 numbers may need retuning once played.
 
+**0.2.7 (unreleased, 2026-10-10, from the user's games):** T4s were still
+too strong (the Chosen big bot beat its cost in T3 tanks easily). 0.2.4's
+per-alloy maths ignored splash (radius 3-4 hits several bunched T3 tanks),
+range (60-100 against the tanks' 34) and counted T4 anti-air as ground damage.
+Re-scored with my estimates (splash x1 / 1.5 / 2 / 2.5 for radius <2 / 2 / 3 /
+4+, range x1.25 at 60, x1.5 at 80+) as health x ground damage per alloy against
+the average T3 tank: big bot 1.49, Ares 1.28, Centaur 1.30, Tripod 1.21, Djinn
+1.02, Behemoth 0.75. Health 0.8x for all; ground damage 0.5x (big bot), 0.6x
+(Ares, Centaur, Tripod), 0.75x (Djinn), 0.9x (others), putting all at 0.54-0.62
+(Quasar 0.45). The user then set the target at 0.8 split between health and
+damage: each T4's health and ground damage x sqrt(0.8 / score), 1.13-1.34x
+(the single-target beam bot and Behemoth about 1.2x, the Quasar 1.34x, the
+splashing big bot, Ares and Djinn 1.14-1.16x). All now score 0.80. T4 speeds 3 / 2.75 / 2.25 (none above a T3 tank's 3.3).
+Guardian T2 anti-air (tower and mobile) half damage: their shells splash 5
+and 10 against the Chosen 2 and 3 (the user first said T1, then corrected it). Nitro: 3000
+health (was 1500), damage x1.25: 12 health and 0.75 damage a second per alloy,
+against T3 tanks' 16-18 / 0.43-0.55 and T2 raiders' 13-19 / 0.61-0.83.
+
+Point defences (0.2.7): scored against same-tier tanks, ours were T1 0.95-1.17,
+T2 0.18-0.28, T3 0.13. FAF's (from its blueprints, my arithmetic with salvo
+and rack timing): T1 1.68, T2 0.37-0.62, T3 Ravager 0.22. T2 raised to 0.65
+(health and damage together); the Chosen T3 to 7000 health (the user's cap)
+and 2.24x damage, about 0.3.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

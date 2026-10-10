@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.6"
+  "version": "0.2.7"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-10T09:35:30.973Z",
+ "generated": "2026-10-10T11:40:35.120Z",
  "sections": [
   {
    "key": "fixes",
@@ -39,19 +39,19 @@
   {
    "key": "air",
    "label": "Air",
-   "description": "Bombers lead their targets and their bombs splash; anti-air leads its shots and the T3 anti-air towers reach their range; the Guardian fighters catch up with the others. Anti-air hits most of the time: faster shells and missiles, no drop or spread, beams aim where the plane is, and aircraft hitboxes 1.5x bigger.",
+   "description": "Bombers lead their targets and their bombs splash; anti-air leads its shots and the T3 anti-air towers reach their range; the Guardian fighters catch up with the others. Anti-air hits most of the time: faster shells and missiles, no drop or spread, beams aim where the plane is, and aircraft hitboxes 1.5x bigger. The Guardian T2 anti-air (big splash) does half damage.",
    "default": true
   },
   {
    "key": "defences",
    "label": "Defences",
-   "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them.",
+   "description": "Point defences see as far as they shoot, and T1 point defences are tougher: they beat their cost in T1 tanks, while T1 artillery still outranges them. T2 point defences are much tougher and hit harder, and the Chosen T3 one hits much harder.",
    "default": true
   },
   {
    "key": "units",
    "label": "Unit tuning",
-   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still but fragile; T4 bots move at 2.5-3.5 (were 2), brawlers fastest, and are game enders: 10000-25000 alloys with health and damage to match; the EDA railgun sniper reaches 80.",
+   "description": "The Chosen Jager toned down and the other T2 raiders brought up, so T2 beats its cost in T1 without crushing it; the three T1 tanks brought level; T3 tanks move as fast as T1 tanks with quicker guns, and the Guardian T3 raider is faster still and lighter; T4 bots move at 2.25-3 (were 2; none faster than T3 tanks) and are game enders: 10000-25000 alloys with health and damage to match, less for the ones whose splash and range already win fights; the EDA railgun sniper reaches 80.",
    "default": true
   }
  ],
@@ -7860,6 +7860,40 @@
   },
   {
    "kind": "unit",
+   "id": "ugl2201",
+   "name": "Perforator",
+   "displayName": "Tier 2: Mobile Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 80,
+   "after": 40,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T2 anti-air tower and mobile anti-air do half damage: their shells splash 5 and 10 (the Chosen ones 2 and 3, the EDA ones are beams, which don't splash), so once anti-air started hitting most of the time (0.2.6) each hit took a chunk out of every aircraft in a group."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2201",
+   "name": "Triode",
+   "displayName": "Tier 2: Anti-Air",
+   "faction": "Guardian",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 50,
+   "after": 25,
+   "sections": [
+    "air"
+   ],
+   "why": [
+    "The Guardian T2 anti-air tower and mobile anti-air do half damage: their shells splash 5 and 10 (the Chosen ones 2 and 3, the EDA ones are beams, which don't splash), so once anti-air started hitting most of the time (0.2.6) each hit took a chunk out of every aircraft in a group."
+   ]
+  },
+  {
+   "kind": "unit",
    "id": "ucs1001",
    "name": "Watchtower",
    "displayName": "Tier 1: Point Defence",
@@ -8077,6 +8111,210 @@
    ],
    "why": [
     "T3 point defences likewise (saw 30, shoot 70)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2001",
+   "name": "Snapper",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "EDA",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 2000,
+   "after": 3000,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T2 point defences had the health of a T1 one at 2.5-3x the price: against their cost in T2 tanks they scored 0.18-0.28 (health x damage per alloy, range counted; my arithmetic), where FAF's T2 point defences score about 0.6 against FAF's T2 tanks. Health and damage raised together to about 0.65: they lose to their cost in T2 tanks that reach them, beat lower tiers, and still fall to artillery. The EDA one: 3000 health (was 2000), 1.52x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2001",
+   "name": "Snapper",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "EDA",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 2000,
+   "after": 3000,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T2 point defences had the health of a T1 one at 2.5-3x the price: against their cost in T2 tanks they scored 0.18-0.28 (health x damage per alloy, range counted; my arithmetic), where FAF's T2 point defences score about 0.6 against FAF's T2 tanks. Health and damage raised together to about 0.65: they lose to their cost in T2 tanks that reach them, beat lower tiers, and still fall to artillery. The EDA one: 3000 health (was 2000), 1.52x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ues2001",
+   "name": "Snapper",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "EDA",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 400,
+   "after": 608,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "T2 point defences had the health of a T1 one at 2.5-3x the price: against their cost in T2 tanks they scored 0.18-0.28 (health x damage per alloy, range counted; my arithmetic), where FAF's T2 point defences score about 0.6 against FAF's T2 tanks. Health and damage raised together to about 0.65: they lose to their cost in T2 tanks that reach them, beat lower tiers, and still fall to artillery. The EDA one: 3000 health (was 2000), 1.52x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2001",
+   "name": "Nailer",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Guardian",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 2000,
+   "after": 3200,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Guardian T2 point defence: 3200 health (was 2000), 1.61x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2001",
+   "name": "Nailer",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Guardian",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 2000,
+   "after": 3200,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Guardian T2 point defence: 3200 health (was 2000), 1.61x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs2001",
+   "name": "Nailer",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Guardian",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 160,
+   "after": 258,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Guardian T2 point defence: 3200 health (was 2000), 1.61x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2001",
+   "name": "Redoubt",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Chosen",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 2000,
+   "after": 3800,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Chosen T2 point defence (the dearest, 572 alloys): 3800 health (was 2000), 1.9x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2001",
+   "name": "Redoubt",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Chosen",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 2000,
+   "after": 3800,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Chosen T2 point defence (the dearest, 572 alloys): 3800 health (was 2000), 1.9x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs2001",
+   "name": "Redoubt",
+   "displayName": "Tier 2: Point Defence",
+   "faction": "Chosen",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 480,
+   "after": 912,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Chosen T2 point defence (the dearest, 572 alloys): 3800 health (was 2000), 1.9x damage."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3001",
+   "name": "Bastion",
+   "displayName": "Tier 3: Point Defence",
+   "faction": "Chosen",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 6500,
+   "after": 7000,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Chosen T3 point defence scored 0.13 against its cost in T3 tanks (FAF's Ravager about 0.2). 7000 health (was 6500) and 2.24x damage (275 to about 615 a second): a hard-hitting but fragile turret, about 0.3."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3001",
+   "name": "Bastion",
+   "displayName": "Tier 3: Point Defence",
+   "faction": "Chosen",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 6500,
+   "after": 7000,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Chosen T3 point defence scored 0.13 against its cost in T3 tanks (FAF's Ravager about 0.2). 7000 health (was 6500) and 2.24x damage (275 to about 615 a second): a hard-hitting but fragile turret, about 0.3."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ucs3001",
+   "name": "Bastion",
+   "displayName": "Tier 3: Point Defence",
+   "faction": "Chosen",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 825,
+   "after": 1848,
+   "sections": [
+    "defences"
+   ],
+   "why": [
+    "The Chosen T3 point defence scored 0.13 against its cost in T3 tanks (FAF's Ravager about 0.2). 7000 health (was 6500) and 2.24x damage (275 to about 615 a second): a hard-hitting but fragile turret, about 0.3."
    ]
   },
   {
@@ -8654,7 +8892,7 @@
     "units"
    ],
    "why": [
-    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
    ]
   },
   {
@@ -8671,7 +8909,7 @@
     "units"
    ],
    "why": [
-    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
    ]
   },
   {
@@ -8688,7 +8926,7 @@
     "units"
    ],
    "why": [
-    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
    ]
   },
   {
@@ -8705,7 +8943,7 @@
     "units"
    ],
    "why": [
-    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
    ]
   },
   {
@@ -8717,12 +8955,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 2250,
-   "after": 1500,
+   "after": 3000,
    "sections": [
     "units"
    ],
    "why": [
-    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
    ]
   },
   {
@@ -8734,12 +8972,29 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 2250,
-   "after": 1500,
+   "after": 3000,
    "sections": [
     "units"
    ],
    "why": [
-    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70), but has 1500 health (was 2250): one EDA T3 tank volley kills it, so it raids rather than fights T3 armies. Its range (24) stays well short of a T3 tank's (34)."
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl3002",
+   "name": "Nitro",
+   "displayName": "Tier 3: Raider",
+   "faction": "Guardian",
+   "field": "weapons.1.damage",
+   "label": "damage",
+   "before": 148,
+   "after": 185,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "The Guardian Nitro (T3 raider) moves at 4.5 (was 3.3), faster than T1 raiders (4), with its gun turning at 180 degrees a second (was 70). It has 3000 health (was 2250) and 25% more damage: per alloy it was far weaker than T3 tanks and even T2 raiders (6 health per alloy against their 13-19), so it is now a little lighter than a T3 tank and hits a little harder, and still loses a straight fight with one. Its range (24) stays well short of a T3 tank's (34)."
    ]
   },
   {
@@ -8751,12 +9006,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 3.5,
+   "after": 3,
    "sections": [
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8768,12 +9023,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 3.5,
+   "after": 3,
    "sections": [
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8790,7 +9045,7 @@
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8802,12 +9057,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 3.5,
+   "after": 3,
    "sections": [
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8819,12 +9074,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 3.5,
+   "after": 3,
    "sections": [
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8841,7 +9096,7 @@
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8853,12 +9108,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 3.5,
+   "after": 3,
    "sections": [
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8870,12 +9125,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 3.5,
+   "after": 3,
    "sections": [
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -8892,7 +9147,7 @@
     "units"
    ],
    "why": [
-    "T4 brawlers walk at 3.5 (were 2), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
+    "T4 brawlers walk at 3 (were 2; no T4 is faster than a T3 tank's 3.3), turn at 70 degrees a second (were 40) and swing their main guns at 90 (were 45): the EDA Behemoth, the Chosen Ares and the Guardian beam bot fight at 30-35 range, so they have to be able to close in."
    ]
   },
   {
@@ -9023,12 +9278,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 3,
+   "after": 2.75,
    "sections": [
     "units"
    ],
    "why": [
-    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 2.75 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
    ]
   },
   {
@@ -9040,12 +9295,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 3,
+   "after": 2.75,
    "sections": [
     "units"
    ],
    "why": [
-    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 2.75 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
    ]
   },
   {
@@ -9062,7 +9317,7 @@
     "units"
    ],
    "why": [
-    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 2.75 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
    ]
   },
   {
@@ -9074,12 +9329,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 3,
+   "after": 2.75,
    "sections": [
     "units"
    ],
    "why": [
-    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 2.75 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
    ]
   },
   {
@@ -9091,12 +9346,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 3,
+   "after": 2.75,
    "sections": [
     "units"
    ],
    "why": [
-    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 2.75 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
    ]
   },
   {
@@ -9113,7 +9368,7 @@
     "units"
    ],
    "why": [
-    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 3 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
+    "The Chosen Djinn (hover, anti-air too) and the Athena mobile shield move at 2.75 (were 2) and turn at 60 (were 40): the shield has to keep up with the army under it."
    ]
   },
   {
@@ -9125,12 +9380,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9142,12 +9397,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9164,7 +9419,7 @@
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9176,12 +9431,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9193,12 +9448,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9215,7 +9470,7 @@
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9227,12 +9482,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9244,12 +9499,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9266,7 +9521,7 @@
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9278,12 +9533,12 @@
    "field": "movement.speed",
    "label": "speed",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9295,12 +9550,12 @@
    "field": "movement.acceleration",
    "label": "acceleration",
    "before": 2,
-   "after": 2.5,
+   "after": 2.25,
    "sections": [
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9317,7 +9572,7 @@
     "units"
    ],
    "why": [
-    "Long-range and heaviest T4s move at 2.5 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
+    "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should."
    ]
   },
   {
@@ -9340,7 +9595,7 @@
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9352,12 +9607,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 72000,
-   "after": 140000,
+   "after": 136000,
    "sections": [
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9369,12 +9624,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 72000,
-   "after": 140000,
+   "after": 136000,
    "sections": [
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9386,12 +9641,12 @@
    "field": "weapons.1.damage",
    "label": "weapon 1 damage",
    "before": 480,
-   "after": 1267,
+   "after": 1380,
    "sections": [
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9403,12 +9658,12 @@
    "field": "weapons.2.damage",
    "label": "weapon 2 damage",
    "before": 345,
-   "after": 911,
+   "after": 992,
    "sections": [
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9420,12 +9675,12 @@
    "field": "weapons.3.damage",
    "label": "weapon 3 damage",
    "before": 345,
-   "after": 911,
+   "after": 992,
    "sections": [
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9442,7 +9697,7 @@
     "units"
    ],
    "why": [
-    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 140000 health (was 72000) and 2.64x weapon damage."
+    "T4s are game enders for long 512 games that become spammable as the game goes on: they cost 10000-25000 alloys (2-3x what they did, energy 6 per alloy), and their health and damage are raised so that per alloy they beat the average T3 tank (15.8 health and 0.49 damage a second per alloy, after this patch's T3 discount) by 10%, or match it for the 60-100 range ones (Djinn, Chosen big bot) - then cut to 0.8x of that in 0.2.6, because one T4 keeps all its damage until it dies while a T3 army loses damage with every tank, so equal stats per alloy played as far stronger. The Quasar is matched against T3 artillery and keeps its health. Damage counts every muzzle and salvo (my arithmetic on the templates); death explosions are unchanged. EDA Behemoth: 10000 alloys (was 3696), 136000 health (was 72000) and weapon damage as listed. In 0.2.7 health went to 0.8x again and damage against the ground was cut by how much each T4 gets from splash (radius 3-4 hits several bunched T3 tanks) and from out-ranging T3 tanks (34): the Chosen big bot to 0.5x, the Ares, Centaur and Tripod to 0.6x, the Djinn to 0.75x, the rest to 0.9x, then both raised together (the same factor on health and ground damage, 1.13-1.34x) to about 0.8x a T3 tank's health x damage per alloy, splash and range counted, so one T4 (keeping all its damage until it dies) beats its cost in T3 tanks clearly but not by a mile. Splash counts: the big bot's radius-3 shells hit several tanks, the beam bot hits one, so the beam bot gets more health and damage per alloy. Anti-air weapons on T4s are unchanged."
    ]
   },
   {
@@ -9465,7 +9720,7 @@
     "units"
    ],
    "why": [
-    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 140000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2x weapon damage: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 127000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and weapon damage as listed: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
    ]
   },
   {
@@ -9477,12 +9732,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 55000,
-   "after": 140000,
+   "after": 127000,
    "sections": [
     "units"
    ],
    "why": [
-    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 140000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2x weapon damage: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 127000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and weapon damage as listed: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
    ]
   },
   {
@@ -9494,12 +9749,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 55000,
-   "after": 140000,
+   "after": 127000,
    "sections": [
     "units"
    ],
    "why": [
-    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 140000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2x weapon damage: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 127000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and weapon damage as listed: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
    ]
   },
   {
@@ -9516,7 +9771,7 @@
     "units"
    ],
    "why": [
-    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 140000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2x weapon damage: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 127000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and weapon damage as listed: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
    ]
   },
   {
@@ -9528,12 +9783,12 @@
    "field": "weapons.1.damage",
    "label": "weapon 1 damage",
    "before": 4000,
-   "after": 8000,
+   "after": 5424,
    "sections": [
     "units"
    ],
    "why": [
-    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 140000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2x weapon damage: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 127000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and weapon damage as listed: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
    ]
   },
   {
@@ -9550,7 +9805,7 @@
     "units"
    ],
    "why": [
-    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 140000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and 2x weapon damage: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
+    "EDA Centaur (railgun sniper): 10000 alloys (was 4295), 127000 health (was 55000), railgun range 80 (was 40, shorter than a T3 sniper bot's 60) and weapon damage as listed: about 0.7x the average T3 tank's damage per alloy, paid for with twice its range. Its vision stays 20, so like the T3 snipers it needs radar or spotters."
    ]
   },
   {
@@ -9573,7 +9828,41 @@
     "units"
    ],
    "why": [
-    "Guardian Quasar: 10000 alloys (was 3407) and 6.88x weapon damage."
+    "Guardian Quasar: 10000 alloys (was 3407), 67000 health (was 50000) and weapon damage as listed."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "defence.health.max",
+   "label": "health",
+   "before": 50000,
+   "after": 67000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian Quasar: 10000 alloys (was 3407), 67000 health (was 50000) and weapon damage as listed."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugl4011",
+   "name": "Quasar",
+   "displayName": "Tier 4: Bot",
+   "faction": "Guardian",
+   "field": "defence.health.value",
+   "label": "defence.health.value",
+   "before": 50000,
+   "after": 67000,
+   "sections": [
+    "units"
+   ],
+   "why": [
+    "Guardian Quasar: 10000 alloys (was 3407), 67000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9585,12 +9874,12 @@
    "field": "weapons.1.damage",
    "label": "damage",
    "before": 300,
-   "after": 2064,
+   "after": 2489,
    "sections": [
     "units"
    ],
    "why": [
-    "Guardian Quasar: 10000 alloys (was 3407) and 6.88x weapon damage."
+    "Guardian Quasar: 10000 alloys (was 3407), 67000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9613,7 +9902,7 @@
     "units"
    ],
    "why": [
-    "Guardian beam bot: 12000 alloys (was 5233), 168000 health (was 50000) and 5.2x weapon damage."
+    "Guardian beam bot: 12000 alloys (was 5233), 160000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9625,12 +9914,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 50000,
-   "after": 168000,
+   "after": 160000,
    "sections": [
     "units"
    ],
    "why": [
-    "Guardian beam bot: 12000 alloys (was 5233), 168000 health (was 50000) and 5.2x weapon damage."
+    "Guardian beam bot: 12000 alloys (was 5233), 160000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9642,12 +9931,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 50000,
-   "after": 168000,
+   "after": 160000,
    "sections": [
     "units"
    ],
    "why": [
-    "Guardian beam bot: 12000 alloys (was 5233), 168000 health (was 50000) and 5.2x weapon damage."
+    "Guardian beam bot: 12000 alloys (was 5233), 160000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9659,12 +9948,12 @@
    "field": "weapons.1.damage",
    "label": "damage",
    "before": 50,
-   "after": 260,
+   "after": 281,
    "sections": [
     "units"
    ],
    "why": [
-    "Guardian beam bot: 12000 alloys (was 5233), 168000 health (was 50000) and 5.2x weapon damage."
+    "Guardian beam bot: 12000 alloys (was 5233), 160000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9687,7 +9976,7 @@
     "units"
    ],
    "why": [
-    "Chosen Tripod: 12000 alloys (was 5012), 168000 health (was 50000) and 2.6x weapon damage."
+    "Chosen Tripod: 12000 alloys (was 5012), 158000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9699,12 +9988,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 50000,
-   "after": 168000,
+   "after": 158000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Tripod: 12000 alloys (was 5012), 168000 health (was 50000) and 2.6x weapon damage."
+    "Chosen Tripod: 12000 alloys (was 5012), 158000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9716,12 +10005,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 50000,
-   "after": 168000,
+   "after": 158000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Tripod: 12000 alloys (was 5012), 168000 health (was 50000) and 2.6x weapon damage."
+    "Chosen Tripod: 12000 alloys (was 5012), 158000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9733,12 +10022,12 @@
    "field": "weapons.1.damage",
    "label": "weapon 1 damage",
    "before": 1000,
-   "after": 2600,
+   "after": 1841,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Tripod: 12000 alloys (was 5012), 168000 health (was 50000) and 2.6x weapon damage."
+    "Chosen Tripod: 12000 alloys (was 5012), 158000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9750,12 +10039,12 @@
    "field": "weapons.2.damage",
    "label": "weapon 2 damage",
    "before": 160,
-   "after": 416,
+   "after": 295,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Tripod: 12000 alloys (was 5012), 168000 health (was 50000) and 2.6x weapon damage."
+    "Chosen Tripod: 12000 alloys (was 5012), 158000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9767,12 +10056,12 @@
    "field": "weapons.3.damage",
    "label": "weapon 3 damage",
    "before": 160,
-   "after": 416,
+   "after": 295,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Tripod: 12000 alloys (was 5012), 168000 health (was 50000) and 2.6x weapon damage."
+    "Chosen Tripod: 12000 alloys (was 5012), 158000 health (was 50000) and weapon damage as listed."
    ]
   },
   {
@@ -9795,7 +10084,7 @@
     "units"
    ],
    "why": [
-    "Chosen Ares: 15000 alloys (was 6812), 208000 health (was 75000) and 4.32x weapon damage."
+    "Chosen Ares: 15000 alloys (was 6812), 189000 health (was 75000) and weapon damage as listed."
    ]
   },
   {
@@ -9807,12 +10096,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 75000,
-   "after": 208000,
+   "after": 189000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Ares: 15000 alloys (was 6812), 208000 health (was 75000) and 4.32x weapon damage."
+    "Chosen Ares: 15000 alloys (was 6812), 189000 health (was 75000) and weapon damage as listed."
    ]
   },
   {
@@ -9824,12 +10113,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 75000,
-   "after": 208000,
+   "after": 189000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Ares: 15000 alloys (was 6812), 208000 health (was 75000) and 4.32x weapon damage."
+    "Chosen Ares: 15000 alloys (was 6812), 189000 health (was 75000) and weapon damage as listed."
    ]
   },
   {
@@ -9841,12 +10130,12 @@
    "field": "weapons.1.damage",
    "label": "weapon 1 damage",
    "before": 4000,
-   "after": 17280,
+   "after": 11820,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Ares: 15000 alloys (was 6812), 208000 health (was 75000) and 4.32x weapon damage."
+    "Chosen Ares: 15000 alloys (was 6812), 189000 health (was 75000) and weapon damage as listed."
    ]
   },
   {
@@ -9858,12 +10147,12 @@
    "field": "weapons.2.damage",
    "label": "weapon 2 damage",
    "before": 100,
-   "after": 432,
+   "after": 296,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Ares: 15000 alloys (was 6812), 208000 health (was 75000) and 4.32x weapon damage."
+    "Chosen Ares: 15000 alloys (was 6812), 189000 health (was 75000) and weapon damage as listed."
    ]
   },
   {
@@ -9875,12 +10164,12 @@
    "field": "weapons.3.damage",
    "label": "weapon 3 damage",
    "before": 100,
-   "after": 432,
+   "after": 296,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Ares: 15000 alloys (was 6812), 208000 health (was 75000) and 4.32x weapon damage."
+    "Chosen Ares: 15000 alloys (was 6812), 189000 health (was 75000) and weapon damage as listed."
    ]
   },
   {
@@ -9903,7 +10192,7 @@
     "units"
    ],
    "why": [
-    "Chosen Djinn: 20000 alloys (was 10167), 256000 health (was 100000) and 5.6x weapon damage."
+    "Chosen Djinn: 20000 alloys (was 10167), 234000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -9915,12 +10204,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 100000,
-   "after": 256000,
+   "after": 234000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Djinn: 20000 alloys (was 10167), 256000 health (was 100000) and 5.6x weapon damage."
+    "Chosen Djinn: 20000 alloys (was 10167), 234000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -9932,12 +10221,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 100000,
-   "after": 256000,
+   "after": 234000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Djinn: 20000 alloys (was 10167), 256000 health (was 100000) and 5.6x weapon damage."
+    "Chosen Djinn: 20000 alloys (was 10167), 234000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -9949,12 +10238,12 @@
    "field": "weapons.1.damage",
    "label": "weapon 1 damage",
    "before": 1000,
-   "after": 5600,
+   "after": 4788,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen Djinn: 20000 alloys (was 10167), 256000 health (was 100000) and 5.6x weapon damage."
+    "Chosen Djinn: 20000 alloys (was 10167), 234000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -9971,7 +10260,7 @@
     "units"
    ],
    "why": [
-    "Chosen Djinn: 20000 alloys (was 10167), 256000 health (was 100000) and 5.6x weapon damage."
+    "Chosen Djinn: 20000 alloys (was 10167), 234000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -9988,7 +10277,7 @@
     "units"
    ],
    "why": [
-    "Chosen Djinn: 20000 alloys (was 10167), 256000 health (was 100000) and 5.6x weapon damage."
+    "Chosen Djinn: 20000 alloys (was 10167), 234000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10011,7 +10300,7 @@
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10023,12 +10312,12 @@
    "field": "defence.health.max",
    "label": "health",
    "before": 100000,
-   "after": 320000,
+   "after": 297000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10040,12 +10329,12 @@
    "field": "defence.health.value",
    "label": "defence.health.value",
    "before": 100000,
-   "after": 320000,
+   "after": 297000,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10057,12 +10346,12 @@
    "field": "weapons.1.damage",
    "label": "weapon 1 damage",
    "before": 1567.9442508711,
-   "after": 5143,
+   "after": 2982,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10079,7 +10368,7 @@
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10096,7 +10385,7 @@
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10108,12 +10397,12 @@
    "field": "weapons.4.damage",
    "label": "weapon 4 damage",
    "before": 836.23693379791,
-   "after": 2743,
+   "after": 1591,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   },
   {
@@ -10125,12 +10414,12 @@
    "field": "weapons.5.damage",
    "label": "weapon 5 damage",
    "before": 836.23693379791,
-   "after": 2743,
+   "after": 1591,
    "sections": [
     "units"
    ],
    "why": [
-    "Chosen big bot: 25000 alloys (was 11136), 320000 health (was 100000) and 3.28x weapon damage."
+    "Chosen big bot: 25000 alloys (was 11136), 297000 health (was 100000) and weapon damage as listed."
    ]
   }
  ],
@@ -14763,8 +15052,8 @@
    },
    "defence": {
     "health": {
-     "max": 208000,
-     "value": 208000
+     "max": 189000,
+     "value": 189000
     }
    },
    "economy": {
@@ -14813,7 +15102,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 3.5,
+    "acceleration": 3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -14843,7 +15132,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 70,
     "sortOrder": 1,
-    "speed": 3.5,
+    "speed": 3,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed"
    },
@@ -14884,7 +15173,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 17280,
+     "damage": 11820,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -14936,7 +15225,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 432,
+     "damage": 296,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -14993,7 +15282,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 432,
+     "damage": 296,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -15057,8 +15346,8 @@
    },
    "defence": {
     "health": {
-     "max": 168000,
-     "value": 168000
+     "max": 158000,
+     "value": 158000
     }
    },
    "economy": {
@@ -15107,7 +15396,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2.5,
+    "acceleration": 2.25,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -15137,7 +15426,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 50,
     "sortOrder": 1,
-    "speed": 2.5,
+    "speed": 2.25,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed"
    },
@@ -15201,7 +15490,7 @@
        "solverType": "HighArc"
       }
      ],
-     "damage": 2600,
+     "damage": 1841,
      "damageOverTimePulseCount": 10,
      "damageOverTimePulseDamage": 40,
      "damageRadius": 4,
@@ -15270,7 +15559,7 @@
       }
      ],
      "beamLifetime": 5,
-     "damage": 416,
+     "damage": 295,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -15321,7 +15610,7 @@
       }
      ],
      "beamLifetime": 5,
-     "damage": 416,
+     "damage": 295,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -15378,8 +15667,8 @@
    },
    "defence": {
     "health": {
-     "max": 256000,
-     "value": 256000
+     "max": 234000,
+     "value": 234000
     }
    },
    "economy": {
@@ -15428,7 +15717,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 3,
+    "acceleration": 2.75,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -15446,7 +15735,7 @@
     "referenceAltitude": "GroundOrWater",
     "rotationSpeed": 60,
     "sortOrder": 1,
-    "speed": 3,
+    "speed": 2.75,
     "terrainAlignmentFactor": 0,
     "type": "Hover"
    },
@@ -15519,7 +15808,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 5600,
+     "damage": 4788,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 2,
@@ -15722,8 +16011,8 @@
    },
    "defence": {
     "health": {
-     "max": 320000,
-     "value": 320000
+     "max": 297000,
+     "value": 297000
     }
    },
    "economy": {
@@ -15772,7 +16061,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2.5,
+    "acceleration": 2.25,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -15802,7 +16091,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 50,
     "sortOrder": 1,
-    "speed": 2.5,
+    "speed": 2.25,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed"
    },
@@ -15877,7 +16166,7 @@
        "yawSpeed": 60
       }
      ],
-     "damage": 5143,
+     "damage": 2982,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 3,
@@ -16084,7 +16373,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 2743,
+     "damage": 1591,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -16142,7 +16431,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 2743,
+     "damage": 1591,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 1,
@@ -16913,7 +17202,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 3,
+    "acceleration": 2.75,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -16931,7 +17220,7 @@
     "referenceAltitude": "GroundOrWater",
     "rotationSpeed": 60,
     "sortOrder": 4,
-    "speed": 3,
+    "speed": 2.75,
     "terrainAlignmentFactor": 0,
     "type": "Hover"
    },
@@ -18820,8 +19109,8 @@
    },
    "defence": {
     "health": {
-     "max": 2000,
-     "value": 2000
+     "max": 3800,
+     "value": 3800
     }
    },
    "economy": {
@@ -18902,7 +19191,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 480,
+     "damage": 912,
      "damageRadius": 2,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -19865,8 +20154,8 @@
    },
    "defence": {
     "health": {
-     "max": 6500,
-     "value": 6500
+     "max": 7000,
+     "value": 7000
     }
    },
    "economy": {
@@ -19946,7 +20235,7 @@
        "yawSpeed": 55
       }
      ],
-     "damage": 825,
+     "damage": 1848,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -27141,8 +27430,8 @@
    },
    "defence": {
     "health": {
-     "max": 140000,
-     "value": 140000
+     "max": 127000,
+     "value": 127000
     }
    },
    "economy": {
@@ -27191,7 +27480,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2.5,
+    "acceleration": 2.25,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -27207,7 +27496,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 50,
     "sortOrder": 6,
-    "speed": 2.5,
+    "speed": 2.25,
     "terrainAlignmentFactor": 1,
     "type": "LegsLand"
    },
@@ -27246,7 +27535,7 @@
       }
      ],
      "beamLifetime": 1,
-     "damage": 8000,
+     "damage": 5424,
      "damageRadius": 2,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -27349,8 +27638,8 @@
    },
    "defence": {
     "health": {
-     "max": 140000,
-     "value": 140000
+     "max": 136000,
+     "value": 136000
     }
    },
    "economy": {
@@ -27399,7 +27688,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 3.5,
+    "acceleration": 3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -27415,7 +27704,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 70,
     "sortOrder": 6,
-    "speed": 3.5,
+    "speed": 3,
     "terrainAlignmentFactor": 1,
     "type": "LegsLand"
    },
@@ -27480,7 +27769,7 @@
        "solverType": "LowArc"
       }
      ],
-     "damage": 1267,
+     "damage": 1380,
      "damageRadius": 0.5,
      "damageType": "Normal",
      "firingRandomness": 8,
@@ -27567,7 +27856,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 911,
+     "damage": 992,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -27620,7 +27909,7 @@
        "yawSpeed": 100
       }
      ],
-     "damage": 911,
+     "damage": 992,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -29525,8 +29814,8 @@
    },
    "defence": {
     "health": {
-     "max": 2000,
-     "value": 2000
+     "max": 3000,
+     "value": 3000
     }
    },
    "economy": {
@@ -29608,7 +29897,7 @@
       }
      ],
      "beamLifetime": 1,
-     "damage": 400,
+     "damage": 608,
      "damageRadius": 2,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -35221,7 +35510,7 @@
        "yawSpeed": 85
       }
      ],
-     "damage": 80,
+     "damage": 40,
      "damageRadius": 10,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -35709,9 +35998,9 @@
    },
    "defence": {
     "health": {
-     "max": 1500,
+     "max": 3000,
      "regen": 5,
-     "value": 1500
+     "value": 3000
     }
    },
    "economy": {
@@ -35812,7 +36101,7 @@
        "yawSpeed": 180
       }
      ],
-     "damage": 148,
+     "damage": 185,
      "damageRadius": 0,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -36174,9 +36463,9 @@
    },
    "defence": {
     "health": {
-     "max": 168000,
+     "max": 160000,
      "regen": 10,
-     "value": 168000
+     "value": 160000
     }
    },
    "economy": {
@@ -36225,7 +36514,7 @@
     "visionRadius": 25
    },
    "movement": {
-    "acceleration": 3.5,
+    "acceleration": 3,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -36255,7 +36544,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 70,
     "sortOrder": 1,
-    "speed": 3.5,
+    "speed": 3,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed",
     "walkAnimation": {
@@ -36331,7 +36620,7 @@
       }
      ],
      "beamLifetime": -1,
-     "damage": 260,
+     "damage": 281,
      "damageRadius": 1,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -36394,9 +36683,9 @@
    },
    "defence": {
     "health": {
-     "max": 50000,
+     "max": 67000,
      "regen": 10,
-     "value": 50000
+     "value": 67000
     }
    },
    "economy": {
@@ -36445,7 +36734,7 @@
     "visionRadius": 20
    },
    "movement": {
-    "acceleration": 2.5,
+    "acceleration": 2.25,
     "altitudeJitterFactor": 0,
     "bankFactor": 0,
     "collisionMaskDefault": [
@@ -36475,7 +36764,7 @@
     "referenceAltitude": "Ground",
     "rotationSpeed": 50,
     "sortOrder": 3,
-    "speed": 2.5,
+    "speed": 2.25,
     "terrainAlignmentFactor": 1,
     "type": "LegsSeabed",
     "walkAnimation": {
@@ -36520,7 +36809,7 @@
        "yawSpeed": 30
       }
      ],
-     "damage": 2064,
+     "damage": 2489,
      "damageRadius": 3,
      "damageType": "Normal",
      "firingRandomness": 10,
@@ -38258,9 +38547,9 @@
    },
    "defence": {
     "health": {
-     "max": 2000,
+     "max": 3200,
      "regen": 2,
-     "value": 2000
+     "value": 3200
     }
    },
    "economy": {
@@ -38341,7 +38630,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 160,
+     "damage": 258,
      "damageRadius": 2,
      "damageType": "Normal",
      "firingRandomness": 0,
@@ -38602,7 +38891,7 @@
        "yawSpeed": 90
       }
      ],
-     "damage": 50,
+     "damage": 25,
      "damageRadius": 5,
      "damageType": "Normal",
      "firingRandomness": 0,

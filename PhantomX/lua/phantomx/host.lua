@@ -57,7 +57,7 @@ local alerts = { all = {} } -- [army or "all"] = the latest few notices
 local alertSeq = 0
 local nextRevealAt = nil    -- game time of the next reveal
 local result = nil          -- how the match ended
-local paying = {}           -- [phantom] = { left = alloys still owed, target = army }
+local paying = {}           -- [phantom] = { left = alloys still owed, cost = the whole price, target = army }
 local vampireHooked = false
 local dirty = true
 local started = false
@@ -803,8 +803,9 @@ local function HandleRequest(army, data)
         and (phase == "playing" or phase == "war") then
         local cost = MarkCost()
         p.marks = p.marks - 1
-        paying[army] = { left = cost, target = target }
-        Alert(army, "Marking " .. Name(target), "Paying " .. cost .. " alloys from your storage as they come in.", Colours.phantom)
+        paying[army] = { left = cost, cost = cost, target = target }
+        Alert(army, "Marking " .. Name(target), "It lands once " .. cost .. " alloys are paid, taken from your storage.",
+            Colours.phantom)
 
     elseif op == "vote" and voteOpen and not p.vote then
         local n = tonumber(data.value)
@@ -881,7 +882,10 @@ local function StateFor(viewer)
         if p.role == "phantom" then
             s.marks = p.marks or 0
             s.markCost = MarkCost()
-            s.paying = paying[viewer] and math.ceil(paying[viewer].left) or nil
+            local pay = paying[viewer]
+            if pay then
+                s.paying = { left = math.ceil(pay.left), cost = pay.cost, target = pay.target.id, name = Name(pay.target) }
+            end
         end
     end
 
@@ -905,7 +909,9 @@ local function StateFor(viewer)
             entry.wants = other.offers[viewer] or false
             entry.canWar = canAct and not other.dead and entry.ally
             entry.canAlly = canAct and not other.dead and not entry.ally and phase ~= "war"
+            -- Every phantom is told who a mark hit, so a marked paladin loses the button.
             entry.canMark = canAct and not other.dead and p.role == "phantom" and (p.marks or 0) > 0 and not paying[viewer]
+                and not other.marked
                 and (phase == "playing" or phase == "war") and not (known[viewer] and known[viewer][army] == "phantom")
         end
         s.players[#s.players + 1] = entry

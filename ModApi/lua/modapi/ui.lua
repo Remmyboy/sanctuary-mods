@@ -115,6 +115,18 @@ function UI.Swatch(color, size)
     return { t = "swatch", color = colour(color) or "FFFFFF", size = size }
 end
 
+--- A progress bar, value from 0 (empty) to 1 (full), stretched across the
+--- width it sits in. o: color (of the filled part; default the HUD accent),
+--- width (the least it shrinks to, default 120), height (default 10).
+--- Mod API 1.9.
+function UI.Bar(value, o)
+    o = options(o)
+    value = tonumber(value) or 0
+    if value ~= value then value = 0 end
+    return { t = "bar", value = math.max(0, math.min(1, value)), color = colour(o.color),
+             width = o.width, height = o.height }
+end
+
 -- ---- what the framework reads ---------------------------------------------------
 
 local function publish()
