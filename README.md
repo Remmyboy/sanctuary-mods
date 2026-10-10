@@ -53,7 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.5) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.6**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.6) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -1695,7 +1695,9 @@ Each section is a lobby option, all on by default:
   are brought closer together.
 - **Air:** bombers lead their targets and their bombs splash; anti-air leads
   its shots and the T3 anti-air towers reach their range; the Guardian
-  fighters catch up.
+  fighters catch up. Anti-air hits most of the time: faster shells and
+  missiles, no drop or spread, beams aim where the plane is, and aircraft
+  hitboxes are 1.5x bigger.
 - **Defences:** point defences see as far as they shoot, and T1 point defences
   are tougher: they beat their cost in T1 tanks, and T1 artillery still
   outranges them.
@@ -1705,7 +1707,7 @@ Each section is a lobby option, all on by default:
   Guardian Nitro (T3 raider) is faster still but dies to one T3 tank volley.
   T4 bots move at 2.5-3.5 (were 2): brawlers fastest, snipers and artillery
   slowest. T4s are game enders: 10000-25000 alloys, with health and damage
-  raised to slightly beat T3 tanks per alloy; the EDA railgun sniper reaches
+  to match; the EDA railgun sniper reaches
   80 (was 40).
 
 The 0.2 numbers come from a top-down redesign

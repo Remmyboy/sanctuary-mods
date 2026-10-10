@@ -630,6 +630,24 @@ E/s (was 150); T3 radar 2800 A / 28000 E (was 700 / 7000), build time kept, upke
 (was 350). EDA T3 radar range 750 (was 450), Chosen 850 (was 550); Guardian
 stays 1000.
 
+**0.2.6 (unreleased, 2026-10-10, the user's calls):** T4 health and damage
+cut to 0.8x of 0.2.4's (one T4 keeps all its damage until it dies, so equal
+stats per alloy played far stronger). Anti-air rebuilt to hit most of the time
+(the user: "AA should hit the majority of the time"). From the game's code:
+projectiles hit by a zero-width ray each tick against the target's box
+(collisionInfo.collisionSize, full size), so a projectile's own size never
+counts; NoArc shells fall at aimGravity (default 1/s^2) uncorrected; homing
+missiles chase the current position at rotationSpeed. Changes: the three AA
+beams that 0.1.0 set to lead stop leading (bug); AA aim speed x1.5, x3 for
+the slowest eight and x6 for the Guardian T2 tower, spread removed on those;
+AA missiles speedMax x1.5, turn 120; AA-only shells don't fall; aircraft
+hitboxes x1.5. An offline shot model (scratchpad aa-sim.mjs; my model of the
+game's hit code, aircraft flight is mine; it matched the 0.1 lab's ranking but
+not its absolute numbers) puts the average hit rate over 24 AA weapons and 5
+aircraft at 82% straight / 75% micro / 71% weaving (0.2.5: 38 / 27 / 28), the
+worst weapon 59% under micro. Effective AA damage is about 2-3x 0.2.5's; air
+numbers may need retuning once played.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;
