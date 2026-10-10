@@ -17,7 +17,8 @@ using static SanctuaryHud.HudCore;
 
 namespace SanctuaryHud
 {
-    // Live replays, the streaming half (Live.Stream, off by default). While
+    // Live replays, the streaming half (Live.StreamLadder and
+    // Live.StreamOther, both off by default). While
     // the player is in a game, the game's own recording is sent to the site
     // as it grows, so anyone can watch it in game a delay behind (the
     // watching half is LiveWatch.cs; the site's is docs/live-replays.md).
@@ -32,8 +33,10 @@ namespace SanctuaryHud
     // side behaving.
     //
     // A chunk is a few tens of KB and the requests are asynchronous, so this
-    // costs the game nothing noticeable. Any game counts: ranked, custom,
-    // skirmish, or one the player only observes.
+    // costs the game nothing noticeable. A ladder game is one this mod
+    // launched for a ladder match (LaunchedThisGame, the same test as
+    // reporting); every other game, custom, skirmish or observed, is
+    // "other", with a setting of its own.
     public partial class LadderReporterPlugin
     {
         private const float LiveChunkSeconds = 15f;
@@ -41,7 +44,8 @@ namespace SanctuaryHud
         // 1.7 MB on The Forge, so the first chunk can be that big.
         private const int LiveChunkMaxBytes = 4 * 1024 * 1024;
 
-        private ConfigEntry<bool> _cfgLiveStream;
+        private ConfigEntry<bool> _cfgLiveLadder;
+        private ConfigEntry<bool> _cfgLiveOther;
 
         private sealed class LiveOut
         {
@@ -66,10 +70,12 @@ namespace SanctuaryHud
 
         private void AwakeLive()
         {
-            _cfgLiveStream = Config.Bind("Live", "Stream", false,
-                "Stream the games you play (or observe) live to sanctuarydb.net/live while they run, so anyone can " +
-                "watch them in game, three minutes behind. Each game is listed on that page while it runs and for a " +
-                "day after.");
+            _cfgLiveLadder = Config.Bind("Live", "StreamLadder", false,
+                "Stream your ladder games live to sanctuarydb.net/live while they run, so anyone can watch them in " +
+                "game, three minutes behind. Each game is listed on that page while it runs and for a day after.");
+            _cfgLiveOther = Config.Bind("Live", "StreamOther", false,
+                "Stream every other game you play or observe (custom lobbies, skirmishes) live to " +
+                "sanctuarydb.net/live in the same way.");
         }
 
         private void UpdateLive()
@@ -82,7 +88,7 @@ namespace SanctuaryHud
             var o = _liveOut;
             if (o == null)
             {
-                if (_cfgLiveStream.Value) TryOpenLive();
+                if (_cfgLiveLadder.Value || _cfgLiveOther.Value) TryOpenLive();
                 return;
             }
             if (o.Over)
@@ -110,11 +116,15 @@ namespace SanctuaryHud
         private void TryOpenLive()
         {
             if (!InMatch || NetworkManager.IsReplayPlayback || !LuaReady) return;
+            // Checked every second, so switching a setting on mid-game
+            // streams the game from its start.
+            var ladder = LaunchedThisGame;
+            if (!(ladder ? _cfgLiveLadder.Value : _cfgLiveOther.Value)) return;
             var path = RecordingPath();
             if (string.IsNullOrEmpty(path) || SameFile(path, _liveDonePath) || !File.Exists(path)) return;
             _liveDonePath = path;
             _liveOut = new LiveOut { SourcePath = path };
-            Logger.LogInfo($"Live: streaming this game ({Path.GetFileName(path)}) to the site.");
+            Logger.LogInfo($"Live: streaming this {(ladder ? "ladder game" : "game")} ({Path.GetFileName(path)}) to the site.");
         }
 
         private IEnumerator OpenLiveRoutine(LiveOut o)

@@ -75,6 +75,12 @@ namespace SanctuaryHud
         private float _settingsAccum;
         private bool _lobbyIsOurs;             // we created/joined it for this match
         private string _mmReportMatchId;       // attached to the result report
+        // The two Steam ids of the game this mod launched, from its start
+        // until the player is back in the menu. Only that game is reported,
+        // uploaded or streamed as a ladder game (see TrySnapshot).
+        private string[] _mmLaunchedPlayers;
+
+        private bool LaunchedThisGame => _mmReportMatchId != null && _mmLaunchedPlayers != null;
 
         // Overlay.
         private string _overlayText;
@@ -914,6 +920,7 @@ namespace SanctuaryHud
                 else if (!LobbyManager.IsInLobby && !InMatch)
                 {
                     _mmReportMatchId = null;
+                    _mmLaunchedPlayers = null;
                     SetPhase(Phase.Idle);
                 }
                 return;
@@ -929,6 +936,7 @@ namespace SanctuaryHud
             {
                 PostEvent("started");
                 _mmReportMatchId = m.Id;
+                _mmLaunchedPlayers = new[] { m.Host, m.Joiner };
                 Overlay("LAUNCHED", $"vs {m.OpponentName ?? "your opponent"} on {MapName(m.Map)}. Good luck.", 8f);
                 SetPhase(Phase.Started);
                 return;
@@ -1027,6 +1035,7 @@ namespace SanctuaryHud
                     if (!LobbyManager.IsInLobby && !InMatch)
                     {
                         _mmReportMatchId = null;
+                        _mmLaunchedPlayers = null;
                         _match = null;
                         SetPhase(Phase.Idle);
                     }
