@@ -1270,10 +1270,12 @@ which Steam account sent the report, not that the result in it is true, so
 the ladder doesn't take it on trust: a player's own loss applies at once, a
 claimed win applies when the opponent's client agrees or after a 15-minute
 window, and reports that contradict each other freeze the match as disputed.
-Only Steam lobbies with exactly two human players on opposing teams and no AI
-are reported; skirmish, LAN, AI and team games are recognised and left alone,
-as is a game you are only watching. Spectators in a ladder game don't stop it
-reporting.
+Only games the mod launched itself for a ladder match (see Matchmaking below)
+are reported, and only with the two players the ladder matched: a custom
+1v1, modded or not, never is, and a manually hosted ladder match is reported
+on the site. Within a launched game it still checks for a Steam lobby with
+exactly two human players on opposing teams and no AI, you being one of
+them. Spectators in a ladder game don't stop it reporting.
 
 **Matchmaking.** The site pairs queued players, picks map, factions, slots
 and host, and runs the countdown. The mod never polls the site: it listens
@@ -1383,7 +1385,8 @@ minutes behind:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `Live.Stream` | false | Stream every game you play or observe while it runs; it is listed on the Live page while it runs and for a day after |
+| `Live.StreamLadder` | false | Stream your ladder games (the ones the mod launched) while they run; each is listed on the Live page while it runs and for a day after |
+| `Live.StreamOther` | false | Stream every other game you play or observe: custom lobbies, skirmishes |
 
 - **Streaming.** Every 15 s the mod reads the frames the game has added to
   its own recording since the last chunk, cut after the last whole one, on
@@ -1391,7 +1394,8 @@ minutes behind:
   recording's header and is the biggest: a game's opening frame is up to
   1.7 MB on the stock maps). Leaving the game sends what is left and closes
   the stream. A chunk's bounds are fixed when it is first read, so a retry
-  sends the same bytes. Any game counts: ranked, custom, skirmish.
+  sends the same bytes. A ladder game is one the mod launched, the same
+  test as reporting; the setting for that kind of game decides.
 - **Watching.** The stream's page on the site has a **Watch in game**
   button, which reaches the mod over the local bridge (`POST /watch`, from
   the main menu or over a replay, which it closes first). The mod fetches

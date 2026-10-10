@@ -38,12 +38,14 @@ namespace SanctuaryHud
     // linking. Every ticket is cancelled once its request is over, as Steam
     // requires, and any still outstanding when the plugin unloads.
     //
-    // It reports only the ladder's shape: a Steam lobby with exactly two
-    // human players, on opposing teams, and no AI. Skirmish, LAN, AI and team
-    // games are recognised and left alone, as is a game this player is only
-    // watching. Spectators in a ladder game don't stop it reporting. The
-    // server ignores reports for games that aren't an open ladder match, so
-    // playing unranked with a friend is fine.
+    // It reports only games it launched itself for a ladder match (the
+    // matchmaking in Matchmaking.cs), with the two players the ladder
+    // matched: a custom 1v1 is never reported, whatever its roster or mods
+    // (issue #9), and the ladder can later run mods of its own without this
+    // side guessing at them. A manually hosted ladder match is reported on
+    // the site instead. Within a launched game it still checks the shape:
+    // a Steam lobby with exactly two human players, on opposing teams, and
+    // no AI, this player one of them. Spectators don't stop it reporting.
     //
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
@@ -143,9 +145,8 @@ namespace SanctuaryHud
             UnitScan = false;
 
             _cfgEnabled = Config.Bind("Report", "Enabled", true,
-                "Report ranked 1v1 results to the SanctuaryDB ladder when the game ends. Only Steam lobbies " +
-                "with exactly two human players on opposing teams and no AI are reported; the ladder ignores " +
-                "games that aren't an open ladder match, so unranked 1v1s are unaffected.");
+                "Report the result of a ladder game to SanctuaryDB when it ends. Only games this mod launched " +
+                "for a ladder match are reported; other games, custom 1v1s included, never are.");
             // www, not the apex: the apex 308-redirects, and UnityWebRequest
             // drops the POST body when it follows a redirect — the report
             // arrives empty. Talk to the canonical host directly.
@@ -365,7 +366,8 @@ namespace SanctuaryHud
 
             var localId = LobbyManager.localPlayerID.value;
             string skip = null;
-            if (!(LobbyManager.Backend is SteamLobbyBackend)) skip = "LAN lobby (no Steam identities)";
+            if (!LaunchedThisGame) skip = "not a game this mod launched for a ladder match";
+            else if (!(LobbyManager.Backend is SteamLobbyBackend)) skip = "LAN lobby (no Steam identities)";
             else if (!SteamManager.IsSteamInitialized) skip = "Steam session not initialised";
             else if (snapshot.Observers.Any(p => p.SteamId == localId)) skip = "observing, not playing";
             else if (aiCount > 0) skip = $"{aiCount} AI player(s) in the game";
@@ -375,6 +377,10 @@ namespace SanctuaryHud
             // Armies on the same team are allies (gameUtils.lua, CreateArmies),
             // so two humans sharing one are playing together, not a 1v1.
             else if (snapshot.Humans[0].Team == snapshot.Humans[1].Team) skip = $"both players are on team {snapshot.Humans[0].Team}";
+            // The players the ladder matched, not whoever else got into the lobby.
+            else if (!snapshot.Humans.Select(p => p.SteamId.ToString(CultureInfo.InvariantCulture)).OrderBy(s => s, StringComparer.Ordinal)
+                         .SequenceEqual(_mmLaunchedPlayers.OrderBy(s => s, StringComparer.Ordinal)))
+                skip = "the players aren't the two the ladder matched";
 
             snapshot.Reportable = skip == null;
             var roster = string.Join(" vs ", snapshot.Humans.Select(p => p.Name)) +
