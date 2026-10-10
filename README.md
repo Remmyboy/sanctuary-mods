@@ -49,14 +49,14 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.4.0) | Reports ranked results; launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.1) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.15.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
+| [ModManager](ModManager/) | [**0.16.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
-| [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [PhantomX](PhantomX/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.2) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
 | [BalancePatch](BalancePatch/) | [**0.2.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.5) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1743,7 +1743,10 @@ later (Mod API 1.8.0), for every player.
   more the fewer innocents they're still allied with. They win by being the last
   one standing. **Innocents** win by killing every phantom. **Paladins** are
   innocents with a smaller share of the bonus, which a phantom can take away by
-  paying alloys to **mark** them.
+  paying alloys to **mark** them. As in the original, a mark is paid from
+  stored alloys as they come in and lands once it's paid in full, so a phantom
+  spending all its income never finishes; the panel shows what's left. Marks
+  cost a quarter of the original's, since Sanctuary's economy is smaller.
 - **Reveals:** phantoms (or paladins, or both) are named at set times, to
   everyone or only to phantoms or paladins. A player's role can be shown when
   they die.
@@ -1756,7 +1759,7 @@ later (Mod API 1.8.0), for every player.
 
 Each player is only sent what their role lets them know. The host checks
 every request against the client it came from. Every number is in
-`lua\phantomxalance.lua`, beside the original's.
+`lua\phantomx\balance.lua`, beside the original's.
 
 ## MapLocalFiles
 
