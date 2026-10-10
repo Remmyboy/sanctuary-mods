@@ -31,7 +31,7 @@ namespace SanctuaryHud
     internal static class Waypoints
     {
         private static ConfigEntry<bool> _cfgRally;
-        private static ConfigEntry<bool> _cfgKeep;
+        private static ConfigEntry<bool> _cfgKeep, _cfgMoveOn;
         private static ConfigEntry<bool> _cfgDrag;
         private static ConfigEntry<float> _cfgGrabPixels;
 
@@ -67,6 +67,10 @@ namespace SanctuaryHud
                 "An engineer assisting another builder carries on with the structure it was helping with when that " +
                 "builder dies or moves on to something else, then goes back to its own queue (or back to helping). " +
                 "Only structures it was already helping to build, which the game only allows if it could build them itself.");
+            _cfgMoveOn = config.Bind("QoL", "FactoryAssistThenQueue", false,
+                "An engineer told to assist a factory, with more orders queued after the assist, stops assisting once " +
+                "the unit it was helping with is finished (or once the factory has nothing to build) and goes on with " +
+                "the rest of its queue. With nothing queued after it, it assists for good, as the game does.");
         }
 
         internal static bool Live => Hook.Live && LuaReady;
@@ -86,7 +90,7 @@ namespace SanctuaryHud
         private static string Chunk()
         {
             var grab = Mathf.Clamp(_cfgGrabPixels.Value, 4f, 60f).ToString(CultureInfo.InvariantCulture);
-            var signature = (_cfgRally.Value ? "r" : "-") + (_cfgDrag.Value ? "d" : "-") + (_cfgKeep.Value ? "k" : "-") + grab;
+            var signature = (_cfgRally.Value ? "r" : "-") + (_cfgDrag.Value ? "d" : "-") + (_cfgKeep.Value ? "k" : "-") + (_cfgMoveOn.Value ? "m" : "-") + grab;
             if (_chunk == null || signature != _chunkSignature)
             {
                 _chunkSignature = signature;
@@ -94,6 +98,7 @@ namespace SanctuaryHud
                     .Replace("__RALLY__", _cfgRally.Value ? "true" : "false")
                     .Replace("__DRAG__", _cfgDrag.Value ? "true" : "false")
                     .Replace("__KEEP__", _cfgKeep.Value ? "true" : "false")
+                    .Replace("__MOVEON__", _cfgMoveOn.Value ? "true" : "false")
                     .Replace("__GRAB__", grab);
             }
             return _chunk;
@@ -129,10 +134,10 @@ namespace SanctuaryHud
             // is the whole gate, as in BuildHotkeys. LuaHook checks once a
             // second, puts it back in a new VM, and swaps it for a settings
             // change; a failed install waits before it is tried again.
-            Hook.Tick(_cfgRally.Value || _cfgDrag.Value || _cfgKeep.Value || (EngineerQueue.Enabled != null && EngineerQueue.Enabled.Value));
+            Hook.Tick(_cfgRally.Value || _cfgDrag.Value || _cfgKeep.Value || _cfgMoveOn.Value || (EngineerQueue.Enabled != null && EngineerQueue.Enabled.Value));
             if (!Hook.Live) return;
 
-            if (_cfgKeep.Value)
+            if (_cfgKeep.Value || _cfgMoveOn.Value)
             {
                 _watch += Time.unscaledDeltaTime;
                 if (_watch >= 0.25f)
@@ -1060,20 +1065,80 @@ if not __SdbWaypoints then
     end
   end
 
+  ------------------------------------------------- factory assist moves on
+  -- An assist on a factory never ends by itself, so whatever is queued
+  -- after it never comes. With this on, an engineer with orders after its
+  -- assist drops the assist once the unit it was helping with is finished
+  -- (or, if it hasn't helped with one, once the factory has been idle a
+  -- couple of seconds), and goes on with the rest of its queue. With
+  -- nothing after it, it goes on assisting.
+  W.moveOn = __MOVEON__
+  W.helped = {}
+
+  local function moveOn(u, o)
+    local plan, why = W.Plan(o, nil, true, { u })
+    if plan then
+      W.Start(plan)
+      __SdbWaypointsCount = __SdbWaypointsCount + 1
+    else
+      Warn('Waypoints: an engineer could not leave its factory assist for its queue (' .. tostring(why) .. ')')
+    end
+  end
+
+  -- From Watch, for an engineer assisting `a`, a building that builds.
+  local function factoryAssist(u, o, a, now)
+    local h = W.helped[u]
+    if not h or h.o ~= o then
+      h = { o = o }
+      W.helped[u] = h
+    end
+    if #u.orderState.queuedOrdersArray == 0 then
+      h.x, h.idle = nil, nil
+      return
+    end
+    -- What it helped with, finished (or killed): next order.
+    if h.x and (not live(h.x) or h.x:IsCompleted()) then
+      W.helped[u] = nil
+      return moveOn(u, o)
+    end
+    -- Putting up the factory itself doesn't count: the unit after it does.
+    local x = u.buildTarget
+    if u.isBuilding and live(x) and x ~= a and not x:IsCompleted() then
+      h.x, h.idle = x, nil
+      return
+    end
+    if not h.x and a:IsCompleted() and not a.isBuilding and not a:IsUpgrading()
+       and not next(a.predictedBuildQueue or {}) then
+      h.idle = h.idle or now
+      if now - h.idle > 20 then
+        W.helped[u] = nil
+        return moveOn(u, o)
+      end
+    else
+      h.idle = nil
+    end
+  end
+
   -- A few times a second. One re-issue at a time: the rest wait for the next.
   W.Watch = function()
-    if not W.keepOn or IsObserver() then
-      W.keep = {}
+    if not (W.keepOn or W.moveOn) or IsObserver() then
+      W.keep, W.helped = {}, {}
       return
     end
     if W.job then return end
+    local now = _G.Tick or 0
     local seen = {}
     for _, u in pairs(ownUnits()) do
       local o = live(u) and u.tp.construction and u.tp.movement and u.orderState and u.orderState.activeOrder
       if o and o.orderTask == OT.ASSISTUNIT then
         seen[u] = true
         local a, x, k = o.targetUnit, u.buildTarget, W.keep[u]
-        if live(a) and a.tp.movement then
+        if W.moveOn and live(a) and not a.tp.movement and a.tp.construction then
+          factoryAssist(u, o, a, now)
+          if W.job then return end
+        elseif not W.keepOn then
+          -- nothing else to watch
+        elseif live(a) and a.tp.movement then
           if u.isBuilding and live(x) and not x:IsCompleted() and a.buildTarget == x then
             W.keep[u] = { x = x, a = a, o = o }
           elseif k and k.o == o and a.buildTarget ~= k.x and not paused(a) and not paused(u) then
@@ -1087,11 +1152,13 @@ if not __SdbWaypoints then
         end
       end
     end
+    for u in pairs(W.helped) do
+      if not seen[u] then W.helped[u] = nil end
+    end
     -- An assist the host has dropped: its unit died. The drop can arrive a
     -- little before the death does, so it is kept a couple of seconds to
     -- see. Any other end (new orders, stop) leaves the engineer to what it
     -- was told.
-    local now = _G.Tick or 0
     for u, k in pairs(W.keep) do
       if not seen[u] then
         k.lost = k.lost or now

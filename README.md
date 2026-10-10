@@ -750,6 +750,13 @@ The same re-issuing serves three more, all off by default:
   unfinished building that builds, the right-click is an assist instead: the
   host's assist builds it first, then helps with what it produces.
 
+- **Factory assist, then the queue** (`QoL · FactoryAssistThenQueue`). An
+  assist on a factory never ends, so orders queued after it never came. With
+  this on, an engineer with orders after its assist drops it once the unit it
+  was helping with is finished (or once the factory has had nothing to build
+  for a couple of seconds) and goes on with the rest. With nothing queued
+  after it, it assists for good, as before.
+
 `QoL · UpgradeBadgeOnlyWhileUpgrading` shows a factory's upgrade badge only
 while the upgrade is under way; the game shows it as soon as an upgrade is
 anywhere in the queue (`IsUpgradeQueued`).
