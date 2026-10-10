@@ -98,6 +98,17 @@ Sections = {
                 set = { ["economy.production.energy"] = 2500, ["economy.cost"] = { alloys = 2800, energy = 28000 }, ["economy.buildTime"] = 2800 },
             },
             {
+                why = "The Crucible (Guardian T4 generator) costs 150000 alloys and 1500000 energy with build time 150000 (all 3x): it still makes 500 alloys and 50000 energy a second, so it stays a game winner once it stands, but it takes three times as long to get there. It had no death explosion; now it does 50000 damage out to 40 (a commander's is 5000 out to 15), friend and foe alike, with the game's biggest land death effect.",
+                ids = { "ugs4621" },
+                expect = { ["economy.cost"] = { alloys = 50000, energy = 500000 }, ["economy.buildTime"] = 50000 },
+                set = {
+                    ["economy.cost"] = { alloys = 150000, energy = 1500000 },
+                    ["economy.buildTime"] = 150000,
+                    weapons = { { category = "DeathExplosion", damage = 50000, damageRadius = 40, damageFriendly = true, damageType = "Normal" } },
+                    ["visuals.effectsInstant.onDeath"] = { { audioName = "Sounds/videvo.net_royalFree_soundEffects/Explosions/mi explosion 03 hpx.ogg", boneName = "Root", particleName = "VFX/Death/vcd1401_death_land_huge.sanvfx" } },
+                },
+            },
+            {
                 why = "T3 extractors make 15 alloys a second (were 10): the upgrade (2000 alloys) pays back in 200 s instead of 400 s, so T3 economy pays for itself inside a 20-30 minute game.",
                 idPattern = "^u.s3601$",
                 expect = { ["economy.production.alloys"] = 10 },

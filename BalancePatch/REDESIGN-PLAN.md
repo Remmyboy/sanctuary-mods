@@ -686,6 +686,20 @@ then a factory that upgrades at once, generators built mid-upgrade when
 energy runs out, no engineers or units. The 500-alloy start bank goes on
 the extractors and the factory, not the upgrade.
 
+**0.2.9 (unreleased, 2026-10-10, the user's call):** the Crucible (ugs4621,
+the Guardian T4 generator) was far too easy to get. It makes 500 alloys and
+50000 energy a second (about 33 T3 extractors and 20 T3 generators), and at
+50000 alloys + 500000 energy it paid back its alloys in 100 s. The user
+wants it to stay super OP once built but take much longer: cost and build
+time 3x (150000 alloys + 1500000 energy, build time 150000; my pick of
+factor). It had no death explosion; now 50000 damage out to 40, friendly
+fire on (commander 5000 / 15, the Guardian T5 air unit 50000 / 20). Damage
+is full across the radius (CollisionUpdate.ProcessAreaDamage, no falloff).
+The game plays one onDeath effect at scale 1, so a client append
+(lua/append/client/units/unitsClasses/unitsBaseClass.lua) adds the
+template's effect at 3x in the middle and two rings at 2x out to the blast's
+edge for any unit whose death explosion reaches 30. Not seen in game.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

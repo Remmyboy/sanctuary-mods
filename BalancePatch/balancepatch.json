@@ -4,13 +4,13 @@
  "mod": {
   "id": "sanctuarymods.balancepatch",
   "name": "Balance Patch",
-  "version": "0.2.8"
+  "version": "0.2.9"
  },
  "game": {
   "version": "0.0.1.20",
   "steamBuild": "25474094"
  },
- "generated": "2026-10-10T18:25:52.654Z",
+ "generated": "2026-10-10T19:13:52.014Z",
  "sections": [
   {
    "key": "fixes",
@@ -21,7 +21,7 @@
   {
    "key": "economy",
    "label": "Economy",
-   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1000 (was 500) over 90 s (was 80) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250 energy a second (was 150) and T3 radar costs 2800 alloys (was 700) and 1400 energy a second (was 350); EDA and Chosen T3 radar see 750 and 850 (were 450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
+   "description": "Commanders make 3 alloys and 30 energy a second (were 5 and 50) and start you with full storage, 500 alloys and 5000 energy (was half, 250 and 2500). T2 and T3 extractors make 5 and 15 (were 4 and 10); generators make 20/600/2500 energy (were 10/200/1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys (were 150), upgrading one to T2 costs 1000 (was 500) over 90 s (was 80) and to T3 4000 (was 2000), and T3 tanks and the Guardian T3 raider cost 30% less. The Guardian Crucible costs 3x as much and takes 3x as long to build (150000 alloys), and its death explosion does 50000 damage out to 40. T2 radar uses 250 energy a second (was 150) and T3 radar costs 2800 alloys (was 700) and 1400 energy a second (was 350); EDA and Chosen T3 radar see 750 and 850 (were 450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land units cost 6 energy per alloy (were 10), Chosen aircraft as much energy as the others, and engineers have less than half their health.",
    "default": true
   },
   {
@@ -760,6 +760,100 @@
    ],
    "why": [
     "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs4621",
+   "name": "Crucible",
+   "displayName": "Tier 4: Experimetal Generator",
+   "faction": "Guardian",
+   "field": "economy.cost",
+   "label": "cost",
+   "before": {
+    "alloys": 50000,
+    "energy": 500000
+   },
+   "after": {
+    "alloys": 150000,
+    "energy": 1500000
+   },
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "The Crucible (Guardian T4 generator) costs 150000 alloys and 1500000 energy with build time 150000 (all 3x): it still makes 500 alloys and 50000 energy a second, so it stays a game winner once it stands, but it takes three times as long to get there. It had no death explosion; now it does 50000 damage out to 40 (a commander's is 5000 out to 15), friend and foe alike, with the game's biggest land death effect."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs4621",
+   "name": "Crucible",
+   "displayName": "Tier 4: Experimetal Generator",
+   "faction": "Guardian",
+   "field": "economy.buildTime",
+   "label": "build time",
+   "before": 50000,
+   "after": 150000,
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "The Crucible (Guardian T4 generator) costs 150000 alloys and 1500000 energy with build time 150000 (all 3x): it still makes 500 alloys and 50000 energy a second, so it stays a game winner once it stands, but it takes three times as long to get there. It had no death explosion; now it does 50000 damage out to 40 (a commander's is 5000 out to 15), friend and foe alike, with the game's biggest land death effect."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs4621",
+   "name": "Crucible",
+   "displayName": "Tier 4: Experimetal Generator",
+   "faction": "Guardian",
+   "field": "weapons",
+   "label": "death explosion",
+   "before": null,
+   "after": [
+    {
+     "category": "DeathExplosion",
+     "damage": 50000,
+     "damageRadius": 40,
+     "damageFriendly": true,
+     "damageType": "Normal"
+    }
+   ],
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "The Crucible (Guardian T4 generator) costs 150000 alloys and 1500000 energy with build time 150000 (all 3x): it still makes 500 alloys and 50000 energy a second, so it stays a game winner once it stands, but it takes three times as long to get there. It had no death explosion; now it does 50000 damage out to 40 (a commander's is 5000 out to 15), friend and foe alike, with the game's biggest land death effect."
+   ]
+  },
+  {
+   "kind": "unit",
+   "id": "ugs4621",
+   "name": "Crucible",
+   "displayName": "Tier 4: Experimetal Generator",
+   "faction": "Guardian",
+   "field": "visuals.effectsInstant.onDeath",
+   "label": "death effect",
+   "before": [
+    {
+     "audioName": "Sounds/videvo.net_royalFree_soundEffects/Explosions/mi explosion 03 hpx.ogg",
+     "boneName": "Root",
+     "particleName": "VFX/Death/vgd0301_death_rdu.sanvfx"
+    }
+   ],
+   "after": [
+    {
+     "audioName": "Sounds/videvo.net_royalFree_soundEffects/Explosions/mi explosion 03 hpx.ogg",
+     "boneName": "Root",
+     "particleName": "VFX/Death/vcd1401_death_land_huge.sanvfx"
+    }
+   ],
+   "sections": [
+    "economy"
+   ],
+   "why": [
+    "The Crucible (Guardian T4 generator) costs 150000 alloys and 1500000 energy with build time 150000 (all 3x): it still makes 500 alloys and 50000 energy a second, so it stays a game winner once it stands, but it takes three times as long to get there. It had no death explosion; now it does 50000 damage out to 40 (a commander's is 5000 out to 15), friend and foe alike, with the game's biggest land death effect."
    ]
   },
   {
@@ -40744,6 +40838,118 @@
     "RADAR",
     "STRUCTURE",
     "TECH3"
+   ]
+  },
+  "ugs4621": {
+   "additions": {
+    "rotators": [
+     {
+      "boneName": "Rails_Ring_01_Rotator",
+      "speed": {
+       "x": 0,
+       "y": 10,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Rails_Ring_02_Rotator",
+      "speed": {
+       "x": 0,
+       "y": 10,
+       "z": 0
+      }
+     },
+     {
+      "boneName": "Torus_Ring_Rotator",
+      "speed": {
+       "x": 0,
+       "y": -120,
+       "z": 0
+      }
+     }
+    ]
+   },
+   "collisionInfo": {
+    "centerOffset": {
+     "x": 0,
+     "y": 1.3,
+     "z": 0
+    },
+    "collisionSize": {
+     "x": 6.6,
+     "y": 2.6,
+     "z": 6.6
+    }
+   },
+   "defence": {
+    "health": {
+     "max": 30000,
+     "regen": 9,
+     "value": 30000
+    }
+   },
+   "economy": {
+    "buildTime": 150000,
+    "cost": {
+     "alloys": 150000,
+     "energy": 1500000
+    },
+    "production": {
+     "alloys": 500,
+     "energy": 50000
+    }
+   },
+   "footprint": {
+    "x": 10,
+    "y": 10
+   },
+   "general": {
+    "class": [
+     "unitsDefaultGuard",
+     "GuardEnergyGenerator"
+    ],
+    "displayName": "Tier 4: Experimetal Generator",
+    "icon": {
+     "shape": "experimental1",
+     "symbol": "alloy",
+     "tech": "t1"
+    },
+    "iconUI": "tech1_experimental1_alloy.png",
+    "iconUIBuildSortPriority": 360,
+    "iconUIType": "land",
+    "name": "Crucible",
+    "threatByLayer": {
+     "Air": 0,
+     "Land": 0,
+     "WaterSurface": 0
+    },
+    "tpId": "ugs4621",
+    "unitTypeName": "GuardT4ExpGenerator"
+   },
+   "intel": {
+    "visionRadius": 30
+   },
+   "skirtSize": {
+    "x": 12,
+    "y": 12
+   },
+   "tags": [
+    "ALLOYS_PRODUCTION",
+    "BUILDABLE_BY_T3_ENGINEER",
+    "ECONOMIC",
+    "ENERGY_PRODUCTION",
+    "GUARD",
+    "STRUCTURE",
+    "TECH4"
+   ],
+   "weapons": [
+    {
+     "category": "DeathExplosion",
+     "damage": 50000,
+     "damageRadius": 40,
+     "damageFriendly": true,
+     "damageType": "Normal"
+    }
    ]
   }
  },
