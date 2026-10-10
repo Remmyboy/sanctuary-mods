@@ -367,6 +367,8 @@ namespace Sanctuary.ModApi
             internal TMP_Text Text;
             internal Image Image;
             internal UiButton Button;
+            /// A bar's filled part (Image is its track).
+            internal RectTransform Value;
             internal LayoutElement Layout;
             internal HorizontalOrVerticalLayoutGroup Group;
             internal readonly List<Node> Children = new List<Node>();
@@ -505,6 +507,20 @@ namespace Sanctuary.ModApi
                     node.Go = node.Image.gameObject;
                     node.Layout = node.Go.AddComponent<LayoutElement>();
                     break;
+                case "bar":
+                {
+                    node.Image = HudCanvas.Fill(parent, "Bar", new Color(1f, 1f, 1f, 0.12f));
+                    node.Go = node.Image.gameObject;
+                    node.Layout = node.Go.AddComponent<LayoutElement>();
+                    node.Layout.flexibleWidth = 1f;
+                    // Anchored to the track's left edge; its right anchor is the value.
+                    var value = HudCanvas.Fill(node.Go.transform, "Value", HudCore.AccentColour).rectTransform;
+                    value.anchorMin = Vector2.zero;
+                    value.anchorMax = new Vector2(0f, 1f);
+                    value.offsetMin = value.offsetMax = Vector2.zero;
+                    node.Value = value;
+                    break;
+                }
                 default:
                     node.Type = "space";
                     node.Go = new GameObject("Space", typeof(RectTransform));
@@ -561,6 +577,16 @@ namespace Sanctuary.ModApi
                     var size = Num(o, "size", 16f);
                     node.Layout.minWidth = node.Layout.preferredWidth = size;
                     node.Layout.minHeight = node.Layout.preferredHeight = size;
+                    break;
+                }
+                case "bar":
+                {
+                    node.Value.GetComponent<Image>().color = Col(o, "color", HudCore.AccentColour);
+                    node.Value.anchorMax = new Vector2(Mathf.Clamp01(Num(o, "value", 0f)), 1f);
+                    var width = Num(o, "width", 120f);
+                    var height = Num(o, "height", 10f);
+                    node.Layout.minWidth = node.Layout.preferredWidth = width;
+                    node.Layout.minHeight = node.Layout.preferredHeight = height;
                     break;
                 }
                 case "space":

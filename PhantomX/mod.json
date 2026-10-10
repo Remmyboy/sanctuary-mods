@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/Remmyboy/sanctuary-mods/main/docs/mod.schema.json",
   "id": "sanctuarymods.phantomx",
   "name": "Phantom-X",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "Sanctuary Mods (after Novaprim3, Duck_42, mead, SpikeyNoob and Fichom's Phantom-X for Forged Alliance)",
   "description": "Supreme Commander's Phantom-X. Everyone starts allied; a few minutes in, some players secretly become phantoms, fed a share of everyone else's income. Phantoms win by being the last one standing, innocents by killing every phantom. Paladins hunt them with a smaller bonus, which phantoms can pay to take away. Phantoms are revealed at set times. Break and offer alliances, mark paladins, vote and volunteer on the Phantom-X panel. Best with three or more players.",
   "kind": "gameplay",

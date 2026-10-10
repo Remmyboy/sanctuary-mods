@@ -49,14 +49,14 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.4.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.4.0) | Reports ranked results; launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.1) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.15.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
+| [ModManager](ModManager/) | [**0.16.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
-| [PhantomX](PhantomX/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.1) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [PhantomX](PhantomX/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.2) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.5) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.7**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.7) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.8.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.15.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -1376,6 +1376,39 @@ All three calls (`POST /api/mm/match/{id}/stats`, `.../replay`,
 ticket when first needed. Stats and replays are cosmetic: the result and
 the rating come from the report alone.
 
+**Live replays (0.5, opt-in).** A player can stream the games they play
+(or observe) to [sanctuarydb.net/live](https://www.sanctuarydb.net/live)
+while they run, and anyone can watch them in their own game, three
+minutes behind:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `Live.Stream` | false | Stream every game you play or observe while it runs; it is listed on the Live page while it runs and for a day after |
+
+- **Streaming.** Every 15 s the mod reads the frames the game has added to
+  its own recording since the last chunk, cut after the last whole one, on
+  a worker thread, and posts them to the site (the first chunk carries the
+  recording's header and is the biggest: a game's opening frame is up to
+  1.7 MB on the stock maps). Leaving the game sends what is left and closes
+  the stream. A chunk's bounds are fixed when it is first read, so a retry
+  sends the same bytes. Any game counts: ranked, custom, skirmish.
+- **Watching.** The stream's page on the site has a **Watch in game**
+  button, which reaches the mod over the local bridge (`POST /watch`, from
+  the main menu or over a replay, which it closes first). The mod fetches
+  the stream from the site itself, into `Replays\Live\<id>.sanreplay`, and
+  plays it with the game's own replay player. The site hands out each
+  chunk only once it is three minutes old, so the delay holds whatever a client
+  does. Two patches let the game's player follow a file that is still
+  growing: it opens the file sharing writes, and at the end of what has
+  arrived so far it waits instead of ending; once the site says the stream
+  is over and the last chunk is in, the replay ends as usual. Pause and
+  speed (ReplayManager) work as on any replay. A viewer starts from the
+  beginning of the game and can speed up to catch up.
+- A stream only plays on the same game version (and, for a modded game,
+  with the same gameplay mods, which ModApi applies from the stream's mod
+  list). The page shows what the game is doing with it: `GET /status`
+  answers `"live": { "streaming": url | null, "watching": { id, phase, error } | null }`.
+
 ## ReplayManager
 
 Makes the game's own replays watchable properly: any player's point of view
@@ -1400,7 +1433,9 @@ the mod now only drives the game's socket:
 - **speed** is the engine's own `ClientEngine.SetReplaySpeed` (0.1× to 16×),
   which is what the socket paces by;
 - **position** is frames read (a postfix on `TryReadFrame`) minus frames
-  still queued; **length** is a scan of the file's frame headers;
+  still queued; **length** is a scan of the file's frame headers, picked
+  up every 2 s from where it stopped, so a live replay's length grows as
+  it arrives;
 - **fast-forward** runs at 16× until the target tick. There are no snapshots
   to seek with, so the seek bar only goes forward — dragging left of the
   current tick does nothing — and **RESTART** is the way back to the start:
@@ -1732,18 +1767,20 @@ Each section is a lobby option, all on by default:
   are brought closer together.
 - **Air:** bombers lead their targets and their bombs splash; anti-air leads
   its shots and the T3 anti-air towers reach their range; the Guardian
-  fighters catch up.
+  fighters catch up. Anti-air hits most of the time: faster shells and
+  missiles, no drop or spread, beams aim where the plane is, and aircraft
+  hitboxes are 1.5x bigger.
 - **Defences:** point defences see as far as they shoot, and T1 point defences
   are tougher: they beat their cost in T1 tanks, and T1 artillery still
-  outranges them.
+  outranges them. T2 point defences are much tougher and hit harder, and the
+  Chosen T3 one hits much harder.
 - **Unit tuning:** the Chosen Jager toned down and the other T2 raiders
   brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
   brought level. T3 tanks move as fast as T1 tanks with quicker guns; the
-  Guardian Nitro (T3 raider) is faster still but dies to one T3 tank volley.
-  T4 bots move at 2.5-3.5 (were 2): brawlers fastest, snipers and artillery
-  slowest. T4s are game enders: 10000-25000 alloys, with health and damage
-  raised to slightly beat T3 tanks per alloy; the EDA railgun sniper reaches
-  80 (was 40).
+  Guardian Nitro (T3 raider) is faster still and lighter than a tank.
+  T4 bots move at 2.25-3 (were 2; none faster than T3 tanks) and are game
+  enders: 10000-25000 alloys, with health and damage set by what each one
+  does (splash and range counted); the EDA railgun sniper reaches 80 (was 40).
 
 The 0.2 numbers come from a top-down redesign
 ([`REDESIGN-PLAN.md`](BalancePatch/REDESIGN-PLAN.md)): match-pacing targets
@@ -1780,7 +1817,10 @@ later (Mod API 1.8.0), for every player.
   more the fewer innocents they're still allied with. They win by being the last
   one standing. **Innocents** win by killing every phantom. **Paladins** are
   innocents with a smaller share of the bonus, which a phantom can take away by
-  paying alloys to **mark** them.
+  paying alloys to **mark** them. As in the original, a mark is paid from
+  stored alloys as they come in and lands once it's paid in full, so a phantom
+  spending all its income never finishes; the panel shows what's left. Marks
+  cost a quarter of the original's, since Sanctuary's economy is smaller.
 - **Reveals:** phantoms (or paladins, or both) are named at set times, to
   everyone or only to phantoms or paladins. A player's role can be shown when
   they die.
@@ -1793,7 +1833,7 @@ later (Mod API 1.8.0), for every player.
 
 Each player is only sent what their role lets them know. The host checks
 every request against the client it came from. Every number is in
-`lua\phantomxalance.lua`, beside the original's.
+`lua\phantomx\balance.lua`, beside the original's.
 
 ## MapLocalFiles
 

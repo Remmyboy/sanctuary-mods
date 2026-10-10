@@ -630,6 +630,48 @@ E/s (was 150); T3 radar 2800 A / 28000 E (was 700 / 7000), build time kept, upke
 (was 350). EDA T3 radar range 750 (was 450), Chosen 850 (was 550); Guardian
 stays 1000.
 
+**0.2.6 (unreleased, 2026-10-10, the user's calls):** T4 health and damage
+cut to 0.8x of 0.2.4's (one T4 keeps all its damage until it dies, so equal
+stats per alloy played far stronger). Anti-air rebuilt to hit most of the time
+(the user: "AA should hit the majority of the time"). From the game's code:
+projectiles hit by a zero-width ray each tick against the target's box
+(collisionInfo.collisionSize, full size), so a projectile's own size never
+counts; NoArc shells fall at aimGravity (default 1/s^2) uncorrected; homing
+missiles chase the current position at rotationSpeed. Changes: the three AA
+beams that 0.1.0 set to lead stop leading (bug); AA aim speed x1.5, x3 for
+the slowest eight and x6 for the Guardian T2 tower, spread removed on those;
+AA missiles speedMax x1.5, turn 120; AA-only shells don't fall; aircraft
+hitboxes x1.5. An offline shot model (scratchpad aa-sim.mjs; my model of the
+game's hit code, aircraft flight is mine; it matched the 0.1 lab's ranking but
+not its absolute numbers) puts the average hit rate over 24 AA weapons and 5
+aircraft at 82% straight / 75% micro / 71% weaving (0.2.5: 38 / 27 / 28), the
+worst weapon 59% under micro. Effective AA damage is about 2-3x 0.2.5's; air
+numbers may need retuning once played.
+
+**0.2.7 (unreleased, 2026-10-10, from the user's games):** T4s were still
+too strong (the Chosen big bot beat its cost in T3 tanks easily). 0.2.4's
+per-alloy maths ignored splash (radius 3-4 hits several bunched T3 tanks),
+range (60-100 against the tanks' 34) and counted T4 anti-air as ground damage.
+Re-scored with my estimates (splash x1 / 1.5 / 2 / 2.5 for radius <2 / 2 / 3 /
+4+, range x1.25 at 60, x1.5 at 80+) as health x ground damage per alloy against
+the average T3 tank: big bot 1.49, Ares 1.28, Centaur 1.30, Tripod 1.21, Djinn
+1.02, Behemoth 0.75. Health 0.8x for all; ground damage 0.5x (big bot), 0.6x
+(Ares, Centaur, Tripod), 0.75x (Djinn), 0.9x (others), putting all at 0.54-0.62
+(Quasar 0.45). The user then set the target at 0.8 split between health and
+damage: each T4's health and ground damage x sqrt(0.8 / score), 1.13-1.34x
+(the single-target beam bot and Behemoth about 1.2x, the Quasar 1.34x, the
+splashing big bot, Ares and Djinn 1.14-1.16x). All now score 0.80. T4 speeds 3 / 2.75 / 2.25 (none above a T3 tank's 3.3).
+Guardian T2 anti-air (tower and mobile) half damage: their shells splash 5
+and 10 against the Chosen 2 and 3 (the user first said T1, then corrected it). Nitro: 3000
+health (was 1500), damage x1.25: 12 health and 0.75 damage a second per alloy,
+against T3 tanks' 16-18 / 0.43-0.55 and T2 raiders' 13-19 / 0.61-0.83.
+
+Point defences (0.2.7): scored against same-tier tanks, ours were T1 0.95-1.17,
+T2 0.18-0.28, T3 0.13. FAF's (from its blueprints, my arithmetic with salvo
+and rack timing): T1 1.68, T2 0.37-0.62, T3 Ravager 0.22. T2 raised to 0.65
+(health and damage together); the Chosen T3 to 7000 health (the user's cap)
+and 2.24x damage, about 0.3.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;
