@@ -20,12 +20,16 @@ namespace SanctuaryHud
     // polls it already makes to the site, so a game left open in the menu
     // costs the site nothing. See docs/local-bridge.md in the site repo.
     //
-    // Two endpoints, plus OPTIONS preflights for both:
+    // Three endpoints, plus OPTIONS preflights for each:
     //
     //   GET  /status  -> { modVersion, gameVersion, state, match | null,
-    //                      uploads: { stats, replays, pending } }
+    //                      uploads: { stats, replays, pending },
+    //                      live: { streaming: url | null,
+    //                              watching: { id, phase, error } | null } }
     //   POST /match   <- the match object (as the site's match API has it)
     //                    or null; -> { ok: true } or { ok: false, error }
+    //   POST /watch   <- { stream: id }: watch a live game (LiveWatch.cs);
+    //                    -> { ok: true } or { error }
     //
     // A browser sends Origin on every cross-origin request, and only an
     // origin on the allow list gets an answer: that is what stops a random
@@ -72,6 +76,8 @@ namespace SanctuaryHud
             public string MatchId, MatchStatus, Phase;
             public bool UploadStats, UploadReplays;
             public int PendingReplays;
+            public string LiveUrl;                          // this game's stream, while it runs
+            public string WatchId, WatchPhase, WatchError;  // a live game being watched
         }
 
         private sealed class HttpRequest
@@ -119,12 +125,16 @@ namespace SanctuaryHud
             var upStats = _cfgUpStats?.Value ?? false;
             var upReplays = _cfgUpReplays?.Value ?? false;
             var pending = _pending.Count;
+            var liveUrl = LiveStreamUrl;
+            var watch = _liveIn;
             if (last == null || last.State != state)
             {
                 Logger.LogInfo($"Matchmaking: state {last?.State ?? "(none)"} -> {state}");
             }
             else if (last.MatchId == m?.Id && last.MatchStatus == m?.Status && last.Phase == _phaseName &&
-                     last.UploadStats == upStats && last.UploadReplays == upReplays && last.PendingReplays == pending)
+                     last.UploadStats == upStats && last.UploadReplays == upReplays && last.PendingReplays == pending &&
+                     last.LiveUrl == liveUrl && last.WatchId == watch?.Id && last.WatchPhase == watch?.Phase &&
+                     last.WatchError == watch?.Error)
             {
                 return;   // nothing changed since last frame; keep the old snapshot
             }
@@ -137,6 +147,10 @@ namespace SanctuaryHud
                 UploadStats = upStats,
                 UploadReplays = upReplays,
                 PendingReplays = pending,
+                LiveUrl = liveUrl,
+                WatchId = watch?.Id,
+                WatchPhase = watch?.Phase,
+                WatchError = watch?.Error,
             };
         }
 
@@ -254,7 +268,7 @@ namespace SanctuaryHud
                 return;
             }
 
-            var known = req.Path == "/status" || req.Path == "/match";
+            var known = req.Path == "/status" || req.Path == "/match" || req.Path == "/watch";
             if (req.Method == "OPTIONS")
             {
                 if (!known)
@@ -288,7 +302,44 @@ namespace SanctuaryHud
                 return;
             }
 
+            if (req.Path == "/watch")
+            {
+                if (req.Method != "POST")
+                {
+                    WriteResponse(stream, 405, origin, Error("use POST"));
+                    return;
+                }
+                HandleWatchPost(req, stream, origin);
+                return;
+            }
+
             WriteResponse(stream, 404, origin, Error("not found"));
+        }
+
+        // The live page's "Watch in game": { stream: <id> }. The mod fetches
+        // the stream from its own site (Matchmaking.BaseUrl), never from a
+        // URL the page names. It starts from the menu, or closes a replay
+        // first; never over a game or a lobby.
+        private void HandleWatchPost(HttpRequest req, Stream stream, string origin)
+        {
+            string id = null;
+            try { id = (string)JObject.Parse(req.Body ?? "")["stream"]; }
+            catch (Newtonsoft.Json.JsonException) { /* not JSON, or not a string: answered below */ }
+            catch (ArgumentException) { /* "stream" isn't a value: answered below */ }
+            if (id == null || !UuidShape.IsMatch(id))
+            {
+                WriteResponse(stream, 400, origin, Error("body must be { \"stream\": \"<stream id>\" }"));
+                return;
+            }
+            var state = _bridgeSnapshot?.State ?? "menu";
+            if (state != "menu" && state != "replay")
+            {
+                WriteResponse(stream, 409, origin, Error("Your game is busy (" + state + "): go back to the main menu first."));
+                return;
+            }
+            id = id.ToLowerInvariant();
+            _bridgeMainThread.Enqueue(() => StartWatch(id));
+            WriteResponse(stream, 200, origin, "{\"ok\":true}");
         }
 
         private string StatusJson()
@@ -310,6 +361,15 @@ namespace SanctuaryHud
                     ["stats"] = s?.UploadStats ?? false,
                     ["replays"] = s?.UploadReplays ?? false,
                     ["pending"] = s?.PendingReplays ?? 0,
+                },
+                // Live replays (0.5): this game's stream, and a live game
+                // being watched with how that is going.
+                ["live"] = new JObject
+                {
+                    ["streaming"] = s?.LiveUrl,
+                    ["watching"] = s?.WatchId == null
+                        ? null
+                        : new JObject { ["id"] = s.WatchId, ["phase"] = s.WatchPhase, ["error"] = s.WatchError },
                 },
             };
             return o.ToString(Newtonsoft.Json.Formatting.None);

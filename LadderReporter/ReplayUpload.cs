@@ -391,13 +391,14 @@ namespace SanctuaryHud
         }
 
         // The game's own reader (main thread: it allocates Allocator.Temp
-        // native memory), after a sanity check of the length prefix.
+        // native memory), after a sanity check of the length prefix. Sharing
+        // writes: a live stream reads the header while the game records.
         private bool TryReadHeader(string path, out string gameVersion, out string mapPath)
         {
             gameVersion = mapPath = null;
             try
             {
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 {
                     var prefix = new byte[4];
                     if (fs.Read(prefix, 0, 4) != 4) return false;

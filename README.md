@@ -42,7 +42,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.16.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.16.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; every panel resizable by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.17.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.17.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
@@ -53,7 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.2) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.5**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.5) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.7**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.7) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -191,7 +191,10 @@ thin dividers where pieces meet.
   in a TextMeshPro font, which are cloned; the clock is the HUD's. The time is the template's
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
-  counts. With the replacement off,
+  counts. `UnitCardStats` (off by default) adds a line of speed, damage per
+  second and weapon range, for a unit and for a build option alike, read
+  from the template (so a balance mod's figures show); damage per second is
+  the game's AI's own sum over the weapons. With the replacement off,
   `TidyGameUnitCard` (on by default) still hides the template id on the
   game's own card and rounds its income figures.
 - **Selection row** (`SelectionRow`) in place of the game's selection list,
@@ -723,6 +726,40 @@ changes, so it stays lobby-compatible. `QoL · ShowRallyPoints`,
 are in the QoL section of the Mods page, and the first two are off by default:
 turn them on to use them. They work with the overlay hidden too:
 they are controls, not display.
+
+The same re-issuing serves three more, all off by default:
+
+- **Engineer queue** (`BottomPanels · EngineerQueue`, needs the build strip).
+  The game shows a factory's queue but nothing for an engineer, whose
+  buildings are orders. Selected builders that share one queue get its
+  buildings as a row of tiles where a factory's queue goes, runs of one
+  building as one tile with a count; right-click a tile to take one out and
+  keep the rest of the queue, before and after it.
+- **Assisting engineers keep building** (`QoL · AssistKeepsBuilding`). An
+  engineer assisting another builder helps with whatever that one builds,
+  and stops when it dies or moves on (`HostUnit:AssistBehaviorThread`). With
+  this on, a structure it was helping with that is left unfinished goes in
+  front of its own queue, as a repair (which builds an unfinished structure),
+  and it then carries on with the rest: back to helping, if the builder is
+  alive. The host only lets an engineer help build what it could build
+  itself, so a T1 engineer never picks up a T2 structure this way.
+- **Assist an unfinished factory** (`QoL · AssistUnfinishedFactories`). A
+  right-click from engineers on an unfinished building of yours is a repair,
+  which ends once the building is up, so Shift-clicking a factory you have
+  just placed, to assist it once built, left the engineers idle. On an
+  unfinished building that builds, the right-click is an assist instead: the
+  host's assist builds it first, then helps with what it produces.
+
+- **Factory assist, then the queue** (`QoL · FactoryAssistThenQueue`). An
+  assist on a factory never ends, so orders queued after it never came. With
+  this on, an engineer with orders after its assist drops it once the unit it
+  was helping with is finished (or once the factory has had nothing to build
+  for a couple of seconds) and goes on with the rest. With nothing queued
+  after it, it assists for good, as before.
+
+`QoL · UpgradeBadgeOnlyWhileUpgrading` shows a factory's upgrade badge only
+while the upgrade is under way; the game shows it as soon as an upgrade is
+anywhere in the queue (`IsUpgradeQueued`).
 
 ## IdleEngineers
 
@@ -1339,6 +1376,39 @@ All three calls (`POST /api/mm/match/{id}/stats`, `.../replay`,
 ticket when first needed. Stats and replays are cosmetic: the result and
 the rating come from the report alone.
 
+**Live replays (0.5, opt-in).** A player can stream the games they play
+(or observe) to [sanctuarydb.net/live](https://www.sanctuarydb.net/live)
+while they run, and anyone can watch them in their own game, three
+minutes behind:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `Live.Stream` | false | Stream every game you play or observe while it runs; it is listed on the Live page while it runs and for a day after |
+
+- **Streaming.** Every 15 s the mod reads the frames the game has added to
+  its own recording since the last chunk, cut after the last whole one, on
+  a worker thread, and posts them to the site (the first chunk carries the
+  recording's header and is the biggest: a game's opening frame is up to
+  1.7 MB on the stock maps). Leaving the game sends what is left and closes
+  the stream. A chunk's bounds are fixed when it is first read, so a retry
+  sends the same bytes. Any game counts: ranked, custom, skirmish.
+- **Watching.** The stream's page on the site has a **Watch in game**
+  button, which reaches the mod over the local bridge (`POST /watch`, from
+  the main menu or over a replay, which it closes first). The mod fetches
+  the stream from the site itself, into `Replays\Live\<id>.sanreplay`, and
+  plays it with the game's own replay player. The site hands out each
+  chunk only once it is three minutes old, so the delay holds whatever a client
+  does. Two patches let the game's player follow a file that is still
+  growing: it opens the file sharing writes, and at the end of what has
+  arrived so far it waits instead of ending; once the site says the stream
+  is over and the last chunk is in, the replay ends as usual. Pause and
+  speed (ReplayManager) work as on any replay. A viewer starts from the
+  beginning of the game and can speed up to catch up.
+- A stream only plays on the same game version (and, for a modded game,
+  with the same gameplay mods, which ModApi applies from the stream's mod
+  list). The page shows what the game is doing with it: `GET /status`
+  answers `"live": { "streaming": url | null, "watching": { id, phase, error } | null }`.
+
 ## ReplayManager
 
 Makes the game's own replays watchable properly: any player's point of view
@@ -1363,7 +1433,9 @@ the mod now only drives the game's socket:
 - **speed** is the engine's own `ClientEngine.SetReplaySpeed` (0.1× to 16×),
   which is what the socket paces by;
 - **position** is frames read (a postfix on `TryReadFrame`) minus frames
-  still queued; **length** is a scan of the file's frame headers;
+  still queued; **length** is a scan of the file's frame headers, picked
+  up every 2 s from where it stopped, so a live replay's length grows as
+  it arrives;
 - **fast-forward** runs at 16× until the target tick. There are no snapshots
   to seek with, so the seek bar only goes forward — dragging left of the
   current tick does nothing — and **RESTART** is the way back to the start:
@@ -1695,18 +1767,20 @@ Each section is a lobby option, all on by default:
   are brought closer together.
 - **Air:** bombers lead their targets and their bombs splash; anti-air leads
   its shots and the T3 anti-air towers reach their range; the Guardian
-  fighters catch up.
+  fighters catch up. Anti-air hits most of the time: faster shells and
+  missiles, no drop or spread, beams aim where the plane is, and aircraft
+  hitboxes are 1.5x bigger.
 - **Defences:** point defences see as far as they shoot, and T1 point defences
   are tougher: they beat their cost in T1 tanks, and T1 artillery still
-  outranges them.
+  outranges them. T2 point defences are much tougher and hit harder, and the
+  Chosen T3 one hits much harder.
 - **Unit tuning:** the Chosen Jager toned down and the other T2 raiders
   brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
   brought level. T3 tanks move as fast as T1 tanks with quicker guns; the
-  Guardian Nitro (T3 raider) is faster still but dies to one T3 tank volley.
-  T4 bots move at 2.5-3.5 (were 2): brawlers fastest, snipers and artillery
-  slowest. T4s are game enders: 10000-25000 alloys, with health and damage
-  raised to slightly beat T3 tanks per alloy; the EDA railgun sniper reaches
-  80 (was 40).
+  Guardian Nitro (T3 raider) is faster still and lighter than a tank.
+  T4 bots move at 2.25-3 (were 2; none faster than T3 tanks) and are game
+  enders: 10000-25000 alloys, with health and damage set by what each one
+  does (splash and range counted); the EDA railgun sniper reaches 80 (was 40).
 
 The 0.2 numbers come from a top-down redesign
 ([`REDESIGN-PLAN.md`](BalancePatch/REDESIGN-PLAN.md)): match-pacing targets
