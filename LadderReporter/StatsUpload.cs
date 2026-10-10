@@ -582,7 +582,10 @@ namespace SanctuaryHud
 
         /// One POST to the site with the bearer token. A 401 means the
         /// session expired: sign in again and send it once more.
-        private IEnumerable ApiPost(string path, string json, ApiResult result)
+        private IEnumerable ApiPost(string path, string json, ApiResult result) =>
+            ApiPost(path, Encoding.UTF8.GetBytes(json), "application/json", result);
+
+        private IEnumerable ApiPost(string path, byte[] body, string contentType, ApiResult result)
         {
             var reminted = false;
             while (true)
@@ -594,7 +597,7 @@ namespace SanctuaryHud
                     result.Error = "no ladder session";
                     yield break;
                 }
-                var req = Post(path, json, _mmToken);
+                var req = Post(path, body, contentType, _mmToken);
                 yield return req.SendWebRequest();
                 _inFlight.Remove(req);
                 result.Status = (int)req.responseCode;
