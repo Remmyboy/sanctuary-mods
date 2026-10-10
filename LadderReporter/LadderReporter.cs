@@ -48,7 +48,7 @@ namespace SanctuaryHud
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
     // ReplayUpload.cs.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.4.0")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.5.0")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -64,6 +64,7 @@ namespace SanctuaryHud
         private bool _reported;
         private bool _snapshotFailed;
         private float _tickAccum;
+        private bool _liveUpdateFailedLogged;
 
         // Steam web-API tickets arrive by callback; each request remembers
         // what to do with its ticket (null on refusal). Shared with the
@@ -164,8 +165,14 @@ namespace SanctuaryHud
             {
                 Logger.LogError($"Ladder reporter: economy patch failed (results will not be reported): {e}");
             }
+            try { ApplyLivePatches(); }
+            catch (Exception e)
+            {
+                Logger.LogError($"Live: replay player patch failed (live games can't be watched): {e}");
+            }
             AwakeMatchmaking();
             AwakeUploads();
+            AwakeLive();
             // The assembly version changes every build, so a log can be
             // matched to the DLL that produced it.
             Logger.LogInfo($"Ladder reporter loaded, build {typeof(LadderReporterPlugin).Assembly.GetName().Version} " +
@@ -175,6 +182,7 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             DestroyMatchmaking();
+            StopWatch(null);
             AbortRequests();
             _harmony?.UnpatchSelf();
             try
@@ -209,6 +217,15 @@ namespace SanctuaryHud
             // Uploads on their own too, and before the Enabled check: a
             // replay queued earlier still uploads with reporting switched off.
             UpdateUploads();
+            try { UpdateLive(); }
+            catch (Exception e)
+            {
+                if (!_liveUpdateFailedLogged)
+                {
+                    _liveUpdateFailedLogged = true;
+                    Logger.LogError($"Live: update failed: {e}");
+                }
+            }
             UpdateCard();
             // No SharedTick: this plugin reads only InMatch, which the economy
             // patch keeps, and the shared tick's once-a-second focus-army

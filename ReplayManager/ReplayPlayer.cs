@@ -55,6 +55,8 @@ namespace SanctuaryHud.Replays
 
         private static object _socket;             // the ReplayClientSockets being driven
         private static int _fed;                   // frames the socket has read from the file
+        private static long _scanPos;              // where the frame count got to in the file
+        private static float _nextScan;
         private static float _seekSpeedBefore;
         private static bool _seekPausedBefore;
 
@@ -184,6 +186,14 @@ namespace SanctuaryHud.Replays
                 WarnOnce(ref _warnedState, "can't read the replay socket's state, so the panel may not leave loading", e);
             }
 
+            // A live replay (LadderReporter) grows while it plays: count the
+            // frames that have arrived since, now and then.
+            if (FilePath != null && Time.unscaledTime >= _nextScan)
+            {
+                _nextScan = Time.unscaledTime + 2f;
+                CountFrames(FilePath);
+            }
+
             if (Current == Stage.Loading && loaded) Current = Stage.Running;
             if (Current == Stage.Running)
             {
@@ -224,34 +234,55 @@ namespace SanctuaryHud.Replays
             SeekTarget = -1;
             Header = default;
             TotalTicks = 0;
+            _scanPos = 0;
             if (FilePath != null) ReadFile(FilePath);
             Current = Stage.Loading;
             _log.LogInfo($"Replay: playback of {FilePath} ({TotalTicks} ticks) started; controls on.");
         }
 
-        // The header the game wrote, and how many frames follow it: each is
-        // a type byte and an int length, so counting is a seek per frame.
+        // The header the game wrote, and how many frames follow it.
         private static void ReadFile(string path)
         {
             try
             {
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 {
                     if (!ReplayFile.TryReadHeader(fs, out Header)) return;
+                    _scanPos = fs.Position;
+                }
+                CountFrames(path);
+            }
+            catch (Exception e)
+            {
+                _log.LogWarning($"Replay: could not read {path}: {e.Message}");
+            }
+        }
+
+        // Counts the whole frames from where the last count stopped: each is
+        // a type byte and an int length, so counting is a seek per frame.
+        private static void CountFrames(string path)
+        {
+            if (_scanPos <= 0) return;
+            try
+            {
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (fs.Length <= _scanPos) return;
+                    fs.Position = _scanPos;
                     var head = new byte[5];
-                    int count = 0;
                     while (fs.Read(head, 0, 5) == 5)
                     {
                         var len = BitConverter.ToInt32(head, 1);
                         if (len < 0 || fs.Position + len > fs.Length) break;
                         fs.Seek(len, SeekOrigin.Current);
-                        count++;
+                        _scanPos = fs.Position;
+                        TotalTicks++;
                     }
-                    TotalTicks = count;
                 }
             }
             catch (Exception e)
             {
+                _scanPos = 0;   // once
                 _log.LogWarning($"Replay: could not read {path}: {e.Message}");
             }
         }

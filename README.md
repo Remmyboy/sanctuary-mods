@@ -1376,6 +1376,39 @@ All three calls (`POST /api/mm/match/{id}/stats`, `.../replay`,
 ticket when first needed. Stats and replays are cosmetic: the result and
 the rating come from the report alone.
 
+**Live replays (0.5, opt-in).** A player can stream the games they play
+(or observe) to [sanctuarydb.net/live](https://www.sanctuarydb.net/live)
+while they run, and anyone can watch them in their own game, three
+minutes behind:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `Live.Stream` | false | Stream every game you play or observe while it runs; it is listed on the Live page while it runs and for a day after |
+
+- **Streaming.** Every 15 s the mod reads the frames the game has added to
+  its own recording since the last chunk, cut after the last whole one, on
+  a worker thread, and posts them to the site (the first chunk carries the
+  recording's header and is the biggest: a game's opening frame is up to
+  1.7 MB on the stock maps). Leaving the game sends what is left and closes
+  the stream. A chunk's bounds are fixed when it is first read, so a retry
+  sends the same bytes. Any game counts: ranked, custom, skirmish.
+- **Watching.** The stream's page on the site has a **Watch in game**
+  button, which reaches the mod over the local bridge (`POST /watch`, from
+  the main menu or over a replay, which it closes first). The mod fetches
+  the stream from the site itself, into `Replays\Live\<id>.sanreplay`, and
+  plays it with the game's own replay player. The site hands out each
+  chunk only once it is three minutes old, so the delay holds whatever a client
+  does. Two patches let the game's player follow a file that is still
+  growing: it opens the file sharing writes, and at the end of what has
+  arrived so far it waits instead of ending; once the site says the stream
+  is over and the last chunk is in, the replay ends as usual. Pause and
+  speed (ReplayManager) work as on any replay. A viewer starts from the
+  beginning of the game and can speed up to catch up.
+- A stream only plays on the same game version (and, for a modded game,
+  with the same gameplay mods, which ModApi applies from the stream's mod
+  list). The page shows what the game is doing with it: `GET /status`
+  answers `"live": { "streaming": url | null, "watching": { id, phase, error } | null }`.
+
 ## ReplayManager
 
 Makes the game's own replays watchable properly: any player's point of view
@@ -1400,7 +1433,9 @@ the mod now only drives the game's socket:
 - **speed** is the engine's own `ClientEngine.SetReplaySpeed` (0.1× to 16×),
   which is what the socket paces by;
 - **position** is frames read (a postfix on `TryReadFrame`) minus frames
-  still queued; **length** is a scan of the file's frame headers;
+  still queued; **length** is a scan of the file's frame headers, picked
+  up every 2 s from where it stopped, so a live replay's length grows as
+  it arrives;
 - **fast-forward** runs at 16× until the target tick. There are no snapshots
   to seek with, so the seek bar only goes forward — dragging left of the
   current tick does nothing — and **RESTART** is the way back to the start:

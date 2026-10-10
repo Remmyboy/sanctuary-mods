@@ -528,11 +528,14 @@ namespace SanctuaryHud
 
         private UnityWebRequest Post(string path, JObject body, string token) => Post(path, body.ToString(), token);
 
-        private UnityWebRequest Post(string path, string json, string token)
+        private UnityWebRequest Post(string path, string json, string token) =>
+            Post(path, Encoding.UTF8.GetBytes(json), "application/json", token);
+
+        private UnityWebRequest Post(string path, byte[] body, string contentType, string token)
         {
             var req = new UnityWebRequest(_cfgMmBaseUrl.Value.TrimEnd('/') + path, UnityWebRequest.kHttpVerbPOST)
             {
-                uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json)) { contentType = "application/json" },
+                uploadHandler = new UploadHandlerRaw(body) { contentType = contentType },
                 downloadHandler = new DownloadHandlerBuffer(),
                 timeout = 15,
             };
