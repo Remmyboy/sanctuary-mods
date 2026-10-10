@@ -20,7 +20,7 @@ on first use).
 | `dump.lua` | Loads every unit and projectile template with the game's own LuaJIT (`GameRef luarun`), applies the patch with the mod's real `patch.lua`, adds wrecks and the adjacency buffs as the game builds them, and writes JSON. Cached per ruleset in `.cache/`. |
 | `parity.mjs` | Checks a dump against `preview.mjs --json`: every template it changed matches field for field, every other one is untouched. 357 templates, 0 differences on 2026-10-09. |
 | `maps.mjs` | Alloy spots and spawns from the installed `.sanmap` files, and which spots a player holds in a 1v1 (nearer to its spawn than to the enemy's). |
-| `sim.mjs` | One player's economy over time at the game's tick rate: build drain, the satisfaction stall, unthrottled generation, storage, the half-storage start, adjacency, upgrades at full price, walking at template speed. The rules and their file/line are listed at the top. |
+| `sim.mjs` | One player's economy over time at the game's tick rate: build drain, the satisfaction stall, unthrottled generation, storage, the half-storage start, adjacency (off: the game never applies it; `rules.adjacency` turns it on), upgrades at full price, walking at template speed. The rules and their file/line are listed at the top. |
 | `calibrate.mjs` | Fits the stand-in player's behaviour (reaction time, power margin, expansion, engineer and factory habits) to real games. |
 | `players.json` | The fitted player styles: `spam` (early factories) and `expand` (expand first). Rewritten by `balance.mjs calibrate`. |
 | `variants.json` | Named rulesets: a `changes.lua`, lobby options, and rules a template can't show (`startShare`). |

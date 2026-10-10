@@ -60,7 +60,7 @@ trusting the sim with anything else.
 | Overflow above storage is lost | `economy.lua:196-200` |
 | Start: the commander adds its storage and gives half of it (250 A / 2500 E). `economy.initial` is ignored | `host/units/unitsClasses/unitsDefault.lua:1394-1403` |
 | Commander death destroys the whole army (assassination) | `unitsDefault.lua:1409-1420` |
-| Adjacency discounts stack additively with **no floor**: discount = 1 + Σ extra. Each adjacent extractor gives factories and engineering stations −10% alloys; each T1/T2/T3 generator gives −2.5/−10/−15% energy. Seven adjacent T3 generators would make a factory's energy cost negative (not tested in game) | `host/systems/buffs.lua:36-58, 85-95`, `host/systems/adjacencyBuffs.lua:3-50` |
+| Adjacency discounts stack additively with **no floor**: discount = 1 + Σ extra. Each adjacent extractor gives factories and engineering stations −10% alloys; each T1/T2/T3 generator gives −2.5/−10/−15% energy. Seven adjacent T3 generators would make a factory's energy cost negative (not tested in game). **None of it is live (2026-10-10):** the buffs are applied only by HostStructure:OnAdjacentTo, and nothing in the game's Lua, C# or native DLLs calls it; the user confirms there is no adjacency bonus in game. The sim applies it only with rules.adjacency | `host/systems/buffs.lua:36-58, 85-95`, `host/systems/adjacencyBuffs.lua:3-50` |
 | Adjacency data exists for T1/T2/T3 *Alloy Fabricators*, but only a T3 Alloy Furnace unit exists: a hint that the devs planned cheaper converters | `adjacencyBuffs.lua:93-113` |
 | Wrecks: half the unit's alloys, no energy, harvest time = build time; only from units at least 50% built and not overkilled. Generated from the *patched* template | `common/systems/templateLoader.lua:450-458, 262-291`; `unitsBaseClass.lua:891-907` |
 | Reclaim exists (a host order class) | `host/managers/orders/orderClasses/hostReclaimOrder.lua` |
@@ -672,16 +672,19 @@ and rack timing): T1 1.68, T2 0.37-0.62, T3 Ravager 0.22. T2 raised to 0.65
 (health and damage together); the Chosen T3 to 7000 health (the user's cap)
 and 2.24x damage, about 0.3.
 
-**0.2.8 (unreleased, 2026-10-10, the user's call from a Fields of Isis game):**
+**0.2.8 (2026-10-10, the user's call from a Fields of Isis game):**
 the T2 factory upgrade at 1500 alloys came too late to matter: by the time
 it was paid for the game was already won with T1 tanks. Now 1000 alloys and
 10000 energy over 90 s (build time 900, was 800; a T1 factory's build power
 is 10): about 11 alloys and 111 energy a second while it runs, was 19 and
-188. The user accepts an earlier T2 rush. The sim (`diff 0.2.7 0.2.8`)
-moves the fastest T2 factory from 4:04 to 2:45 on both reference maps
-(the 500-alloy start bank pays half of it), facing 2 spam units alive
-instead of 6; 512 alloy income at 15:00 rises 42 -> 46 with the assumed
-9:00 T2 factory. Nothing else in the pacing table moves.
+188. The user accepts an earlier T2 rush. Released first with the sim still
+applying adjacency, which the game doesn't (see the table above): without it
+(`diff 0.2.7 0.2.8`) the fastest T2 factory moves from 4:57 to 3:22 (256)
+and 3:28 (512), facing 3 spam units alive (was 9-12). That rush is the
+commander taking 3 extractors in the first 35 s (alloy income 3 -> 6),
+then a factory that upgrades at once, generators built mid-upgrade when
+energy runs out, no engineers or units. The 500-alloy start bank goes on
+the extractors and the factory, not the upgrade.
 
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
