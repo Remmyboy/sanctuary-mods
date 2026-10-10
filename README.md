@@ -1341,8 +1341,8 @@ the rating come from the report alone.
 
 **Live replays (0.5, opt-in).** A player can stream the games they play
 (or observe) to [sanctuarydb.net/live](https://www.sanctuarydb.net/live)
-while they run, and anyone can watch them in their own game, a minute
-behind:
+while they run, and anyone can watch them in their own game, three
+minutes behind:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -1360,7 +1360,7 @@ behind:
   the main menu or over a replay, which it closes first). The mod fetches
   the stream from the site itself, into `Replays\Live\<id>.sanreplay`, and
   plays it with the game's own replay player. The site hands out each
-  chunk only once it is a minute old, so the delay holds whatever a client
+  chunk only once it is three minutes old, so the delay holds whatever a client
   does. Two patches let the game's player follow a file that is still
   growing: it opens the file sharing writes, and at the end of what has
   arrived so far it waits instead of ending; once the site says the stream

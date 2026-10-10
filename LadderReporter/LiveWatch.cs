@@ -233,7 +233,7 @@ namespace SanctuaryHud
                 if (startsIn != null && startsIn.Type == JTokenType.Integer)
                 {
                     w.Phase = "waiting";
-                    w.NextPoll = Time.realtimeSinceStartup + Mathf.Clamp((int)startsIn, 1, 120);
+                    w.NextPoll = Time.realtimeSinceStartup + Mathf.Clamp((int)startsIn, 1, 300);
                 }
 
                 foreach (var c in (poll["chunks"] as JArray ?? new JArray()).OfType<JObject>())

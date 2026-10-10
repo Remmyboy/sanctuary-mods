@@ -68,7 +68,7 @@ namespace SanctuaryHud
         {
             _cfgLiveStream = Config.Bind("Live", "Stream", false,
                 "Stream the games you play (or observe) live to sanctuarydb.net/live while they run, so anyone can " +
-                "watch them in game, a minute behind. Each game is listed on that page while it runs and for a " +
+                "watch them in game, three minutes behind. Each game is listed on that page while it runs and for a " +
                 "day after.");
         }
 
@@ -156,7 +156,7 @@ namespace SanctuaryHud
                 o.Url = TokenString(reply["url"]);
                 o.Failures = 0;
                 o.NextTry = 0f;
-                var delay = reply["delayS"]?.Type == JTokenType.Integer ? (int)reply["delayS"] : 60;
+                var delay = reply["delayS"]?.Type == JTokenType.Integer ? (int)reply["delayS"] : 180;
                 Logger.LogInfo($"Live: this game is live at {o.Url} (viewers are {delay} s behind).");
             }
             finally { o.Busy = false; }
