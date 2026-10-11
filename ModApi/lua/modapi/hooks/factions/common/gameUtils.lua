@@ -17,14 +17,26 @@ function GetDefaultAISettings(faction)
     return settings
 end
 
--- CreateArmies gives every lobby AI the default settings, then spawns the
+-- CreateArmies gives every lobby AI its lobby settings, then spawns the
 -- starting units: by then each army knows its faction.
 local stockSpawnInitialUnits = SpawnInitialUnits
 function SpawnInitialUnits(...)
     for _, army in pairs(Armies) do
         local options = army.lobbyOptions
-        if options and type(options.aiSettings) == "table" and ModFactions.AIOf(army.faction) then
-            options.aiSettings = GetDefaultAISettings(army.faction).aiSettings
+        local ai = options and type(options.aiSettings) == "table" and ModFactions.AIOf(army.faction)
+        if ai then
+            -- Since game 0.0.1.21 the host sets each AI seat up in the lobby
+            -- (difficulty, expansions, layers): only the AI itself changes,
+            -- and the layers its AI can't play go off.
+            local s = options.aiSettings
+            local layers = s.useLayer or {}
+            s.modDirectory = ai.directory
+            s.modName = ai.name
+            s.useLayer = {
+                land = layers.land ~= false and ai.land,
+                air = layers.air ~= false and ai.air,
+                water = layers.water ~= false and ai.water,
+            }
         end
     end
     return stockSpawnInitialUnits(...)

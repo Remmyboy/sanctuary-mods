@@ -77,16 +77,6 @@ namespace Sanctuary.ModApi
         private static float _optionsChangedAt;
         private const float OptionsSettle = 0.4f;
         private static readonly Dictionary<ulong, string> _apiVersions = new Dictionary<ulong, string>();
-        // The AI seats the host gave a mod's AI, by lobby row. Seats not here
-        // play the game's default.
-        private static readonly Dictionary<int, (string mod, string key, float at)> _aiPicks =
-            new Dictionary<int, (string, string, float)>();
-        // The AI seats' rows and army numbers when the picks last went out:
-        // the match knows a seat by its army number, so moving one re-applies.
-        private static string _aiSeatsSig = "";
-        // A pick made on an empty row waits this long for the game to put
-        // the AI in it before it's dropped.
-        private const float AiAddGrace = 3f;
 
         // ---- client state ---------------------------------------------------
         private static bool _helloSent;
@@ -300,92 +290,6 @@ namespace Sanctuary.ModApi
             return true;
         }
 
-        /// The AI a lobby row's seat plays: a mod's AI as (mod id, AI key,
-        /// what the dropdown shows), or null for the game's default. On the
-        /// host, its own pick; elsewhere, the host's as last received.
-        public static (string modId, string key, string label)? SeatAi(int slot)
-        {
-            if (!InLobby) return null;
-            if (IsHost && _hostSession)
-            {
-                if (!_aiPicks.TryGetValue(slot, out var p)) return null;
-                return (p.mod, p.key, Ais.Find(p.mod, p.key)?.Label ?? "AI: " + p.key);
-            }
-            var seat = _received?.ais?.FirstOrDefault(s => s != null && s.slot == slot);
-            return seat == null ? ((string, string, string)?)null : (seat.mod, seat.key, "AI: " + Cap(seat.name, 40));
-        }
-
-        /// As the host, gives a lobby row's AI seat a mod's AI (null modId:
-        /// the game's default). Picks the mod too, if it isn't yet. The row
-        /// may still be empty, about to become an AI seat. False when the
-        /// selection can't be changed now, or there's no such AI.
-        public static bool SetSeatAi(int slot, string modId, string key)
-        {
-            if (!CanChangeSelection || slot < 0 || slot > 255) return false;
-            if (modId == null)
-            {
-                if (!_aiPicks.Remove(slot)) return true;
-            }
-            else
-            {
-                var ai = Ais.Find(modId, key);
-                if (ai == null) return false;
-                if (_aiPicks.TryGetValue(slot, out var was) && was.mod == modId && was.key == key) return true;
-                if (!_selection.Contains(modId) && !SetSelected(modId, true)) return false;
-                _aiPicks[slot] = (modId, key, UnityEngine.Time.unscaledTime);
-            }
-            if (!_optionsPending) _statusDirty = true; // Start waits for it
-            _optionsPending = true;
-            _optionsChangedAt = UnityEngine.Time.unscaledTime;
-            _changeCounter++;
-            AiLobby.Redraw();
-            return true;
-        }
-
-        /// The host's AI seats as the match will know them: each picked
-        /// row that holds an AI, with its army number.
-        private static List<AiSeat> HostAiSeats()
-        {
-            var seats = new List<AiSeat>();
-            var players = LobbyManager.hostState?.players;
-            if (players == null) return seats;
-            foreach (var kv in _aiPicks.OrderBy(kv => kv.Key))
-            {
-                if (kv.Key >= players.Count || players[kv.Key].type != PlayerType.AI) continue;
-                seats.Add(new AiSeat
-                {
-                    slot = kv.Key, army = players[kv.Key].armyID, mod = kv.Value.mod, key = kv.Value.key,
-                    name = Ais.Find(kv.Value.mod, kv.Value.key)?.Ai.Name ?? kv.Value.key,
-                });
-            }
-            return seats;
-        }
-
-        /// Picks for rows that no longer hold an AI go. A row that is still
-        /// empty keeps its pick for a moment: the host picked on an empty
-        /// row, and the AI is on its way.
-        private static bool PruneAiPicks()
-        {
-            var players = LobbyManager.hostState?.players;
-            if (players == null || _aiPicks.Count == 0) return false;
-            var now = UnityEngine.Time.unscaledTime;
-            var gone = _aiPicks.Where(kv => kv.Key >= players.Count ||
-                                            players[kv.Key].type == PlayerType.Player || players[kv.Key].type == PlayerType.Observer ||
-                                            players[kv.Key].type == PlayerType.Empty && now - kv.Value.at > AiAddGrace ||
-                                            !_selection.Contains(kv.Value.mod))
-                .Select(kv => kv.Key).ToList();
-            foreach (var slot in gone) _aiPicks.Remove(slot);
-            return gone.Count > 0;
-        }
-
-        private static string AiSeatsSignature()
-        {
-            var players = LobbyManager.hostState?.players;
-            if (players == null || _aiPicks.Count == 0) return "";
-            return string.Join(",", _aiPicks.Keys.OrderBy(k => k)
-                .Select(k => k < players.Count ? $"{k}:{(int)players[k].type}:{players[k].armyID}" : $"{k}:-"));
-        }
-
         /// The host's values for a mod it has (picked or not): this lobby's,
         /// else the ones it used last time, else the defaults.
         private static Dictionary<string, string> HostValues(ModInfo mod)
@@ -431,8 +335,6 @@ namespace Sanctuary.ModApi
             _hostSelectionProblem = null;
             _options.Clear();
             _optionsPending = false;
-            _aiPicks.Clear();
-            _aiSeatsSig = "";
             _apiVersions.Clear();
             _reports.Clear();
             _hellos.Clear();
@@ -504,26 +406,10 @@ namespace Sanctuary.ModApi
                 _changeCounter++;
             }
 
-            // An AI seat with a mod's AI moved to another army number, was
-            // removed, or became a player's: that goes out like an option.
-            if (_hostSession && !_locked && !MatchUnderway && _aiPicks.Count > 0)
-            {
-                var pruned = PruneAiPicks();
-                if (pruned || AiSeatsSignature() != _aiSeatsSig)
-                {
-                    if (!_optionsPending) _statusDirty = true;
-                    _optionsPending = true;
-                    _optionsChangedAt = UnityEngine.Time.unscaledTime;
-                    _aiSeatsSig = AiSeatsSignature();
-                    _changeCounter++;
-                    if (pruned) AiLobby.Redraw();
-                }
-            }
-
             if (_optionsPending && _hostSession && !_locked && !MatchUnderway &&
                 UnityEngine.Time.unscaledTime - _optionsChangedAt >= OptionsSettle)
             {
-                HostApply("options or AI seats changed");
+                HostApply("options changed");
             }
 
             if (_hostSession)
@@ -581,11 +467,7 @@ namespace Sanctuary.ModApi
 
             _optionsPending = false;
             var options = HostOptions();
-            var hadPicks = _aiPicks.Count;
-            PruneAiPicks();
-            _aiSeatsSig = AiSeatsSignature();
-            Overlay.Apply(_hostResolved, options, HostAiSeats());
-            if (_aiPicks.Count != hadPicks) AiLobby.Redraw();
+            Overlay.Apply(_hostResolved, options);
             // A picked mod the host couldn't put on whole: the match would run
             // without it here and with it everywhere else.
             if (Overlay.Failed.Count > 0)
@@ -619,9 +501,6 @@ namespace Sanctuary.ModApi
                 id = m.Id, name = Cap(m.Name, 80), version = Cap(m.Version, 40), hash = m.ContentHash, url = Cap(m.Manifest.Url, 300),
                 options = m.Manifest.Options.Count == 0 ? null : new Dictionary<string, string>(HostValues(m)),
             }).ToList(),
-            // What the overlay went on with, so every machine writes the
-            // same seats file.
-            ais = Overlay.AppliedAis.Count == 0 ? null : Overlay.AppliedAis.ToList(),
         };
 
         /// The picked mods' option values, as the overlay takes them.
@@ -633,7 +512,7 @@ namespace Sanctuary.ModApi
         /// The host has picked anything at all, resolved or not: what decides
         /// whether a Start gate that threw refuses the start or lets a
         /// vanilla lobby play. Plain field reads, so it can't throw itself.
-        internal static bool HostHasPicks => _hostSession && (_selection.Count > 0 || _hostResolved.Count > 0 || _aiPicks.Count > 0);
+        internal static bool HostHasPicks => _hostSession && (_selection.Count > 0 || _hostResolved.Count > 0);
 
         /// The start check threw part-way: undo the freeze it may have put on,
         /// so the host can change the pick and try again.
@@ -670,7 +549,7 @@ namespace Sanctuary.ModApi
         {
             var state = LobbyManager.hostState;
             if (state == null) return Enumerable.Empty<LobbyPlayer>();
-            return state.players.Where(p => p.type == PlayerType.Player || p.type == PlayerType.Observer);
+            return state.GetPlayers(includeAIs: false, includeObservers: true);
         }
 
         // Names and seat types too: the status shows both, and is only
@@ -681,7 +560,7 @@ namespace Sanctuary.ModApi
 
         private static bool RosterChanged()
         {
-            var players = LobbyManager.hostState?.players;
+            var players = LobbyManager.hostState?.GetPlayers(includeAIs: false, includeObservers: true).ToList();
             var n = 0;
             var same = true;
             if (players != null)
@@ -717,7 +596,7 @@ namespace Sanctuary.ModApi
             var s = new StatusMsg { rev = _rev };
             var reasons = new List<string>();
             if (_hostSelectionProblem != null) reasons.Add(_hostSelectionProblem);
-            if (_optionsPending) reasons.Add("options or AI seats changing");
+            if (_optionsPending) reasons.Add("options changing");
             // A reason that won't clear by itself: someone is missing
             // something, or the pick itself is incomplete. The rest is a
             // change still on its way to everyone.
@@ -807,17 +686,15 @@ namespace Sanctuary.ModApi
             if (_optionsPending)
             {
                 // Everyone has to confirm the new values first.
-                HostApply("options or AI seats changed");
-                reason = "Gameplay mod options or AI seats changed a moment ago; press Start again once everyone has them.";
+                HostApply("options changed");
+                reason = "Gameplay mod options changed a moment ago; press Start again once everyone has them.";
                 return false;
             }
             if (!GateOpen(out reason, fresh: true)) return false;
             var applied = Overlay.Applied;
-            PruneAiPicks();
             if (applied.Count != _hostResolved.Count || applied.Where((m, i) => !ReferenceEquals(m, _hostResolved[i])).Any() ||
                 _hostResolved.Any(m => m.Manifest.Options.Count > 0 &&
-                                       OptionValues.Signature(Overlay.OptionsOf(m.Id)) != OptionValues.Signature(HostValues(m))) ||
-                Ais.Signature(Overlay.AppliedAis) != Ais.Signature(HostAiSeats()))
+                                       OptionValues.Signature(Overlay.OptionsOf(m.Id)) != OptionValues.Signature(HostValues(m))))
             {
                 reason = "Gameplay mods changed on disk a moment ago; press Start again.";
                 HostApply("re-applied at start");
@@ -896,7 +773,7 @@ namespace Sanctuary.ModApi
                 if (ui == null || state == null || !LobbyManager.IsCurrentUserHost()) return;
                 var button = StartButtonRef(ui);
                 if (button == null || !button.gameObject.activeInHierarchy) return;
-                var allReady = state.players.Take(state.maxPlayers).All(p => p.isReady || p.type == PlayerType.Empty);
+                var allReady = state.GetPlayers(includeAIs: false, includeObservers: false).All(p => p.isReady);
                 // No gameplay mods in play: the button is the game's alone.
                 // Put back what we changed, once, if mods were just
                 // switched off.
@@ -942,23 +819,14 @@ namespace Sanctuary.ModApi
                 if (!LobbyProtocol.TryRead<ModSetMsg>(payload, out var set)) return;
                 if (set.mods == null) set.mods = new List<WireMod>();
                 if (set.mods.Count > 64) return;
-                if (set.ais != null)
-                {
-                    if (set.ais.Count > 32) return;
-                    set.ais = set.ais.Where(s => s != null && s.slot >= 0 && s.slot < 256 && s.army > 0 && s.army < 128 &&
-                                                 ModManifest.IsValidId(s.mod) && s.key != null && s.key.Length <= 32).ToList();
-                    foreach (var s in set.ais) s.name = Cap(s.name, 40);
-                }
                 // Once the match is loading, the files the VMs read must not move.
                 if (MatchUnderway && !LobbyManager.isHostRunning)
                 {
                     if (_received != null) return;
                 }
-                var seatsWere = Ais.Signature(_received?.ais);
                 _received = set;
                 ClientEvaluate(sendReport: true);
                 _changeCounter++;
-                if (!LobbyManager.isHostRunning && Ais.Signature(set.ais) != seatsWere) AiLobby.Redraw();
                 if (!LobbyManager.isHostRunning) ModEvents.RaiseSelectionChanged();
             }
             else if (type == LobbyProtocol.Status)
@@ -1003,7 +871,7 @@ namespace Sanctuary.ModApi
             // The host's own client shares the host's cache: the host applies.
             if (!LobbyManager.isHostRunning && !MatchUnderway)
             {
-                Overlay.Apply(complete ? resolved : new List<ModInfo>(), options, _received.ais);
+                Overlay.Apply(complete ? resolved : new List<ModInfo>(), options);
                 if (Overlay.Failed.Count > 0)
                 {
                     // Part of the pick is no better than none: back to vanilla,

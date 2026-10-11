@@ -197,7 +197,7 @@ namespace SanctuaryHud
             if (ForceUploadId() != null) return true;
             if (_snapshot != null) return _snapshot.Reportable;
             if (!LobbyManager.IsInLobby || !(LobbyManager.Backend is SteamLobbyBackend)) return false;
-            var players = LobbyManager.CurrentState?.players;
+            var players = LobbyManager.CurrentState?.GetPlayers(includeAIs: true, includeObservers: true);
             if (players == null) return false;
             var humans = 0;
             foreach (var p in players)

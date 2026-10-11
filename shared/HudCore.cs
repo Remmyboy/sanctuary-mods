@@ -381,21 +381,16 @@ namespace SanctuaryHud
         /// set rather than read the silence as a stall.
         internal static bool Paused => InMatch && Time.realtimeSinceStartup - _lastEcoRealtime > 0.75f;
 
-        // ---- idle-builder polling (reflection over Unity.Entities) --------
+        // ---- idle-builder polling (the game's own entity worlds) ----------
+        //
+        // Since 0.0.1.21 the game runs its own entity engine (EM.Entities)
+        // instead of Unity.Entities. Strategic icons live on the client's
+        // rendering world, one IconEntityElementComponent buffer per unit,
+        // on the entity whose LocalID is the unit's `localId` in Lua.
 
-        private static Type _iconElemType;
-        private static Type _entityType;
-        private static FieldInfo _allWorldsField;
-        private static PropertyInfo _entityManagerProp;
-        private static MethodInfo _componentTypeReadOnly;
-        private static MethodInfo _createQueryMi;
-        private static MethodInfo _getBufferMi;
-        private static FieldInfo _iconEnabledField;
-        private static FieldInfo _iconIndexField;
         private static int _idleImageIndex = -1;
         private static int _upgradeImageIndex = -1;
         private static bool _loggedUpgradeIndexWait;
-        private static object _allocatorTemp;
         private static bool _ecsResolved;
         private static bool _ecsResolveFailed;
         private static float _nextResolveRetry;
@@ -404,34 +399,19 @@ namespace SanctuaryHud
         // Cached for the late-resolve retries (see PollIdleBuilders).
         private static Type _iconLoaderType;
 
-        // ---- ownership filter: local army colour matching ----
-        // Render entities carry no army id, but every unit's renderer tint is
-        // ArmyColors[armyID] from common/colors.lua (players cannot pick
-        // custom colours in the demo lobby). So: local clientID -> armyID via
-        // the lobby statics, armyID -> colour via the parsed Lua table, then
-        // match each entity's RenderInstanceData.instanceData0 against it.
-        private static MethodInfo _getRendererMi;
-        private static FieldInfo _renderInstanceDataField;
-        private static FieldInfo _instanceData0Field;
-        private static FieldInfo _f4x, _f4y, _f4z;
+        // ---- ownership ----
+        // Render entities carry no army id. The client's Lua does know: the
+        // army sweep (RefreshArmyLookups) lists every unit of the focused
+        // army by LocalID, and that set is the ownership test. The lobby
+        // colours below are only for tinting when Lua can't say.
         private static Vector4[] _armyColours;
         private static MethodInfo _getClientIdMi;
         private static Type _lobbyInfoType;
         /// Our army's colour, for tinting the commander icon like the game does.
         internal static Color? _ownArmyColourUi;
 
-        private static void ResolveOwnership(List<Assembly> assemblies, Type emType)
+        private static void ResolveOwnership()
         {
-            var rendererType = NeedType(TypeIndex.ByFullName("EM.Components.RendererComponent"), "EM.Components.RendererComponent");
-            _getRendererMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
-                .MakeGenericMethod(rendererType);
-            _renderInstanceDataField = rendererType.GetField("RenderInstanceData");
-            _instanceData0Field = _renderInstanceDataField.FieldType.GetField("instanceData0");
-            _f4x = _instanceData0Field.FieldType.GetField("x");
-            _f4y = _instanceData0Field.FieldType.GetField("y");
-            _f4z = _instanceData0Field.FieldType.GetField("z");
-
             // ownClientID lives in a Burst SharedStatic, but the Lua-facing
             // getter is a plain managed method we can just call.
             _getClientIdMi = TypeIndex.ByFullName("EM.Lua.Client.ClientLuaInterface")
@@ -601,39 +581,13 @@ namespace SanctuaryHud
             return null;
         }
 
-        private static readonly object[] _entityArg = new object[1];
-
-        /// The argument array for a GetComponentData(entity) call, reused:
-        /// the unit scan makes several per unit. Main thread only.
-        private static object[] EntityArg(object entity)
-        {
-            _entityArg[0] = entity;
-            return _entityArg;
-        }
-
-        private static bool ColourMatches(object em, object entity, Vector4 target)
-        {
-            try
-            {
-                var renderer = _getRendererMi.Invoke(em, EntityArg(entity));
-                var instance = _instanceData0Field.GetValue(_renderInstanceDataField.GetValue(renderer));
-                var dx = Convert.ToSingle(_f4x.GetValue(instance)) - target.x;
-                var dy = Convert.ToSingle(_f4y.GetValue(instance)) - target.y;
-                var dz = Convert.ToSingle(_f4z.GetValue(instance)) - target.z;
-                return dx * dx + dy * dy + dz * dz < 0.003f;
-            }
-            catch
-            {
-                // Fail closed: an entity we cannot attribute is not counted.
-                return false;
-            }
-        }
+        /// Whether the unit with this LocalID index is one of ours, by the
+        /// army sweep. Fails closed: no answer from Lua, nothing is ours.
+        private static bool OwnsUnit(int localIndex) => _ownIdsValid && _ownLocalIds.Contains(localIndex);
 
         // The strategic icon (slot 0) image name encodes the unit's tier and
         // role, e.g. "bot1_t2_engineer_normal" — so the icon registry gives us
         // a tech breakdown without touching unit templates.
-        private static FieldInfo _localIdField;
-        private static MethodInfo _getLocalIdMi;
         private static Dictionary<int, string> _iconNamesByIndex;
 
         private static string IconName(int registryIndex)
@@ -855,31 +809,18 @@ namespace SanctuaryHud
             RunLua(chunk);
         }
 
-        private static MethodInfo _getPairedGlobalMi;
-        private static FieldInfo _pairedGlobalField;
-        private static MethodInfo _getHealthMi;
-        private static MethodInfo _getMaxHealthMi;
-
         // Health lives on the sim-side entity, not the render entity, so hop
         // via LocalPairedGlobalIDComponent and use the engine's own accessors.
-        private static void RecordCommander(object em, object entity)
+        private static void RecordCommander(EM.Core.LocalID localId)
         {
             try
             {
-                if (_localIdField != null && _getLocalIdMi != null)
-                {
-                    var localComponent = _getLocalIdMi.Invoke(em, EntityArg(entity));
-                    var localId = _localIdField.GetValue(localComponent);
-                    var indexField = IndexField(localId);
-                    if (indexField != null) _commanderLocalIndex = Convert.ToInt32(indexField.GetValue(localId));
-                }
-
-                if (_getPairedGlobalMi == null || _getHealthMi == null) return;
-                var pairedComponent = _getPairedGlobalMi.Invoke(em, EntityArg(entity));
-                var globalId = _pairedGlobalField.GetValue(pairedComponent);
+                _commanderLocalIndex = (int)localId.index;
+                if (!EM.Engine.ClientEngine.TryGetLocalComponent<EM.Components.LocalPairedGlobalIDComponent>(localId, out var paired)) return;
+                var globalId = paired.Value;
                 // A commander that has died can still be drawn for a while;
                 // its id is known to be gone, so don't ask about it again.
-                if (globalId == null || globalId.Equals(_refusedCommanderId)) return;
+                if (_refusedCommanderId == globalId) return;
                 _commanderGlobalId = globalId;
                 if (!ReadCommanderHealth(globalId)) ForgetCommanderId();
             }
@@ -890,14 +831,14 @@ namespace SanctuaryHud
         }
 
         /// The commander's sim-side id, kept so the health can be re-read
-        /// between the once-a-second ECS polls (the alerts want damage
+        /// between the once-a-second unit scans (the alerts want damage
         /// noticed within a quarter second, not a second later).
-        private static object _commanderGlobalId;
+        private static EM.Core.GlobalID? _commanderGlobalId;
 
         /// The last id the engine refused: the commander died. Every refused
         /// ask writes a line to the game's log, and the alerts ask four times
         /// a second, so it is asked about once.
-        private static object _refusedCommanderId;
+        private static EM.Core.GlobalID? _refusedCommanderId;
 
         private static void ForgetCommanderId()
         {
@@ -911,31 +852,24 @@ namespace SanctuaryHud
         /// values are kept either way.
         internal static bool RefreshCommanderHealth()
         {
-            if (_commanderLocalIndex < 0 || _commanderGlobalId == null || _getHealthMi == null) return false;
+            if (_commanderLocalIndex < 0 || _commanderGlobalId == null) return false;
             try
             {
-                if (ReadCommanderHealth(_commanderGlobalId)) return true;
+                if (ReadCommanderHealth(_commanderGlobalId.Value)) return true;
                 ForgetCommanderId();
                 return false;
             }
             catch { return false; }
         }
 
-        private static bool ReadCommanderHealth(object globalId)
+        private static bool ReadCommanderHealth(EM.Core.GlobalID globalId)
         {
-            var args = new[] { globalId, null };
-            var code = _getHealthMi.Invoke(null, args);
-            // EngineErrorCode.Success is 0; anything else means the id no
-            // longer names a live entity and the value is meaningless.
-            if (code != null && Convert.ToInt32(code) != 0) return false;
-            _commanderHealth = Convert.ToSingle(args[1] ?? 0f);
-
-            if (_getMaxHealthMi != null)
-            {
-                var maxArgs = new[] { globalId, null };
-                _getMaxHealthMi.Invoke(null, maxArgs);
-                _commanderMaxHealth = Convert.ToSingle(maxArgs[1] ?? 0f);
-            }
+            // Anything but Success means the id no longer names a live
+            // entity and the value is meaningless.
+            if (EM.Lua.Client.ClientLuaInterface.GetHealth(in globalId, out var health) != EM.Core.EngineErrorCode.Success) return false;
+            _commanderHealth = health;
+            if (EM.Lua.Client.ClientLuaInterface.GetMaxHealth(in globalId, out var max) == EM.Core.EngineErrorCode.Success)
+                _commanderMaxHealth = max;
             return true;
         }
 
@@ -981,8 +915,7 @@ namespace SanctuaryHud
             RunLua(chunk);
         }
 
-        private static void RecordIdle(object em, object entity, object buffer, PropertyInfo itemGetter, int bufLength,
-            Dictionary<int, IdleGroup> groups)
+        private static void RecordIdle(int localIndex, string name, Dictionary<int, IdleGroup> groups)
         {
             try
             {
@@ -990,9 +923,6 @@ namespace SanctuaryHud
                 // "land1_t2_engineer_normal". Engineers carry the "engineer"
                 // role; factories carry what they build (land/air/naval), and
                 // commanders carry "direct" — so this is what separates them.
-                if (bufLength == 0) return;
-                var strategic = ItemAt(itemGetter, buffer, 0);
-                var name = IconName(Convert.ToInt32(_iconIndexField.GetValue(strategic)));
                 if (string.IsNullOrEmpty(name)) return;
 
                 var m = System.Text.RegularExpressions.Regex.Match(name, @"^(\w+?)_t(\d)_(\w+?)(_normal)?$");
@@ -1024,15 +954,8 @@ namespace SanctuaryHud
                     groups[key] = group;
                 }
                 group.Count++;
-
                 // LocalID index is the key the selection system uses.
-                if (_localIdField != null && _getLocalIdMi != null)
-                {
-                    var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
-                    var localId = _localIdField.GetValue(component);
-                    var indexField = IndexField(localId);
-                    if (indexField != null) group.UnitIds.Add(Convert.ToInt32(indexField.GetValue(localId)));
-                }
+                group.UnitIds.Add(localIndex);
             }
             catch
             {
@@ -1057,6 +980,9 @@ namespace SanctuaryHud
         // the upgrade adornment, so it is what fills the UPGRADING row.
         private static readonly HashSet<int> _extractorLocalIds = new HashSet<int>();
         private static bool _extractorIdsValid;
+        /// Every unit of the focused army, by LocalID: the ownership test.
+        private static readonly HashSet<int> _ownLocalIds = new HashSet<int>();
+        private static bool _ownIdsValid;
         private static bool _loggedArmyLookupFail;
 
         // ---- factory identity, from the same tag tables ----
@@ -1098,11 +1024,13 @@ namespace SanctuaryHud
             // last poll's (or, local ids being reused, last match's).
             _factoryKindsValid = false;
             _extractorIdsValid = false;
+            _ownIdsValid = false;
             if (!LuaReady) return;
             try
             {
                 if (!RunLua(
                         "__SdbExtractors = '' " +
+                        "__SdbOwnUnits = '' " +
                         "__SdbFactories = '' " +
                         "__SdbRowIcons = '' " +
                         // Tags fills in as templates load, so early in a match
@@ -1117,12 +1045,13 @@ namespace SanctuaryHud
                         "  return tonumber(g and g.techNumber) or 1 " +
                         "end " +
                         $"local wantFactories = {(_trackIdleFactories ? "true" : "false")} " +
-                        "local out, facs, reps = {}, {}, {} " +
+                        "local out, facs, reps, own = {}, {}, {}, {} " +
                         "for _, a in pairs(Armies or {}) do " +
                         "  if a.focused then " +
                         "    for _, u in pairs(a.units or {}) do " +
                         "      local li = u.localId and u.localId.index " +
                         "      local tp = u.tpId " +
+                        "      if li then own[#own+1] = li end " +
                         "      if li and tp then " +
                         "        local d = (fac[1][tp] and 1) or (fac[2][tp] and 2) or (fac[3][tp] and 3) " +
                         "        if ext[tp] then " +
@@ -1151,6 +1080,7 @@ namespace SanctuaryHud
                         "  end " +
                         "end " +
                         "__SdbExtractors = table.concat(out, ',') " +
+                        "__SdbOwnUnits = table.concat(own, ',') " +
                         "__SdbFactories = table.concat(facs, ',') " +
                         // The art is a nicety and the ids are not, so an
                         // unexpected template shape must not take the ids down.
@@ -1184,6 +1114,17 @@ namespace SanctuaryHud
                     if (int.TryParse(part, out var id)) _extractorLocalIds.Add(id);
                 }
                 _extractorIdsValid = true;
+
+                var ownRaw = GetLuaGlobal("__SdbOwnUnits");
+                if (ownRaw != null)
+                {
+                    _ownLocalIds.Clear();
+                    foreach (var part in ownRaw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        if (int.TryParse(part, out var id)) _ownLocalIds.Add(id);
+                    }
+                    _ownIdsValid = true;
+                }
 
                 if (_trackIdleFactories)
                 {
@@ -1240,16 +1181,10 @@ namespace SanctuaryHud
         /// Files an idle entity under its factory row, if it is one of our
         /// factories. The kind table only holds our own army's units, so this
         /// is the ownership check as well.
-        private static void RecordIdleFactory(object em, object entity, Dictionary<int, IdleGroup> groups)
+        private static void RecordIdleFactory(int localIndex, Dictionary<int, IdleGroup> groups)
         {
             try
             {
-                if (_localIdField == null || _getLocalIdMi == null) return;
-                var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
-                var localId = _localIdField.GetValue(component);
-                var indexField = IndexField(localId);
-                if (indexField == null) return;
-                var localIndex = Convert.ToInt32(indexField.GetValue(localId));
                 if (!_factoryKinds.TryGetValue(localIndex, out var kind)) return;
 
                 if (!groups.TryGetValue(kind, out var group))
@@ -1290,20 +1225,11 @@ namespace SanctuaryHud
         /// Files an alloy structure into its tier row (and the upgrading row
         /// when the game's upgrade adornment is lit). `name` is the already
         /// resolved strategic icon name, `tier` its parsed tech level.
-        private static void RecordAlloy(object em, object entity, int tier, bool upgrading,
+        private static void RecordAlloy(int localIndex, int tier, bool upgrading,
             Dictionary<int, IdleGroup> groups, Dictionary<int, IdleGroup> upgradingGroups)
         {
             try
             {
-                var localIndex = -1;
-                if (_localIdField != null && _getLocalIdMi != null)
-                {
-                    var component = _getLocalIdMi.Invoke(em, EntityArg(entity));
-                    var localId = _localIdField.GetValue(component);
-                    var indexField = IndexField(localId);
-                    if (indexField != null) localIndex = Convert.ToInt32(indexField.GetValue(localId));
-                }
-
                 // Extractors only — the icon also matches storages and the
                 // furnace, and Lua's tag set is what separates them. It is
                 // already restricted to our own army, so this doubles as the
@@ -1346,106 +1272,33 @@ namespace SanctuaryHud
 
             try
             {
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic).ToList();
-                _iconElemType = NeedType(TypeIndex.ByName("IconEntityElementComponent"), "IconEntityElementComponent");
-                _iconEnabledField = _iconElemType.GetField("Enabled", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    ?? throw new MissingFieldException("IconEntityElementComponent.Enabled");
-                _iconIndexField = _iconElemType.GetField("IconIndex", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
                 // Resolve the registry index of the idle-adornment image so we
                 // can match the idle icon exactly — entities like resource
                 // deposits and wrecks carry icon buffers too, so slot position
                 // alone overcounts badly. Registration happens during match
                 // load, so this (and the other icon lookups below) may not
                 // succeed yet — PollIdleBuilders keeps retrying them.
-                _iconLoaderType = TypeIndex.ByName("IconLoader");
+                _iconLoaderType = NeedType(TypeIndex.ByName("IconLoader"), "IconLoader");
                 TryResolveIdleImageIndex();
                 TryResolveUpgradeImageIndex();
 
-                var entities = assemblies.First(a => a.GetName().Name == "Unity.Entities");
-                var worldType = entities.GetType("Unity.Entities.World", true);
-                // World.All's NoAllocReadOnlyCollection throws on IEnumerable
-                // casts, so read the internal backing list instead.
-                _allWorldsField = worldType.GetField("s_AllWorlds", BindingFlags.NonPublic | BindingFlags.Static)
-                    ?? throw new MissingFieldException("World.s_AllWorlds");
-                _entityManagerProp = worldType.GetProperty("EntityManager");
-                _entityType = entities.GetType("Unity.Entities.Entity", true);
-
-                var componentTypeType = entities.GetType("Unity.Entities.ComponentType", true);
-                _componentTypeReadOnly = componentTypeType.GetMethod("ReadOnly", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Type) }, null);
-
-                var emType = entities.GetType("Unity.Entities.EntityManager", true);
-                var ctArray = Array.CreateInstance(componentTypeType, 0).GetType();
-                _createQueryMi = emType.GetMethod("CreateEntityQuery", new[] { ctArray });
-
                 try
                 {
-                    ResolveOwnership(assemblies, emType);
+                    ResolveOwnership();
                 }
                 catch (Exception e)
                 {
-                    _log.LogWarning($"Ownership filter unavailable (counts will include allies): {e.Message}");
+                    _log.LogWarning($"Lobby colour fallback unavailable: {e.Message}");
                 }
 
                 ResolveIconNames();
                 ResolveIconAtlas();
 
-                try
-                {
-                    var localIdComponent = NeedType(TypeIndex.ByFullName("EM.Components.LocalIDComponent"), "EM.Components.LocalIDComponent");
-                    _getLocalIdMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                        .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
-                        .MakeGenericMethod(localIdComponent);
-                    _localIdField = localIdComponent.GetFields(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault();
-
-                    var pairedType = NeedType(TypeIndex.ByFullName("EM.Components.LocalPairedGlobalIDComponent"), "EM.Components.LocalPairedGlobalIDComponent");
-                    _getPairedGlobalMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                        .First(m => m.Name == "GetComponentData" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
-                        .MakeGenericMethod(pairedType);
-                    _pairedGlobalField = pairedType.GetField("Value");
-
-                    var cli = NeedType(TypeIndex.ByFullName("EM.Lua.Client.ClientLuaInterface"), "EM.Lua.Client.ClientLuaInterface");
-                    _getHealthMi = cli.GetMethod("GetHealth", BindingFlags.Public | BindingFlags.Static);
-                    _getMaxHealthMi = cli.GetMethod("GetMaxHealth", BindingFlags.Public | BindingFlags.Static);
-                    _log.LogInfo($"Commander tracking: health {(_getHealthMi != null ? "ok" : "missing")}, paired-id {(_pairedGlobalField != null ? "ok" : "missing")}.");
-
-                    _nextLuaBridgeTry = 0f;
-                    EnsureLuaBridge();
-                }
-                catch (Exception e)
-                {
-                    _log.LogWarning($"Selection support unavailable (rows won't be clickable): {e.Message}");
-                }
-                _getBufferMi = emType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .First(m => m.Name == "GetBuffer" && m.IsGenericMethodDefinition && m.GetParameters().Length == 2)
-                    .MakeGenericMethod(_iconElemType);
-
-                var allocatorType = assemblies.Select(a => a.GetType("Unity.Collections.Allocator")).First(t => t != null);
-                _allocatorTemp = Enum.ToObject(allocatorType, 2); // Allocator.Temp
-
-                // ToEntityArray takes AllocatorManager.AllocatorHandle here;
-                // apply the implicit Allocator->handle conversion ourselves,
-                // since reflection Invoke won't.
-                var handleType = assemblies.Select(a => a.GetType("Unity.Collections.AllocatorManager+AllocatorHandle")).FirstOrDefault(t => t != null);
-                var opImplicit = handleType?.GetMethods(BindingFlags.Public | BindingFlags.Static)
-                    .FirstOrDefault(m => m.Name == "op_Implicit" && m.GetParameters()[0].ParameterType == allocatorType && m.ReturnType == handleType);
-                if (opImplicit != null)
-                {
-                    _allocatorTemp = opImplicit.Invoke(null, new[] { _allocatorTemp });
-                }
-                else if (handleType != null)
-                {
-                    // Build the handle by hand: for built-in allocators the
-                    // handle is just { Index = (ushort)allocator, Version = 0 }.
-                    var handle = Activator.CreateInstance(handleType);
-                    var indexField = handleType.GetField("Index", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    indexField?.SetValue(handle, (ushort)2);
-                    _allocatorTemp = handle;
-                }
-                _log.LogInfo($"ECS idle poll: allocator arg is {_allocatorTemp.GetType().Name} (handleType {(handleType == null ? "missing" : "found")}, implicit {(opImplicit == null ? "missing" : "found")}).");
+                _nextLuaBridgeTry = 0f;
+                EnsureLuaBridge();
 
                 _ecsResolved = true;
-                _log.LogInfo("ECS idle poll: types resolved.");
+                _log.LogInfo("Unit scan: resolved.");
                 return true;
             }
             catch (Exception e)
@@ -1456,7 +1309,7 @@ namespace SanctuaryHud
                 if (!_loggedResolveFail)
                 {
                     _loggedResolveFail = true;
-                    _log.LogError($"ECS idle poll: type resolution failed (will keep retrying): {e}");
+                    _log.LogError($"Unit scan: resolve failed (will keep retrying): {e}");
                 }
                 return false;
             }
@@ -1505,56 +1358,75 @@ namespace SanctuaryHud
             catch { /* the marker alone will have to do this poll */ }
         }
 
-        /// The entity's LocalID index, or -1.
-        private static int LocalIndexOf(object em, object entity)
+        /// One pass over every entity carrying strategic icons in the
+        /// client's rendering world. Typed against the game's own entity
+        /// engine, so a rename there fails the build, not the match.
+        private static void ScanIconWorld(Dictionary<int, IdleGroup> groups, Dictionary<int, IdleGroup> alloyGroups,
+            Dictionary<int, IdleGroup> alloyUpgrading, Dictionary<int, IdleGroup> factoryGroups)
         {
-            try
+            ref var world = ref EM.Engine.ClientEngine.Data.localEngineData.localWorld;
+            if (!world.IsCreated) return;
+            var query = EM.Entities.EntityQuery.Of<EM.Components.IconEntityElementComponent>();
+            foreach (var instance in world.QueryInstances(in query))
             {
-                if (_localIdField == null || _getLocalIdMi == null) return -1;
-                var localComponent = _getLocalIdMi.Invoke(em, EntityArg(entity));
-                var localId = _localIdField.GetValue(localComponent);
-                var indexField = IndexField(localId);
-                return indexField != null ? Convert.ToInt32(indexField.GetValue(localId)) : -1;
+                var entities = instance.GetEntities<EM.Components.IconEntityElementComponent>();
+                for (var n = 0; n < entities.Length; n++)
+                {
+                    var entity = entities[n];
+                    var buffer = instance.GetBuffer<EM.Components.IconEntityElementComponent>(entity);
+                    var localId = instance.GetEntityID<EM.Core.LocalID>(entity);
+                    var localIndex = (int)localId.index;
+                    var length = buffer.Length;
+
+                    // The strategic icon (slot 0) identifies what the unit
+                    // is; the rest of the buffer carries adornments. Read the
+                    // name once, then scan the buffer once for every
+                    // adornment we care about, rather than a pass per feature.
+                    string iconName = null;
+                    if (length > 0)
+                    {
+                        int strategicIndex = buffer[0].IconIndex;
+                        iconName = IconName(strategicIndex);
+
+                        // The commander is tracked whether or not it is idle,
+                        // for the always-on health readout.
+                        if (iconName != null && iconName.StartsWith(CommanderIconSuffix) && OwnsUnit(localIndex))
+                        {
+                            _commanderIconIndex = strategicIndex;
+                            RecordCommander(localId);
+                        }
+                    }
+
+                    if (_idleImageIndex < 0 && _upgradeImageIndex < 0) continue;
+                    var idle = false;
+                    var upgrading = false;
+                    for (var e = 0; e < length; e++)
+                    {
+                        var element = buffer[e];
+                        int index = element.IconIndex;
+                        if (index != _idleImageIndex && index != _upgradeImageIndex) continue;
+                        if (!element.Enabled) continue;
+                        if (index == _idleImageIndex) idle = true;
+                        else upgrading = true;
+                    }
+                    // Selected and idle by the client's own test, marker or
+                    // no marker.
+                    if (!idle && _idleSelected.Contains(localIndex)) idle = true;
+
+                    if (idle)
+                    {
+                        if (OwnsUnit(localIndex)) RecordIdle(localIndex, iconName, groups);
+                        // The kind table holds only our own factories, so it
+                        // is the ownership check as well.
+                        if (_factoryKindsValid) RecordIdleFactory(localIndex, factoryGroups);
+                    }
+
+                    // RecordAlloy does its own ownership check, via the
+                    // army-scoped extractor id set.
+                    if (_extractorIdsValid && IsAlloyStructure(iconName, out var alloyTier))
+                        RecordAlloy(localIndex, alloyTier, upgrading, alloyGroups, alloyUpgrading);
+                }
             }
-            catch
-            {
-                return -1;
-            }
-        }
-
-        // ---- reflection, looked up once ----------------------------------------
-        //
-        // The once-a-second unit scan reads every unit's icon buffer through
-        // reflection; looking the members up again for each unit and element
-        // was most of its cost, so they are looked up once per type here.
-
-        private static readonly Dictionary<Type, FieldInfo> _indexFields = new Dictionary<Type, FieldInfo>();
-        private static readonly Dictionary<Type, PropertyInfo[]> _listProps = new Dictionary<Type, PropertyInfo[]>();
-        private static readonly Dictionary<Type, MethodInfo> _toEntityArray = new Dictionary<Type, MethodInfo>();
-        private static readonly object[] _oneArg = new object[1];
-
-        /// The 'index' field of a local-id struct, or null.
-        private static FieldInfo IndexField(object localId)
-        {
-            var type = localId.GetType();
-            if (!_indexFields.TryGetValue(type, out var field))
-                _indexFields[type] = field = type.GetField("index", BindingFlags.Public | BindingFlags.Instance);
-            return field;
-        }
-
-        /// A list-like type's Length and Item properties.
-        private static PropertyInfo[] ListProps(Type type)
-        {
-            if (!_listProps.TryGetValue(type, out var props))
-                _listProps[type] = props = new[] { type.GetProperty("Length"), type.GetProperty("Item") };
-            return props;
-        }
-
-        /// list[i] through its Item property, with no array allocated per call.
-        private static object ItemAt(PropertyInfo item, object list, int i)
-        {
-            _oneArg[0] = i;
-            return item.GetValue(list, _oneArg);
         }
 
         /// Whether this mod runs the once-a-second unit scan (idle groups,
@@ -1607,111 +1479,7 @@ namespace SanctuaryHud
                     _pollStatus = "no owner";
                     return;
                 }
-                var componentType = _componentTypeReadOnly.Invoke(null, new object[] { _iconElemType });
-                var ctArray = Array.CreateInstance(componentType.GetType(), 1);
-                ctArray.SetValue(componentType, 0);
-
-                var worlds = ((System.Collections.IEnumerable)_allWorldsField.GetValue(null)).Cast<object>().ToList();
-                foreach (var world in worlds)
-                {
-                    var em = _entityManagerProp.GetValue(world);
-                    var query = _createQueryMi.Invoke(em, new object[] { ctArray });
-                    try
-                    {
-                        var queryType = query.GetType();
-                        if (!_toEntityArray.TryGetValue(queryType, out var toArray))
-                            _toEntityArray[queryType] = toArray = queryType.GetMethod("ToEntityArray");
-                        var entitiesArray = toArray.Invoke(query, new[] { _allocatorTemp });
-                        try
-                        {
-                            var arrayProps = ListProps(entitiesArray.GetType());
-                            var itemProp = arrayProps[1];
-                            var length = (int)arrayProps[0].GetValue(entitiesArray);
-                            var bufferArgs = new object[2];
-                            bufferArgs[1] = true;
-                            for (var i = 0; i < length; i++)
-                            {
-                                var entity = ItemAt(itemProp, entitiesArray, i);
-                                bufferArgs[0] = entity;
-                                var buffer = _getBufferMi.Invoke(em, bufferArgs);
-                                var bufferProps = ListProps(buffer.GetType());
-                                var bufLength = (int)bufferProps[0].GetValue(buffer);
-                                var itemGetter = bufferProps[1];
-
-                                // The strategic icon (slot 0) identifies what
-                                // the unit is; the rest of the buffer carries
-                                // adornments. Read the name once, then scan
-                                // the buffer once for every adornment we care
-                                // about, rather than a pass per feature.
-                                string iconName = null;
-                                if (bufLength > 0 && _iconIndexField != null)
-                                {
-                                    var strategic = ItemAt(itemGetter, buffer, 0);
-                                    var strategicIndex = Convert.ToInt32(_iconIndexField.GetValue(strategic));
-                                    iconName = IconName(strategicIndex);
-
-                                    // The commander is tracked whether or not
-                                    // it is idle, for the always-on health
-                                    // readout.
-                                    if (iconName != null && iconName.StartsWith(CommanderIconSuffix) &&
-                                        ColourMatches(em, entity, ownColour.Value))
-                                    {
-                                        _commanderIconIndex = strategicIndex;
-                                        RecordCommander(em, entity);
-                                    }
-                                }
-
-                                if (_iconIndexField != null && (_idleImageIndex >= 0 || _upgradeImageIndex >= 0))
-                                {
-                                    var idle = false;
-                                    var upgrading = false;
-                                    for (var e = 0; e < bufLength; e++)
-                                    {
-                                        var element = ItemAt(itemGetter, buffer, e);
-                                        var index = Convert.ToInt32(_iconIndexField.GetValue(element));
-                                        if (index != _idleImageIndex && index != _upgradeImageIndex) continue;
-                                        if (!(bool)_iconEnabledField.GetValue(element)) continue;
-                                        if (index == _idleImageIndex) idle = true;
-                                        else upgrading = true;
-                                    }
-                                    // Selected and idle by the client's own
-                                    // test, marker or no marker.
-                                    if (!idle && _idleSelected.Count > 0 && _idleSelected.Contains(LocalIndexOf(em, entity))) idle = true;
-
-                                    if (idle)
-                                    {
-                                        if (ColourMatches(em, entity, ownColour.Value))
-                                        {
-                                            RecordIdle(em, entity, buffer, itemGetter, bufLength, groups);
-                                        }
-
-                                        // RecordIdleFactory does its own
-                                        // ownership check, like RecordAlloy.
-                                        if (_factoryKindsValid)
-                                        {
-                                            RecordIdleFactory(em, entity, factoryGroups);
-                                        }
-                                    }
-
-                                    // RecordAlloy does its own ownership check,
-                                    // via the army-scoped extractor id set.
-                                    if (_extractorIdsValid && IsAlloyStructure(iconName, out var alloyTier))
-                                    {
-                                        RecordAlloy(em, entity, alloyTier, upgrading, alloyGroups, alloyUpgrading);
-                                    }
-                                }
-                            }
-                        }
-                        finally
-                        {
-                            entitiesArray.GetType().GetMethod("Dispose", Type.EmptyTypes)?.Invoke(entitiesArray, null);
-                        }
-                    }
-                    finally
-                    {
-                        query.GetType().GetMethod("Dispose", Type.EmptyTypes)?.Invoke(query, null);
-                    }
-                }
+                ScanIconWorld(groups, alloyGroups, alloyUpgrading, factoryGroups);
 
                 var ordered = groups.Values.OrderBy(g => g.Tier).ToList();
                 // The headline number is idle *engineers*: factories and the

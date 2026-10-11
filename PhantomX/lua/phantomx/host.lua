@@ -484,7 +484,9 @@ end
 ---an army has lost when it's dead, has won when EndMatch says, and is
 ---undecided until then.
 local function TakeOverWinCondition()
-    local HostArmy = Import("host/systems/army.lua").Army
+    -- HostArmy since game 0.0.1.21 (Army before).
+    local armyModule = Import("host/systems/army.lua")
+    local HostArmy = armyModule.HostArmy or armyModule.Army
     HostArmy.ComputeWinCondition = function(self)
         if not self:IsAlive() then return WinCondition.Lost end
         return decided[self.id] or WinCondition.Undecided

@@ -94,7 +94,8 @@
       }
     },
     "ais": {
-      "description": "AIs the mod brings. The lobby host gives one to any AI seat from that seat's Player/AI dropdown. In a mod folder that is itself an AI (AIPlatoonFunctions.lua at its root), leave out folder: the AI is the folder.",
+      "description": "Ignored since game 0.0.1.21, whose lobby picks AIs itself from LJ/lua/AI/mods. Kept so older mod.json files still validate.",
+      "deprecated": true,
       "type": "array",
       "maxItems": 8,
       "items": {

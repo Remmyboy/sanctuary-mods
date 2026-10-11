@@ -42,21 +42,21 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.17.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.17.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; every panel resizable by its corner grip |
-| [IdleEngineers](IdleEngineers/) | [**0.7.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.1) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
-| [EcoManager](EcoManager/) | [**0.9.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.1) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.18.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.18.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; every panel resizable by its corner grip |
+| [IdleEngineers](IdleEngineers/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.2) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
+| [EcoManager](EcoManager/) | [**0.9.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
-| [LadderReporter](LadderReporter/) | [**0.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.5.0) | Reports ranked results; launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
-| [ReplayManager](ReplayManager/) | [**0.5.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.2) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
-| [CameraUtilities](CameraUtilities/) | [**0.2.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.1) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [ModManager](ModManager/) | [**0.16.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods, and community AIs picked per AI seat |
+| [LadderReporter](LadderReporter/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.5.1) | Reports ranked results; launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
+| [ReplayManager](ReplayManager/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.3) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
+| [CameraUtilities](CameraUtilities/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
+| [ModManager](ModManager/) | [**0.17.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
-| [PhantomX](PhantomX/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.2) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
-| [UnitRestrictions](UnitRestrictions/) | [**0.1.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.1) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
+| [PhantomX](PhantomX/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.3) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
+| [UnitRestrictions](UnitRestrictions/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.2) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
 | [BalancePatch](BalancePatch/) | [**0.2.8**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.8) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
-| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
-| [ModApi](ModApi/) | [**1.9.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.16.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, AIs per seat, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
+| [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
+| [ModApi](ModApi/) | [**1.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
 
 [All releases](https://github.com/Remmyboy/sanctuary-mods/releases) · MapLocalFiles
 has no release of its own yet; build it from source if you need it.
@@ -315,7 +315,7 @@ answerable from the log alone.
   and a player quitting reads the same as one disconnecting, since the game
   sends the same message for both. Clicking a commander
   toast jumps to it like the widget does. Health is re-read four times a
-  second off the commander's cached sim id, since the once-a-second ECS poll
+  second off the commander's cached sim id, since the once-a-second unit scan
   would make the alert a second late. All of it is for the active player
   only: "own" means exactly one focused army, so a replay's all-armies view
   (every army focused) and a seatless observer (none) get no commander
@@ -633,17 +633,9 @@ selection without the commander deletes as before. It swaps the two delete
 functions on `client/simpleEvents.lua` for ones that hold the order while the
 popup is up, then send the game's own order for the same units.
 
-**Right-clicking a queue item takes from that item** (`QueueRightClickTakesClickedItem`,
-**on** by default, as it fixes the game). Factories start with repeat build on,
-and each finished item goes back on the end of the queue carrying the same
-queue ids as the original (`HostFactory:CompleteBuildQueueItem`). The game's
-right-click sends one of those ids and the host takes from the back, so with
-`Tank ×2 | Raider | Tank ×1` a right-click on the first tank removed the last
-one. This swaps the queue panel's click handler: a right-click sends an id no
-later item shares, or, when every id is shared, takes the items behind it off,
-takes from the clicked one and puts them back. Left clicks are the game's own.
-It covers the game's queue panel and the build strip; the commands are the
-game's own, so it works against unmodded hosts.
+(The old `QueueRightClickTakesClickedItem` fix is gone: since 0.0.1.21 every
+queued unit has its own entry id, repeat copies get fresh ones, and the game's
+own right-click takes from the tile you click.)
 
 **Match clock** (`ShowMatchClock`): the time since the match started and the sim
 speed (`12:34   1.5×`, or `PAUSED`), under the menu buttons in the middle of
@@ -917,9 +909,9 @@ It is scoped to extractors on purpose: factories upgrade too, and silently
 spending that much because someone assisted one would be a nasty surprise.
 
 This is the one thing in the repo that *acts* rather than displays. It goes
-through the game's own client path — the same `ModifyBuildQueue` prediction
-and `UpdateQueueAmount` command the construction panel sends when you click
-the upgrade button — so the host validates and replicates it like any other
+through the game's own client path — the same `AddToBuildQueueForUnits` call
+(prediction plus `RequestAddToBuildQueue`) the construction panel makes when
+you click the upgrade button — so the host validates and replicates it like any other
 order, and no files change, so the lobby hash is untouched. What it costs you
 is that an assist click now spends alloy.
 
@@ -1997,21 +1989,12 @@ other mod's reloads, the Mod Manager's included:
   - It lends the looked-like faction's tag while a unit's prefab is built, so
     its shields, build beams, factory spawn bones and shield impacts follow.
   - It adds mods' units to `AvailableUnits`, the list the AI builds from.
-- **AIs.** A folder with `AIPlatoonFunctions.lua` at its root is an AI mod,
-  with or without a `mod.json` (whose `ais` can also name AI folders inside a
-  bigger mod).
-  - Its files go under `AI\mods\<folder>`, beside the game's AIs and never
-    over them.
-  - Some authors share the game's whole `AI` folder. Dropped in as it is, it
-    yields only that author's AIs; its shared files and its copies of the
-    stock AIs are left out.
-  - The host picks an AI per seat in the lobby row's Player/AI dropdown
-    (`AI: <name>`). Picking one also picks the mod.
-  - The picks go out like options and follow a seat's army number.
-  - The API writes them to `modapi/ai.lua`, and a `CreateArmies` hook applies
-    each pick after the seat's faction AI.
-  - A shim adds shared AI functions that newer AIs call, only where the game
-    lacks them.
+- **AIs.** Since game 0.0.1.21 the lobby picks each AI seat's AI itself, from
+  the folders in `LJ\lua\AI\mods`, so the API's AI seats are gone. An AI
+  folder dropped into `SanctuaryMods` gets a notice on the Mods page saying
+  where it goes. A faction's own AI still plays that faction's AI seats,
+  keeping the host's lobby settings for the seat; for those AIs a shim adds
+  shared AI functions newer AIs call, only where the game lacks them.
 - **Borrowed models.** A unit template with `general.modelTpId` gets that
   model's placement ghost (under its own prefab name), portrait (unless its
   pack has one), wreck and hierarchy maps.

@@ -10,16 +10,17 @@ namespace SanctuaryHud
 {
     // Drag a factory's queue tile to move that item in the queue.
     //
-    // The host has no way to reorder a queue. It takes one queue command,
-    // RequestQueueAmount (add or take away N of an item), and an item it has
-    // not seen before goes on the end. So a move rebuilds the queue from the
-    // first position that changes: everything from there to the back is taken
-    // off, last first, and put back on in the new order. Each step goes the way
-    // a queue button click does (constructionBuildQueuePanel.lua): predicted
-    // locally with ModifyBuildQueue, recorded as a pending operation, sent.
+    // The host has no way to reorder a queue. It takes two queue commands,
+    // add entries (to an item, or as a new item on the end) and remove
+    // entries by id. So a move rebuilds the queue from the first position
+    // that changes: everything from there to the back is taken off, last
+    // first, and put back on in the new order. Each step goes through the
+    // same functions a queue button click does (constructionBuildQueuePanel
+    // .lua): RemoveFromBuildQueueForUnits and AddToBuildQueueForUnits, which
+    // predict locally, record the pending operation and send.
     //
     // Moving an item to the very front takes off the item in hand, and the host
-    // cancels what the factory was building (ModifyBuildQueue calls
+    // cancels what the factory was building (RemoveFromBuildQueue calls
     // OnCancelConstruction whenever the head of the queue changes), so the new
     // front item starts at once. Anywhere further back leaves the current
     // build alone.
@@ -57,7 +58,7 @@ local ok, err = pcall(function()
 
   local function sig(q)
     local t = {}
-    for i, it in ipairs(q) do t[i] = it.tpId .. 'x' .. it.count end
+    for i, it in ipairs(q) do t[i] = it.tpId .. 'x' .. #it.entryIds end
     return table.concat(t, ',')
   end
 
@@ -78,7 +79,9 @@ local ok, err = pcall(function()
     if from <= n and to <= n then
       local old, order = {}, {}
       for i = 1, n do
-        old[i] = { tpId = q[i].tpId, count = q[i].count, id = next(q[i].queueItemIds) }
+        local ids = {}
+        for j, id in ipairs(q[i].entryIds) do ids[j] = id end
+        old[i] = { tpId = q[i].tpId, entryIds = ids }
         order[i] = old[i]
       end
       table.insert(order, to, table.remove(order, from))
@@ -86,7 +89,7 @@ local ok, err = pcall(function()
       -- Refuse an order the queue would not keep: a unit moved ahead of the
       -- factory upgrade that unlocks it is dropped by CleanUpAndMergeQueueItems.
       local sim = {}
-      for i, it in ipairs(order) do sim[i] = { tpId = it.tpId, count = it.count, queueItemIds = {} } end
+      for i, it in ipairs(order) do sim[i] = { tpId = it.tpId, entryIds = {} } end
       u.predictedBuildQueue = sim
       local buildable = true
       for i = 1, #sim do
@@ -96,17 +99,11 @@ local ok, err = pcall(function()
 
       if buildable then
         local k = math.min(from, to)
-        local function step(id, tpId, delta)
-          local newId = buildQueueUtils.ModifyBuildQueue(u, id, tpId, delta, true)
-          if delta > 0 then
-            if not newId then return end
-            id = newId
-          end
-          table.insert(u.buildQueuePendingOperations, { deltaAmount = delta, queueItemId = id, tpID = tpId })
-          BQ.RequestQueueAmount.Send({ u.id }, { id }, tpId, delta)
+        local one = { [1] = u }
+        for i = n, k, -1 do
+          BQ.RemoveFromBuildQueueForUnits(one, old[i].tpId, #old[i].entryIds, { [1] = old[i] })
         end
-        for i = n, k, -1 do step(old[i].id, old[i].tpId, -old[i].count) end
-        for i = k, n do step(-1, order[i].tpId, order[i].count) end
+        for i = k, n do BQ.AddToBuildQueueForUnits(one, order[i].tpId, #order[i].entryIds) end
       end
     end
   end

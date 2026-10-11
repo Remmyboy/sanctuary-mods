@@ -178,7 +178,7 @@ namespace SanctuaryHud
         {
             var list = new JArray();
             if (!LobbyManager.IsInLobby) return list;
-            var players = LobbyManager.CurrentState?.players;
+            var players = LobbyManager.CurrentState?.GetPlayers(includeAIs: true, includeObservers: true);
             if (players == null) return list;
             foreach (var p in players.Where(p => p != null).Take(16))
             {

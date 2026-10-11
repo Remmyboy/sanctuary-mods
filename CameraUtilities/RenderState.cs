@@ -367,7 +367,7 @@ namespace SanctuaryHud.CameraUtils
             "    if not ok2 then _G." + ErrorGlobal + " = tostring(err2) end " +
             "  end " +
             // Order lines and markers: the manager redraws them from scratch
-            // every tick in DebugDraw, which clears the last tick's prefabs
+            // every tick in UpdateOrderDraw, which clears the last tick's prefabs
             // first and then draws either every army's orders (while the
             // append key is held) or the selected units' own. So the way to
             // draw none without leaving the last tick's behind is to let its
@@ -378,16 +378,16 @@ namespace SanctuaryHud.CameraUtils
             "  local orders = Import('client/managers/orders/clientOrderManager.lua') " +
             "  local selection = Import('client/input/selectionSystem.lua') " +
             "  S.ordersWanted = S.ordersWanted or false " +
-            "  S.origDebugDraw = S.origDebugDraw or orders.DebugDraw " +
+            "  S.origUpdateOrderDraw = S.origUpdateOrderDraw or orders.UpdateOrderDraw " +
             "  S.origSetOrderDraw = S.origSetOrderDraw or orders.SetOrderDraw " +
             "  local nothingSelected = function() return {} end " +
             "  orders.SetOrderDraw = function(v) S.ordersWanted = v and true or false S.origSetOrderDraw(v) end " +
-            "  orders.DebugDraw = function(...) " +
-            "    if not S.orders then return S.origDebugDraw(...) end " +
+            "  orders.UpdateOrderDraw = function(...) " +
+            "    if not S.orders then return S.origUpdateOrderDraw(...) end " +
             "    S.origSetOrderDraw(false) " +
             "    local origSelected = selection.GetSelectedUnits " +
             "    selection.GetSelectedUnits = nothingSelected " +
-            "    local ok2, err2 = pcall(S.origDebugDraw, ...) " +
+            "    local ok2, err2 = pcall(S.origUpdateOrderDraw, ...) " +
             "    selection.GetSelectedUnits = origSelected " +
             "    S.origSetOrderDraw(S.ordersWanted) " +
             "    if not ok2 then _G." + ErrorGlobal + " = tostring(err2) end " +
@@ -396,7 +396,7 @@ namespace SanctuaryHud.CameraUtils
             "    pcall(function() Import('client/rendering/rendering.lua').RenderUpdate = S.origRenderUpdate end) " + // lua-check: ok
             "    pcall(function() " + // lua-check: ok
             "      local om = Import('client/managers/orders/clientOrderManager.lua') " +
-            "      om.DebugDraw = S.origDebugDraw " +
+            "      om.UpdateOrderDraw = S.origUpdateOrderDraw " +
             "      om.SetOrderDraw = S.origSetOrderDraw " +
             "      S.origSetOrderDraw(S.ordersWanted) " +
             "    end) " +

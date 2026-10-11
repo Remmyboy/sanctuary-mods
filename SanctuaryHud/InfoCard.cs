@@ -379,7 +379,7 @@ namespace SanctuaryHud
             "  local out = {} " +
             "  for i, item in ipairs(u.predictedBuildQueue or {}) do " +
             "    if i > 5 then break end " +
-            "    out[#out + 1] = (tonumber(item.count) or 0) .. ':' .. art(item.tpId) " +
+            "    out[#out + 1] = (item.entryIds and #item.entryIds or 0) .. ':' .. art(item.tpId) " +
             "  end " +
             "  local prog, target = -1, '' " +
             "  local t = u.buildTarget " +

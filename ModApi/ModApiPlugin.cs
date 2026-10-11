@@ -18,7 +18,7 @@ namespace Sanctuary.ModApi
     public class ModApiPlugin : BaseUnityPlugin
     {
         public const string Guid = "com.sanctuarydb.modapi";
-        public const string Version = "1.9.0";
+        public const string Version = "1.10.0";
 
         private static ManualLogSource _log;
 
@@ -117,7 +117,6 @@ namespace Sanctuary.ModApi
             GamePatches.Apply(_harmony);
             Replays.Apply(_harmony);
             FactionLobby.Apply(_harmony);
-            AiLobby.Apply(_harmony);
             LobbyManager.OnLobbyStatusChanged += OnLobbyStatusChanged;
 
             Log.LogInfo($"Mod API {Version} ready: {ModCatalog.Mods.Count} mod folder(s), " +

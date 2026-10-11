@@ -318,7 +318,7 @@ namespace SanctuaryHud.Replays
             };
             SeekTarget = tick;
             _log.LogInfo($"Replay: rewinding to tick {tick}, restarting playback.");
-            EngineLoader.isGameRestartRequested = true;
+            HostEngine.MainThreadData.isGameRestartRequested = true;
         }
 
         private static void EndSeek()
@@ -367,7 +367,7 @@ namespace SanctuaryHud.Replays
         {
             if (!Active) return;
             _restart = null;
-            EngineLoader.isGameRestartRequested = true;
+            HostEngine.MainThreadData.isGameRestartRequested = true;
         }
 
         internal static void Stop()

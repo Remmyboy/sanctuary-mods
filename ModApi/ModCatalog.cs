@@ -51,17 +51,9 @@ namespace Sanctuary.ModApi
 
         public string LuaRootPath => Manifest.LuaRoot == "." ? Folder : Path.Combine(Folder, Manifest.LuaRoot);
 
-        /// The file on disk behind one of <see cref="OverlayFiles"/>. The
-        /// same path under the lua root, except in an AI folder, whose files
-        /// are listed where they go (under AI\mods).
-        public string SourcePath(string rel)
-        {
-            var prefix = AiPrefix;
-            if (prefix != null && rel.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) rel = rel.Substring(prefix.Length);
-            return Path.Combine(LuaRootPath, rel);
-        }
-
-        internal string AiPrefix => Manifest.AiFolder.Length == 0 ? null : Manifest.AiFolder.Replace('/', '\\') + "\\";
+        /// The file on disk behind one of <see cref="OverlayFiles"/>: the same
+        /// path under the lua root.
+        public string SourcePath(string rel) => Path.Combine(LuaRootPath, rel);
 
         internal string Signature;
         /// The id mod.json gave (or the folder's), before the catalog settles
@@ -147,43 +139,22 @@ namespace Sanctuary.ModApi
             return found;
         }
 
-        /// The AI folders inside a top-level folder that holds AIs and no
-        /// Lua of its own: an AI author's release, often the game's whole AI
-        /// folder with the author's AI in its mods\. Null when the folder is
-        /// something else, such as a mod laid out like LJ\lua that ships an
-        /// AI under AI\mods among its other files. From a whole AI folder,
-        /// the copies of the game's own AIs and the shared AI files are left
-        /// out (every match uses the game's), and `note` says so.
-        internal static List<string> NestedAiFolders(string dir, out string note)
-        {
-            note = null;
-            var found = new List<string>();
-            void Walk(string d, int depth)
-            {
-                foreach (var sub in Directory.EnumerateDirectories(d))
-                {
-                    if (Path.GetFileName(sub).StartsWith(".")) continue;
-                    if (Ais.IsAiFolder(sub)) found.Add(Path.GetFullPath(sub).TrimEnd('\\', '/'));
-                    else if (depth < 3) Walk(sub, depth + 1);
-                }
-            }
-            Walk(dir, 1);
-            if (found.Count == 0) return null;
+        /// A folder with this file at its root is an AI, as the game's
+        /// AI\mods\AI-Sanctuary-Rush is.
+        private const string AiMarkerFile = "AIPlatoonFunctions.lua";
 
-            bool IsWhole(string d) => File.Exists(Path.Combine(d, "AIInit.lua")) && Directory.Exists(Path.Combine(d, "mods"));
-            var whole = IsWhole(dir) || Directory.EnumerateDirectories(dir).Any(IsWhole);
-            if (!whole)
+        /// Whether a top-level folder is an AI, or an AI author's release
+        /// holding some (often the game's whole AI folder): since game
+        /// 0.0.1.21 those go in LJ\lua\AI\mods, where the lobby's AI
+        /// settings list them, not in SanctuaryMods.
+        private static bool HoldsAis(string dir)
+        {
+            bool Walk(string d, int depth)
             {
-                var outside = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
-                    .Where(f => f.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".santp", StringComparison.OrdinalIgnoreCase))
-                    .Any(f => !found.Any(a => f.StartsWith(a + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)));
-                return outside ? null : found;
+                if (File.Exists(Path.Combine(d, AiMarkerFile))) return true;
+                return depth < 3 && Directory.EnumerateDirectories(d).Any(sub => !Path.GetFileName(sub).StartsWith(".") && Walk(sub, depth + 1));
             }
-            var gameOwn = found.Where(f => Ais.IsGameAi(Path.GetFileName(f))).ToList();
-            note = $"comes from the whole AI folder '{Path.GetFileName(dir)}'. Only the AIs of its own are used; " +
-                   (gameOwn.Count > 0 ? $"its copies of the game's AIs ({string.Join(", ", gameOwn.Select(Path.GetFileName))}) and " : "") +
-                   "its shared AI files are left out, so every match runs the game's own";
-            return found.Except(gameOwn).ToList();
+            return Walk(dir, 0);
         }
 
         // A rescan lists and stats every file of every mod, so the API asks
@@ -275,22 +246,12 @@ namespace Sanctuary.ModApi
                         // itself: take the mods from inside it, as the loader
                         // does for their DLLs.
                         var nested = File.Exists(Path.Combine(full, ModManifest.FileName)) ? null : NestedModFolders(full);
-                        // Or a folder of AIs: an AI author's release, often
-                        // the game's whole AI folder with theirs in its mods\.
-                        if ((nested == null || nested.Count == 0) && !File.Exists(Path.Combine(full, ModManifest.FileName)) && !Ais.IsAiFolder(full))
+                        // Or an AI, or a folder of them: the game's lobby
+                        // takes those from LJ\lua\AI\mods now.
+                        if ((nested == null || nested.Count == 0) && !File.Exists(Path.Combine(full, ModManifest.FileName)) && HoldsAis(full))
                         {
-                            var ais = NestedAiFolders(full, out var aiNote);
-                            if (ais != null)
-                            {
-                                foreach (var inner in ais)
-                                {
-                                    var info = Scan(inner, old);
-                                    if (info == null) continue;
-                                    if (aiNote != null) AddNote(extra, info, aiNote);
-                                    next.Add(info);
-                                }
-                                continue;
-                            }
+                            notices.Add($"{name} is an AI. Since game 0.0.1.21 AIs go in the game's LJ\\lua\\AI\\mods folder, where the lobby's AI settings list them; here it does nothing.");
+                            continue;
                         }
                         if (nested == null || nested.Count == 0)
                         {
@@ -405,12 +366,11 @@ namespace Sanctuary.ModApi
 
             var name = Path.GetFileName(dir);
             var problems = new List<string>();
-            var isAiFolder = Ais.IsAiFolder(dir);
             ModManifest manifest = null;
             var manifestPath = Path.Combine(dir, ModManifest.FileName);
             if (File.Exists(manifestPath))
             {
-                try { manifest = ModManifest.Parse(File.ReadAllText(manifestPath), name, problems, isAiFolder); }
+                try { manifest = ModManifest.Parse(File.ReadAllText(manifestPath), name, problems); }
                 catch (Exception e) { problems.Add($"mod.json unreadable ({e.Message}); treated as a folder without one"); }
             }
             if (manifest == null)
@@ -423,13 +383,6 @@ namespace Sanctuary.ModApi
                     Id = id, Name = name, Version = "", Author = "", Description = "",
                     LuaRoot = ".", Url = "", Synthesised = true, KindUnset = true,
                 };
-                // An AI folder as its author ships it: the whole folder is
-                // one AI, named after the folder as the game's AIs are.
-                if (isAiFolder)
-                {
-                    manifest.AiFolder = Ais.OverlayFolderFor(name);
-                    manifest.Ais = AiDef.ParseAll(null, problems, manifest.AiFolder, name);
-                }
             }
 
             var info = new ModInfo { Manifest = manifest, Folder = dir, Signature = signature };
@@ -437,7 +390,7 @@ namespace Sanctuary.ModApi
             var overlay = Directory.Exists(luaRoot)
                 ? files.Where(f => f.StartsWith(luaRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     .Where(f => f.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".santp", StringComparison.OrdinalIgnoreCase))
-                    .Select(f => info.AiPrefix + f.Substring(luaRoot.Length).TrimStart('\\', '/'))
+                    .Select(f => f.Substring(luaRoot.Length).TrimStart('\\', '/'))
                     .OrderBy(r => r.ToLowerInvariant(), StringComparer.Ordinal)
                     .ToList()
                 : new List<string>();
@@ -454,7 +407,7 @@ namespace Sanctuary.ModApi
             info.Packs = ModApi.Packs.Find(dir, files);
 
             info.DllsAreGameplay = !manifest.KindUnset && manifest.Kind == ModKind.Gameplay;
-            var matchContent = overlay.Count > 0 || info.Packs.Count > 0 || manifest.Factions.Count > 0 || manifest.Ais.Count > 0;
+            var matchContent = overlay.Count > 0 || info.Packs.Count > 0 || manifest.Factions.Count > 0;
             info.Kind = info.DllsAreGameplay || matchContent ? ModKind.Gameplay : ModKind.Ui;
             if (!manifest.KindUnset && manifest.Kind == ModKind.Ui && matchContent)
                 problems.Add("kind is \"ui\" but the folder has Lua, .santp or .sanpack files: those can only be picked in a lobby, so the mod is listed as gameplay");
@@ -482,7 +435,6 @@ namespace Sanctuary.ModApi
             if (overlay.Any(r => r.Replace('\\', '/').StartsWith("modapi/", StringComparison.OrdinalIgnoreCase)))
                 problems.Add("lua\\modapi\\ is where the Mod API writes its own files; files of yours there may be replaced");
             CheckFactions(info, overlay, problems);
-            CheckAis(info, overlay, problems);
             CheckReplacements(overlay, problems);
             info.PortraitIds = ModApi.Packs.PortraitIds(info.Packs);
 
@@ -519,26 +471,6 @@ namespace Sanctuary.ModApi
                 }
                 if (f.Icon.Length > 0 && !File.Exists(Path.Combine(info.Folder, f.Icon)))
                     problems.Add($"faction {f.Name}: icon '{f.Icon}' isn't in the mod folder; the lobby shows the name alone");
-            }
-        }
-
-        /// Each AI's folder has to hold an AI: its AIPlatoonFunctions.lua and
-        /// the formers and strategies the game's AI loads from it.
-        private static void CheckAis(ModInfo info, List<string> overlay, List<string> problems)
-        {
-            if (info.Manifest.Ais.Count == 0) return;
-            var files = overlay.Select(r => r.Replace('\\', '/').ToLowerInvariant()).ToList();
-            foreach (var a in info.Manifest.Ais)
-            {
-                var prefix = a.Folder.ToLowerInvariant() + "/";
-                if (!files.Contains(prefix + Ais.MarkerFile.ToLowerInvariant()))
-                {
-                    problems.Add($"AI {a.Name}: '{a.Folder}' has no {Ais.MarkerFile}, so seats given it would do nothing");
-                    continue;
-                }
-                foreach (var sub in new[] { "formers", "strategies" })
-                    if (!files.Any(f => f.StartsWith(prefix + sub + "/", StringComparison.Ordinal)))
-                        problems.Add($"AI {a.Name}: '{a.Folder}' has no {sub} folder, so it has nothing to {(sub == "formers" ? "build or do" : "plan with")}");
             }
         }
 
@@ -592,13 +524,6 @@ namespace Sanctuary.ModApi
                 if (info.Manifest.Factions.Count > 0)
                 {
                     var sig = Encoding.UTF8.GetBytes("factions\n" + string.Join("\n", info.Manifest.Factions.Select(f => f.Signature())));
-                    sha.TransformBlock(sig, 0, sig.Length, null, 0);
-                }
-                // And the AIs, which the framework routes seats to. Only
-                // for mods that have some.
-                if (info.Manifest.Ais.Count > 0)
-                {
-                    var sig = Encoding.UTF8.GetBytes("ais\n" + string.Join("\n", info.Manifest.Ais.Select(a => a.Signature())));
                     sha.TransformBlock(sig, 0, sig.Length, null, 0);
                 }
                 // So are the scripts the framework imports for it.

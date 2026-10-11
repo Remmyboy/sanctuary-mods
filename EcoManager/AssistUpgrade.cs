@@ -15,8 +15,8 @@ namespace SanctuaryHud
     //
     // Unlike the rest of these mods this one *acts*: it queues a build item.
     // It does so through the game's own client path — the same
-    // ModifyBuildQueue prediction plus UpdateQueueAmount command that the
-    // construction panel sends when you click the upgrade button — so the host
+    // AddToBuildQueueForUnits call (prediction plus RequestAddToBuildQueue) the
+    // construction panel makes when you click the upgrade button — so the host
     // validates and replicates it like any other order. No files change, so
     // the lobby's Lua hash is untouched and this stays MP-compatible; what it
     // costs you is that an assist click now spends alloy. Set
@@ -98,17 +98,11 @@ namespace SanctuaryHud
             // Half-built, or already upgrading: leave it alone.
             "      if hover.IsCompleted and not hover:IsCompleted() then return end " +
             "      if hover.IsUpgradeQueued and hover:IsUpgradeQueued() then return end " +
-            // Exactly what constructionPanel.lua does for an upgrade click:
-            // predict locally, record the pending op, tell the host.
-            "      local itemId = buildQueueUtils.ModifyBuildQueue(hover, -1, up, 1, true) " +
-            "      if not itemId then return end " +
-            "      hover.buildQueuePendingOperations = hover.buildQueuePendingOperations or {} " +
-            "      table.insert(hover.buildQueuePendingOperations, " +
-            "        { deltaAmount = 1, queueItemId = itemId, tpID = up }) " +
-            // Since the 2026-09-04 update commands live in a registry; this
-            // is the same call constructionPanel.lua makes for an upgrade click.
+            // Exactly what constructionPanel.lua does for an upgrade click
+            // (predict locally, record the pending op, tell the host), in
+            // the one call it makes since 0.0.1.21.
             "      Import('common/commands/definitions/buildQueue.lua')" +
-            ".RequestQueueAmount.Send({ hover.id }, { itemId }, up, 1) " +
+            ".AddToBuildQueueForUnits({ [1] = hover }, up, 1) " +
             // Remember the extractor, so the tick below can hold its upgrade
             // until work on it actually begins.
             "      if S.pause then " +

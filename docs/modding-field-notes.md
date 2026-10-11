@@ -45,7 +45,7 @@ Install the Mod Manager Standalone zip into the game's `engine` folder, then put
 
 ## How the game is put together
 
-Sanctuary is a Unity game whose engine is `Trebuchet.dll` (C#, Unity ECS) and whose gameplay is LuaJIT. Only the host runs the match; every other player, and every replay, rebuilds it from the host's command stream.
+Sanctuary is a Unity game whose engine is `Trebuchet.dll` (C#; its own entity engine since 0.0.1.21, Unity ECS before) and whose gameplay is LuaJIT. Only the host runs the match; every other player, and every replay, rebuilds it from the host's command stream.
 
 ```mermaid
 flowchart TB
@@ -141,7 +141,7 @@ Put your UI on the game's own uGUI canvas, not IMGUI. We started with `OnGUI` an
 
 ## Building on the Mod API
 
-Most gameplay mods need no C# at all: a folder with a `mod.json` and a `lua\` tree that mirrors the game's. The Mod API handles the lobby sync, options, match events, HUD panels, factions, AI seats and art packs. The [full reference](writing-mods.md) has every field and call; this is the map.
+Most gameplay mods need no C# at all: a folder with a `mod.json` and a `lua\` tree that mirrors the game's. The Mod API handles the lobby sync, options, match events, HUD panels, factions and art packs. The [full reference](writing-mods.md) has every field and call; this is the map.
 
 | | UI mod | Gameplay mod |
 | --- | --- | --- |
@@ -170,7 +170,7 @@ Most gameplay mods need no C# at all: a folder with a `mod.json` and a `lua\` tr
 
 **Factions:** declare them in `mod.json` and the framework adds the lobby entries. Game visuals such as shields, build beams and adjacency pick materials by the three stock faction tags, which is what `looksLike` is for. Sounds can't come from art packs; new units use the game's sounds.
 
-**AI:** AI runs on the host only. Every decision reads `Armies[i].ai.settings.modDirectory`, and the only per-AI boundary is `AI\mods\<name>\`. The loose `AI\*.lua` files are a shared engine, so an AI that edits them changes every AI in the match. The framework keeps those stock, adds the few shared functions newer AIs call, and lets the host pick an AI per seat. The AI writes its own log to `LJ\lua\AI\ai_logs`.
+**AI:** AI runs on the host only. Every decision reads `Armies[i].ai.settings.modDirectory`, and the only per-AI boundary is `AI\mods\<name>\`. The loose `AI\*.lua` files are a shared engine, so an AI that edits them changes every AI in the match. Since 0.0.1.21 the lobby itself gives each AI seat an AI from the `AI\mods` folders, with difficulty, unit cap and income settings; the framework only routes a modded faction's seats to that faction's AI. The AI writes its own log to `LJ\lua\AI\ai_logs`.
 
 **Art packs:** a `.sanpack` is a zip with the game's layout inside (`Units/<id>/...`, `UI/Sprites/Icons/Units/<id>.sansprite`). Packs go in at match load and come out after. The host reads meshes and skeletons too, so every player needs identical packs.
 
@@ -218,7 +218,7 @@ Unit stats are plain Lua tables in `LJ\lua\common\units\unitsTemplates\<id>\<id>
 **Orders and factory queues**
 
 - Every factory has repeat build on by default. A repeated item's copy shares its queue ids, so vanilla right-click on the front tile removes the copy at the back. Code that edits a queue by id must expect duplicate ids.
-- The queue's only edit is `RequestQueueAmount` (+/- N per queue item id). To reorder, remove the tail last-first and re-append. Removing the head fires `OnCancelConstruction`.
+- Since 0.0.1.21 a queue item is `{ tpId, entryIds }`, one id per queued unit. The only edits are `RequestAddToBuildQueue` (new ids, onto an item or the back) and `RequestRemoveFromBuildQueue` (by id); call them through `AddToBuildQueueForUnits` / `RemoveFromBuildQueueForUnits` in `common/commands/definitions/buildQueue.lua`, which predict locally and record the pending operation. To reorder, remove the tail last-first and re-append. Removing the head fires `OnCancelConstruction`.
 - Rally points live only on the host (`HostFactory.rallyPoint`). A client can only remember what it sent.
 - Re-placing an unstarted build order on the same spot is refused until the host's next update deletes the old ghost. Wait for the ghost to vanish client-side, then re-issue. A started build re-issues as a repair, which finishes it.
 - After issuing an order from code, call `RecalculatePendingMessages()` and `DebugDraw()` on the client order manager, or the marker flicks back for a frame.
@@ -259,7 +259,7 @@ Check both logs, every time. BepInEx's own Unity log writer often fails to start
 
 - **Replays are the best test bed** for anything client-side: they run the HUD, wrecks, builds and the economy stream exactly as a match does. A paused replay sends no economy updates, so anything gated on "in a match" may switch off while it's paused.
 - **Drive the game from a probe plugin, not synthetic input.** We use a small plugin that polls a command file and runs Lua, takes screenshots, walks the UI tree, clicks by pointer events, plays replays and starts a skirmish against the AI. Ours is [tools/Probe](../tools/Probe) with `tools/probe.ps1`.
-- Starting a skirmish from code: set an AI seat's team *before* its army. Each AI setter resends the cached army and team, so the other order silently resets the army to 0. `CanStartGame` rejects any army id above the lobby's max players.
+- Starting a skirmish from code (0.0.1.21): players join a lobby unassigned (army 0), so take a seat first (`SetMemberArmyID`), then put an AI in an empty seat with `SetMemberType(GetPlayerAtSlot(seat), PlayerType.AI)` and set its team. `CanStartGame` refuses while anyone is unassigned. `LobbyState.players` is internal: read `GetPlayers(includeAIs, includeObservers)`.
 - **Pure logic needs no game.** A net472 console can byte-load your built DLL (resolve references from `Sanctuary_Data\Managed` and `BepInEx\core`) and call its methods by reflection.
 
 **Hot-reload traps**

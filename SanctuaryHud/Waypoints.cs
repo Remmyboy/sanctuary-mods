@@ -173,8 +173,10 @@ namespace SanctuaryHud
         // table, which is where the game's callers look the function up at call
         // time: inputActions.lua calls Import(...).OnMouseLeftDown() per press,
         // clientMain.lua calls Import(...).UpdateDragFormationPreview() per
-        // frame, and a module's own bare calls (Update -> DebugDraw,
-        // DrawOrderNode -> GetPosForOrder) resolve against that same table.
+        // frame, and a module's own bare calls (Update -> UpdateOrderDraw)
+        // resolve against that same table. The order's marker position is a
+        // class method (ClientBaseOrder:GetRenderPosition), hooked through the
+        // class so classy hands it on to every order class.
         private const string InstallChunk = @"
 if not __SdbWaypoints then
   local W = { hooks = {}, drawn = {}, showAll = false }
@@ -202,6 +204,8 @@ if not __SdbWaypoints then
   local PL = Import('common/layers.lua').PlacementLayer
   local RS = Import('common/resourceSpot.lua')
   local MU = Import('common/mapUtils.lua')
+  local Water = Import('common/water.lua')
+  local CBO = Import('client/managers/orders/clientBaseOrder.lua').ClientBaseOrder
   local OT = Import('common/commonOrders.lua').OrderTasks
   local PredictedUnit = Import('client/entities/predictedUnit.lua').PredictedUnit
   local ONE = EngineClasses.float3(1, 1, 1)
@@ -218,24 +222,31 @@ if not __SdbWaypoints then
 
   -- Hooks. Each wrapper steps aside once this install is gone, so one left in
   -- place under another mod's wrapper does nothing.
-  local function hook(tbl, key, make)
-    local orig = rawget(tbl, key)
-    if type(orig) ~= 'function' then error('Waypoints: nothing to hook at ' .. key) end
-    local mine = make(orig)
-    rawset(tbl, key, mine)
-    table.insert(W.hooks, { t = tbl, k = key, orig = orig, mine = mine })
-    return orig
+  -- A class (classy) keeps its methods behind a proxy, so it is read and set
+  -- the ordinary way, which also hands the change on to its subclasses.
+  local function get(h) if h.cls then return h.t[h.k] end return rawget(h.t, h.k) end
+  local function set(h, v) if h.cls then h.t[h.k] = v else rawset(h.t, h.k, v) end end
+  local function hookAny(tbl, key, make, cls)
+    local h = { t = tbl, k = key, cls = cls }
+    h.orig = get(h)
+    if type(h.orig) ~= 'function' then error('Waypoints: nothing to hook at ' .. key) end
+    h.mine = make(h.orig)
+    set(h, h.mine)
+    table.insert(W.hooks, h)
+    return h.orig
   end
+  local function hook(tbl, key, make) return hookAny(tbl, key, make, false) end
+  local function hookMethod(cls, key, make) return hookAny(cls, key, make, true) end
   -- Put ours back where someone restored the original over it; anything else
   -- there is a wrapper around ours and is left alone.
   W.Ensure = function()
     for _, h in ipairs(W.hooks) do
-      if rawget(h.t, h.k) == h.orig then rawset(h.t, h.k, h.mine) end
+      if get(h) == h.orig then set(h, h.mine) end
     end
   end
   local function unhook()
     for _, h in ipairs(W.hooks) do
-      if rawget(h.t, h.k) == h.mine then rawset(h.t, h.k, h.orig) end
+      if get(h) == h.mine then set(h, h.orig) end
     end
   end
 
@@ -298,16 +309,10 @@ if not __SdbWaypoints then
     W.shown = {}
   end
 
-  -- The same prefabs and calls CreateOrderLine and DrawOrderNode use, with
-  -- the colours DebugDraw gives each task.
+  -- The same prefabs and calls ClientOrderRenderer's CreateOrderLine and
+  -- CreateOrderNode use, with the style it gives each task.
   local LINE_STYLE = { [OT.BUILD] = 1, [OT.REPAIR] = 1, [OT.ASSISTUNIT] = 1, [OT.RECLAIM] = 1, [OT.CAPTURE] = 1,
-                       [OT.ATTACKUNIT] = 2, [OT.ATTACKMOVE] = 2, [OT.DASH] = 3 }
-  local function nodePrefab(task)
-    if LINE_STYLE[task] == 1 then return _G.OrderNodePrefabIDOrange end
-    if LINE_STYLE[task] == 2 then return _G.OrderNodePrefabIDRed end
-    if LINE_STYLE[task] == 3 then return _G.OrderNodePrefabIDPurple end
-    return _G.OrderNodePrefabIDBlue
-  end
+                       [OT.ATTACKUNIT] = 2, [OT.ATTACKMOVE] = 2, [OT.PATROLATTACKMOVE] = 2, [OT.DASH] = 3 }
   -- Eight numbers an item: kind (1 line, 2 node), a, b (0s for a node), task.
   local function wantLine(a, b, task)
     local w, n = W.want, #W.want
@@ -320,8 +325,8 @@ if not __SdbWaypoints then
     w[n + 5], w[n + 6], w[n + 7], w[n + 8] = 0, 0, 0, task or 0
   end
   local function drawLine(a, b, task)
-    a = MU.SnapToWaterVisualMarkerHeight(copy3(a))
-    b = MU.SnapToWaterVisualMarkerHeight(copy3(b))
+    a = Water.SnapToSurface(copy3(a))
+    b = Water.SnapToSurface(copy3(b))
     local id = EngineClasses.LocalID()
     Engine.InstantiatePrefab(_G.OrderLinePrefabID, b, ONE, GetIdentityQuaternion(), id)
     Engine.SetLineRendererPointTypes(id, LinePointType.Position, LinePointType.Position, LinePointType.Position, LinePointType.Position)
@@ -331,8 +336,8 @@ if not __SdbWaypoints then
     table.insert(W.drawn, id)
   end
   local function drawNode(p, task)
-    local id = {}
-    Engine.InstantiatePrefab(nodePrefab(task), MU.SnapToWaterVisualMarkerHeight(copy3(p)), ONE, GetIdentityQuaternion(), id)
+    local _, id = Engine.InstantiatePrefab(_G.OrderNodePrefabID, Water.SnapToSurface(copy3(p)), ONE, GetIdentityQuaternion())
+    Engine.SetRendererInstanceData0(id, EngineClasses.float4(LINE_STYLE[task] or 0))
     table.insert(W.drawn, id)
   end
 
@@ -449,7 +454,7 @@ if not __SdbWaypoints then
     W.shown = want
   end
 
-  hook(COM, 'DebugDraw', function(orig) return function(...)
+  hook(COM, 'UpdateOrderDraw', function(orig) return function(...)
     local res = orig(...)
     if __SdbWaypoints == W then
       local ok, err = pcall(W.DrawExtras)
@@ -459,8 +464,8 @@ if not __SdbWaypoints then
   end end)
 
   -- While a waypoint is held its marker and lines follow the cursor: the
-  -- order manager draws every node and line through this.
-  W.origGetPos = hook(COM, 'GetPosForOrder', function(orig) return function(o, ...)
+  -- order renderer places every order's nodes and lines through this.
+  W.origGetPos = hookMethod(CBO, 'GetRenderPosition', function(orig) return function(o, ...)
     local D = W.drag
     if D and D.active and D.order == o and D.pos and __SdbWaypoints == W then return D.pos end
     return orig(o, ...)
@@ -672,7 +677,6 @@ if not __SdbWaypoints then
       local old = s.old
       if old and old.predictedBuildQueue and next(old.predictedBuildQueue) then
         pu.predictedBuildQueue = table.deepCopy(old.predictedBuildQueue)
-        pu.predictedBuildQueueIdCounter = old.predictedBuildQueueIdCounter or 0
       end
     end)
     if not ok then
@@ -694,7 +698,7 @@ if not __SdbWaypoints then
   -- before jumping to where it was dropped. Predict and draw straight away.
   local function showNow()
     pcall(COM.RecalculatePendingMessages) -- lua-check: ok
-    pcall(COM.DebugDraw) -- lua-check: ok
+    pcall(COM.UpdateOrderDraw) -- lua-check: ok
   end
 
   W.Start = function(plan)
@@ -841,7 +845,7 @@ if not __SdbWaypoints then
   W.Cancel = function()
     W.drag = nil
     clearPreview()
-    pcall(COM.DebugDraw) -- lua-check: ok
+    pcall(COM.UpdateOrderDraw) -- lua-check: ok
   end
 
   -- A left press on a waypoint marker picks it up instead of starting a
@@ -854,14 +858,14 @@ if not __SdbWaypoints then
     local ms = MC.GetMouseScreenPosition()
     local best, bestD = nil, W.grab
     for _, o in ipairs(shownOrders()) do
-      local d = pixelDist(MU.SnapToWaterVisualMarkerHeight(copy3(W.origGetPos(o))), ms)
+      local d = pixelDist(Water.SnapToSurface(copy3(W.origGetPos(o))), ms)
       if d < bestD then best, bestD = { order = o }, d end
     end
     if W.rallyOn then
       for _, f in ipairs(shownFactories()) do
         local p = rallyOf(f)
         if p then
-          local d = pixelDist(MU.SnapToWaterVisualMarkerHeight(copy3(p)), ms)
+          local d = pixelDist(Water.SnapToSurface(copy3(p)), ms)
           if d < bestD then best, bestD = { rally = f }, d end
         end
       end
@@ -911,7 +915,7 @@ if not __SdbWaypoints then
       D.pos = copy3(m)
       D.valid = MU.IsPositionOnMap(D.pos)
     end
-    COM.DebugDraw()
+    COM.UpdateOrderDraw()
   end
 
   local function sameId(a, b)
@@ -986,7 +990,7 @@ if not __SdbWaypoints then
         end
       end
     end
-    pcall(COM.DebugDraw) -- lua-check: ok
+    pcall(COM.UpdateOrderDraw) -- lua-check: ok
     return true
   end
 

@@ -10,6 +10,7 @@ using System.Text;
 using BepInEx.Configuration;
 using EM.Core;
 using EM.DOTS.Engine.Loader;
+using EM.Engine;
 using EM.Network;
 using EM.Network.Lobby;
 using EM.UI;
@@ -412,7 +413,7 @@ namespace SanctuaryHud
             _leaveOldUi = InterfaceManager.Instance;
             _leaveRequestedAt = Time.realtimeSinceStartup;
             _menuBackSince = -1f;
-            EngineLoader.isGameRestartRequested = true;
+            HostEngine.MainThreadData.isGameRestartRequested = true;
         }
 
         private bool MenuIsBack()
@@ -821,6 +822,8 @@ namespace SanctuaryHud
                     name = $"Ladder: {LobbyManager.CurrentUserName} vs {opponent}",
                     mapPath = m.Map,
                     maxPlayerCount = Math.Max(2, (int)limit),
+                    // Since 0.0.1.21 lobbies can hold observers; a ladder 1v1 has none.
+                    maxObserverCount = 0,
                     ownerName = LobbyManager.CurrentUserName,
                     type = LobbyManager.LobbyType.Public,
                 });
@@ -1048,8 +1051,8 @@ namespace SanctuaryHud
         private static LobbyPlayer FindPlayer(string steamId)
         {
             var state = LobbyManager.CurrentState;
-            if (state?.players == null || steamId == null) return null;
-            return state.players.FirstOrDefault(p => p != null && p.type == PlayerType.Player && p.id.value.ToString() == steamId);
+            if (state == null || steamId == null) return null;
+            return state.GetPlayers(includeAIs: false, includeObservers: true).FirstOrDefault(p => p != null && p.type == PlayerType.Player && p.id.value.ToString() == steamId);
         }
 
         private static bool TryFaction(string name, out Faction faction) =>
@@ -1083,10 +1086,10 @@ namespace SanctuaryHud
         private void KickStrangers(MmMatch m, string me)
         {
             var state = LobbyManager.CurrentState;
-            if (state?.players == null) return;
-            foreach (var p in state.players)
+            if (state == null) return;
+            foreach (var p in state.GetPlayers(includeAIs: false, includeObservers: true).ToList())
             {
-                if (p == null || p.type != PlayerType.Player) continue;
+                if (p == null || !p.IsHumanPlayer) continue;
                 var id = p.id.value.ToString();
                 if (id == me || id == m.Joiner) continue;
                 Logger.LogInfo($"Matchmaking: kicking {p.name}, not part of this match.");

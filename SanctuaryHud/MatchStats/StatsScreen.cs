@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using EM.DOTS.Engine.Loader;
+using EM.Engine;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
@@ -308,7 +308,7 @@ namespace SanctuaryHud
             }
             _confirmUntil = -1f;
             _log?.LogInfo("Match stats: quitting to the main menu.");
-            EngineLoader.isGameRestartRequested = true;
+            HostEngine.MainThreadData.isGameRestartRequested = true;
         }
 
         /// Anyone without a result yet: the match goes on without us.

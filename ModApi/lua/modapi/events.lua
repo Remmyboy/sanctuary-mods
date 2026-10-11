@@ -356,9 +356,12 @@ function hookDamage()
             end
         end
         wrap(HostMuzzle, "__init", function(original)
-            return function(self, muzzleBoneID, boneName, unit, ...)
+            -- Since game 0.0.1.21 a muzzle is made with its weapon, which
+            -- knows the unit; before, with the unit itself.
+            return function(self, muzzleBoneID, boneName, owner, ...)
+                local unit = type(owner) == "table" and (owner.unit or owner) or nil
                 if muzzleBoneID and unit then muzzleUnits[muzzleBoneID.index] = unit end
-                return original(self, muzzleBoneID, boneName, unit, ...)
+                return original(self, muzzleBoneID, boneName, owner, ...)
             end
         end)
 
@@ -386,7 +389,8 @@ function hookDamage()
                 return withSource(army, nil, "area", original, position, radius, damage, army, damageFriendly, ...)
             end
         end)
-        wrap(HostBeam, "Fire", function(original)
+        -- Raycast deals a beam's damage since 0.0.1.21 (Fire before it).
+        wrap(HostBeam, "Raycast", function(original)
             return function(self, ...)
                 if not damageWanted or not self.unit then return original(self, ...) end
                 return withSource(self.unit.army, self.unit, "beam", original, self, ...)

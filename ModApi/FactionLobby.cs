@@ -34,7 +34,8 @@ namespace Sanctuary.ModApi
                 // Before the game selects the player's value in it: a value
                 // with no entry would throw and stop the row updating.
                 h.Patch(AccessTools.Method(typeof(PlayerListItem), "UpdatePlayerFactionDropdown"),
-                    prefix: new HarmonyMethod(typeof(FactionLobby), nameof(RowUpdatePrefix)));
+                    prefix: new HarmonyMethod(typeof(FactionLobby), nameof(RowUpdatePrefix)),
+                    postfix: new HarmonyMethod(typeof(FactionLobby), nameof(RowUpdatePostfix)));
             }
             catch (Exception e)
             {
@@ -45,6 +46,27 @@ namespace Sanctuary.ModApi
         private static void RowAwakePostfix(PlayerListItem __instance) => Sync(__instance);
 
         private static void RowUpdatePrefix(PlayerListItem __instance) => Sync(__instance);
+
+        private static readonly AccessTools.FieldRef<PlayerListItem, TMPro.TextMeshProUGUI> FactionTextOf =
+            AccessTools.FieldRefAccess<PlayerListItem, TMPro.TextMeshProUGUI>("factionText");
+
+        /// Since game 0.0.1.21 a row the viewer can't change shows the faction
+        /// as text, the enum's name: a modded faction would read "3".
+        private static void RowUpdatePostfix(PlayerListItem __instance)
+        {
+            try
+            {
+                if (__instance == null || __instance.player == null) return;
+                var value = (int)__instance.player.faction;
+                if (value < StockCount) return;
+                var text = FactionTextOf(__instance);
+                if (text != null && text.gameObject.activeSelf) text.text = Factions.NameOf(value);
+            }
+            catch (Exception e)
+            {
+                ModApiPlugin.Log.LogWarning($"Faction label: {e.Message}");
+            }
+        }
 
         /// Makes a row's dropdown the game's three factions, then the modded
         /// ones by value. A value this machine doesn't know (a faction from a
@@ -120,7 +142,7 @@ namespace Sanctuary.ModApi
                 var was = previous.ToDictionary(f => f.Value, f => f.Identity);
                 var now = new Dictionary<string, int>();
                 foreach (var f in next) if (!now.ContainsKey(f.Identity)) now[f.Identity] = f.Value;
-                foreach (var p in state.players.ToList())
+                foreach (var p in state.GetPlayers(includeAIs: true, includeObservers: true).ToList())
                 {
                     var value = (int)p.faction;
                     if (value < StockCount || !was.TryGetValue(value, out var identity)) continue;

@@ -96,7 +96,7 @@ namespace SanctuaryHud
                 w.WaitingForMenu = true;
                 w.OldUi = InterfaceManager.Instance;
                 w.QuitAt = Time.realtimeSinceStartup;
-                EngineLoader.isGameRestartRequested = true;
+                HostEngine.MainThreadData.isGameRestartRequested = true;
             }
             _liveIn = w;
             Logger.LogInfo($"Live: watching stream {id}.");

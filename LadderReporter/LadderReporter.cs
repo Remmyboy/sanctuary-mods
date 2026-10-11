@@ -50,7 +50,7 @@ namespace SanctuaryHud
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
     // ReplayUpload.cs.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.5.0")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.5.1")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -337,7 +337,9 @@ namespace SanctuaryHud
         {
             if (!LobbyManager.IsInLobby) return null; // solo skirmishes have no lobby session
             var state = LobbyManager.CurrentState;
-            if (state?.players == null || state.players.Count == 0) return null;
+            if (state == null) return null;
+            var players = state.GetPlayers(includeAIs: true, includeObservers: true).Where(p => p != null).ToList();
+            if (players.Count == 0) return null;
 
             // Map data lands in the client VM early in loading; until it has,
             // the chunk leaves the global empty and we try again next tick.
@@ -352,7 +354,6 @@ namespace SanctuaryHud
                 Name = p.name ?? "",
             };
             bool Seated(LobbyPlayer p) => p.armyID >= 1 && p.armyID <= armyCount;
-            var players = state.players.Where(p => p != null).ToList();
             var snapshot = new MatchSnapshot
             {
                 MapName = Path.GetFileNameWithoutExtension(state.mapPath ?? ""),

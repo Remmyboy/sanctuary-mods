@@ -101,11 +101,6 @@ namespace Sanctuary.ModApi
         private static Dictionary<string, Dictionary<string, string>> _appliedOptions =
             new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 
-        /// The AI seats the overlay routes to mods' AIs, as last applied.
-        private static List<AiSeat> _appliedAis = new List<AiSeat>();
-
-        internal static IReadOnlyList<AiSeat> AppliedAis => _appliedAis;
-
         /// The option values an applied mod runs with, or null when the mod
         /// isn't applied.
         public static IReadOnlyDictionary<string, string> OptionsOf(string modId)
@@ -118,11 +113,8 @@ namespace Sanctuary.ModApi
         /// Replacements go first, a later mod's winning; then each mod's
         /// options file; then every append, in the same order, onto whatever
         /// the file has become. A mod missing from `options` runs with its
-        /// defaults. `ais` are the AI seats playing a mod's AI; a seat whose
-        /// mod isn't among `mods` plays the game's default. Returns false when
-        /// the cache doesn't exist yet.
-        internal static bool Apply(IList<ModInfo> mods, IReadOnlyDictionary<string, Dictionary<string, string>> options = null,
-            IEnumerable<AiSeat> ais = null)
+        /// defaults. Returns false when the cache doesn't exist yet.
+        internal static bool Apply(IList<ModInfo> mods, IReadOnlyDictionary<string, Dictionary<string, string>> options = null)
         {
             var cache = EM.Lua.FilesCache.pathToFileContents;
             if (cache == null) return false;
@@ -134,15 +126,13 @@ namespace Sanctuary.ModApi
                 options?.TryGetValue(m.Id, out given);
                 values[m.Id] = OptionValues.Complete(m, given);
             }
-            var seats = (ais ?? Enumerable.Empty<AiSeat>()).Where(s => s != null).ToList();
 
             // Unchanged: leave the arrays the VMs may already hold alone.
             if (_appliedToDict != null && ReferenceEquals(_appliedToDict, cache) &&
                 mods.Count == _applied.Count &&
                 mods.Zip(_applied, (a, b) => ReferenceEquals(a, b)).All(x => x) &&
                 values.Count == _appliedOptions.Count &&
-                values.All(kv => _appliedOptions.TryGetValue(kv.Key, out var was) && OptionValues.Signature(was) == OptionValues.Signature(kv.Value)) &&
-                Ais.Signature(seats) == Ais.Signature(_appliedAis))
+                values.All(kv => _appliedOptions.TryGetValue(kv.Key, out var was) && OptionValues.Signature(was) == OptionValues.Signature(kv.Value)))
             {
                 return true;
             }
@@ -160,7 +150,7 @@ namespace Sanctuary.ModApi
                 RestoreAll();
                 _appliedToDict = cache;
                 var attempt = mods.Where(m => !failed.Contains(m)).ToList();
-                var failedNow = TryApply(attempt, values, seats, cache, out files);
+                var failedNow = TryApply(attempt, values, cache, out files);
                 if (failedNow.Count == 0) { applied = attempt; break; }
                 failed.AddRange(failedNow);
             }
@@ -169,15 +159,12 @@ namespace Sanctuary.ModApi
             Factions.OnApplied(applied);
             _appliedOptions = values.Where(kv => applied.Any(m => m.Id == kv.Key))
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
-            _appliedAis = seats;
             _currentHash = SafeHash();
             var withOptions = values.Count == 0 ? "" :
                 " Options: " + string.Join("; ", values.Select(kv => kv.Key + " " + string.Join(", ", kv.Value.Select(o => o.Key + "=" + o.Value)))) + ".";
-            var withAis = seats.Count == 0 || applied.Count == 0 ? "" :
-                " AI seats: " + string.Join(", ", seats.OrderBy(s => s.army).Select(s => $"army {s.army} plays {s.mod}/{s.key}")) + ".";
             ModApiPlugin.Log.LogInfo(applied.Count == 0
                 ? $"Lua overlay: vanilla (hash {Short(_currentHash)})."
-                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.{withOptions}{withAis}");
+                : $"Lua overlay: {files} file(s) from {string.Join(", ", applied)}; Lua hash {Short(_currentHash)}.{withOptions}");
             return true;
         }
 
@@ -185,7 +172,7 @@ namespace Sanctuary.ModApi
         /// framework and options files, then appends. Returns the mods that
         /// threw part-way (their files are already in the cache).
         private static List<ModInfo> TryApply(IList<ModInfo> mods, Dictionary<string, Dictionary<string, string>> values,
-            List<AiSeat> seats, Dictionary<string, NativeArray<byte>> cache, out int files)
+            Dictionary<string, NativeArray<byte>> cache, out int files)
         {
             files = 0;
             var failed = new List<ModInfo>();
@@ -195,7 +182,7 @@ namespace Sanctuary.ModApi
                 {
                     // Between the two passes, so a mod's own appends can
                     // already Import its options and the match events.
-                    if (mods.Count > 0) files += ApplyFramework(mods, seats, cache, failed);
+                    if (mods.Count > 0) files += ApplyFramework(mods, cache, failed);
                     foreach (var mod in mods.Where(m => values.ContainsKey(m.Id)))
                     {
                         try
@@ -252,11 +239,9 @@ namespace Sanctuary.ModApi
         {
             var mods = _applied.ToList();
             var options = _appliedOptions;
-            var ais = _appliedAis;
             ForgetDict();
             _applied = new List<ModInfo>();
-            _appliedAis = new List<AiSeat>();
-            Apply(mods, options, ais);
+            Apply(mods, options);
         }
 
         private static int ApplyMod(ModInfo mod, Dictionary<string, NativeArray<byte>> cache, bool appends)
@@ -362,12 +347,9 @@ namespace Sanctuary.ModApi
                 foreach (var rel in mod.OverlayFiles)
                 {
                     if (!rel.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
-                    // An AI folder's files are listed under the folder they're overlaid at.
-                    var prefix = mod.AiPrefix;
-                    var onDisk = prefix != null && rel.StartsWith(prefix, StringComparison.Ordinal) ? rel.Substring(prefix.Length) : rel;
                     try
                     {
-                        if (File.ReadAllText(Path.Combine(mod.LuaRootPath, onDisk)).Contains(path)) return true;
+                        if (File.ReadAllText(Path.Combine(mod.LuaRootPath, rel)).Contains(path)) return true;
                     }
                     catch (Exception e)
                     {
@@ -479,30 +461,21 @@ namespace Sanctuary.ModApi
             return Encoding.UTF8.GetBytes(sb.ToString());
         }
 
-        /// AI support, whenever a picked mod brings an AI (its own, or a
-        /// faction's): the shared AI functions those AIs expect from newer
-        /// games, and when seats are given mods' AIs, the file saying which
-        /// plays which and the hook that routes them.
-        private static int ApplyAis(IList<ModInfo> mods, List<AiSeat> seats, Dictionary<string, NativeArray<byte>> cache)
+        /// AI support, whenever a picked mod's faction brings its own AI: the
+        /// shared AI functions AIs written for newer games expect. (AI seats
+        /// are the game's own since 0.0.1.21: the AI\mods folders its lobby
+        /// lists.)
+        private static int ApplyAis(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache)
         {
-            if (!mods.Any(m => m.Manifest.Ais.Count > 0 || m.Manifest.Factions.Any(f => f.Ai != null))) return 0;
+            if (!mods.Any(m => m.Manifest.Factions.Any(f => f.Ai != null))) return 0;
             var count = 0;
             foreach (var (target, resource) in Hooks("aicompat"))
                 if (AppendTo(cache, target, Resource(resource), "Mod API AI compatibility")) count++;
-            var resolved = Ais.Resolve(seats, mods);
-            if (resolved.Count == 0) return count;
-            var lua = Ais.Lua(resolved);
-            var error = LuaSyntax.Check(lua, Ais.LuaPath);
-            if (error != null) throw new InvalidOperationException($"{Ais.LuaPath} doesn't compile: {error}");
-            PutFile(cache, Ais.LuaPath.Replace('/', '\\'), lua);
-            count++;
-            foreach (var (target, resource) in Hooks("ai"))
-                if (AppendTo(cache, target, Resource(resource), "Mod API AI seat hooks")) count++;
             return count;
         }
 
         /// The framework's files, whenever any gameplay mod is applied.
-        private static int ApplyFramework(IList<ModInfo> mods, List<AiSeat> seats, Dictionary<string, NativeArray<byte>> cache, List<ModInfo> failed)
+        private static int ApplyFramework(IList<ModInfo> mods, Dictionary<string, NativeArray<byte>> cache, List<ModInfo> failed)
         {
             var count = 0;
             try
@@ -536,16 +509,10 @@ namespace Sanctuary.ModApi
                 ModApiPlugin.Log.LogError($"Mod API faction support couldn't be put in place, so the mods adding factions are left out: {e.Message}");
                 foreach (var m in mods.Where(m => m.Manifest.Factions.Count > 0 && !failed.Contains(m))) failed.Add(m);
             }
-            // After the factions, which point every AI's faction tables
-            // (mods' AIs' included) at the full list.
-            try { count += ApplyAis(mods, seats, cache); }
-            catch (Exception e)
-            {
-                // Seats would silently play the game's AI on one machine and
-                // the mod's elsewhere: leave the AI mods out instead.
-                ModApiPlugin.Log.LogError($"Mod API AI support couldn't be put in place, so the mods adding AIs are left out: {e.Message}");
-                foreach (var m in mods.Where(m => m.Manifest.Ais.Count > 0 && !failed.Contains(m))) failed.Add(m);
-            }
+            // After the factions, which point every AI's faction tables at
+            // the full list.
+            try { count += ApplyAis(mods, cache); }
+            catch (Exception e) { ModApiPlugin.Log.LogError($"Mod API AI compatibility couldn't be put in place: {e.Message}"); }
             return count;
         }
 

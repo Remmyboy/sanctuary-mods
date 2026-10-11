@@ -86,6 +86,12 @@
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\Trebuchet.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- The game's entity components carry float2/float4 fields; the unit
+         scan in shared/HudCore.cs reads them as typed structs. -->
+    <Reference Include="Unity.Mathematics">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Unity.Mathematics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

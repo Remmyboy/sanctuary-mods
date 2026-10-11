@@ -73,8 +73,8 @@ public class Probe : BaseUnityPlugin
   lobby [maxPlayers] [map]    private Steam lobby (default 2 players, The Forge)
   lan [port]                  later lobbies use the LAN backend (no Steam needed; default port 7777)
   maps [text|*]               stock maps; installed map folders matching <text> (* = all)
-  ai <slot> | army <slot> <id> | team <slot> <id> | faction <slot> <n>
-  ready | start | lobbystate | select <modId;modId> | seat <slot> <mod> <key>|default
+  ai <seat> | army <i> <seat> | team <i> <id> | faction <i> <n>   (i = roster index, join order)
+  ready | start | lobbystate | select <modId;modId>
   skirmish [map]              lobby + AI opponent + start + waitmatch, in one
   leave                       quit the match to the menu (the game's own QuitGame)
   quit                        close the game (Application.Quit)
@@ -467,8 +467,8 @@ public class Probe : BaseUnityPlugin
             }
             case "ai":
             {
-                var slot = a.Length > 0 ? int.Parse(a[0]) : 1;
-                LobbyManager.SetMemberType(LobbyManager.CurrentState.players[slot], (byte)slot, PlayerType.AI);
+                var slot = a.Length > 0 ? int.Parse(a[0]) : 2;
+                LobbyManager.SetMemberType(LobbyManager.CurrentState.GetPlayerAtSlot(slot), PlayerType.AI);
                 Out("AI at slot " + slot);
                 break;
             }
@@ -476,7 +476,7 @@ public class Probe : BaseUnityPlugin
             case "team": LobbyManager.SetMemberTeam(Player(a[0]), int.Parse(a[1])); Out("ok"); break;
             case "faction": LobbyManager.SetMemberFaction(Player(a[0]), (Faction)int.Parse(a[1])); Out("ok"); break;
             case "ready":
-                LobbyManager.SetMemberIsReady(LobbyManager.CurrentState.players.First(LobbyManager.IsLocalPlayer), true);
+                LobbyManager.SetMemberIsReady(Roster().First(LobbyManager.IsLocalPlayer), true);
                 Out("ready");
                 break;
             case "start":
@@ -488,14 +488,11 @@ public class Probe : BaseUnityPlugin
             case "select":
                 Out("SetSelection -> " + Lobby.SetSelection(arg.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)));
                 break;
-            case "seat":
-                Out("SetSeatAi -> " + (a[1] == "default" ? Lobby.SetSeatAi(int.Parse(a[0]), null, null) : Lobby.SetSeatAi(int.Parse(a[0]), a[1], a[2])));
-                break;
             case "skirmish":
-                // Each AI setter resends the cached army/team, so the team must
-                // land before the army (sanctuary-probe-skirmish memory).
-                Prepend(("lobby 2 " + arg).Trim(), "wait 3", "ai 1", "wait 3", "army 0 1", "wait 2", "team 1 2", "wait 3",
-                        "army 1 2", "wait 3", "ready", "wait 3", "lobbystate", "start", "waitmatch 240", "wait 5", "state");
+                // Since 0.0.1.21 we join unassigned: take seat 1, put an AI in
+                // seat 2 (roster index 1 once it's there), give it team 2.
+                Prepend(("lobby 2 " + arg).Trim(), "wait 3", "army 0 1", "wait 2", "ai 2", "wait 3", "team 1 2", "wait 3",
+                        "ready", "wait 3", "lobbystate", "start", "waitmatch 240", "wait 5", "state");
                 break;
 
             case "leave":
@@ -621,7 +618,7 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
         }
         catch { parts.Add("window=?"); }
         parts.Add("luaVM=" + ModLua.Ready);
-        try { parts.Add("lobby=" + (LobbyManager.CurrentState != null ? LobbyManager.CurrentState.players.Count + " players" : "none")); } catch { }
+        try { parts.Add("lobby=" + (LobbyManager.CurrentState != null ? Roster().Count + " players" : "none")); } catch { }
         try { parts.Add("replay=" + ReplayState()); } catch { }
         return string.Join("  ", parts);
     }
@@ -725,7 +722,7 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
     {
         var state = LobbyManager.CurrentState;
         if (state == null) { Out("not in a lobby"); return; }
-        Out("players: " + string.Join(", ", state.players.Select((p, i) => $"[{i}] {p.name}/{p.type} army={p.armyID} team={p.team} faction={(int)p.faction} ready={p.isReady}")));
+        Out("players: " + string.Join(", ", Roster().Select((p, i) => $"[{i}] {p.name}/{p.type} army={p.armyID} team={p.team} faction={(int)p.faction} ready={p.isReady}")));
         try { Out("mods selected: " + string.Join(", ", Lobby.Selection.Select(s => s.Id))); } catch { }
         try { Out("start blocked: " + (Lobby.StartBlockedReason ?? "no")); } catch { }
         Out($"canStart={LobbyManager.CanStartGame()} status={LobbyManager.lobbyGameStatus}");
@@ -753,7 +750,10 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
         return "Maps/" + Path.GetFileName(dir) + "/" + (file != null ? Path.GetFileName(file) : Path.GetFileName(dir) + ".sanmap");
     }
 
-    private static LobbyPlayer Player(string slot) => LobbyManager.CurrentState.players[int.Parse(slot)];
+    // Since 0.0.1.21 players join a lobby unassigned (army 0) and the list is
+    // in join order, not by seat: `army`/`team`/`faction` take a roster index.
+    private static List<LobbyPlayer> Roster() => LobbyManager.CurrentState.GetPlayers(includeAIs: true, includeObservers: true).ToList();
+    private static LobbyPlayer Player(string index) => Roster()[int.Parse(index)];
 
     private void Created(bool ok, LobbyState state, string reason)
     {
