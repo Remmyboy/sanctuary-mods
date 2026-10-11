@@ -218,6 +218,9 @@ const PLAIN = {
   'intel.visionRadius': 'vision', 'movement.speed': 'speed', 'general.displayName': 'name', tags: 'tags',
   'movement.type': 'homing', 'movement.speedMax': 'top speed', 'movement.acceleration': 'acceleration',
   'movement.preferredAltitude': 'flying height', 'movement.rotationSpeed': 'turn rate (deg/s)',
+  'visuals.effectsInstant.onDeath': 'death effect', weapons: 'death explosion',
+  'economy.maintenanceConsumption.energy': 'upkeep (energy/s)', 'intel.radarRadius': 'radar range',
+  'defence.shields.1.max': 'shield', 'defence.shields.1.regen': 'shield regen/s',
 };
 
 function fieldLabel(r) {
@@ -240,17 +243,20 @@ function show(v, field = '') {
   if (v === null || v === undefined) return '(none)';
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   if (typeof v === 'number') return num(v);
+  // A whole weapons list (a death explosion added) or a list of effects
+  if (Array.isArray(v) && v.some(x => x && typeof x === 'object')) return v.map(x => (x.category === 'DeathExplosion'
+    ? `${num(x.damage)} damage out to ${num(x.damageRadius)}` : (x.particleName || '?').replace(/^.*\//, '').replace(/\.sanvfx$/, ''))).join(', ');
   if (Array.isArray(v)) return v.length ? v.join(', ') : '(empty)';
   if (typeof v === 'object') return Object.entries(v).map(([k, x]) => `${num(x)} ${k}${/storage|cost/.test(field) ? '' : '/s'}`).join(' + ');
   return String(v);
 }
 
 // A unit's changes as "field before -> after" items, folding duplicates: health.value mirrors
-// health.max, and one "leads its target" stands for every weapon and aim controller.
+// health.max (a shield's value its max), and one "leads its target" stands for every weapon and aim controller.
 function itemsOf(rs) {
   const items = [];
   for (const r of rs) {
-    if (r.field === 'defence.health.value') continue;
+    if (r.field === 'defence.health.value' || /^defence\.shields\.\d+\.value$/.test(r.field)) continue;
     let text;
     if (r.field === 'tags') {
       const gone = (r.before || []).filter(t => !(r.after || []).includes(t));

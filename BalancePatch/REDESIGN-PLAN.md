@@ -60,7 +60,7 @@ trusting the sim with anything else.
 | Overflow above storage is lost | `economy.lua:196-200` |
 | Start: the commander adds its storage and gives half of it (250 A / 2500 E). `economy.initial` is ignored | `host/units/unitsClasses/unitsDefault.lua:1394-1403` |
 | Commander death destroys the whole army (assassination) | `unitsDefault.lua:1409-1420` |
-| Adjacency discounts stack additively with **no floor**: discount = 1 + Σ extra. Each adjacent extractor gives factories and engineering stations −10% alloys; each T1/T2/T3 generator gives −2.5/−10/−15% energy. Seven adjacent T3 generators would make a factory's energy cost negative (not tested in game) | `host/systems/buffs.lua:36-58, 85-95`, `host/systems/adjacencyBuffs.lua:3-50` |
+| Adjacency discounts stack additively with **no floor**: discount = 1 + Σ extra. Each adjacent extractor gives factories and engineering stations −10% alloys; each T1/T2/T3 generator gives −2.5/−10/−15% energy. Seven adjacent T3 generators would make a factory's energy cost negative (not tested in game). **None of it is live (2026-10-10):** the buffs are applied only by HostStructure:OnAdjacentTo, and nothing in the game's Lua, C# or native DLLs calls it; the user confirms there is no adjacency bonus in game. The sim applies it only with rules.adjacency | `host/systems/buffs.lua:36-58, 85-95`, `host/systems/adjacencyBuffs.lua:3-50` |
 | Adjacency data exists for T1/T2/T3 *Alloy Fabricators*, but only a T3 Alloy Furnace unit exists: a hint that the devs planned cheaper converters | `adjacencyBuffs.lua:93-113` |
 | Wrecks: half the unit's alloys, no energy, harvest time = build time; only from units at least 50% built and not overkilled. Generated from the *patched* template | `common/systems/templateLoader.lua:450-458, 262-291`; `unitsBaseClass.lua:891-907` |
 | Reclaim exists (a host order class) | `host/managers/orders/orderClasses/hostReclaimOrder.lua` |
@@ -672,16 +672,33 @@ and rack timing): T1 1.68, T2 0.37-0.62, T3 Ravager 0.22. T2 raised to 0.65
 (health and damage together); the Chosen T3 to 7000 health (the user's cap)
 and 2.24x damage, about 0.3.
 
-**0.2.8 (unreleased, 2026-10-10, the user's call from a Fields of Isis game):**
+**0.2.8 (2026-10-10, the user's call from a Fields of Isis game):**
 the T2 factory upgrade at 1500 alloys came too late to matter: by the time
 it was paid for the game was already won with T1 tanks. Now 1000 alloys and
 10000 energy over 90 s (build time 900, was 800; a T1 factory's build power
 is 10): about 11 alloys and 111 energy a second while it runs, was 19 and
-188. The user accepts an earlier T2 rush. The sim (`diff 0.2.7 0.2.8`)
-moves the fastest T2 factory from 4:04 to 2:45 on both reference maps
-(the 500-alloy start bank pays half of it), facing 2 spam units alive
-instead of 6; 512 alloy income at 15:00 rises 42 -> 46 with the assumed
-9:00 T2 factory. Nothing else in the pacing table moves.
+188. The user accepts an earlier T2 rush. Released first with the sim still
+applying adjacency, which the game doesn't (see the table above): without it
+(`diff 0.2.7 0.2.8`) the fastest T2 factory moves from 4:57 to 3:22 (256)
+and 3:28 (512), facing 3 spam units alive (was 9-12). That rush is the
+commander taking 3 extractors in the first 35 s (alloy income 3 -> 6),
+then a factory that upgrades at once, generators built mid-upgrade when
+energy runs out, no engineers or units. The 500-alloy start bank goes on
+the extractors and the factory, not the upgrade.
+
+**0.2.9 (unreleased, 2026-10-10, the user's call):** the Crucible (ugs4621,
+the Guardian T4 generator) was far too easy to get. It makes 500 alloys and
+50000 energy a second (about 33 T3 extractors and 20 T3 generators), and at
+50000 alloys + 500000 energy it paid back its alloys in 100 s. The user
+wants it to stay super OP once built but take much longer: cost and build
+time 3x (150000 alloys + 1500000 energy, build time 150000; my pick of
+factor). It had no death explosion; now 50000 damage out to 40, friendly
+fire on (commander 5000 / 15, the Guardian T5 air unit 50000 / 20). Damage
+is full across the radius (CollisionUpdate.ProcessAreaDamage, no falloff).
+The game plays one onDeath effect at scale 1, so a client append
+(lua/append/client/units/unitsClasses/unitsBaseClass.lua) adds the
+template's effect at 3x in the middle and two rings at 2x out to the blast's
+edge for any unit whose death explosion reaches 30. Not seen in game.
 
 **0.2.9 (2026-10-11, game 0.1.21.1, Steam build 25856019):** the game patch
 moved 19 fields this patch guards with `expect`, so 0.2.8 skipped them in game.
@@ -709,6 +726,35 @@ shells 75 x 1.5 x 2 = 225, Guardian T2 AA 240, AA missiles 75). The user's calls
 `diff 0.2.8 0.2.9` moves nothing in the pacing table (the sim doesn't reach T2
 power or air). The LuaJIT dump applies every change with none skipped, and
 parity against the export is 358 templates, 0 different.
+
+**0.2.9, second pass (2026-10-11, the user's calls):** the developers' own
+0.1.21.1 anti-air pass (T3 fighters lead, missiles at 50, doubled pitch
+speeds, splash on T1 AA) left much of the Air section resting on numbers that
+moved: the EDA and Chosen T3 tower missiles already reach their range (speed
+50 for 5 s and 2 s), the Triode's splash that justified half damage is 3 (was
+5), and the Aerofoil/Contrail buffs were measured before the fighters changed.
+So:
+
+- The Air section is gone; air plays as the game has it. The 0.2.6 aim
+  ("AA hits the majority of the time") is unmeasured against the game's new
+  anti-air. The T3 bomb lifetime fix is dropped too: the user thinks the game's
+  flight patterns fixed it, to test. The T1 bomb fix (Inertia) stays.
+- Aircraft T1-T3 cost 40 energy per alloy (EDA/Guardian 20, Chosen 10; the
+  0.2.8-0.2.9 Chosen doubling also hit the Typhoon and Cleric, already 20, and
+  made them 40 against 20). This patch's generators make 2x, so 40 is the
+  game's energy burden in generator time; land stays at 6. T4/T5 aircraft keep
+  the game's 10 (not re-priced like T4 land; open).
+- Alloy Furnace upkeep 2000 (was 1000). My arithmetic, alloys of furnace plus
+  its share of a T3 generator per alloy a second: game 382, 0.2.9 at 1000 302,
+  now 404 (T3 extractor upgrade 200).
+- Shields, "meet in the middle": T2 300 alloys / 6000 / regen 60 / upkeep 200
+  (was 150 / 10000 / 100 / 100: 67 health per alloy, ~4x a T3 tank's 15.8);
+  T3 1000 / 15000 / 110 / 500 (was 600 / 20000 / 150 / 250). Build times
+  follow cost. T2 upkeep 200 is a third of a 600 generator, as 100 was of 300.
+- The Crucible change (above) merged in.
+
+None of it played. The sim doesn't model air, furnaces or shields, so the
+pacing table doesn't move.
 
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 

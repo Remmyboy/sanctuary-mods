@@ -15,7 +15,8 @@
 //   income from extractors, generators and the commander is never throttled ("generation")
 //   storage: the commander's, plus factory energy storage; start with startShare of it
 //     (host/units/unitsClasses/unitsDefault.lua HostCommander:OnStopBeingBuilt gives half)
-//   adjacency discount = 1 + sum of extras, per resource (host/systems/buffs.lua calculateValue)
+//   adjacency discount = 1 + sum of extras, per resource (host/systems/buffs.lua calculateValue),
+//     only with rules.adjacency: the game never applies it (see discountFor)
 //   upgrades charge the target's full cost and build time; the old structure keeps producing
 //     until replaced (assumed: nothing in UpgradeBehaviorThread disables it)
 // Not modelled: combat, raids, reclaim, storage structures, terrain and pathing (straight
@@ -136,7 +137,10 @@ export function simulate({ T, adjacency = {}, faction = 'e', map, spawn, enemies
 
   function discountFor(builder) {
     // A factory's adjacency: each touching extractor -10% alloys, each generator -2.5/-10/-15% energy
-    // (values from the dump's adjacency buffs).
+    // (values from the dump's adjacency buffs). Off unless rules.adjacency: in 0.0.1.20 nothing
+    // calls HostStructure:OnAdjacentTo (host/units/unitsClasses/unitsDefault.lua), the only thing
+    // that applies these buffs - no Lua, game C# or native DLL names it (checked 2026-10-10).
+    if (!rules.adjacency) return null;
     const s = builder.structure;
     if (!s || s.kind !== 'factory') return null;
     const adj = adjacency;
