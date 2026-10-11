@@ -16,41 +16,26 @@ Sections = {
         key = "fixes",
         changes = {
             {
-                why = "The EDA T3 anti-air fighter's second launcher fired at land and sea. It now fires at aircraft like the first, which also puts its anti-air damage level with the other factions' T3 fighters.",
-                ids = { "uea3201" },
-                expect = { ["weapons.2.layerTargetLimits"] = { "Land", "WaterSurface" } },
-                set = { ["weapons.2.layerTargetLimits"] = { "Air", "LandedAir" } },
-            },
-            {
                 why = "Bombs lived 2 seconds at speed 20, about 40 range, while bombers release from up to 60 (T1) or 90 (T3): the EDA T3 bomber fired all the time and never hit anything. They now live long enough to land.",
                 tags = { "BOMBER", "TECH3" },
                 expect = { ["weapons.1.projectileLifetime"] = 2 },
                 set = { ["weapons.1.projectileLifetime"] = 5 },
             },
             {
-                why = "Likewise for T1 bombs.",
+                why = "Likewise for T1 bombs. Not the Chosen Comet, which the game reworked in 0.1.21.1 to drop its bomb from 10.",
                 tags = { "BOMBER", "TECH1" },
                 notTags = { "EDA" },
+                notIds = { "uca1001" },
                 expect = { ["weapons.1.projectileLifetime"] = 2 },
                 set = { ["weapons.1.projectileLifetime"] = 4 },
             },
             {
-                why = "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now, rests level, and turns the model's real yaw bone (it named Turret01, which the model doesn't have).",
+                why = "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)",
                 ids = { "ucs2001" },
-                expect = { ["weapons.1.aimControllers.1.yawBone"] = "Turret01", ["weapons.1.aimControllers.1.pitchMax"] = 45, ["weapons.1.aimControllers.1.defaultPitchAdjustment"] = 0 },
+                expect = { ["weapons.1.aimControllers.1.yawBone"] = "Turret01_Yaw01", ["weapons.1.aimControllers.1.pitchMax"] = 55, ["weapons.1.aimControllers.1.defaultPitchAdjustment"] = 0 },
                 set = {
-                    ["weapons.1.aimControllers.1.yawBone"] = "Turret01_Yaw01",
                     ["weapons.1.aimControllers.1.pitchMax"] = 100,
                     ["weapons.1.aimControllers.1.defaultPitchAdjustment"] = 55,
-                },
-            },
-            {
-                why = "The Guardian TALEN gunship is built by T3 air factories at T3 cost but was tagged and labelled tier 1.",
-                ids = { "uga3011" },
-                expect = { ["general.displayName"] = "Tier 1: Gunship" },
-                set = {
-                    ["general.displayName"] = "Tier 3: Gunship",
-                    tags = { "AIR", "ANTI_SURFACE", "BUILDABLE_BY_T3_FACTORY", "DIRECT_FIRE", "GUARD", "GUNSHIP", "MOBILE", "TECH3" },
                 },
             },
         },
@@ -86,16 +71,16 @@ Sections = {
                 set = { ["defence.health.max"] = 500, ["defence.health.value"] = 500 },
             },
             {
-                why = "T2 generators give 1.5x the energy per cost of T1 ones (were equal): 600 a second.",
+                why = "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.1.21.1, was 200).",
                 idPattern = "^u.s2611$",
-                expect = { ["economy.production.energy"] = 200 },
+                expect = { ["economy.production.energy"] = 300 },
                 set = { ["economy.production.energy"] = 600 },
             },
             {
-                why = "T3 generators make 2500 energy a second (were 1000) and cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): about 2.25x the energy per cost of T1 ones (were equal), in a smaller step that feeds two or three Alloy Furnaces.",
+                why = "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that feeds two or three Alloy Furnaces.",
                 idPattern = "^u.s3611$",
-                expect = { ["economy.production.energy"] = 1000, ["economy.cost"] = { alloys = 5000, energy = 50000 }, ["economy.buildTime"] = 5000 },
-                set = { ["economy.production.energy"] = 2500, ["economy.cost"] = { alloys = 2800, energy = 28000 }, ["economy.buildTime"] = 2800 },
+                expect = { ["economy.production.energy"] = 2750, ["economy.cost"] = { alloys = 5000, energy = 50000 }, ["economy.buildTime"] = 5000 },
+                set = { ["economy.cost"] = { alloys = 2800, energy = 28000 }, ["economy.buildTime"] = 2800 },
             },
             {
                 why = "T3 extractors make 15 alloys a second (were 10): the upgrade (2000 alloys) pays back in 200 s instead of 400 s, so T3 economy pays for itself inside a 20-30 minute game.",
@@ -255,9 +240,9 @@ Sections = {
                 set = { ["weapons.*.aimControllers.*.leadTarget"] = true },
             },
             {
-                why = "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%. Not the beams (the EDA T2 mobile anti-air and T2 tower, the Guardian T1 tower and mobile anti-air): a beam hits at once, so aiming ahead of a crossing plane misses it (the EDA Komodo fell from 71% to 1% leading; 0.1.0-0.2.5 had the other three leading by mistake).",
+                why = "Anti-air weapons lead their targets. The T3 fighters, the T3 anti-air towers and others shot at where an aircraft was, so a moving plane was mostly missed: against weaving T1 bombers the T3 fighters went from 23-58% to 54-78%, the EDA T3 tower from 39% to 50%. Not the EDA T2 mobile anti-air (Komodo): leading, its shells fell from 71% to 1%. Not the beams (the EDA T2 mobile anti-air and T2 tower, the Guardian T1 tower and mobile anti-air, and since game 0.1.21.1 the Guardian T3 tower): a beam hits at once, so aiming ahead of a crossing plane misses it (the EDA Komodo fell from 71% to 1% leading; 0.1.0-0.2.5 had the other three leading by mistake).",
                 where = { rangeRingType = "AntiAir" },
-                notIds = { "uel2201", "ues2201", "ugl1201", "ugs1201" },
+                notIds = { "uel2201", "ues2201", "ugl1201", "ugs1201", "ugs3201" },
                 set = { ["weapons.*.aimControllers.*.leadTarget"] = true },
             },
             {
@@ -282,23 +267,10 @@ Sections = {
                 set = { ["weapons.*.projectileLifetime"] = 4 },
             },
             {
-                why = "The Guardian T3 anti-air tower aimed its slow, falling shells (speed 20) straight at its target and hit nothing: 0% on weaving T1 bombers, 3% on a hovering gunship. It fires faster shells and aims for their fall: 18% and 13%. Still the weakest T3 anti-air tower.",
-                ids = { "ugs3201" },
-                where = { rangeRingType = "AntiAir" },
-                expect = { ["weapons.*.aimControllers.*.projectileSpeed"] = 20, ["weapons.*.aimControllers.*.solverType"] = "NoArc" },
-                set = { ["weapons.*.aimControllers.*.projectileSpeed"] = 40, ["weapons.*.aimControllers.*.solverType"] = "LowArc" },
-            },
-            {
-                why = "T1 fighters' bullets lived exactly long enough to reach their range (0.5 s at speed 50 for 25), so anything pulling away outran them.",
-                tags = { "FIGHTER", "TECH1" },
-                expect = { ["weapons.1.projectileLifetime"] = 0.5 },
-                set = { ["weapons.*.projectileLifetime"] = 0.75 },
-            },
-            {
-                why = "The Guardian T1 fighter (Aerofoil) was the slowest fighter (12 against 15) and lost every fight with the other T1 fighters without killing any: as fast as them, and more damage.",
+                why = "The Guardian T1 fighter (Aerofoil) lost every fight with the other T1 fighters without killing any: more damage. (Game 0.1.21.1 made it as fast as them, 15, which this patch used to do.)",
                 ids = { "uga1201" },
-                expect = { ["movement.speed"] = 12, ["weapons.1.damage"] = 25 },
-                set = { ["movement.speed"] = 15, ["weapons.*.damage"] = 40 },
+                expect = { ["weapons.1.damage"] = 25 },
+                set = { ["weapons.*.damage"] = 40 },
             },
             {
                 why = "The Guardian T3 fighter (Contrail) lost to both other T3 fighters even leading its shots: more damage per shot.",
@@ -307,9 +279,10 @@ Sections = {
                 set = { ["weapons.1.damage"] = 650 },
             },
             {
-                why = "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty).",
+                why = "Bombs with no splash do nothing when they land beside a target: T1 bombs get some (the EDA one already had plenty, and game 0.1.21.1 gave the Chosen Comet 1.5).",
                 tags = { "BOMBER", "TECH1" },
                 notTags = { "EDA" },
+                notIds = { "uca1001" },
                 expect = { ["weapons.1.damageRadius"] = 0 },
                 set = { ["weapons.1.damageRadius"] = 3 },
             },
@@ -320,17 +293,17 @@ Sections = {
                 set = { ["weapons.1.damageRadius"] = 4 },
             },
             {
-                why = "Anti-air should hit most of the time against a plane that is being moved around, not miss most of it. Projectiles hit by a zero-width ray each tick against the aircraft's box, so a projectile's own size never counts; what decides it is how long the shot is in the air, whether it falls, and the size of the box. Anti-air shells and missiles leave 1.5x as fast (each weapon's aim speed; beams unchanged). In an offline model of every anti-air weapon against five aircraft (my model of the game's shot and hit code, not played), this with the changes below takes the average hit rate from 27% to about 62% against aircraft moved around every 1-2 s, and from 38% to 71% against ones flying straight.",
+                why = "Anti-air should hit most of the time against a plane that is being moved around, not miss most of it. Projectiles hit by a zero-width ray each tick against the aircraft's box, so a projectile's own size never counts; what decides it is how long the shot is in the air, whether it falls, and the size of the box. Anti-air shells and missiles leave 1.5x as fast (each weapon's aim speed; beams unchanged). Not the T3 fighters: game 0.1.21.1 raised theirs past what this patch did (Chosen and Guardian 75, EDA 35; were 20). Not the Guardian T3 tower, a beam since 0.1.21.1. In an offline model of every anti-air weapon against five aircraft (my model of the game's shot and hit code, not played), this with the changes below takes the average hit rate from 27% to about 62% against aircraft moved around every 1-2 s, and from 38% to 71% against ones flying straight.",
                 where = { rangeRingType = "AntiAir" },
+                notIds = { "uca3201", "uea3201", "uga3201", "ugs3201" },
                 scale = { ["weapons.*.aimControllers.*.projectileSpeed"] = 1.5 },
             },
             {
-                why = "Anti-air missiles fly 1.5x as fast at most (EDA 30, was 20; Chosen 37.5, was 25) and turn twice as fast (120 degrees a second, was 60), so a dodging plane doesn't outturn them. The EDA T3 air scout shares the EDA missile.",
+                why = "The Chosen anti-air missile turns twice as fast again (120 degrees a second), so a dodging plane doesn't outturn it. Game 0.1.21.1 raised both anti-air missiles' top speed to 50 (Chosen was 25, EDA 20) and the EDA one's turn rate to 180, past what this patch did, so those are left alone.",
                 kind = "projectile",
-                ids = { "pea341", "pca341" },
-                expect = { ["movement.rotationSpeed"] = 60 },
+                ids = { "pca341" },
+                expect = { ["movement.rotationSpeed"] = 60, ["movement.speedMax"] = 50 },
                 set = { ["movement.rotationSpeed"] = 120 },
-                scale = { ["movement.speedMax"] = 1.5 },
             },
             {
                 why = "Anti-air shells fired straight (no arc) fell 1 unit per second squared and the aim doesn't allow for it, so slow shells passed under small aircraft. Shells only anti-air fires now fly straight (the Guardian T1 and T3 fighters share theirs with bombers and keep the fall).",
@@ -344,16 +317,10 @@ Sections = {
                 scale = { ["collisionInfo.collisionSize.x"] = 1.5, ["collisionInfo.collisionSize.y"] = 1.5, ["collisionInfo.collisionSize.z"] = 1.5 },
             },
             {
-                why = "The slowest anti-air shells (T2 towers and mobile anti-air, the Chosen and Guardian T3 fighters, the Guardian T3 tower, the Chosen big bot) fly twice as fast again, and lose their spread (up to 3 degrees, 1-3 units off at range 50, wider than the hitbox): in the same model they went from 23-49% to 59-72% against moved aircraft.",
-                ids = { "ucs2201", "ucl2201", "ugl2201", "ugs2201", "ugs3201", "uga3201", "uca3201", "ucl4004" },
+                why = "The slowest anti-air shells (T2 towers and mobile anti-air, the Chosen big bot) fly twice as fast again, and lose their spread (up to 3 degrees, 1-3 units off at range 50, wider than the hitbox): in the same model they went from 23-49% to 59-72% against moved aircraft. The Guardian T2 tower's (40 since game 0.1.21.1, was 20) come to 120 in all.",
+                ids = { "ucs2201", "ucl2201", "ugl2201", "ugs2201", "ucl4004" },
                 where = { rangeRingType = "AntiAir" },
                 set = { ["weapons.*.firingRandomness"] = 0 },
-                scale = { ["weapons.*.aimControllers.*.projectileSpeed"] = 2 },
-            },
-            {
-                why = "The Guardian T2 anti-air tower's shells (20 in the game) need twice as much again to reach most of its 50 range in time: 120 in all (12% to 69% in the model).",
-                ids = { "ugs2201" },
-                where = { rangeRingType = "AntiAir" },
                 scale = { ["weapons.*.aimControllers.*.projectileSpeed"] = 2 },
             },
             {
@@ -368,10 +335,16 @@ Sections = {
         key = "defences",
         changes = {
             {
-                why = "T1 point defences saw 15 but shot 25, so T1 tanks (range 20) could kill one from outside its sight. They now see their full range: still more than a tank's, less than T1 artillery's 30.",
-                idPattern = "^u.s1001$",
-                expect = { ["intel.visionRadius"] = 15 },
-                set = { ["intel.visionRadius"] = 25 },
+                why = "T1 point defences see less than they shoot (since game 0.1.21.1 the Chosen one sees 20, the others 22, and all shoot 27), so T1 tanks (range 20) can get shots in from outside their sight. They now see their full range: still more than a tank's, less than T1 artillery's 30.",
+                ids = { "ucs1001" },
+                expect = { ["intel.visionRadius"] = 20, ["weapons.1.rangeMax"] = 27 },
+                set = { ["intel.visionRadius"] = 27 },
+            },
+            {
+                why = "Likewise for the EDA and Guardian ones.",
+                ids = { "ues1001", "ugs1001" },
+                expect = { ["intel.visionRadius"] = 22, ["weapons.1.rangeMax"] = 27 },
+                set = { ["intel.visionRadius"] = 27 },
             },
             {
                 why = "With nothing like walls to hide behind, a T1 point defence died to its own value in T1 tanks while killing half of them. More health makes it a real answer to T1 tanks and an early commander, while T1 artillery still outranges it.",
@@ -508,8 +481,8 @@ Sections = {
                 set = { ["movement.speed"] = 2.75, ["movement.acceleration"] = 2.75, ["movement.rotationSpeed"] = 60 },
             },
             {
-                why = "Long-range and heaviest T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery, the Chosen Tripod (100 range) and the Chosen big bot (100000 health, the most firepower). They stay the slowest, as snipers and artillery should.",
-                ids = { "uel4001", "ugl4011", "ucl4002", "ucl4004" },
+                why = "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)",
+                ids = { "uel4001", "ugl4011", "ucl4002" },
                 expect = { ["movement.speed"] = 2 },
                 set = { ["movement.speed"] = 2.25, ["movement.acceleration"] = 2.25, ["movement.rotationSpeed"] = 50 },
             },
