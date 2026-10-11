@@ -683,6 +683,33 @@ moves the fastest T2 factory from 4:04 to 2:45 on both reference maps
 instead of 6; 512 alloy income at 15:00 rises 42 -> 46 with the assumed
 9:00 T2 factory. Nothing else in the pacing table moves.
 
+**0.2.9 (2026-10-11, game 0.1.21.1, Steam build 25856019):** the game patch
+moved 19 fields this patch guards with `expect`, so 0.2.8 skipped them in game.
+Several unguarded scales also stacked on the developers' own buffs (T3 fighter
+shells 75 x 1.5 x 2 = 225, Guardian T2 AA 240, AA missiles 75). The user's calls:
+
+- The game now does it, so the change is dropped: Peregrine second launcher
+  targets air, TALEN is T3, Aerofoil speed 15, T1 fighter bullets live 0.8 s
+  (patch 0.75), anti-air missile top speed 50 (patch 37.5 / 30), EDA missile
+  turn rate 180 (patch 120). The Redoubt's yaw bone is fixed in the game; its
+  pitch is not (55 only reaches level), so pitchMax 100 and rest 55 stay.
+- T2 generators stay 600 (game 300, was 200). T3 generators take the game's
+  2750 (patch had 2500) but keep the 2800-alloy cost cut: about 2.5x a T1's
+  energy per cost, not 2.25x.
+- AA speeds are capped at what the patch was aiming for: no scaling on the T3
+  fighters (game 75 / 35, patch aimed for 60 / 30), the Guardian T2 tower comes
+  to 120 (40 x 1.5 x 2). The Guardian T3 tower (Engraver) is a continuous beam
+  now, so it no longer leads, gets no shell fix and no aim-speed scale.
+- T1 point defences see 27, their new range (game 20/22, range 25 -> 27).
+- The game reworked the Comet (300 damage, 1.5 splash, range 10, 4 s) and
+  slowed the Chosen big bot to 1. Both are left as the game has them: no splash
+  or bomb lifetime on the Comet, and the big bot is out of the T4 speed change
+  (its cost, health and damage changes stay).
+
+`diff 0.2.8 0.2.9` moves nothing in the pacing table (the sim doesn't reach T2
+power or air). The LuaJIT dump applies every change with none skipped, and
+parity against the export is 358 templates, 0 different.
+
 **Playtest asks:** a 1v1 on a 512 map (and a 256 if there's time). Watch:
 
 - when you first upgrade an extractor and a factory, and why;

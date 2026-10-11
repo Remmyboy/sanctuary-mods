@@ -13,5 +13,6 @@
   "0.2.5": { "changes": "rulesets/0.2.5.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.5: radar costs" },
   "0.2.6": { "changes": "rulesets/0.2.6.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.6: AA hits, T4 0.8x" },
   "0.2.7": { "changes": "rulesets/0.2.7.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.7: T4s re-scored, PDs, Nitro, Guardian T2 AA" },
-  "0.2.8": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod" }
+  "0.2.8": { "changes": "rulesets/0.2.8.lua", "options": "defaults", "rules": { "startShare": 1 }, "about": "Released 0.2.8: T2 factory upgrade 1000 over 90 s (made for game 0.0.1.20)" },
+  "0.2.9": { "options": "defaults", "rules": { "startShare": 1 }, "about": "The redesign as it stands in the mod" }
 }
