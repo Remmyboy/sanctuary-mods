@@ -53,7 +53,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.3) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
 | [UnitRestrictions](UnitRestrictions/) | [**0.1.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/UnitRestrictions-0.1.2) | Gameplay mod: the host takes units out of the match: land, air, naval or experimentals as a whole, a kind of unit for every faction, or one faction's unit alone |
-| [BalancePatch](BalancePatch/) | [**0.2.8**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.8) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery and bombers lead their targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
+| [BalancePatch](BalancePatch/) | [**0.2.9**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BalancePatch-0.2.9) | Gameplay mod: a rebalance designed from target match pacing. Territory pays, the commander starts the game rather than carrying it, T2 has to be paid for, land costs alloys and air costs energy, engineers can be raided, artillery leads its targets, and fixes such as one broken bomber freezing targeting and aircraft firing from inside shields |
 | [MapLocalFiles](MapLocalFiles/) | — | Lets Lua read files from the loaded map's folder |
 | [ModLoader](ModLoader/) | [**1.5.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Loads and hot-reloads every mod above from `SanctuaryMods`; ships with the Mod Manager |
 | [ModApi](ModApi/) | [**1.10.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Ships with the Mod Manager. The framework's stable core: gameplay mods applied per lobby, the Start check, modded replays, art packs, factions, Lua panels for gameplay mods (no DLL needed), unit-list options with a picker, and the API mods are built on |
@@ -1741,35 +1741,33 @@ Each section is a lobby option, all on by default:
 - **Fixes:** a weapon with no muzzles (the Guardian T1 and T3 bombers, among
   others) no longer stops every other unit's targeting; an aircraft's shots
   from inside an enemy shield's bubble hit the shield, not what's under it;
-  the Chosen T2 point defence and the EDA T3 anti-air fighter no longer shoot
-  the ground; bombs live long enough to land (the EDA T3 bomber fired all game
-  and never hit); the Guardian TALEN gunship is labelled tier 3.
+  the Chosen T2 point defence can raise its barrel above level, so it no
+  longer shoots the ground; T1 bombs live long enough to land.
 - **Economy:** commanders make 3 alloys and 30 energy a second (were 5 and 50)
   and you start with full storage, 500 alloys and 5000 energy (was half), so
   income comes from taking the map. T2 and T3 extractors make 5 and 15 alloys
-  (were 4 and 10); generators make 20, 600 and 2500 energy (were 10, 200 and
-  1000), and T3 ones cost 2800 alloys (were 5000). Factories cost 200 alloys
+  (were 4 and 10); T1 and T2 generators make 20 and 600 energy (were 10 and
+  300), and T3 ones cost 2800 alloys (were 5000). Alloy Furnaces use 2000
+  energy a second (were 1000). The Guardian Crucible costs 3x as much and its
+  death explosion does 50000 damage out to 40. Factories cost 200 alloys
   (were 150); upgrading one to T2 costs 1000 (was 500) over 90 s (was 80)
   and to T3 4000 (was 2000). T3 tanks and the Guardian T3 raider cost 30% less. T2 radar uses 250
   energy a second (was 150); T3 radar costs 2800 alloys and 1400 energy a
   second (were 700 and 350), and the EDA and Chosen ones see 750 and 850 (were
   450 and 550). Wrecks reclaim 3x as fast and last 6 minutes (were 3). Land
-  and naval units cost 6 energy per alloy (were 10), Chosen aircraft as much
-  energy as everyone else's, and engineers have less than half their health,
-  so raids on them work.
+  and naval units cost 6 energy per alloy (were 10) and T1-T3 aircraft 40
+  (were 20, Chosen 10), and engineers have less than half their health, so
+  raids on them work.
 - **Commanders:** the EDA and Guardian commanders' missiles fly at once and
   steer at where the target is going, in smaller, faster volleys.
 - **Artillery:** leads moving targets; the T1 artillery of the three factions
   are brought closer together.
-- **Air:** bombers lead their targets and their bombs splash; anti-air leads
-  its shots and the T3 anti-air towers reach their range; the Guardian
-  fighters catch up. Anti-air hits most of the time: faster shells and
-  missiles, no drop or spread, beams aim where the plane is, and aircraft
-  hitboxes are 1.5x bigger.
 - **Defences:** point defences see as far as they shoot, and T1 point defences
   are tougher: they beat their cost in T1 tanks, and T1 artillery still
   outranges them. T2 point defences are much tougher and hit harder, and the
-  Chosen T3 one hits much harder.
+  Chosen T3 one hits much harder. Shields cost more and hold less: T2 300
+  alloys for 6000 (were 150 for 10000), T3 1000 for 15000 (were 600 for
+  20000), and use twice the energy to run.
 - **Unit tuning:** the Chosen Jager toned down and the other T2 raiders
   brought up, so T2 beats its cost in T1 without crushing it; the T1 tanks
   brought level. T3 tanks move as fast as T1 tanks with quicker guns; the
