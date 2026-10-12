@@ -7,10 +7,10 @@
   "version": "0.2.9"
  },
  "game": {
-  "version": "0.1.21.1",
+  "version": "0.0.1.21.1",
   "steamBuild": "25856019"
  },
- "generated": "2026-10-11T18:51:46.883Z",
+ "generated": "2026-10-12T18:24:21.948Z",
  "sections": [
   {
    "key": "fixes",
@@ -64,7 +64,7 @@
     "fixes"
    ],
    "why": [
-    "T1 bombs lived 2 seconds at speed 20, about 40 range, while the bombers release from up to 60. They now live long enough to land. Not the Chosen Comet, which the game reworked in 0.1.21.1 to drop its bomb from 10. (T3 bombs had the same fix until 0.2.9; the game's new flight patterns may have fixed them, to be tested.)"
+    "T1 bombs lived 2 seconds at speed 20, about 40 range, while the bombers release from up to 60. They now live long enough to land. Not the Chosen Comet, which the game reworked in 0.0.1.21.1 to drop its bomb from 10. (T3 bombs had the same fix until 0.2.9; the game's new flight patterns may have fixed them, to be tested.)"
    ]
   },
   {
@@ -81,7 +81,7 @@
     "fixes"
    ],
    "why": [
-    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)"
+    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)"
    ]
   },
   {
@@ -98,7 +98,7 @@
     "fixes"
    ],
    "why": [
-    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)"
+    "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)"
    ]
   },
   {
@@ -388,7 +388,7 @@
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.1.21.1, was 200)."
+    "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.0.1.21.1, was 200)."
    ]
   },
   {
@@ -405,7 +405,7 @@
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.1.21.1, was 200)."
+    "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.0.1.21.1, was 200)."
    ]
   },
   {
@@ -422,7 +422,7 @@
     "economy"
    ],
    "why": [
-    "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.1.21.1, was 200)."
+    "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.0.1.21.1, was 200)."
    ]
   },
   {
@@ -445,7 +445,7 @@
     "economy"
    ],
    "why": [
-    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
+    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
    ]
   },
   {
@@ -462,7 +462,7 @@
     "economy"
    ],
    "why": [
-    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
+    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
    ]
   },
   {
@@ -485,7 +485,7 @@
     "economy"
    ],
    "why": [
-    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
+    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
    ]
   },
   {
@@ -502,7 +502,7 @@
     "economy"
    ],
    "why": [
-    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
+    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
    ]
   },
   {
@@ -525,7 +525,7 @@
     "economy"
    ],
    "why": [
-    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
+    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
    ]
   },
   {
@@ -542,7 +542,7 @@
     "economy"
    ],
    "why": [
-    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
+    "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half."
    ]
   },
   {
@@ -4496,7 +4496,7 @@
     "defences"
    ],
    "why": [
-    "T1 point defences see less than they shoot (since game 0.1.21.1 the Chosen one sees 20, the others 22, and all shoot 27), so T1 tanks (range 20) can get shots in from outside their sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
+    "T1 point defences see less than they shoot (since game 0.0.1.21.1 the Chosen one sees 20, the others 22, and all shoot 27), so T1 tanks (range 20) can get shots in from outside their sight. They now see their full range: still more than a tank's, less than T1 artillery's 30."
    ]
   },
   {
@@ -6623,7 +6623,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6640,7 +6640,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6657,7 +6657,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6674,7 +6674,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6691,7 +6691,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6708,7 +6708,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6725,7 +6725,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6742,7 +6742,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -6759,7 +6759,7 @@
     "units"
    ],
    "why": [
-    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)"
+    "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)"
    ]
   },
   {
@@ -7613,7 +7613,7 @@
  "optional": {},
  "skipped": [],
  "notes": [
-  "Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with \"fixes\" on): a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider; the TALEN until game 0.1.21.1) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range. Not a template change.",
+  "Targeting (append to host/units/weaponsClasses/weaponsBaseClass.lua, with \"fixes\" on): a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider; the TALEN until game 0.0.1.21.1) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range. Not a template change.",
   "Shields (balancepatch/shields.lua, with the \"fixes\" section on): an aircraft's projectile that starts inside an enemy shield's bubble and lands inside it hits the shield instead, and so does an aircraft's beam fired from inside one. Before, gunships and bombers flew inside T3 bubbles and hit everything under them. Units on the ground inside a bubble shoot as before. Not a template change.",
   "AI: the stock AI's energy-to-alloy income targets (LessThan/MoreThanEnergyToResourceRatioIncome in AI/AIFunctions.lua) are scaled by 0.7 when the \"economy\" section is on. Not a template change."
  ],

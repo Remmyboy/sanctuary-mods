@@ -7,7 +7,7 @@
   "description": "A rebalance designed from target match pacing: territory pays, the commander starts the game rather than carrying it, land costs alloys and air costs energy, T2 has to be paid for, engineers can be raided, and commanders' missiles and artillery hit moving targets. Air is left as the game has it, at the energy price. Fixes a bug where one broken bomber froze other units' targeting, and aircraft can no longer fire from inside a shield at what it covers. Each section can be turned off in the lobby.",
   "kind": "gameplay",
   "luaRoot": "lua",
-  "gameVersion": "0.1.21.1",
+  "gameVersion": "0.0.1.21.1",
   "apiVersion": 1,
   "options": [
     { "key": "fixes", "label": "Fixes", "type": "toggle", "default": true,

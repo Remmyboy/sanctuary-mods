@@ -16,7 +16,7 @@ Sections = {
         key = "fixes",
         changes = {
             {
-                why = "T1 bombs lived 2 seconds at speed 20, about 40 range, while the bombers release from up to 60. They now live long enough to land. Not the Chosen Comet, which the game reworked in 0.1.21.1 to drop its bomb from 10. (T3 bombs had the same fix until 0.2.9; the game's new flight patterns may have fixed them, to be tested.)",
+                why = "T1 bombs lived 2 seconds at speed 20, about 40 range, while the bombers release from up to 60. They now live long enough to land. Not the Chosen Comet, which the game reworked in 0.0.1.21.1 to drop its bomb from 10. (T3 bombs had the same fix until 0.2.9; the game's new flight patterns may have fixed them, to be tested.)",
                 tags = { "BOMBER", "TECH1" },
                 notTags = { "EDA" },
                 notIds = { "uca1001" },
@@ -24,7 +24,7 @@ Sections = {
                 set = { ["weapons.1.projectileLifetime"] = 4 },
             },
             {
-                why = "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)",
+                why = "The Chosen T2 point defence (Redoubt) shot the ground: its model's barrel bone rests about 55 degrees nose-down, and it may only pitch up 45, so it could never raise the barrel to level. It never came on target (0% in tests at 20-47 range, other T2 point defences 48-94%). It may pitch up 100 now and rests level. (Game 0.0.1.21.1 turns the model's real yaw bone, which this patch used to fix, and lets it pitch up 55: just enough to reach level, never above it.)",
                 ids = { "ucs2001" },
                 expect = { ["weapons.1.aimControllers.1.yawBone"] = "Turret01_Yaw01", ["weapons.1.aimControllers.1.pitchMax"] = 55, ["weapons.1.aimControllers.1.defaultPitchAdjustment"] = 0 },
                 set = {
@@ -65,13 +65,13 @@ Sections = {
                 set = { ["defence.health.max"] = 500, ["defence.health.value"] = 500 },
             },
             {
-                why = "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.1.21.1, was 200).",
+                why = "T2 generators give 1.5x the energy per cost of T1 ones: 600 a second (the game makes 300 since 0.0.1.21.1, was 200).",
                 idPattern = "^u.s2611$",
                 expect = { ["economy.production.energy"] = 300 },
                 set = { ["economy.production.energy"] = 600 },
             },
             {
-                why = "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half.",
+                why = "T3 generators cost 2800 alloys and 28000 energy (were 5000 and 50000; build time 2800, was 5000): with the game's 2750 energy a second (since 0.0.1.21.1, was 1000) that is about 2.5x the energy per cost of T1 ones, in a smaller step that runs an Alloy Furnace and a half.",
                 idPattern = "^u.s3611$",
                 expect = { ["economy.production.energy"] = 2750, ["economy.cost"] = { alloys = 5000, energy = 50000 }, ["economy.buildTime"] = 5000 },
                 set = { ["economy.cost"] = { alloys = 2800, energy = 28000 }, ["economy.buildTime"] = 2800 },
@@ -261,7 +261,7 @@ Sections = {
         key = "defences",
         changes = {
             {
-                why = "T1 point defences see less than they shoot (since game 0.1.21.1 the Chosen one sees 20, the others 22, and all shoot 27), so T1 tanks (range 20) can get shots in from outside their sight. They now see their full range: still more than a tank's, less than T1 artillery's 30.",
+                why = "T1 point defences see less than they shoot (since game 0.0.1.21.1 the Chosen one sees 20, the others 22, and all shoot 27), so T1 tanks (range 20) can get shots in from outside their sight. They now see their full range: still more than a tank's, less than T1 artillery's 30.",
                 ids = { "ucs1001" },
                 expect = { ["intel.visionRadius"] = 20, ["weapons.1.rangeMax"] = 27 },
                 set = { ["intel.visionRadius"] = 27 },
@@ -433,7 +433,7 @@ Sections = {
                 set = { ["movement.speed"] = 2.75, ["movement.acceleration"] = 2.75, ["movement.rotationSpeed"] = 60 },
             },
             {
-                why = "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.1.21.1 slowed it to 1, and that is left as the game has it.)",
+                why = "Long-range T4s move at 2.25 (were 2) and turn at 50 (were 40): the EDA Centaur railgun sniper, the Guardian Quasar artillery and the Chosen Tripod (100 range). They stay the slowest, as snipers and artillery should. (The Chosen big bot was in this list; game 0.0.1.21.1 slowed it to 1, and that is left as the game has it.)",
                 ids = { "uel4001", "ugl4011", "ucl4002" },
                 expect = { ["movement.speed"] = 2 },
                 set = { ["movement.speed"] = 2.25, ["movement.acceleration"] = 2.25, ["movement.rotationSpeed"] = 50 },

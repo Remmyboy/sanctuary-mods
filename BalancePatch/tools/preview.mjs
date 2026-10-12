@@ -359,7 +359,7 @@ const OPTIONAL_RULES = {
 // The one rule that isn't template data: BalancePatch/lua/balancepatch/shields.lua.
 const SHIELD_RULE = "an aircraft's projectile that starts inside an enemy shield's bubble and lands inside it hits the shield instead, and so does an aircraft's beam fired from inside one. Before, gunships and bombers flew inside T3 bubbles and hit everything under them. Units on the ground inside a bubble shoot as before.";
 
-const TARGETING_RULE = "a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider; the TALEN until game 0.1.21.1) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range.";
+const TARGETING_RULE = "a weapon whose muzzles aren't in its model (the Guardian T1 and T3 bombers, the Chosen T3 bomber, the EDA T2 raider; the TALEN until game 0.0.1.21.1) picks no target. Before, its target search threw an error that stopped every weapon queued after it from picking a new target, every tick, for as long as it had an enemy in range.";
 
 function changelog() {
   const net = netChanges();

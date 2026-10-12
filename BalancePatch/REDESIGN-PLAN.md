@@ -700,7 +700,7 @@ The game plays one onDeath effect at scale 1, so a client append
 template's effect at 3x in the middle and two rings at 2x out to the blast's
 edge for any unit whose death explosion reaches 30. Not seen in game.
 
-**0.2.9 (2026-10-11, game 0.1.21.1, Steam build 25856019):** the game patch
+**0.2.9 (2026-10-11, game 0.0.1.21.1, Steam build 25856019):** the game patch
 moved 19 fields this patch guards with `expect`, so 0.2.8 skipped them in game.
 Several unguarded scales also stacked on the developers' own buffs (T3 fighter
 shells 75 x 1.5 x 2 = 225, Guardian T2 AA 240, AA missiles 75). The user's calls:
@@ -728,7 +728,7 @@ power or air). The LuaJIT dump applies every change with none skipped, and
 parity against the export is 358 templates, 0 different.
 
 **0.2.9, second pass (2026-10-11, the user's calls):** the developers' own
-0.1.21.1 anti-air pass (T3 fighters lead, missiles at 50, doubled pitch
+0.0.1.21.1 anti-air pass (T3 fighters lead, missiles at 50, doubled pitch
 speeds, splash on T1 AA) left much of the Air section resting on numbers that
 moved: the EDA and Chosen T3 tower missiles already reach their range (speed
 50 for 5 s and 2 s), the Triode's splash that justified half damage is 3 (was
