@@ -62,6 +62,8 @@ namespace SanctuaryHud
         private float _qNextPoll;
         private string _qError;
         private float _qWaitingForSessionSince = -1f;
+        private bool _qSyncWanted, _qWasOnPlay;
+        private float _qNextSync;
 
         // The public counts, while nothing is queued.
         private readonly int[] _qWaiting = new int[3];
@@ -143,29 +145,44 @@ namespace SanctuaryHud
                 return;
             }
 
-            // A game started that isn't the ladder's: a match found now
-            // couldn't be played, so the queue goes.
-            if (AnyQueued && _phase == Phase.Idle && _qLeave.Count == 0)
+            // A lobby joined or a game started that isn't the ladder's: a
+            // match found now couldn't be played, so the queue goes.
+            var state = CurrentState();
+            if (_phase == Phase.Idle && (state == "lobby" || state == "ingame" || state == "loading"))
             {
-                var state = CurrentState();
-                if (state == "ingame" || state == "loading")
+                var queued = Enumerable.Range(0, QueueModes.Length).Where(ModeQueued).Select(i => QueueModes[i]).ToList();
+                if (queued.Count > 0)
                 {
-                    Logger.LogInfo($"Queue: another game is {state}; leaving the ladder queue.");
-                    RequestQueue(Enumerable.Empty<string>(), QueueModes.Where(InQueue).ToList(), null);
-                    Overlay("QUEUE", "Left the ladder queue: you started another game.", 10f);
+                    Logger.LogInfo($"Queue: {(state == "lobby" ? "joined a lobby" : "another game is " + state)}; leaving the ladder queue.");
+                    RequestQueue(Enumerable.Empty<string>(), queued, null);
+                    Overlay("QUEUE", state == "lobby"
+                        ? "Left the ranked queue: you joined a lobby."
+                        : "Left the ranked queue: you started another game.", 10f);
                 }
             }
 
             // The game it found has been played (or this is some other one):
             // the panel stops naming it.
-            if (_qOpen != null && !_qHolding && CurrentState() == "ingame") _qOpen = null;
+            if (_qOpen != null && !_qHolding && state == "ingame") _qOpen = null;
+
+            // Arriving on the Play screen: ask the site once what this
+            // account is queued in, so a queue started on the website shows
+            // (and is held) here too.
+            var onPlay = QueueMenuWindow() == InterfaceManager.Window.Play;
+            if (onPlay && !_qWasOnPlay && now >= _qNextSync) _qSyncWanted = true;
+            _qWasOnPlay = onPlay;
 
             _qHolding = _qJoin.Count > 0 || _qLeave.Count > 0 || AnyQueued || LaunchUnderWay;
-            if (_qHolding && !_qInFlight && now >= _qNextPoll) StartQueuePoll(now);
+            if ((_qHolding || _qSyncWanted) && !_qInFlight && now >= _qNextPoll && StartQueuePoll(now))
+            {
+                _qSyncWanted = false;
+                _qNextSync = now + 30f;
+            }
             if (!_qHolding && QueueCountsWanted() && !_qCountsInFlight && now >= _qNextCounts) StartCounts(now);
         }
 
-        private void StartQueuePoll(float now)
+        /// False while it is still signing in.
+        private bool StartQueuePoll(float now)
         {
             if (_mmToken == null)
             {
@@ -174,11 +191,12 @@ namespace SanctuaryHud
                 if (_qWaitingForSessionSince < 0f) _qWaitingForSessionSince = now;
                 if (now - _qWaitingForSessionSince > 45f && _qError == null) _qError = "Can't sign in to the ladder: is Steam online?";
                 EnsureSession();
-                return;
+                return false;
             }
             _qWaitingForSessionSince = -1f;
             _qInFlight = true;
             StartCoroutine(QueuePoll());
+            return true;
         }
 
         private IEnumerator QueuePoll()
@@ -373,9 +391,9 @@ namespace SanctuaryHud
             AccessTools.FieldRefAccess<InterfaceManager, InterfaceManager.Window>("currentWindow");
 
         private RectTransform _qPanel;
-        private HudButton[] _qButtons;
-        private TMP_Text _qLive, _qLine;
-        private PanelHeading _qLink;
+        private HudButton _qButton;
+        private TMP_Text _qLine;
+        private Image _qDot;
         private string _qPanelErr;
         private bool _qPanelLogged;
 
@@ -388,18 +406,14 @@ namespace SanctuaryHud
             return im == null ? (InterfaceManager.Window?)null : QueueWindow(im);
         }
 
-        // The queue lives on the Play screen (PlayRanked.cs); elsewhere on the
-        // front screens this small panel is the reminder that you're queued,
-        // or that a match was found for you to host or join.
-        private bool QueuePanelWanted()
-        {
-            var window = QueueMenuWindow();
-            if (window != InterfaceManager.Window.Home && window != InterfaceManager.Window.Replays) return false;
-            return AnyModeQueued || MatchToHost;
-        }
+        // The one sign, on every menu screen, that you're in the ranked
+        // queue (or that a match was found for you to host or join), with
+        // the way out of it. The queue itself is on the Play screen
+        // (PlayRanked.cs).
+        private bool QueuePanelWanted() => QueueMenuWindow() != null && (AnyModeQueued || MatchToHost);
 
-        // Counts are worth fetching while either view is up.
-        private bool QueueCountsWanted() => QueuePanelWanted() || QueueMenuWindow() == InterfaceManager.Window.Play;
+        // Counts are worth fetching while the Play screen is up.
+        private bool QueueCountsWanted() => QueueMenuWindow() == InterfaceManager.Window.Play;
 
         private void UpdateQueuePanel()
         {
@@ -422,23 +436,21 @@ namespace SanctuaryHud
                     if (!_qPanelLogged)
                     {
                         _qPanelLogged = true;
-                        Logger.LogInfo("Queue: reminder panel shown in the menu.");
+                        Logger.LogInfo("Queue: queue strip shown in the menu.");
                     }
                 }
                 FillQueuePanel();
                 var size = HudCanvas.Size;
-                var at = new Vector2(Mathf.Round(size.x - _qPanel.rect.width - 80f), Mathf.Round(size.y - _qPanel.rect.height - 80f));
+                var at = new Vector2(Mathf.Round(size.x - _qPanel.rect.width - 48f), Mathf.Round(size.y - _qPanel.rect.height - 36f));
                 if (_qPanel.anchoredPosition != at) _qPanel.anchoredPosition = at;
             }
             catch (Exception e)
             {
                 if (_qPanelErr == e.Message) return;
                 _qPanelErr = e.Message;
-                Logger.LogWarning($"Queue: panel: {e}");
+                Logger.LogWarning($"Queue: strip: {e}");
             }
         }
-
-        private const float QueuePanelWidth = 560f;
 
         private void BuildQueuePanel(RectTransform root)
         {
@@ -446,40 +458,64 @@ namespace SanctuaryHud
             var im = InterfaceManager.Instance;
             if (im != null) HudCanvas.TakeFont(im.GetComponentInChildren<TMP_Text>(true));
 
-            _qPanel = HudCanvas.Plate(root, "Ladder queue");
-            var group = _qPanel.gameObject.AddComponent<VerticalLayoutGroup>();
-            group.padding = new RectOffset(24, 24, 18, 18);
-            group.spacing = 12f;
-            group.childAlignment = TextAnchor.UpperLeft;
+            _qPanel = HudCanvas.Plate(root, "Ranked queue");
+            var group = _qPanel.gameObject.AddComponent<HorizontalLayoutGroup>();
+            group.padding = new RectOffset(28, 14, 14, 14);
+            group.spacing = 20f;
+            group.childAlignment = TextAnchor.MiddleLeft;
             group.childControlWidth = true;
             group.childControlHeight = true;
-            group.childForceExpandWidth = true;
+            group.childForceExpandWidth = false;
             group.childForceExpandHeight = false;
             HudCanvas.FitToContents(_qPanel);
-            HudControls.Size(_qPanel.gameObject, QueuePanelWidth, -1f);
 
-            var head = HudControls.Row(_qPanel, "Heading", 12f);
-            HudControls.Label(head, "Title", "RANKED LADDER", 24f, AccentColour, TextAlignmentOptions.Left);
-            HudControls.Flexible(head);
-            _qLive = HudControls.Label(head, "Live", "", 22f, HudControls.TextDim, TextAlignmentOptions.Right);
+            var dotCell = HudControls.Cell(_qPanel, "Dot", 16f, 56f);
+            _qDot = HudCanvas.Fill(dotCell, "Fill", AccentColour);
+            _qDot.sprite = HudStyle.Shade;
+            _qDot.type = Image.Type.Sliced;
+            var drt = _qDot.rectTransform;
+            drt.anchorMin = drt.anchorMax = new Vector2(0.5f, 0.5f);
+            drt.sizeDelta = new Vector2(16f, 16f);
 
-            var row = HudControls.Row(_qPanel, "Modes", 12f);
-            _qButtons = new HudButton[QueueModes.Length];
-            for (var i = 0; i < QueueModes.Length; i++)
+            _qLine = HudControls.Label(_qPanel, "Line", "", 28f, Color.white, TextAlignmentOptions.MidlineLeft);
+            _qButton = HudButton.Create(_qPanel, "Action", "LEAVE QUEUE", 230f, 56f, 24f);
+            _qButton.OnClick = QueueStripAction;
+        }
+
+        // Leave every queue; with a match to host instead, its page.
+        private void QueueStripAction()
+        {
+            if (!AnyModeQueued && MatchToHost)
             {
-                var mode = QueueModes[i];
-                var button = HudButton.Create(row, mode, mode.ToUpperInvariant(), 160f, 64f, 24f).Flexible();
-                button.OnClick = () => ToggleQueue(mode);
-                _qButtons[i] = button;
+                OpenQueueMatch();
+                return;
             }
+            Logger.LogInfo("Queue: left from the queue strip.");
+            RequestQueue(Enumerable.Empty<string>(), Enumerable.Range(0, QueueModes.Length).Where(ModeQueued).Select(i => QueueModes[i]).ToList(), null);
+        }
 
-            _qLine = HudControls.Label(_qPanel, "Line", "", 22f, HudControls.TextMid, TextAlignmentOptions.TopLeft);
-            _qLine.textWrappingMode = TextWrappingModes.Normal;
-            HudControls.Size(_qLine.gameObject, QueuePanelWidth - 48f, -1f);
-
-            _qLink = PanelHeading.Create(_qPanel, "Link", 22f, AccentColour, TextAlignmentOptions.Left);
-            HudCanvas.SetText(_qLink.Text, "OPEN THE MATCH ON SANCTUARYDB  >");
-            _qLink.OnClick = OpenQueueMatch;
+        private void FillQueuePanel()
+        {
+            string line, action;
+            if (AnyModeQueued)
+            {
+                var times = Enumerable.Range(0, QueueModes.Length).Select(ModeTime).Where(t => t != null);
+                line = "<color=#3DAFFF>RANKED</color>   SEARCHING   " + string.Join("   ", times);
+                action = "LEAVE QUEUE";
+            }
+            else
+            {
+                line = _qOpen.HostId == LocalSteamId
+                    ? $"<color=#3DAFFF>MATCH FOUND</color>   {_qOpen.Mode.ToUpperInvariant()} ON {_qOpen.MapName.ToUpperInvariant()}   YOU'RE HOSTING"
+                    : $"<color=#3DAFFF>MATCH FOUND</color>   {_qOpen.Mode.ToUpperInvariant()} ON {_qOpen.MapName.ToUpperInvariant()}   {_qOpen.HostName} HOSTS";
+                action = "MATCH PAGE";
+            }
+            HudCanvas.SetText(_qLine, line);
+            _qButton.SetLabel(action);
+            // A slow pulse: searching, not stuck.
+            var c = AccentColour;
+            c.a = 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.realtimeSinceStartup * 2f));
+            _qDot.color = c;
         }
 
         private void ToggleQueue(string mode)
@@ -487,20 +523,6 @@ namespace SanctuaryHud
             var queued = (InQueue(mode) || _qJoin.Contains(mode)) && !_qLeave.Contains(mode);
             if (queued) RequestQueue(Enumerable.Empty<string>(), new[] { mode }, null);
             else RequestQueue(new[] { mode }, Enumerable.Empty<string>(), null);
-        }
-
-        private void FillQueuePanel()
-        {
-            HudCanvas.SetText(_qLive, LiveGamesText());
-            for (var i = 0; i < QueueModes.Length; i++)
-            {
-                var queued = ModeQueued(i);
-                _qButtons[i].SetLabel($"{ModeTime(i) ?? QueueModes[i].ToUpperInvariant()}  <alpha=#88>{_qWaiting[i]}");
-                _qButtons[i].SetOn(queued);
-            }
-            HudCanvas.SetText(_qLine, QueueLine());
-            var link = MatchToHost;
-            if (_qLink.gameObject.activeSelf != link) _qLink.gameObject.SetActive(link);
         }
 
         // ---- what both views say ---------------------------------------------

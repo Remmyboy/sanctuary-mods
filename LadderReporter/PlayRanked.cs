@@ -13,9 +13,9 @@ using Object = UnityEngine.Object;
 namespace SanctuaryHud
 {
     // The ladder queue on the game's own Play screen, above Multiplayer /
-    // Skirmish: a "Ranked ladder" badge like the screen's own, a button per
-    // mode showing how many are waiting (or how long you have been), the
-    // factions a 1v1 may launch you as, and a line saying what's going on.
+    // Skirmish: a "Ranked ladder" badge like the screen's own, the factions a
+    // 1v1 may launch you as, a button per mode showing how many are waiting
+    // (or how long you have been), and a line saying what's going on.
     // Buttons and badge are clones of the screen's own, so they look, sound
     // and highlight like the game's; Queue.cs does the queueing.
     //
@@ -138,15 +138,6 @@ namespace SanctuaryHud
                 BlockText(_prBlock, "Title", font, 30f).text = "RANKED LADDER";
             }
 
-            var modes = Row(_prBlock, "Modes", TextAnchor.MiddleLeft);
-            _prModes = new RankedButton[QueueModes.Length];
-            for (var i = 0; i < QueueModes.Length; i++)
-            {
-                var mode = QueueModes[i];
-                _prModes[i] = CloneGameButton(template.gameObject, holder.transform, modes, "Ranked " + mode, RankedModeWidth);
-                _prModes[i].Button.onClick.AddListener(() => ToggleQueue(mode));
-            }
-
             // Which factions a 1v1 may launch you as (team games are hosted
             // by hand, where you pick in the lobby).
             var factions = Row(_prBlock, "Factions", TextAnchor.MiddleLeft);
@@ -156,7 +147,7 @@ namespace SanctuaryHud
             if (font != null) label.characterSpacing = font.characterSpacing;
             label.alignment = TextAlignmentOptions.MidlineLeft;
             label.color = new Color(1f, 1f, 1f, 0.6f);
-            // Under 1v1, so the factions sit under the other two modes.
+            // As wide as 1v1, so the factions sit over the other two modes.
             HudControls.Size(label.gameObject, RankedModeWidth, RankedButtonHeight);
             _prFactions = new RankedButton[AllFactions.Length];
             for (var i = 0; i < AllFactions.Length; i++)
@@ -164,6 +155,15 @@ namespace SanctuaryHud
                 var faction = AllFactions[i];
                 _prFactions[i] = CloneGameButton(template.gameObject, holder.transform, factions, "Faction " + faction, RankedFactionWidth);
                 _prFactions[i].Button.onClick.AddListener(() => ToggleFaction(faction));
+            }
+
+            var modes = Row(_prBlock, "Modes", TextAnchor.MiddleLeft);
+            _prModes = new RankedButton[QueueModes.Length];
+            for (var i = 0; i < QueueModes.Length; i++)
+            {
+                var mode = QueueModes[i];
+                _prModes[i] = CloneGameButton(template.gameObject, holder.transform, modes, "Ranked " + mode, RankedModeWidth);
+                _prModes[i].Button.onClick.AddListener(() => ToggleQueue(mode));
             }
 
             _prLine = BlockText(_prBlock, "Line", font, 24f);
