@@ -79,7 +79,7 @@ namespace SanctuaryHud
 
         private void AwakeQueue()
         {
-            _cfgQueuePanel = Config.Bind("Queue", "Panel", false,
+            _cfgQueuePanel = Config.Bind("Queue", "Panel", true,
                 "Queue for the ladder from the game: Ranked 1v1, 2v2 and 3v3 buttons on the Play screen, with how many " +
                 "are waiting, and a small reminder on the home screen while you're queued. The site's Play page uses " +
                 "the game's queue whether or not this is on.");

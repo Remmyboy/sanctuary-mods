@@ -46,7 +46,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [IdleEngineers](IdleEngineers/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.2) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
-| [LadderReporter](LadderReporter/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.5.1) | Reports ranked results; queues for the ladder from the game and launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
+| [LadderReporter](LadderReporter/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.6.0) | Reports ranked results; queues for the ladder from the game and launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.3) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.17.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
@@ -1306,7 +1306,7 @@ small overlay, and points at manual hosting. A matchmade game's result
 report carries its `matchId` so the site can close the match.
 
 **Queue (0.6).** The game can queue for the ladder itself: 1v1, 2v2 and
-3v3, from buttons on the game's own Play screen (`Queue.Panel`, off by
+3v3, from buttons on the game's own Play screen (`Queue.Panel`, on by
 default) that show how many are waiting in each mode and how many games are
 live, with the factions a 1v1 may launch you as; a small reminder shows on
 the home screen while you're queued. The
