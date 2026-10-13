@@ -24,6 +24,12 @@
       <Private>false</Private>
     </Reference>
     <!-- Matchmaking parses the site's JSON; the game ships Newtonsoft. -->
+    <!-- The ranked buttons on the Play screen are copies of the game's own
+         (PlayRanked.cs), which are Beam UI ButtonManagers. -->
+    <Reference Include="Michsky.UI.Beam">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Michsky.UI.Beam.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>

@@ -202,6 +202,9 @@ namespace SanctuaryHud
             _ticketCallback?.Dispose();
             // The status card and its canvas, and the overlay's panel texture.
             DestroyCard();
+            // The ranked block lives in the game's own menu: a reloaded copy
+            // builds its own.
+            if (_prBlock != null) Destroy(_prBlock.gameObject);
         }
 
         private void Update()

@@ -78,8 +78,9 @@ namespace SanctuaryHud
         private void AwakeQueue()
         {
             _cfgQueuePanel = Config.Bind("Queue", "Panel", false,
-                "Show the ladder queue in the main menu: queue for 1v1, 2v2 and 3v3 from the game and see how many " +
-                "are waiting. The site's Play page uses the game's queue whether or not this is on.");
+                "Queue for the ladder from the game: Ranked 1v1, 2v2 and 3v3 buttons on the Play screen, with how many " +
+                "are waiting, and a small reminder on the home screen while you're queued. The site's Play page uses " +
+                "the game's queue whether or not this is on.");
             _cfgQueueFactions = Config.Bind("Queue", "Factions", "",
                 "What you can be launched as in a 1v1 queued from the game: EDA, Chosen and/or Guard, " +
                 "comma-separated. Empty for any. A queue started from the site uses the site's pick.");
@@ -161,7 +162,7 @@ namespace SanctuaryHud
 
             _qHolding = _qJoin.Count > 0 || _qLeave.Count > 0 || AnyQueued || LaunchUnderWay;
             if (_qHolding && !_qInFlight && now >= _qNextPoll) StartQueuePoll(now);
-            if (!_qHolding && QueuePanelWanted() && !_qCountsInFlight && now >= _qNextCounts) StartCounts(now);
+            if (!_qHolding && QueueCountsWanted() && !_qCountsInFlight && now >= _qNextCounts) StartCounts(now);
         }
 
         private void StartQueuePoll(float now)
@@ -378,19 +379,31 @@ namespace SanctuaryHud
         private string _qPanelErr;
         private bool _qPanelLogged;
 
-        // The front screens of the menu, with nothing launching.
+        // The menu, with nothing launching: the window it is on, or null.
+        private InterfaceManager.Window? QueueMenuWindow()
+        {
+            if (!_cfgQueuePanel.Value || QueueBlocked() != null || CurrentState() != "menu") return null;
+            if (_phase != Phase.Idle && _phase != Phase.Started) return null;
+            var im = InterfaceManager.Instance;
+            return im == null ? (InterfaceManager.Window?)null : QueueWindow(im);
+        }
+
+        // The queue lives on the Play screen (PlayRanked.cs); elsewhere on the
+        // front screens this small panel is the reminder that you're queued,
+        // or that a match was found for you to host or join.
         private bool QueuePanelWanted()
         {
-            if (!_cfgQueuePanel.Value || QueueBlocked() != null || CurrentState() != "menu") return false;
-            if (_phase != Phase.Idle && _phase != Phase.Started) return false;
-            var im = InterfaceManager.Instance;
-            if (im == null) return false;
-            var window = QueueWindow(im);
-            return window == InterfaceManager.Window.Home || window == InterfaceManager.Window.Play;
+            var window = QueueMenuWindow();
+            if (window != InterfaceManager.Window.Home && window != InterfaceManager.Window.Replays) return false;
+            return AnyModeQueued || MatchToHost;
         }
+
+        // Counts are worth fetching while either view is up.
+        private bool QueueCountsWanted() => QueuePanelWanted() || QueueMenuWindow() == InterfaceManager.Window.Play;
 
         private void UpdateQueuePanel()
         {
+            UpdatePlayRanked();
             try
             {
                 var show = QueuePanelWanted();
@@ -401,15 +414,15 @@ namespace SanctuaryHud
                 }
                 var root = HudCanvas.EnsureOwn();
                 if (root == null) return;
-                if (_qPanel == null) BuildQueuePanel(root);
-                if (!_qPanel.gameObject.activeSelf)
+                var built = _qPanel == null;
+                if (built) BuildQueuePanel(root);
+                if (built || !_qPanel.gameObject.activeSelf)
                 {
                     _qPanel.gameObject.SetActive(true);
-                    _qNextCounts = 0f;   // fresh counts on arrival
                     if (!_qPanelLogged)
                     {
                         _qPanelLogged = true;
-                        Logger.LogInfo("Queue: panel shown in the main menu.");
+                        Logger.LogInfo("Queue: reminder panel shown in the menu.");
                     }
                 }
                 FillQueuePanel();
@@ -478,42 +491,59 @@ namespace SanctuaryHud
 
         private void FillQueuePanel()
         {
-            HudCanvas.SetText(_qLive, _qLiveGames < 0 ? "" : _qLiveGames == 1 ? "1 game live" : $"{_qLiveGames} games live");
-            var age = _qStatus == null ? 0 : (int)(DateTime.UtcNow - _qStatusAtUtc).TotalSeconds;
-            var longest = -1;
+            HudCanvas.SetText(_qLive, LiveGamesText());
             for (var i = 0; i < QueueModes.Length; i++)
             {
-                var mode = QueueModes[i];
-                var asked = _qJoin.Contains(mode);
-                var leaving = _qLeave.Contains(mode);
-                var queued = (InQueue(mode) && !leaving) || asked;
-                var waiting = _qWaiting[i];
-                string label;
-                if (queued && InQueue(mode))
-                {
-                    var secs = _qStatus["queues"][mode]["queuedSeconds"];
-                    var s = (secs != null && secs.Type == JTokenType.Integer ? (int)secs : 0) + age;
-                    longest = Math.Max(longest, s);
-                    label = $"{mode.ToUpperInvariant()}  {s / 60}:{s % 60:00}";
-                }
-                else label = queued ? $"{mode.ToUpperInvariant()}  ..." : mode.ToUpperInvariant();
-                _qButtons[i].SetLabel($"{label}  <alpha=#88>{waiting}");
+                var queued = ModeQueued(i);
+                _qButtons[i].SetLabel($"{ModeTime(i) ?? QueueModes[i].ToUpperInvariant()}  <alpha=#88>{_qWaiting[i]}");
                 _qButtons[i].SetOn(queued);
             }
+            HudCanvas.SetText(_qLine, QueueLine());
+            var link = MatchToHost;
+            if (_qLink.gameObject.activeSelf != link) _qLink.gameObject.SetActive(link);
+        }
 
-            string line;
-            if (_qError != null) line = _qError;
-            else if (_qOpen != null && !_qOpen.Auto)
+        // ---- what both views say ---------------------------------------------
+
+        private string LiveGamesText() =>
+            _qLiveGames < 0 ? "" : _qLiveGames == 1 ? "1 game live" : $"{_qLiveGames} games live";
+
+        /// Queued in mode i, or asked to be (and not asked to leave).
+        private bool ModeQueued(int i)
+        {
+            var mode = QueueModes[i];
+            return (InQueue(mode) && !_qLeave.Contains(mode)) || _qJoin.Contains(mode);
+        }
+
+        /// "1V1  0:42" while queued in mode i, "1V1  ..." while the join is
+        /// on its way, else null.
+        private string ModeTime(int i)
+        {
+            if (!ModeQueued(i)) return null;
+            var mode = QueueModes[i];
+            if (!InQueue(mode)) return $"{mode.ToUpperInvariant()}  ...";
+            var secs = _qStatus["queues"][mode]["queuedSeconds"];
+            var s = (secs != null && secs.Type == JTokenType.Integer ? (int)secs : 0) +
+                    (int)(DateTime.UtcNow - _qStatusAtUtc).TotalSeconds;
+            return $"{mode.ToUpperInvariant()}  {s / 60}:{s % 60:00}";
+        }
+
+        private bool AnyModeQueued => Enumerable.Range(0, QueueModes.Length).Any(ModeQueued);
+
+        // A match found that this game won't launch: someone hosts it by hand.
+        private bool MatchToHost => _qOpen != null && !_qOpen.Auto;
+
+        private string QueueLine()
+        {
+            if (_qError != null) return _qError;
+            if (MatchToHost)
             {
-                line = _qOpen.HostId == LocalSteamId
+                return _qOpen.HostId == LocalSteamId
                     ? $"Match found: {_qOpen.Mode} on {_qOpen.MapName}. You're hosting."
                     : $"Match found: {_qOpen.Mode} on {_qOpen.MapName}. {_qOpen.HostName} is hosting.";
             }
-            else if (longest >= 0) line = "Searching. A 1v1 launches by itself; for a team game this says who hosts.";
-            else line = "Pick a mode to queue; you can queue for several. The number is how many are waiting.";
-            HudCanvas.SetText(_qLine, line);
-            var link = _qOpen != null && !_qOpen.Auto;
-            if (_qLink.gameObject.activeSelf != link) _qLink.gameObject.SetActive(link);
+            if (AnyModeQueued) return "Searching. A 1v1 launches by itself; for a team game this says who hosts.";
+            return "Pick a mode to queue; you can queue for several. The number is how many are waiting.";
         }
 
         private void OpenQueueMatch()

@@ -1306,8 +1306,10 @@ small overlay, and points at manual hosting. A matchmade game's result
 report carries its `matchId` so the site can close the match.
 
 **Queue (0.6).** The game can queue for the ladder itself: 1v1, 2v2 and
-3v3, from a panel in the main menu (`Queue.Panel`, off by default) that
-shows how many are waiting in each mode and how many games are live. The
+3v3, from buttons on the game's own Play screen (`Queue.Panel`, off by
+default) that show how many are waiting in each mode and how many games are
+live, with the factions a 1v1 may launch you as; a small reminder shows on
+the home screen while you're queued. The
 site's Play page hands its Queue and Leave clicks to the game too, when it
 sees one signed in to the same Steam account (`POST /queue` on the bridge).
 Either way the game then holds the queue: it polls the site every 5 s while
@@ -1315,8 +1317,7 @@ queued (the queue heartbeat, carrying its own presence), so the browser tab
 can close and a 1v1 still launches, and the Play page shows the game's
 queue rather than polling the site a second time. Team games aren't
 launched; the panel says who hosts and links to the match page. Starting
-another game leaves the queue. `Queue.Factions` is what a 1v1 queued from
-the game may launch you as.
+another game leaves the queue.
 
 Everything the site side needs is in [docs/matchmaking-site-plan.md](docs/matchmaking-site-plan.md)
 and the site repo's `docs/local-bridge.md`.
