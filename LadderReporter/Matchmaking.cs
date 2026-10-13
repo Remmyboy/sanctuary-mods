@@ -370,6 +370,10 @@ namespace SanctuaryHud
         private static string LocalSteamId =>
             SteamManager.IsSteamInitialized ? SteamUser.GetSteamID().m_SteamID.ToString() : null;
 
+        // The same, asked of Steam once: /status carries it every frame.
+        private string _localSteamId;
+        private string LocalSteamIdCached => _localSteamId ?? (_localSteamId = LocalSteamId);
+
         private static bool UsingSteam => LobbyManager.Backend is SteamLobbyBackend && SteamManager.IsSteamInitialized;
 
         private bool MockMode => !string.IsNullOrWhiteSpace(_cfgMmMockFile.Value);

@@ -50,7 +50,7 @@ namespace SanctuaryHud
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
     // ReplayUpload.cs.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.5.1")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.0")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -67,6 +67,7 @@ namespace SanctuaryHud
         private bool _snapshotFailed;
         private float _tickAccum;
         private bool _liveUpdateFailedLogged;
+        private bool _queueUpdateFailedLogged;
 
         // Steam web-API tickets arrive by callback; each request remembers
         // what to do with its ticket (null on refusal). Shared with the
@@ -172,6 +173,7 @@ namespace SanctuaryHud
                 Logger.LogError($"Live: replay player patch failed (live games can't be watched): {e}");
             }
             AwakeMatchmaking();
+            AwakeQueue();
             AwakeUploads();
             AwakeLive();
             // The assembly version changes every build, so a log can be
@@ -213,6 +215,19 @@ namespace SanctuaryHud
                 {
                     _mmUpdateFailedLogged = true;
                     Logger.LogError($"Matchmaking: update failed: {e}");
+                }
+            }
+            try
+            {
+                UpdateQueue();
+                UpdateQueuePanel();
+            }
+            catch (Exception e)
+            {
+                if (!_queueUpdateFailedLogged)
+                {
+                    _queueUpdateFailedLogged = true;
+                    Logger.LogError($"Queue: update failed: {e}");
                 }
             }
             // Uploads on their own too, and before the Enabled check: a

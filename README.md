@@ -46,7 +46,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [IdleEngineers](IdleEngineers/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.2) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
-| [LadderReporter](LadderReporter/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.5.1) | Reports ranked results; launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
+| [LadderReporter](LadderReporter/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.5.1) | Reports ranked results; queues for the ladder from the game and launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.3) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
 | [ModManager](ModManager/) | [**0.17.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
@@ -1270,7 +1270,8 @@ exactly two human players on opposing teams and no AI, you being one of
 them. Spectators in a ladder game don't stop it reporting.
 
 **Matchmaking.** The site pairs queued players, picks map, factions, slots
-and host, and runs the countdown. The mod never polls the site: it listens
+and host, and runs the countdown. Unless it holds a queue (below), the mod
+never polls the site: it listens
 on `127.0.0.1:27555` (loopback only, `Matchmaking.LocalPort`), and the
 SanctuaryDB page in the player's browser asks it every couple of seconds
 what the game is doing (`GET /status`), relays that inside the polls the
@@ -1303,6 +1304,19 @@ events, and mirror the site's timeouts locally so both sides converge if a
 push is late. Any failure leaves the lobby, tells the player why in a
 small overlay, and points at manual hosting. A matchmade game's result
 report carries its `matchId` so the site can close the match.
+
+**Queue (0.6).** The game can queue for the ladder itself: 1v1, 2v2 and
+3v3, from a panel in the main menu (`Queue.Panel`, off by default) that
+shows how many are waiting in each mode and how many games are live. The
+site's Play page hands its Queue and Leave clicks to the game too, when it
+sees one signed in to the same Steam account (`POST /queue` on the bridge).
+Either way the game then holds the queue: it polls the site every 5 s while
+queued (the queue heartbeat, carrying its own presence), so the browser tab
+can close and a 1v1 still launches, and the Play page shows the game's
+queue rather than polling the site a second time. Team games aren't
+launched; the panel says who hosts and links to the match page. Starting
+another game leaves the queue. `Queue.Factions` is what a 1v1 queued from
+the game may launch you as.
 
 Everything the site side needs is in [docs/matchmaking-site-plan.md](docs/matchmaking-site-plan.md)
 and the site repo's `docs/local-bridge.md`.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -20,12 +21,16 @@ namespace SanctuaryHud
     // polls it already makes to the site, so a game left open in the menu
     // costs the site nothing. See docs/local-bridge.md in the site repo.
     //
-    // Three endpoints, plus OPTIONS preflights for each:
+    // Four endpoints, plus OPTIONS preflights for each:
     //
-    //   GET  /status  -> { modVersion, gameVersion, state, match | null,
+    //   GET  /status  -> { modVersion, gameVersion, state, steamId, match | null,
     //                      uploads: { stats, replays, pending },
     //                      live: { streaming: url | null,
-    //                              watching: { id, phase, error } | null } }
+    //                              watching: { id, phase, error } | null },
+    //                      queue: { status, ageS } | null }
+    //   POST /queue   <- { join?: [mode], leave?: [mode], factions?: [faction] }:
+    //                    queue from the Play page (Queue.cs); -> { ok: true }
+    //                    or { ok: false, error }
     //   POST /match   <- the match object (as the site's match API has it)
     //                    or null; -> { ok: true } or { ok: false, error }
     //   POST /watch   <- { stream: id }: watch a live game (LiveWatch.cs);
@@ -78,6 +83,10 @@ namespace SanctuaryHud
             public int PendingReplays;
             public string LiveUrl;                          // this game's stream, while it runs
             public string WatchId, WatchPhase, WatchError;  // a live game being watched
+            public string SteamId;                          // who the game runs as
+            public string QueueJson;                        // the site's last queue answer, while relayed
+            public DateTime QueueAtUtc;
+            public string QueueBlocked;                     // why a join would be refused, or null
         }
 
         private sealed class HttpRequest
@@ -127,6 +136,9 @@ namespace SanctuaryHud
             var pending = _pending.Count;
             var liveUrl = LiveStreamUrl;
             var watch = _liveIn;
+            var steamId = LocalSteamIdCached;
+            var queue = QueueRelayJson();
+            var queueBlocked = BridgeQueueBlocked(state);
             if (last == null || last.State != state)
             {
                 Logger.LogInfo($"Matchmaking: state {last?.State ?? "(none)"} -> {state}");
@@ -134,7 +146,8 @@ namespace SanctuaryHud
             else if (last.MatchId == m?.Id && last.MatchStatus == m?.Status && last.Phase == _phaseName &&
                      last.UploadStats == upStats && last.UploadReplays == upReplays && last.PendingReplays == pending &&
                      last.LiveUrl == liveUrl && last.WatchId == watch?.Id && last.WatchPhase == watch?.Phase &&
-                     last.WatchError == watch?.Error)
+                     last.WatchError == watch?.Error && last.SteamId == steamId &&
+                     ReferenceEquals(last.QueueJson, queue) && last.QueueBlocked == queueBlocked)
             {
                 return;   // nothing changed since last frame; keep the old snapshot
             }
@@ -151,6 +164,10 @@ namespace SanctuaryHud
                 WatchId = watch?.Id,
                 WatchPhase = watch?.Phase,
                 WatchError = watch?.Error,
+                SteamId = steamId,
+                QueueJson = queue,
+                QueueAtUtc = _qStatusAtUtc,
+                QueueBlocked = queueBlocked,
             };
         }
 
@@ -268,7 +285,7 @@ namespace SanctuaryHud
                 return;
             }
 
-            var known = req.Path == "/status" || req.Path == "/match" || req.Path == "/watch";
+            var known = req.Path == "/status" || req.Path == "/match" || req.Path == "/watch" || req.Path == "/queue";
             if (req.Method == "OPTIONS")
             {
                 if (!known)
@@ -313,7 +330,80 @@ namespace SanctuaryHud
                 return;
             }
 
+            if (req.Path == "/queue")
+            {
+                if (req.Method != "POST")
+                {
+                    WriteResponse(stream, 405, origin, Error("use POST"));
+                    return;
+                }
+                HandleQueuePost(req, stream, origin);
+                return;
+            }
+
             WriteResponse(stream, 404, origin, Error("not found"));
+        }
+
+        // The Play page's Queue and Leave: { join?, leave?, factions? }. The
+        // game joins through its own session from the next frame on and
+        // holds the queue from then; the page sees it in /status.
+        private void HandleQueuePost(HttpRequest req, Stream stream, string origin)
+        {
+            string[] join, leave, factions;
+            try
+            {
+                var o = JObject.Parse(req.Body ?? "");
+                join = Words(o["join"], QueueModes);
+                leave = Words(o["leave"], QueueModes);
+                factions = Words(o["factions"], AllFactions);
+            }
+            catch (Exception e) when (e is Newtonsoft.Json.JsonException || e is FormatException || e is ArgumentException)
+            {
+                WriteResponse(stream, 400, origin, Error("body must be { join?: [mode], leave?: [mode], factions?: [faction] }"));
+                return;
+            }
+            if (join.Length == 0 && leave.Length == 0)
+            {
+                WriteResponse(stream, 400, origin, Error("nothing to join or leave"));
+                return;
+            }
+            var blocked = _bridgeSnapshot?.QueueBlocked;
+            if (blocked != null && join.Length > 0)
+            {
+                WriteResponse(stream, 409, origin, Error(blocked));
+                return;
+            }
+            _bridgeMainThread.Enqueue(() => RequestQueue(join, leave, factions.Length > 0 ? factions : null));
+            WriteResponse(stream, 200, origin, "{\"ok\":true}");
+        }
+
+        // Why the Play page can't queue through this game right now, or
+        // null. A game being played or loaded would leave the queue at once.
+        private string BridgeQueueBlocked(string state)
+        {
+            if (_cfgQueuePanel == null) return "The game is still starting.";
+            var blocked = QueueBlocked();
+            if (blocked != null) return blocked;
+            if (state == "ingame" || state == "loading") return "Your game is in a match: back to the main menu to queue.";
+            return null;
+        }
+
+        // A list of known words (modes, factions), in their canonical
+        // spelling; anything else in it is a FormatException.
+        private static string[] Words(JToken token, string[] known)
+        {
+            if (token == null || token.Type == JTokenType.Null) return new string[0];
+            if (!(token is JArray array)) throw new FormatException("not a list");
+            var words = new List<string>();
+            foreach (var item in array)
+            {
+                var word = item.Type == JTokenType.String
+                    ? known.FirstOrDefault(k => string.Equals(k, (string)item, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                if (word == null) throw new FormatException("unknown value " + item);
+                if (!words.Contains(word)) words.Add(word);
+            }
+            return words.ToArray();
         }
 
         // The live page's "Watch in game": { stream: <id> }. The mod fetches
@@ -371,6 +461,17 @@ namespace SanctuaryHud
                         ? null
                         : new JObject { ["id"] = s.WatchId, ["phase"] = s.WatchPhase, ["error"] = s.WatchError },
                 },
+                // The ladder queue (0.6): present, even as null, says the
+                // game can queue (POST /queue); the site's last answer while
+                // it holds one.
+                ["steamId"] = s?.SteamId,
+                ["queue"] = s?.QueueJson == null
+                    ? null
+                    : new JObject
+                    {
+                        ["status"] = new JRaw(s.QueueJson),
+                        ["ageS"] = Math.Max(0, (int)(DateTime.UtcNow - s.QueueAtUtc).TotalSeconds),
+                    },
             };
             return o.ToString(Newtonsoft.Json.Formatting.None);
         }
