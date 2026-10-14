@@ -105,7 +105,7 @@ namespace SanctuaryHud
             private static readonly System.Text.RegularExpressions.Regex SteamIdShape =
                 new System.Text.RegularExpressions.Regex(@"^[0-9]{17}$");
 
-            public string Id, Mode, Status, Host, Joiner, Map, Reason, CancelledBy, OpponentName;
+            public string Id, Mode, Status, Host, Joiner, Map, MapName, Reason, CancelledBy, OpponentName;
             public ulong SessionId;
             public readonly Dictionary<string, string> Factions = new Dictionary<string, string>();
             public readonly Dictionary<string, int> Slots = new Dictionary<string, int>();
@@ -124,6 +124,7 @@ namespace SanctuaryHud
                     Host = Str(o, "host"),
                     Joiner = Str(o, "joiner"),
                     Map = Str(o, "map"),
+                    MapName = Str(o, "mapName"),
                     Reason = Str(o, "reason"),
                     CancelledBy = Str(o, "cancelledBy"),
                     OpponentName = o["opponent"] is JObject opponent ? Str(opponent, "name") : null,
@@ -679,11 +680,13 @@ namespace SanctuaryHud
                         // lobby-creation window doesn't.
                         var closingReplay = m.Mode == "auto" && NetworkManager.IsReplayPlayback;
                         if (closingReplay) QuitReplay();
-                        Overlay("MATCH FOUND", m.Mode != "auto"
-                            ? $"vs {opponent}. {(isHost ? "You're hosting" : "They're hosting")}, see the site."
+                        var text = m.Mode != "auto"
+                            ? ManualText(m, isHost, opponent)
                             : closingReplay
-                                ? $"vs {opponent} on {MapName(m.Map)}. Closing the replay; launching when the site's countdown ends."
-                                : $"vs {opponent} on {MapName(m.Map)}. Launching when the site's countdown ends.", 20f);
+                                ? $"1v1 vs {opponent} on {MapName(m.Map)}. Closing the replay; launching in a few seconds."
+                                : $"1v1 vs {opponent} on {MapName(m.Map)}. Launching in a few seconds.";
+                        MatchFoundAlert(m.Id, text);
+                        Overlay("MATCH FOUND", text, m.Mode != "auto" ? 60f : 20f);
                     }
                     break;
 
@@ -693,8 +696,7 @@ namespace SanctuaryHud
                         _match = m;
                         if (isNew)
                         {
-                            Overlay("LADDER MATCH", $"vs {opponent} on {MapName(m.Map)}. " +
-                                (isHost ? "You're hosting: create the lobby as usual." : "They're hosting: join their lobby."), 30f);
+                            Overlay("LADDER MATCH", ManualText(m, isHost, opponent), 60f);
                         }
                         break;
                     }
@@ -770,7 +772,7 @@ namespace SanctuaryHud
                 return;
             }
 
-            RestoreWindow();
+            RaiseForLaunch();
             var opponent = string.IsNullOrEmpty(m.OpponentName) ? "your opponent" : m.OpponentName;
 
             if (state == "lobby")
@@ -1126,7 +1128,7 @@ namespace SanctuaryHud
             _lobbyIsOurs = false;
             ForgetReplayQuit();
             Logger.LogInfo($"Matchmaking: {message}");
-            Overlay("MATCH NOT LAUNCHED", message + " You can host a game manually from the site's instructions.", 40f);
+            Overlay("MATCH NOT LAUNCHED", message + " If the ladder turns it into a match to host by hand, this game will say who hosts.", 40f);
             SetPhase(Phase.Idle);
         }
 
@@ -1152,6 +1154,17 @@ namespace SanctuaryHud
                 return false;
             }
             catch { return false; }
+        }
+
+        // A 1v1 to host by hand, from the match object: no site needed.
+        private string ManualText(MmMatch m, bool isHost, string opponent)
+        {
+            var map = m.MapName ?? (m.Map != null ? MapName(m.Map) : "the ladder map");
+            var me = LocalSteamId;
+            var start = me != null && m.Slots.TryGetValue(me, out var slot) ? $" Take start {slot}." : "";
+            return $"1v1 vs {opponent} on {map}. " +
+                   (isHost ? $"You're hosting: make a lobby on {map} and let them in." : $"{opponent} is hosting: join their lobby.") +
+                   start;
         }
 
         private static string MapName(string map) =>

@@ -75,13 +75,20 @@ namespace SanctuaryHud
         {
             public string Id, Mode, MapName, HostId, HostName;
             public bool Auto;
+            public readonly List<QueuePlayer> Players = new List<QueuePlayer>();
+        }
+
+        private sealed class QueuePlayer
+        {
+            public string SteamId, Name;
+            public int Team, Slot;   // Slot 0: none given
         }
 
         private void AwakeQueue()
         {
             _cfgQueuePanel = Config.Bind("Queue", "Panel", true,
                 "Queue for the ladder from the game: Ranked 1v1, 2v2 and 3v3 buttons on the Play screen, with how many " +
-                "are waiting, and a small reminder on the home screen while you're queued. The site's Play page uses " +
+                "are waiting, and a strip on every menu screen while you're queued, with a button to leave. The site's Play page uses " +
                 "the game's queue whether or not this is on.");
             _cfgQueueFactions = Config.Bind("Queue", "Factions", "",
                 "What you can be launched as in a 1v1 queued from the game: EDA, Chosen and/or Guard, " +
@@ -282,18 +289,29 @@ namespace SanctuaryHud
                     HostId = (string)open["host"]?["steamId"],
                     HostName = (string)open["host"]?["name"],
                 };
+            if (_qOpen != null && open["players"] is JArray players)
+            {
+                foreach (var p in players.OfType<JObject>())
+                {
+                    _qOpen.Players.Add(new QueuePlayer
+                    {
+                        SteamId = (string)p["steamId"],
+                        Name = (string)p["name"],
+                        Team = p["team"]?.Type == JTokenType.Integer ? (int)p["team"] : 0,
+                        Slot = p["slot"]?.Type == JTokenType.Integer ? (int)p["slot"] : 0,
+                    });
+                }
+            }
             // A team game (or a 1v1 the site paired as manual, or one that
             // fell back to manual before it launched) is the player's to
             // host or join; say so once, loudly.
             var fellBack = previous != null && _qOpen != null && previous.Id == _qOpen.Id && previous.Auto && !_qOpen.Auto;
             if (_qOpen != null && !_qOpen.Auto && (fellBack || (previous?.Id != _qOpen.Id && wasQueued)))
             {
-                var hosting = _qOpen.HostId == LocalSteamId;
                 Logger.LogInfo($"Queue: {_qOpen.Mode} match {_qOpen.Id} found on {_qOpen.MapName}, host {_qOpen.HostName}.");
-                RestoreWindow();
-                Overlay("MATCH FOUND", $"{_qOpen.Mode} on {_qOpen.MapName}. " +
-                    (hosting ? "You're hosting: create the lobby, the site has the teams." : $"{_qOpen.HostName} is hosting: join their lobby.") +
-                    " The match page has the details.", 40f);
+                var text = ManualMatchText(_qOpen);
+                MatchFoundAlert(_qOpen.Id, text);
+                Overlay("MATCH FOUND", text, 60f);
             }
 
             // The 1v1 to launch: the same object the match room pushes, and
@@ -321,6 +339,30 @@ namespace SanctuaryHud
             {
                 ApplyPushedMatch(null);
             }
+        }
+
+        /// Everything a player needs to host or join a match by hand, with no
+        /// site open: map, who they're with and against, who hosts, and the
+        /// start to take when the ladder gave one.
+        private string ManualMatchText(QueueOpen o)
+        {
+            var me = LocalSteamId;
+            var mine = o.Players.FirstOrDefault(p => p.SteamId == me);
+            string Names(IEnumerable<QueuePlayer> ps) => string.Join(", ", ps.Select(p => p.Name));
+            string who;
+            if (mine == null) who = "";
+            else if (o.Mode == "1v1") who = " vs " + Names(o.Players.Where(p => p.SteamId != me));
+            else
+            {
+                var mates = o.Players.Where(p => p.Team == mine.Team && p.SteamId != me).ToList();
+                var foes = o.Players.Where(p => p.Team != mine.Team).ToList();
+                who = (mates.Count > 0 ? " with " + Names(mates) : "") + (foes.Count > 0 ? " vs " + Names(foes) : "");
+            }
+            var how = o.HostId == me
+                ? $"You're hosting: make a lobby on {o.MapName} and let them in."
+                : $"{o.HostName} is hosting: join their lobby.";
+            var start = mine != null && mine.Slot > 0 ? $" Take start {mine.Slot}." : "";
+            return $"{o.Mode} on {o.MapName}{who}. {how}{start}";
         }
 
         private string[] ConfiguredFactions()
@@ -558,12 +600,7 @@ namespace SanctuaryHud
         private string QueueLine()
         {
             if (_qError != null) return _qError;
-            if (MatchToHost)
-            {
-                return _qOpen.HostId == LocalSteamId
-                    ? $"Match found: {_qOpen.Mode} on {_qOpen.MapName}. You're hosting."
-                    : $"Match found: {_qOpen.Mode} on {_qOpen.MapName}. {_qOpen.HostName} is hosting.";
-            }
+            if (MatchToHost) return "Match found: " + ManualMatchText(_qOpen);
             if (AnyModeQueued) return "Searching. A 1v1 launches by itself; for a team game this says who hosts.";
             return "Pick a mode to queue; you can queue for several. The number is how many are waiting.";
         }

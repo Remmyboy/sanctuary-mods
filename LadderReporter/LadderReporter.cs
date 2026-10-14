@@ -50,7 +50,7 @@ namespace SanctuaryHud
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
     // ReplayUpload.cs.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.0")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.1")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -174,6 +174,7 @@ namespace SanctuaryHud
             }
             AwakeMatchmaking();
             AwakeQueue();
+            AwakeAlerts();
             AwakeUploads();
             AwakeLive();
             // The assembly version changes every build, so a log can be
@@ -185,6 +186,7 @@ namespace SanctuaryHud
         private void OnDestroy()
         {
             DestroyMatchmaking();
+            DestroyAlerts();
             StopWatch(null);
             AbortRequests();
             _harmony?.UnpatchSelf();
@@ -224,6 +226,7 @@ namespace SanctuaryHud
             {
                 UpdateQueue();
                 UpdateQueuePanel();
+                UpdateAlerts();
             }
             catch (Exception e)
             {
