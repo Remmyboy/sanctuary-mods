@@ -112,6 +112,24 @@ version unless they have already said to go ahead.
 - if the game is running, the packer built to a temp folder and did not disturb
   it; a normal `dotnet build` will redeploy the Debug DLLs
 
+## 8. Discord notes
+
+Once it is published, end with release notes the user can paste straight into
+Discord, in a fenced code block in the chat (one block covering every mod
+released together):
+
+- the fewest words that say what changed, for a player, not a developer
+- `**Name version**` per mod, then one short `-` line per change
+- options that are off by default say so, with where to turn them on
+- links in `<...>` so Discord shows no embed: the release page
+- no internal detail (file names, commits, how it was measured)
+
+```
+**SanctuaryHud 0.18.1** <https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.18.1>
+- Engineer queue: right-click takes the last of a stack (5th mex), not the one being built
+- Engineer queue art is sharp now
+```
+
 ## Things that have caught people out
 
 - **BepInEx.cfg must ship with `HideManagerGameObject = true`.** Sanctuary
