@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>BuildSpacing</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Only the Lua bridge, LuaHook and the HUD canvas are used from here. -->
+    <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
