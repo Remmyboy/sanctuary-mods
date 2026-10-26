@@ -600,6 +600,13 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
     {
         if (o == null) return "(null)";
         if (o is string s) return "\"" + s + "\"";
+        // What decides how sharp it draws: its pixels, and the texture's.
+        if (o is Sprite sp)
+        {
+            var tx = sp.texture;
+            return $"Sprite '{sp.name}' rect {sp.rect.width}x{sp.rect.height} ppu {sp.pixelsPerUnit}" +
+                   (tx == null ? " (no texture)" : $" on '{tx.name}' {tx.width}x{tx.height} mips {tx.mipmapCount} {tx.filterMode} aniso {tx.anisoLevel} {tx.graphicsFormat}");
+        }
         if (o is System.Collections.IEnumerable e && !(o is string))
             return "[" + string.Join(", ", e.Cast<object>().Take(50).Select(x => x?.ToString() ?? "null")) + "]";
         return o.ToString();

@@ -144,7 +144,8 @@ namespace SanctuaryHud
         }
 
         /// 'index:icon:plate' per building; consecutive ones of a kind make
-        /// one item, which keeps the index of its first.
+        /// one item, which keeps the index of its last, so a right-click
+        /// takes the last of the run (five mexes: the fifth goes).
         private static void Parse(string raw)
         {
             _items.Clear();
@@ -155,7 +156,11 @@ namespace SanctuaryHud
                 uint.TryParse(f[1], out var icon);
                 uint.TryParse(f[2], out var plate);
                 var last = _items.Count > 0 ? _items[_items.Count - 1] : null;
-                if (last != null && last.Icon == icon && last.Plate == plate) last.Count++;
+                if (last != null && last.Icon == icon && last.Plate == plate)
+                {
+                    last.Count++;
+                    last.Index = index;
+                }
                 else _items.Add(new Item { Index = index, Count = 1, Icon = icon, Plate = plate });
             }
         }
@@ -196,8 +201,17 @@ namespace SanctuaryHud
                 back.raycastTarget = true;
                 var tile = back.gameObject.AddComponent<Tile>();
                 tile._layout = back.gameObject.AddComponent<LayoutElement>();
-                tile._plate = Stretched(back.transform, "Plate");
-                tile._art = Stretched(back.transform, "Art");
+                // The game's own tile: a 68 by 100 plate in a 2-unit border,
+                // the art 64 square across its top. The art is 48 px with a
+                // flipped (negative) height, so preserveAspect can't size it:
+                // stretched over the tile it came out half again too big and
+                // blurred, where the game's box draws it a little smaller.
+                tile._plate = Stretched(back.transform, "Plate", 2f);
+                tile._art = Stretched(back.transform, "Art", 0f);
+                var art = tile._art.rectTransform;
+                art.anchorMin = art.anchorMax = art.pivot = new Vector2(0.5f, 1f);
+                art.sizeDelta = new Vector2(64f, 64f);
+                art.anchoredPosition = new Vector2(0f, -2f);
                 var box = HudCanvas.Fill(back.transform, "Count", new Color(0f, 0f, 0f, 0.65f));
                 tile._countBox = box.gameObject;
                 var brt = box.rectTransform;
@@ -213,15 +227,14 @@ namespace SanctuaryHud
                 return tile;
             }
 
-            private static Image Stretched(Transform parent, string name)
+            private static Image Stretched(Transform parent, string name, float inset)
             {
                 var image = HudCanvas.Fill(parent, name, Color.white);
                 var rt = image.rectTransform;
                 rt.anchorMin = Vector2.zero;
                 rt.anchorMax = Vector2.one;
-                rt.offsetMin = Vector2.zero;
-                rt.offsetMax = Vector2.zero;
-                image.preserveAspect = true;
+                rt.offsetMin = new Vector2(inset, inset);
+                rt.offsetMax = new Vector2(-inset, -inset);
                 image.enabled = false;
                 return image;
             }
