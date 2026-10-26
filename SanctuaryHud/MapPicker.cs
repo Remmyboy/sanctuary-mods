@@ -86,13 +86,9 @@ namespace SanctuaryHud
         private static LayoutElement _areaLe;
         private static VerticalLayoutGroup _vlg;
         private static bool _vlgExpand;
-        private static Michsky.UI.Beam.Dropdown _playersDd, _sizeDd;
         private static ButtonManager _customBtn;
-        private static int[] _playerValues = Array.Empty<int>(), _sizeValues = Array.Empty<int>();
-        // The picks, for the session: player counts ticked (none = any),
-        // and the size (0 = any).
-        private static readonly HashSet<int> _players = new HashSet<int>();
-        private static int _size;
+        private static readonly MultiPick _players = new MultiPick("Any players", n => n + " players", " players");
+        private static readonly MultiPick _sizes = new MultiPick("Any size", n => n.ToString(System.Globalization.CultureInfo.InvariantCulture), "");
 
         private static void UpdateMapListPostfix(LobbySettingsInterface __instance, string[] maps)
         {
@@ -181,14 +177,8 @@ namespace SanctuaryHud
             hl.childControlWidth = hl.childControlHeight = false;
             hl.childForceExpandWidth = hl.childForceExpandHeight = false;
 
-            // Players ticks any number of counts (a 2v2 on a 4-spawn map
-            // wants 4 too), so its items are rewired in SetPlayerOptions.
-            _playersDd = CloneDropdown(observers, "Players", null);
-            _sizeDd = CloneDropdown(observers, "Size", i =>
-            {
-                _size = i > 0 && i <= _sizeValues.Length ? _sizeValues[i - 1] : 0;
-                Apply();
-            });
+            _players.Dropdown = CloneDropdown(observers, "Players");
+            _sizes.Dropdown = CloneDropdown(observers, "Size");
 
             // The Maps header's Filters button, which the game hides: the
             // same chip, as the custom maps switch.
@@ -215,7 +205,7 @@ namespace SanctuaryHud
             }
         }
 
-        private static Michsky.UI.Beam.Dropdown CloneDropdown(Michsky.UI.Beam.Dropdown source, string name, Action<int> picked)
+        private static Michsky.UI.Beam.Dropdown CloneDropdown(Michsky.UI.Beam.Dropdown source, string name)
         {
             // Cloned under an inactive holder and set up before it wakes: a
             // clone's Awake would add a second Canvas to the item list, which
@@ -229,14 +219,13 @@ namespace SanctuaryHud
                 dd.setHighPriority = false;
                 dd.saveSelected = false;
                 dd.invokeOnEnable = false;
-                // The header is ours to write (a summary, for players), and
-                // carries no item icon.
+                // The header is ours to write (a summary of the ticks), and
+                // carries no item icon. Items are wired in MultiPick.
                 dd.updateOnEnable = false;
                 dd.enableIcon = false;
                 dd.items = new List<Michsky.UI.Beam.Dropdown.Item> { new Michsky.UI.Beam.Dropdown.Item { itemName = "Any" } };
                 dd.selectedItemIndex = 0;
                 dd.onValueChanged = new Michsky.UI.Beam.Dropdown.DropdownEvent();
-                if (picked != null) dd.onValueChanged.AddListener(i => picked(i));
                 var rt = (RectTransform)dd.transform;
                 rt.sizeDelta = new Vector2(260f, rt.sizeDelta.y);
                 rt.SetParent(_bar.transform, false);
@@ -249,107 +238,105 @@ namespace SanctuaryHud
         // The dropdowns offer only the values some installed map has.
         private static void SetOptions()
         {
-            var players = _rows.Select(r => r.Info.Players).Where(n => n > 0).Distinct().OrderBy(n => n).ToArray();
-            var sizes = _rows.Select(r => r.Info.Size).Where(n => n > 0).Distinct().OrderBy(n => n).ToArray();
-            SetPlayerOptions(players);
-            SetOptions(_sizeDd, ref _sizeValues, sizes, ref _size, "Any size", n => n.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            _players.SetOptions(_rows.Select(r => r.Info.Players).Where(n => n > 0).Distinct().OrderBy(n => n).ToArray());
+            _sizes.SetOptions(_rows.Select(r => r.Info.Size).Where(n => n > 0).Distinct().OrderBy(n => n).ToArray());
         }
 
-        private static void SetPlayerOptions(int[] values)
+        /// A dropdown that ticks any number of values (a 2v2 might use a
+        /// 4-spawn map; 256 and 512 maps both suit a quick game). None
+        /// ticked shows everything. The picks last for the session.
+        private sealed class MultiPick
         {
-            var dd = _playersDd;
-            if (dd == null) return;
-            _players.IntersectWith(values);
-            if (!_playerValues.SequenceEqual(values) || dd.items.Count != values.Length + 1)
+            private readonly string _any;
+            private readonly Func<int, string> _label;
+            private readonly string _unit;
+            private readonly HashSet<int> _picked = new HashSet<int>();
+            internal Michsky.UI.Beam.Dropdown Dropdown;
+            internal int[] Values = Array.Empty<int>();
+
+            internal MultiPick(string any, Func<int, string> label, string unit)
             {
-                _playerValues = values;
-                dd.items.Clear();
-                dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = "Any players", itemIcon = HudStyle.Icon("box") });
-                foreach (var v in values)
-                    dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = v + " players", itemIcon = HudStyle.Icon("box") });
-                dd.selectedItemIndex = 0;
-                dd.Initialize();
-                // A tick leaves the list open for the next one; only "Any"
-                // closes it. Initialize wired each item to pick and close.
+                _any = any;
+                _label = label;
+                _unit = unit;
+            }
+
+            internal bool Shows(int value) => _picked.Count == 0 || _picked.Contains(value);
+
+            internal void SetOptions(int[] values)
+            {
+                var dd = Dropdown;
+                if (dd == null) return;
+                _picked.IntersectWith(values);
+                if (!Values.SequenceEqual(values) || dd.items.Count != values.Length + 1)
+                {
+                    Values = values;
+                    dd.items.Clear();
+                    dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = _any, itemIcon = HudStyle.Icon("box") });
+                    foreach (var v in values)
+                        dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = _label(v), itemIcon = HudStyle.Icon("box") });
+                    dd.selectedItemIndex = 0;
+                    dd.Initialize();
+                    // A tick leaves the list open for the next one; only "Any"
+                    // closes it. Initialize wired each item to pick and close.
+                    for (var i = 0; i < dd.items.Count; i++)
+                    {
+                        var index = i;
+                        var button = dd.items[i].itemButton;
+                        if (button == null) continue;
+                        button.onClick.RemoveAllListeners();
+                        button.onClick.AddListener(() => Toggle(index));
+                    }
+                }
+                ShowPicks();
+            }
+
+            private void Toggle(int index)
+            {
+                if (index <= 0 || index > Values.Length)
+                {
+                    _picked.Clear();
+                    if (Dropdown != null && Dropdown.isOn) Dropdown.Animate();
+                }
+                else if (!_picked.Remove(Values[index - 1]))
+                    _picked.Add(Values[index - 1]);
+                ShowPicks();
+                Apply();
+            }
+
+            /// Ticks on the items, and the header as a summary: "2-4, 8 players".
+            private void ShowPicks()
+            {
+                var dd = Dropdown;
+                if (dd == null) return;
                 for (var i = 0; i < dd.items.Count; i++)
                 {
-                    var index = i;
                     var button = dd.items[i].itemButton;
                     if (button == null) continue;
-                    button.onClick.RemoveAllListeners();
-                    button.onClick.AddListener(() => TogglePlayers(index));
+                    var ticked = i == 0 ? _picked.Count == 0 : _picked.Contains(Values[i - 1]);
+                    var icon = HudStyle.Icon(ticked ? "box-ticked" : "box");
+                    if (button.buttonIcon == icon) continue;
+                    button.buttonIcon = icon;
+                    if (button.gameObject.activeInHierarchy) button.UpdateUI();
                 }
+                if (dd.headerText != null) dd.headerText.text = Summary();
             }
-            ShowPlayerPicks();
-        }
 
-        private static void TogglePlayers(int index)
-        {
-            if (index <= 0 || index > _playerValues.Length)
+            private string Summary()
             {
-                _players.Clear();
-                if (_playersDd != null && _playersDd.isOn) _playersDd.Animate();
-            }
-            else if (!_players.Remove(_playerValues[index - 1]))
-                _players.Add(_playerValues[index - 1]);
-            ShowPlayerPicks();
-            Apply();
-        }
-
-        /// Ticks on the items, and the header as a summary: "2-4, 8 players".
-        private static void ShowPlayerPicks()
-        {
-            var dd = _playersDd;
-            if (dd == null) return;
-            for (var i = 0; i < dd.items.Count; i++)
-            {
-                var button = dd.items[i].itemButton;
-                if (button == null) continue;
-                var ticked = i == 0 ? _players.Count == 0 : _players.Contains(_playerValues[i - 1]);
-                var icon = HudStyle.Icon(ticked ? "box-ticked" : "box");
-                if (button.buttonIcon == icon) continue;
-                button.buttonIcon = icon;
-                if (button.gameObject.activeInHierarchy) button.UpdateUI();
-            }
-            if (dd.headerText != null) dd.headerText.text = PlayersSummary();
-        }
-
-        private static string PlayersSummary()
-        {
-            if (_players.Count == 0) return "Any players";
-            var picked = _players.OrderBy(n => n).ToList();
-            var parts = new List<string>();
-            for (var i = 0; i < picked.Count;)
-            {
-                // A run of counts that are all on offer, with none missing
-                // between them, reads as a range.
-                var j = i;
-                while (j + 1 < picked.Count && Array.IndexOf(_playerValues, picked[j + 1]) == Array.IndexOf(_playerValues, picked[j]) + 1) j++;
-                parts.Add(j - i >= 2 ? $"{picked[i]}-{picked[j]}" : string.Join(", ", picked.Skip(i).Take(j - i + 1)));
-                i = j + 1;
-            }
-            return string.Join(", ", parts) + " players";
-        }
-
-        private static void SetOptions(Michsky.UI.Beam.Dropdown dd, ref int[] current, int[] values, ref int pick, string any, Func<int, string> label)
-        {
-            if (dd == null) return;
-            var pickNow = pick;
-            if (!values.Contains(pickNow)) pick = 0;
-            if (!current.SequenceEqual(values) || dd.items.Count != values.Length + 1)
-            {
-                current = values;
-                dd.items.Clear();
-                dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = any });
-                foreach (var v in values) dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = label(v) });
-                dd.selectedItemIndex = 0;
-                dd.Initialize();
-            }
-            var index = pick == 0 ? 0 : Array.IndexOf(values, pick) + 1;
-            if (dd.selectedItemIndex != index || dd.headerText != null && dd.headerText.text != dd.items[index].itemName)
-            {
-                dd.selectedItemIndex = index;
-                if (dd.headerText != null) dd.headerText.text = dd.items[index].itemName;
+                if (_picked.Count == 0) return _any;
+                var picked = _picked.OrderBy(n => n).ToList();
+                var parts = new List<string>();
+                for (var i = 0; i < picked.Count;)
+                {
+                    // A run of values that are all on offer, with none missing
+                    // between them, reads as a range.
+                    var j = i;
+                    while (j + 1 < picked.Count && Array.IndexOf(Values, picked[j + 1]) == Array.IndexOf(Values, picked[j]) + 1) j++;
+                    parts.Add(j - i >= 2 ? $"{picked[i]}-{picked[j]}" : string.Join(", ", picked.Skip(i).Take(j - i + 1)));
+                    i = j + 1;
+                }
+                return string.Join(", ", parts) + _unit;
             }
         }
 
@@ -360,8 +347,8 @@ namespace SanctuaryHud
             {
                 if (row.Go == null) continue;
                 var info = row.Info;
-                var show = (_players.Count == 0 || _players.Contains(info.Players))
-                    && (_size == 0 || info.Size == _size)
+                var show = _players.Shows(info.Players)
+                    && _sizes.Shows(info.Size)
                     && (showCustom || !info.Custom);
                 if (row.Go.activeSelf != show) row.Go.SetActive(show);
             }
@@ -402,9 +389,9 @@ namespace SanctuaryHud
             _areaLe = null;
             _bar = null;
             _list = null;
-            _playersDd = _sizeDd = null;
+            _players.Dropdown = _sizes.Dropdown = null;
+            _players.Values = _sizes.Values = Array.Empty<int>();
             _customBtn = null;
-            _playerValues = _sizeValues = Array.Empty<int>();
         }
 
         // ---- map facts ------------------------------------------------------

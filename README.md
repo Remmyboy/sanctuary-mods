@@ -646,8 +646,9 @@ line), since a client's own engine speed need not follow the host's.
 **Map list filters** (`MapListFilters`): a bar above the lobby settings
 screen's map list — a players dropdown, a size dropdown (256, 512, …) and a
 **Custom maps: on/off** switch — and each row shows its players and size
-(`8P  1024`). Players takes any number of ticks (2, 3 and 4 for a 2v2 that
-might use a 4-player map) and reads them back as `2-4 players`. The
+(`8P  1024`). Both dropdowns take any number of ticks (2, 3 and 4 players for
+a 2v2 that might use a 4-player map; 256 and 512 for a quick game) and read
+them back as `2-4 players` or `256, 512`. The
 game lists every installed map in one column, which with converted and
 generated maps runs to ~190 rows. Players is the number of spawn markers in the
 `.sanmap`, not the lobby's player limit (the game says 8 for any map it doesn't
