@@ -14,8 +14,9 @@ namespace SanctuaryHud.BuildSpacing
     // next, scroll down takes one away, down to the game's own touching
     // rows. The gap is one number for every building and every engineer,
     // kept between matches. Buildings whose death explosion would reach the
-    // next one in the line (power generators, storage) get at least the gap
-    // that keeps it out, so one going up doesn't take the row with it.
+    // next one in the line (power generators, storage) get a warning when
+    // the spacing is under the gap that keeps it out: on picking one to
+    // place, and on each scroll. The spacing itself is always the player's.
     //
     // The drag line is constructionPreviewSystem.lua's
     // GetBuildingPlacementPositions: a Bresenham walk from where the drag
@@ -29,7 +30,7 @@ namespace SanctuaryHud.BuildSpacing
     // modifier), which looks up cameraController.SetZoomAmount at each
     // event; the wrapper keeps the event in build mode with Shift held.
     // Plain scroll still zooms.
-    [BepInPlugin("com.sanctuarydb.buildspacing", "Build Spacing", "0.1.0")]
+    [BepInPlugin("com.sanctuarydb.buildspacing", "Build Spacing", "0.2.0")]
     public class BuildSpacingPlugin : BaseUnityPlugin
     {
         private const int MaxSpacing = 20;
@@ -38,6 +39,9 @@ namespace SanctuaryHud.BuildSpacing
         /// zoom step (0.066 × 10 per step) also assumes.
         private const float Notch = 0.5f;
         private const float PopupSeconds = 1.4f, PopupFade = 0.35f;
+        /// The warning lasts longer: it is the one a player has to read.
+        private const float WarningSeconds = 2.5f;
+        private static readonly Color Warning = new Color(1f, 0.69f, 0.25f);
 
         private ConfigEntry<bool> _cfgEnabled;
         private ConfigEntry<int> _cfgSpacing;
@@ -52,6 +56,7 @@ namespace SanctuaryHud.BuildSpacing
         private CanvasGroup _group;
         private TMP_Text _text;
         private float _shownAt = -100f;
+        private float _showFor = PopupSeconds;
 
         private void Awake()
         {
@@ -65,9 +70,10 @@ namespace SanctuaryHud.BuildSpacing
                     "while placing a building adds one, Shift + scroll down takes one away; the last value is kept for every " +
                     "building and every match.",
                     new AcceptableValueRange<int>(0, MaxSpacing)));
-            _cfgBlast = Config.Bind("General", "BlastSpacing", true,
-                "Buildings that explode when destroyed (power generators, storage) always get at least the gap that keeps " +
-                "their blast off the next one in the line, whatever Spacing is.");
+            _cfgBlast = Config.Bind("General", "BlastWarning", true,
+                "Picking a building that explodes when destroyed (power generators, storage, T3 alloy furnaces) while " +
+                "Spacing is under the gap that keeps its blast off the next one in the line shows that gap as a warning " +
+                "by the cursor. The spacing stays as you set it.");
 
             _hook = new LuaHook("__BldSpc", "build spacing", InstallChunk)
             {
@@ -110,9 +116,10 @@ namespace SanctuaryHud.BuildSpacing
             if (_hook.Call($"__BldSpc.Set({spacing}, {(_cfgBlast.Value ? "true" : "false")})")) _pushed = want;
         }
 
-        /// A scroll in build mode leaves "seq:spacing:effective" in
-        /// __BldSpcEvent: the new spacing is saved, and the popup says what
-        /// this building now gets.
+        /// A scroll in build mode, or picking an exploding building while the
+        /// spacing is under its blast gap, leaves "seq:spacing:blastGap" in
+        /// __BldSpcEvent (blastGap 0 when there is nothing to warn about):
+        /// the spacing is saved, and the popup shows it.
         private void Poll()
         {
             var ev = GetLuaGlobal("__BldSpcEvent");
@@ -121,26 +128,28 @@ namespace SanctuaryHud.BuildSpacing
             var parts = ev.Split(':');
             if (parts.Length < 3
                 || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var spacing)
-                || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var effective))
+                || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var blastGap))
                 return;
             if (_cfgSpacing.Value != spacing) _cfgSpacing.Value = spacing;
             _pushed = spacing.ToString(CultureInfo.InvariantCulture) + "|" + (_cfgBlast.Value ? "true" : "false");
-            ShowPopup(spacing, effective);
+            ShowPopup(spacing, blastGap);
         }
 
         // ---- the popup -------------------------------------------------------------
 
         private static string Tiles(int n) => n == 1 ? "1 tile" : n + " tiles";
 
-        private void ShowPopup(int spacing, int effective)
+        private void ShowPopup(int spacing, int blastGap)
         {
             var root = HudCanvas.Ensure();
             if (root == null) return;
             if (_plate == null) Build(root);
             var line = spacing == 0 ? "Spacing: none" : "Spacing: " + Tiles(spacing);
-            if (effective > spacing) line += $"  <alpha=#99>({Tiles(effective)} for its blast)";
+            var warn = blastGap > spacing;
+            if (warn) line += $"  <color=#{ColorUtility.ToHtmlStringRGB(Warning)}>{Tiles(blastGap)} needed for its blast</color>";
             HudCanvas.SetText(_text, line);
             _shownAt = Time.unscaledTime;
+            _showFor = warn ? WarningSeconds : PopupSeconds;
         }
 
         private void Build(RectTransform root)
@@ -168,11 +177,11 @@ namespace SanctuaryHud.BuildSpacing
         {
             if (_plate == null) return;
             var age = Time.unscaledTime - _shownAt;
-            var show = live && age < PopupSeconds + PopupFade;
+            var show = live && age < _showFor + PopupFade;
             if (_plate.gameObject.activeSelf != show) _plate.gameObject.SetActive(show);
             if (!show) return;
 
-            _group.alpha = age < PopupSeconds ? 1f : 1f - (age - PopupSeconds) / PopupFade;
+            _group.alpha = age < _showFor ? 1f : 1f - (age - _showFor) / PopupFade;
             var canvas = _plate.GetComponentInParent<Canvas>();
             var cam = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
             var parent = (RectTransform)_plate.parent;
@@ -231,10 +240,28 @@ do
     return gap
   end
 
-  function S.Gap(tpId)
-    if not tpId or tpId == '' then return S.spacing end
-    if S.blast then return math.max(S.spacing, S.BlastGap(tpId)) end
-    return S.spacing
+  -- The blast gap to warn about for this building: 0 when the warning is
+  -- off, or for an extractor (placed one at a time on a deposit).
+  function S.Need(tpId)
+    if not S.blast or not tpId or tpId == '' or Tags.ALLOYS_EXTRACTION[tpId] then return 0 end
+    return S.BlastGap(tpId)
+  end
+
+  function S.Raise(tpId)
+    S.seq = S.seq + 1
+    __BldSpcEvent = S.seq .. ':' .. S.spacing .. ':' .. S.Need(tpId)
+  end
+
+  -- Picking a building to place (a new one, or the same one again after
+  -- leaving build mode): the preview asks for positions every frame while
+  -- placing, so a gap in the calls is a new placement. Warns once per pick
+  -- when the spacing is under the blast gap.
+  function S.Picked(tpId)
+    local now = os.clock()
+    local fresh = tpId ~= S.pickedTp or now - (S.lastAsk or -1) > 0.5
+    S.pickedTp = tpId
+    S.lastAsk = now
+    if fresh and S.Need(tpId) > S.spacing then S.Raise(tpId) end
   end
 
   -- From the plugin: the saved spacing and switch, without a popup.
@@ -277,7 +304,9 @@ do
   CPS.GetBuildingPlacementPositions = function(includeInvalid, ...)
     local tpId = BM.GetBuildTpId()
     local tp = __Templates.Units[tpId]
-    local gap = tp and S.Gap(tpId) or 0
+    -- Only a warning: whatever it hits, placing goes on.
+    if tp and includeInvalid then pcall(S.Picked, tpId) end -- lua-check: ok
+    local gap = tp and S.spacing or 0
     if gap <= 0 or Tags.ALLOYS_EXTRACTION[tpId] then return S.orig.place(includeInvalid, ...) end
 
     local start = BM.GetStartPosition()
@@ -317,8 +346,7 @@ do
       if step ~= 0 then
         S.acc = 0
         S.spacing = math.max(0, math.min(__MAX__, S.spacing + step))
-        S.seq = S.seq + 1
-        __BldSpcEvent = S.seq .. ':' .. S.spacing .. ':' .. S.Gap(BM.GetBuildTpId())
+        S.Raise(BM.GetBuildTpId())
       end
       return
     end

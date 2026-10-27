@@ -49,7 +49,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 | [LadderReporter](LadderReporter/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.6.1) | Reports ranked results; queues for the ladder from the game and launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.3) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
-| [BuildSpacing](BuildSpacing/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildSpacing-0.1.0) | Shift + scroll while placing a building spaces out the line you drag, a tile per notch, remembered for every building; power generators and other buildings that explode keep their blast off the next one |
+| [BuildSpacing](BuildSpacing/) | [**0.1.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildSpacing-0.1.0) | Shift + scroll while placing a building spaces out the line you drag, a tile per notch, remembered for every building; warns when power generators and other buildings that explode are closer than their blast reaches |
 | [ModManager](ModManager/) | [**0.17.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ModManager-0.17.0) | Mods page in the menu's side bar and on F8 in a match: mod toggles, one-click updates from the menu, settings (switches, sliders, text) with their descriptions on hover; the lobby's Mods panel where the host picks gameplay mods |
 | [ZoneControl](ZoneControl/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ZoneControl-0.5.1) | Gameplay mod: Supreme Commander's Zone Control on the converted Zone Control for FAF 8P V2 map. No commanders and no building; every zone you hold sends you units, and kills buy levels, heroes, artillery and upgrades |
 | [PhantomX](PhantomX/) | [**0.2.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/PhantomX-0.2.3) | Gameplay mod: Supreme Commander's Phantom-X. Everyone starts allied until secret phantoms are chosen and fed a share of everyone's income; paladins, marks, timed reveals and the phantom war, all on an in-game panel |
@@ -1625,16 +1625,18 @@ Plain scroll still zooms the camera.
 The spacing is one number for every building and every engineer, and it is
 kept between matches (the `Spacing` setting on the Mods page, 0 to 20).
 
-Buildings that explode when destroyed get at least the gap that keeps their
-blast off the next one in the line, whatever the spacing is (`BlastSpacing`,
-on by default). The gap comes from the building's template: the death
-explosion's radius, its footprint and its collision box: T1 energy
-generators and storage 1 tile (Chosen storage 2), T2 energy generators 1
-(Chosen 2), T3 energy generators 4 (Chosen 5), T3 alloy furnaces 6. EDA's T1
-and T3 generators and T3 furnace were blown up in a test match: one tile
-closer, the neighbour took the blast; at the gap, nothing. The label says so
-when that is more than your spacing. Alloy extractors, which snap to a deposit one at a
-time, are left alone.
+Buildings that explode when destroyed warn you when the spacing is under the
+gap that keeps their blast off the next one in the line: picking one to
+place, or scrolling below its gap, shows "1 tile needed for its blast" in
+amber beside the spacing. The spacing stays yours, so you can still pack
+them tight (`BlastWarning` turns the warning off). The gap comes from the
+building's template: the death explosion's radius, its footprint and its
+collision box: T1 energy generators and storage 1 tile (Chosen storage 2),
+T2 energy generators 1 (Chosen 2), T3 energy generators 4 (Chosen 5), T3
+alloy furnaces 6. EDA's T1 and T3 generators and T3 furnace were blown up in
+a test match: one tile closer, the neighbour took the blast; at the gap,
+nothing. Alloy extractors, which snap to a deposit one at a time, are left
+alone.
 
 It changes only where your own client puts the buildings in the order it
 sends, so it works in any match without the other players having it.
