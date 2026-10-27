@@ -644,6 +644,23 @@ the economy strip, where the game's version line was. The game has no clock.
 The speed is the one the host last announced (its "Speed changed to …" log
 line), since a client's own engine speed need not follow the host's.
 
+**Map list filters** (`MapListFilters`): a bar above the lobby settings
+screen's map list — a players dropdown, a size dropdown (256, 512, …) and a
+**Custom maps: on/off** switch — and each row shows its players and size
+(`8P  1024`). Both dropdowns take any number of ticks (2, 3 and 4 players for
+a 2v2 that might use a 4-player map; 256 and 512 for a quick game) and read
+them back as `2-4 players` or `256, 512`. The
+game lists every installed map in one column, which with converted and
+generated maps runs to ~190 rows. Players is the number of spawn markers in the
+`.sanmap`, not the lobby's player limit (the game says 8 for any map it doesn't
+know). Size is the playable area (the rect named `PlayableArea`, else the whole
+terrain), so a 4096 map fenced to its 2048 centre reads 2048. Custom means
+any map Steam didn't install: the game's depot manifest in Steam's
+`depotcache` lists the 99 maps the build ships. Without it the switch isn't
+shown. The switch is remembered (`MapListShowsCustomMaps`); players and size
+reset each launch. The headers are read on a background thread at startup
+(~0.5 s for 188 maps).
+
 **Right-click cursors** (`RightClickCursors`): the cursor shows what a
 right-click there would do — a sword for attack-move (with Alt held), a
 crosshair for attack, an open hand for assist, a wrench for repair (which also

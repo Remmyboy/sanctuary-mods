@@ -1,0 +1,594 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using BepInEx.Configuration;
+using EM.Gamedata;
+using EM.UI;
+using HarmonyLib;
+using Michsky.UI.Beam;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+using static SanctuaryHud.HudCore;
+using Object = UnityEngine.Object;
+
+namespace SanctuaryHud
+{
+    // Filters for the lobby settings screen's map list: player count, size,
+    // and whether custom maps show. The game lists every .sanmap under Maps\
+    // in one alphabetical column, which with converted and generated maps
+    // installed runs to ~190 rows.
+    //
+    // Players is the number of ARMY_n spawn markers in the .sanmap, not the
+    // game's GetMapMemberLimit (a hardcoded switch that says 8 for anything
+    // it doesn't know). Size is the playable area, the rect named exactly
+    // "PlayableArea" that the game fences play into, or the terrain when a map
+    // has none; snapped to a power of two, since one shipped map is 1023 wide.
+    //
+    // Custom is any map Steam didn't install: the game's depot manifest in
+    // Steam's depotcache lists every file of the build in plain text. Without
+    // it (no Steam, a pruned cache) nothing can be told apart, and the custom
+    // switch is left out rather than guessing.
+    internal static class MapPicker
+    {
+        internal static ConfigEntry<bool> Enabled;
+        private static ConfigEntry<bool> _cfgShowCustom;
+
+        internal static void Bind(ConfigFile config)
+        {
+            Enabled = config.Bind("QoL", "MapListFilters", false,
+                "Filters above the lobby's map list: players, size, and a switch for custom maps (any map Steam didn't install).");
+            _cfgShowCustom = config.Bind("QoL", "MapListShowsCustomMaps", true,
+                "The map list's custom maps switch, remembered between launches.");
+        }
+
+        internal static void ApplyPatch(Harmony harmony)
+        {
+            harmony.Patch(AccessTools.Method(typeof(LobbySettingsInterface), nameof(LobbySettingsInterface.UpdateMapList)),
+                postfix: new HarmonyMethod(typeof(MapPicker), nameof(UpdateMapListPostfix)));
+        }
+
+        private static readonly AccessTools.FieldRef<LobbySettingsInterface, ScrollRect> MapList =
+            AccessTools.FieldRefAccess<LobbySettingsInterface, ScrollRect>("mapList");
+        private static readonly AccessTools.FieldRef<LobbySettingsInterface, Michsky.UI.Beam.Dropdown> ObserversList =
+            AccessTools.FieldRefAccess<LobbySettingsInterface, Michsky.UI.Beam.Dropdown>("observersList");
+
+        private sealed class MapInfo
+        {
+            public int Players;
+            public int Size;
+            public bool Custom;
+        }
+
+        private struct Row
+        {
+            public GameObject Go;
+            public MapInfo Info;
+        }
+
+        // Read once per file version: (full path) -> (length, write time, info).
+        private static readonly Dictionary<string, (long, DateTime, MapInfo)> _infoCache =
+            new Dictionary<string, (long, DateTime, MapInfo)>(StringComparer.OrdinalIgnoreCase);
+        private static HashSet<string> _stock;
+        private static bool _stockRead;
+
+        private static readonly List<Row> _rows = new List<Row>();
+        private static ScrollRect _list;
+        private static GameObject _bar;
+        // The list's area as found, to give back.
+        private static RectTransform _area;
+        private static Vector2 _areaSize;
+        private static LayoutElement _areaLe;
+        private static VerticalLayoutGroup _vlg;
+        private static bool _vlgExpand;
+        private static ButtonManager _customBtn;
+        private static readonly MultiPick _players = new MultiPick("Any players", n => n + " players", " players");
+        private static readonly MultiPick _sizes = new MultiPick("Any size", n => n.ToString(System.Globalization.CultureInfo.InvariantCulture), "");
+
+        private static void UpdateMapListPostfix(LobbySettingsInterface __instance, string[] maps)
+        {
+            try
+            {
+                var list = MapList(__instance);
+                if (list == null || maps == null) return;
+                if (Enabled == null || !Enabled.Value)
+                {
+                    if (_bar != null) Shutdown();
+                    return;
+                }
+
+                // The game Destroys the old rows, which only happens at the
+                // end of the frame: the new ones are the last maps.Length.
+                ReadStock(Directory.GetParent(Application.dataPath)?.FullName);
+                var sw = Stopwatch.StartNew();
+                var content = list.content;
+                var first = content.childCount - maps.Length;
+                _rows.Clear();
+                for (var i = 0; i < maps.Length && first + i >= 0; i++)
+                {
+                    var info = Info(maps[i]);
+                    var go = content.GetChild(first + i).gameObject;
+                    _rows.Add(new Row { Go = go, Info = info });
+                    ShowDetails(go, info);
+                }
+                if (sw.ElapsedMilliseconds > 50)
+                    _log.LogInfo($"Map list filters: read {maps.Length} maps in {sw.ElapsedMilliseconds} ms.");
+
+                if (_bar == null || _list != list) BuildBar(__instance, list);
+                if (_bar == null) return;
+                SetOptions();
+                Apply();
+            }
+            catch (Exception e)
+            {
+                _log.LogWarning($"Map list filters failed: {e}");
+            }
+        }
+
+        // ---- the bar --------------------------------------------------------
+
+        private static void BuildBar(LobbySettingsInterface ui, ScrollRect list)
+        {
+            Shutdown();
+            _list = list;
+            // Scroll View / Content / Front, and Front is a vertical layout:
+            // the bar goes in above the list's Content, which gives up the
+            // bar's height.
+            var area = (RectTransform)list.transform.parent;
+            var front = area.parent;
+            var vlg = front != null ? front.GetComponent<VerticalLayoutGroup>() : null;
+            var observers = ObserversList(ui);
+            if (vlg == null || observers == null)
+            {
+                _log.LogWarning("Map list filters: the lobby settings screen isn't laid out as expected; no filters.");
+                return;
+            }
+
+            const float height = 40f, gap = 10f;
+            _bar = new GameObject("SanctuaryHud Map Filters", typeof(RectTransform));
+            var rt = (RectTransform)_bar.transform;
+            rt.SetParent(front, false);
+            rt.SetSiblingIndex(area.GetSiblingIndex());
+            rt.sizeDelta = new Vector2(area.rect.width, height + gap);
+            var le = _bar.AddComponent<LayoutElement>();
+            le.minHeight = le.preferredHeight = height + gap;
+            le.flexibleHeight = 0f;
+            // Front force-expands its children, which would split the height
+            // between the bar and the list; only the list should stretch.
+            _area = area;
+            _vlg = vlg;
+            _areaSize = area.sizeDelta;
+            _vlgExpand = vlg.childForceExpandHeight;
+            vlg.childForceExpandHeight = false;
+            area.sizeDelta = new Vector2(_areaSize.x, _areaSize.y - height - gap - vlg.spacing);
+            if (vlg.childControlHeight && area.GetComponent<LayoutElement>() == null)
+            {
+                _areaLe = area.gameObject.AddComponent<LayoutElement>();
+                _areaLe.flexibleHeight = 1f;
+            }
+            var hl = _bar.AddComponent<HorizontalLayoutGroup>();
+            hl.spacing = gap;
+            hl.childAlignment = TextAnchor.UpperLeft;
+            hl.childControlWidth = hl.childControlHeight = false;
+            hl.childForceExpandWidth = hl.childForceExpandHeight = false;
+
+            _players.Dropdown = CloneDropdown(observers, "Players");
+            _sizes.Dropdown = CloneDropdown(observers, "Size");
+
+            // The Maps header's Filters button, which the game hides: the
+            // same chip, as the custom maps switch.
+            // Front / MainContent / ListPanel.
+            var listPanel = front.parent != null ? front.parent.parent : null;
+            var chip = listPanel != null ? listPanel.Find("Header/Actions/Filters") : null;
+            if (chip != null && _stock != null)
+            {
+                var go = Object.Instantiate(chip.gameObject, _bar.transform, false);
+                go.name = "Custom";
+                ((RectTransform)go.transform).sizeDelta = new Vector2(((RectTransform)go.transform).sizeDelta.x, height);
+                go.SetActive(true);
+                _customBtn = go.GetComponent<ButtonManager>();
+                _customBtn.onClick.RemoveAllListeners();
+                for (var i = 0; i < _customBtn.onClick.GetPersistentEventCount(); i++)
+                    _customBtn.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
+                _customBtn.useLocalization = false;
+                _customBtn.Interactable(true);
+                _customBtn.onClick.AddListener(() =>
+                {
+                    _cfgShowCustom.Value = !_cfgShowCustom.Value;
+                    Apply();
+                });
+            }
+        }
+
+        private static Michsky.UI.Beam.Dropdown CloneDropdown(Michsky.UI.Beam.Dropdown source, string name)
+        {
+            // Cloned under an inactive holder and set up before it wakes: a
+            // clone's Awake would add a second Canvas to the item list, which
+            // the source's own Awake already did (and the clone copied).
+            var holder = new GameObject("SanctuaryHud Dropdown Holder");
+            holder.SetActive(false);
+            try
+            {
+                var dd = Object.Instantiate(source.gameObject, holder.transform, false).GetComponent<Michsky.UI.Beam.Dropdown>();
+                dd.name = name;
+                dd.setHighPriority = false;
+                dd.saveSelected = false;
+                dd.invokeOnEnable = false;
+                // The header is ours to write (a summary of the ticks), and
+                // carries no item icon. Items are wired in MultiPick.
+                dd.updateOnEnable = false;
+                dd.enableIcon = false;
+                dd.items = new List<Michsky.UI.Beam.Dropdown.Item> { new Michsky.UI.Beam.Dropdown.Item { itemName = "Any" } };
+                dd.selectedItemIndex = 0;
+                dd.onValueChanged = new Michsky.UI.Beam.Dropdown.DropdownEvent();
+                var rt = (RectTransform)dd.transform;
+                rt.sizeDelta = new Vector2(260f, rt.sizeDelta.y);
+                rt.SetParent(_bar.transform, false);
+                dd.gameObject.SetActive(true);
+                return dd;
+            }
+            finally { Object.DestroyImmediate(holder); }
+        }
+
+        // The dropdowns offer only the values some installed map has.
+        private static void SetOptions()
+        {
+            _players.SetOptions(_rows.Select(r => r.Info.Players).Where(n => n > 0).Distinct().OrderBy(n => n).ToArray());
+            _sizes.SetOptions(_rows.Select(r => r.Info.Size).Where(n => n > 0).Distinct().OrderBy(n => n).ToArray());
+        }
+
+        /// A dropdown that ticks any number of values (a 2v2 might use a
+        /// 4-spawn map; 256 and 512 maps both suit a quick game). None
+        /// ticked shows everything. The picks last for the session.
+        private sealed class MultiPick
+        {
+            private readonly string _any;
+            private readonly Func<int, string> _label;
+            private readonly string _unit;
+            private readonly HashSet<int> _picked = new HashSet<int>();
+            internal Michsky.UI.Beam.Dropdown Dropdown;
+            internal int[] Values = Array.Empty<int>();
+
+            internal MultiPick(string any, Func<int, string> label, string unit)
+            {
+                _any = any;
+                _label = label;
+                _unit = unit;
+            }
+
+            internal bool Shows(int value) => _picked.Count == 0 || _picked.Contains(value);
+
+            internal void SetOptions(int[] values)
+            {
+                var dd = Dropdown;
+                if (dd == null) return;
+                _picked.IntersectWith(values);
+                if (!Values.SequenceEqual(values) || dd.items.Count != values.Length + 1)
+                {
+                    Values = values;
+                    dd.items.Clear();
+                    dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = _any, itemIcon = HudStyle.Icon("box") });
+                    foreach (var v in values)
+                        dd.items.Add(new Michsky.UI.Beam.Dropdown.Item { itemName = _label(v), itemIcon = HudStyle.Icon("box") });
+                    dd.selectedItemIndex = 0;
+                    dd.Initialize();
+                    // A tick leaves the list open for the next one; only "Any"
+                    // closes it. Initialize wired each item to pick and close.
+                    for (var i = 0; i < dd.items.Count; i++)
+                    {
+                        var index = i;
+                        var button = dd.items[i].itemButton;
+                        if (button == null) continue;
+                        button.onClick.RemoveAllListeners();
+                        button.onClick.AddListener(() => Toggle(index));
+                    }
+                }
+                ShowPicks();
+            }
+
+            private void Toggle(int index)
+            {
+                if (index <= 0 || index > Values.Length)
+                {
+                    _picked.Clear();
+                    if (Dropdown != null && Dropdown.isOn) Dropdown.Animate();
+                }
+                else if (!_picked.Remove(Values[index - 1]))
+                    _picked.Add(Values[index - 1]);
+                ShowPicks();
+                Apply();
+            }
+
+            /// Ticks on the items, and the header as a summary: "2-4, 8 players".
+            private void ShowPicks()
+            {
+                var dd = Dropdown;
+                if (dd == null) return;
+                for (var i = 0; i < dd.items.Count; i++)
+                {
+                    var button = dd.items[i].itemButton;
+                    if (button == null) continue;
+                    var ticked = i == 0 ? _picked.Count == 0 : _picked.Contains(Values[i - 1]);
+                    var icon = HudStyle.Icon(ticked ? "box-ticked" : "box");
+                    if (button.buttonIcon == icon) continue;
+                    button.buttonIcon = icon;
+                    if (button.gameObject.activeInHierarchy) button.UpdateUI();
+                }
+                if (dd.headerText != null) dd.headerText.text = Summary();
+            }
+
+            private string Summary()
+            {
+                if (_picked.Count == 0) return _any;
+                var picked = _picked.OrderBy(n => n).ToList();
+                var parts = new List<string>();
+                for (var i = 0; i < picked.Count;)
+                {
+                    // A run of values that are all on offer, with none missing
+                    // between them, reads as a range.
+                    var j = i;
+                    while (j + 1 < picked.Count && Array.IndexOf(Values, picked[j + 1]) == Array.IndexOf(Values, picked[j]) + 1) j++;
+                    parts.Add(j - i >= 2 ? $"{picked[i]}-{picked[j]}" : string.Join(", ", picked.Skip(i).Take(j - i + 1)));
+                    i = j + 1;
+                }
+                return string.Join(", ", parts) + _unit;
+            }
+        }
+
+        private static void Apply()
+        {
+            var showCustom = _stock == null || _cfgShowCustom.Value;
+            foreach (var row in _rows)
+            {
+                if (row.Go == null) continue;
+                var info = row.Info;
+                var show = _players.Shows(info.Players)
+                    && _sizes.Shows(info.Size)
+                    && (showCustom || !info.Custom);
+                if (row.Go.activeSelf != show) row.Go.SetActive(show);
+            }
+            if (_customBtn != null)
+            {
+                _customBtn.buttonText = _cfgShowCustom.Value ? "Custom maps: on" : "Custom maps: off";
+                if (_customBtn.gameObject.activeInHierarchy) _customBtn.UpdateUI();
+            }
+            if (_list != null) _list.verticalNormalizedPosition = 1f;
+        }
+
+        // The row prefab carries a players column (from the lobby list's
+        // rows) that the map list leaves hidden.
+        private static void ShowDetails(GameObject row, MapInfo info)
+        {
+            var players = row.transform.Find("Content/Players");
+            if (players == null || info.Players <= 0) return;
+            var text = players.GetComponent<TMP_Text>();
+            if (text == null) return;
+            text.text = info.Size > 0 ? $"{info.Players}P  {info.Size}" : $"{info.Players}P";
+            players.gameObject.SetActive(true);
+            var sep = row.transform.Find("Content/Separator (3)");
+            if (sep != null) sep.gameObject.SetActive(true);
+        }
+
+        /// From the plugin's OnDestroy, and when the filters are switched off:
+        /// every row back, the list its full height, the bar gone.
+        internal static void Shutdown()
+        {
+            foreach (var row in _rows)
+                if (row.Go != null && !row.Go.activeSelf) row.Go.SetActive(true);
+            if (_area != null) _area.sizeDelta = _areaSize;
+            if (_vlg != null) _vlg.childForceExpandHeight = _vlgExpand;
+            _vlg = null;
+            if (_areaLe != null) Object.Destroy(_areaLe);
+            if (_bar != null) Object.Destroy(_bar);
+            _area = null;
+            _areaLe = null;
+            _bar = null;
+            _list = null;
+            _players.Dropdown = _sizes.Dropdown = null;
+            _players.Values = _sizes.Values = Array.Empty<int>();
+            _customBtn = null;
+        }
+
+        // ---- map facts ------------------------------------------------------
+
+        private static readonly Regex ArmyMarker = new Regex(@"^army_\d+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        // Data.DataPath (Application.dataPath underneath), taken on the main
+        // thread for the prefetch.
+        private static string _dataPath;
+        private static readonly object _lock = new object();
+
+        /// From Awake: reads every installed map's header on a worker thread,
+        /// so the lobby screen doesn't stall half a second on first opening
+        /// (188 maps measured at ~0.5 s).
+        internal static void Prefetch()
+        {
+            if (Enabled == null || !Enabled.Value) return;
+            _dataPath = Data.DataPath;
+            var engine = Directory.GetParent(Application.dataPath)?.FullName;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    ReadStock(engine);
+                    var sw = Stopwatch.StartNew();
+                    var n = 0;
+                    foreach (var file in Directory.EnumerateFiles(_dataPath + "Maps/", "*.sanmap", SearchOption.AllDirectories))
+                    {
+                        Info(file.Replace('\\', '/').Substring(_dataPath.Length));
+                        n++;
+                    }
+                    _log.LogInfo($"Map list filters: read {n} maps in {sw.ElapsedMilliseconds} ms (in the background).");
+                }
+                catch (Exception e)
+                {
+                    _log.LogInfo($"Map list filters: background map read failed ({e.Message}); the list reads them when it opens.");
+                }
+            });
+        }
+
+        private static MapInfo Info(string mapPath)
+        {
+            lock (_lock) return InfoLocked(mapPath);
+        }
+
+        private static MapInfo InfoLocked(string mapPath)
+        {
+            var full = (_dataPath ?? Data.DataPath) + mapPath.Replace('\\', '/');
+            var info = new MapInfo();
+            try
+            {
+                var fi = new FileInfo(full);
+                if (_infoCache.TryGetValue(full, out var hit) && hit.Item1 == fi.Length && hit.Item2 == fi.LastWriteTimeUtc)
+                    info = hit.Item3;
+                else
+                {
+                    Read(full, info);
+                    _infoCache[full] = (fi.Length, fi.LastWriteTimeUtc, info);
+                }
+            }
+            catch (Exception e)
+            {
+                _log.LogDebug($"Map list filters: couldn't read {mapPath}: {e.Message}");
+            }
+            info.Custom = _stock != null && !_stock.Contains(StockKey(mapPath));
+            return info;
+        }
+
+        // A .sanmap is JSON with its props (megabytes on some maps) after the
+        // markers, so the read stops as soon as it has what it needs.
+        private static void Read(string full, MapInfo info)
+        {
+            float width = 0f, length = 0f, playable = 0f;
+            bool haveAreas = false, haveMarkers = false;
+            using (var reader = new JsonTextReader(new StreamReader(full)))
+            {
+                if (!reader.Read() || reader.TokenType != JsonToken.StartObject) return;
+                while (reader.Read() && reader.TokenType == JsonToken.PropertyName)
+                {
+                    var name = (string)reader.Value;
+                    if (!reader.Read()) break;
+                    switch (name)
+                    {
+                        case "width": width = ToFloat(reader.Value); break;
+                        case "length": length = ToFloat(reader.Value); break;
+                        case "areas":
+                            haveAreas = true;
+                            if (JToken.ReadFrom(reader) is JObject areas && areas["PlayableArea"] is JObject pa)
+                                playable = Math.Max(ToFloat((pa["width"] as JValue)?.Value), ToFloat((pa["height"] as JValue)?.Value));
+                            break;
+                        case "markers":
+                            haveMarkers = true;
+                            var armies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            CountArmies(JToken.ReadFrom(reader), armies);
+                            info.Players = armies.Count;
+                            break;
+                        default: reader.Skip(); break;
+                    }
+                    if (haveAreas && haveMarkers && width > 0f && length > 0f) break;
+                }
+            }
+            var size = playable > 0f ? playable : Math.Max(width, length);
+            if (size > 0f) info.Size = (int)Math.Pow(2, Math.Round(Math.Log(size, 2)));
+        }
+
+        private static float ToFloat(object v)
+        {
+            try { return v == null ? 0f : Convert.ToSingle(v, System.Globalization.CultureInfo.InvariantCulture); }
+            catch { return 0f; }
+        }
+
+        private static void CountArmies(JToken token, HashSet<string> armies)
+        {
+            if (token is JObject o)
+            {
+                foreach (var p in o.Properties())
+                {
+                    if (ArmyMarker.IsMatch(p.Name)) armies.Add(p.Name);
+                    CountArmies(p.Value, armies);
+                }
+            }
+            else if (token is JArray a)
+            {
+                foreach (var t in a) CountArmies(t, armies);
+            }
+        }
+
+        // ---- which maps Steam installed ---------------------------------------
+
+        private const string DefaultAppId = "4511930";
+        private static readonly Regex ManifestMap = new Regex(@"Sanctuary_Data\\Maps\\([^\x00-\x1f]+?\.sanmap)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        private static readonly Regex InstalledDepot = new Regex(@"""(\d+)""\s*\{\s*""manifest""\s*""(\d+)""", RegexOptions.CultureInvariant);
+
+        private static string StockKey(string mapPath)
+        {
+            var p = mapPath.Replace('\\', '/');
+            if (p.StartsWith("Maps/", StringComparison.OrdinalIgnoreCase)) p = p.Substring(5);
+            return p.ToLowerInvariant();
+        }
+
+        /// The maps in the installed build's depot manifests, from Steam's
+        /// depotcache: the app manifest (.acf) beside the game names each
+        /// installed depot's manifest id.
+        private static void ReadStock(string enginePath)
+        {
+            lock (_lock) ReadStockLocked(enginePath);
+        }
+
+        private static void ReadStockLocked(string enginePath)
+        {
+            if (_stockRead || enginePath == null) return;
+            _stockRead = true;
+            try
+            {
+                // ...\steamapps\common\<game>\engine
+                var engine = new DirectoryInfo(enginePath);
+                var steamapps = engine.Parent?.Parent?.Parent;
+                if (steamapps == null) return;
+                var appIdFile = Path.Combine(engine.FullName, "steam_appid.txt");
+                var appId = File.Exists(appIdFile) ? File.ReadAllText(appIdFile).Trim() : DefaultAppId;
+                var acf = Path.Combine(steamapps.FullName, $"appmanifest_{appId}.acf");
+                if (!File.Exists(acf))
+                {
+                    _log.LogInfo($"Map list filters: no {Path.GetFileName(acf)}, so custom maps can't be told apart.");
+                    return;
+                }
+                var caches = new List<string> { Path.Combine(steamapps.Parent.FullName, "depotcache") };
+                if (Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) is string steam)
+                    caches.Add(Path.Combine(steam, "depotcache"));
+
+                var stock = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var found = 0;
+                foreach (Match m in InstalledDepot.Matches(File.ReadAllText(acf)))
+                {
+                    var file = caches.Select(c => Path.Combine(c, $"{m.Groups[1].Value}_{m.Groups[2].Value}.manifest")).FirstOrDefault(File.Exists);
+                    if (file == null) continue;
+                    found++;
+                    // Binary protobuf with the paths in plain text: one char
+                    // per byte keeps them intact for the regex.
+                    var bytes = File.ReadAllBytes(file);
+                    var chars = new char[bytes.Length];
+                    for (var i = 0; i < bytes.Length; i++) chars[i] = (char)bytes[i];
+                    var text = new string(chars);
+                    foreach (Match map in ManifestMap.Matches(text)) stock.Add(StockKey(map.Groups[1].Value));
+                }
+                if (found == 0 || stock.Count == 0)
+                {
+                    _log.LogInfo("Map list filters: Steam's depot manifests for the game weren't found, so custom maps can't be told apart.");
+                    return;
+                }
+                _stock = stock;
+                _log.LogInfo($"Map list filters: {stock.Count} maps came with the game (Steam depot manifest).");
+            }
+            catch (Exception e)
+            {
+                _log.LogInfo($"Map list filters: couldn't read Steam's depot manifests ({e.Message}), so custom maps can't be told apart.");
+            }
+        }
+    }
+}
