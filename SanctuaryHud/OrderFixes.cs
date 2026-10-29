@@ -17,7 +17,11 @@ namespace SanctuaryHud
     // assist it once built, and it goes idle instead. The host's assist
     // order already builds an unfinished target first and then helps what
     // it produces (HostUnit:AssistBehaviorThread), so with this on that
-    // right-click, on a building that can build, is an assist.
+    // right-click, on a building that can build, is an assist. A finished
+    // one below full health is a repair too, which ends as soon as the
+    // factory is healed: a forward factory under fire gets a few seconds of
+    // help each click. That one keeps the repair and queues the assist
+    // after it.
     //
     // Client side only, standard orders. The class methods go through the
     // class's own assignment, which carries them to every unit type that
@@ -40,7 +44,8 @@ namespace SanctuaryHud
                 "anywhere in the factory's queue, however far back.");
             _cfgAssist = config.Bind("QoL", "AssistUnfinishedFactories", false,
                 "Right-clicking an unfinished factory with engineers assists it instead of repairing it: they help " +
-                "finish it, then go on helping with what it builds. The game's repair order ends once the building is up.");
+                "finish it, then go on helping with what it builds. A damaged factory gets the repair with an assist " +
+                "queued after it. The game's repair order ends once the building is up or healed.");
         }
 
         internal static void Shutdown() => Hook.Remove();
@@ -112,15 +117,24 @@ if not __SdbOrderFixes then
       end
     end
     if __ASSIST__ then
+      local COM = Import('client/managers/orders/clientOrderManager.lua')
+      local SS = Import('client/input/selectionSystem.lua')
+      local OT = Import('common/commonOrders.lua').OrderTasks
       -- OnMouseRightUp calls this only for engineers on an unfinished (or
       -- damaged) unit of an ally; an unfinished one that builds gets the
-      -- assist instead.
+      -- assist instead, and a damaged one the repair with the assist queued
+      -- after it.
       hook(IEF, 'IssueRepairOrder', function(orig) return function(...)
         if __SdbOrderFixes == S then
           local t = IEF.GetHoverUnit()
           if t and t.tp and t.tp.construction and t.tp.construction.canBuild and t:HasTags(Tags.STRUCTURE)
-             and not t:IsCompleted() and not t:IsUpgrading() then
-            return IEF.IssueAssistOrder()
+             and not t:IsUpgrading() then
+            if not t:IsCompleted() then return IEF.IssueAssistOrder() end
+            local r = orig(...)
+            if not SS.SelectionBox:IsActive() then
+              COM.ClientIssueOrder(OT.ASSISTUNIT, SS.GetSelectedUnits(), true, t:GetPosition(), { targetGlobalId = t.id })
+            end
+            return r
           end
         end
         return orig(...)

@@ -1081,6 +1081,10 @@ if not __SdbWaypoints then
 
   local function moveOn(u, o)
     local plan, why = W.Plan(o, nil, true, { u })
+    -- Everything after the assist already done or gone (a building others
+    -- finished, a dead target): re-issuing nothing would clear its orders
+    -- and stop it. It goes on assisting instead.
+    if plan and #plan.groups[1].specs == 0 then return end
     if plan then
       W.Start(plan)
       __SdbWaypointsCount = __SdbWaypointsCount + 1
