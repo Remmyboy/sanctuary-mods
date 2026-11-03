@@ -190,6 +190,7 @@ namespace SanctuaryHud
             EngineerQueue.Bind(Config);
             QueueReorder.Bind(Config);
             GameClock.Bind(Config);
+            MapPicker.Bind(Config);
 
             // Every Bind has run by now, and the file is this mod's alone, so
             // whatever is still unclaimed is a setting no version reads any
@@ -230,6 +231,15 @@ namespace SanctuaryHud
                 _log.LogWarning($"Panel stand-ins unavailable (hook failed): {e.Message}");
                 PanelConceal.Unavailable = true;
             }
+            try
+            {
+                MapPicker.ApplyPatch(_harmony);
+            }
+            catch (Exception e)
+            {
+                _log.LogWarning($"Map list filters unavailable (hook failed): {e.Message}");
+            }
+            MapPicker.Prefetch();
             _log.LogInfo($"Hotkeys: {_cfgToggleKey.Value} = toggle overlay, F9 = dump UI hierarchy to log (at Debug level).");
         }
 
@@ -311,6 +321,7 @@ namespace SanctuaryHud
                 SelectSameType.Shutdown();
                 CommanderGuard.Shutdown();
                 MatchStats.Shutdown();
+                MapPicker.Shutdown();
                 HudCanvas.Destroy();
             }
             finally

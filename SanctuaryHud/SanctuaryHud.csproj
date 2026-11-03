@@ -6,6 +6,19 @@
     <SharedMatchStats>true</SharedMatchStats>
   </PropertyGroup>
 
+  <!-- The lobby's map list filters (MapPicker.cs) clone the game's Beam UI
+       dropdowns and read .sanmap headers with the game's Newtonsoft. -->
+  <ItemGroup>
+    <Reference Include="Michsky.UI.Beam">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Michsky.UI.Beam.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(GamePath)\Sanctuary_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
   <ItemGroup>
     <Compile Include="..\shared\**\*.cs" Link="shared\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>

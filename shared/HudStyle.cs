@@ -125,9 +125,10 @@ namespace SanctuaryHud
         internal static void Released() => _icons.Clear();
 
         /// One of the HUD's own white icons, 64 pixels square, to tint:
-        /// "menu" (three lines), "ring" (a circle, for a glyph to sit in) or
+        /// "menu" (three lines), "ring" (a circle, for a glyph to sit in),
         /// "grip" (three diagonal strokes in the bottom-right corner, for a
-        /// resize handle). Null for a name it doesn't draw.
+        /// resize handle), or "box" and "box-ticked" (a checkbox). Null for a
+        /// name it doesn't draw.
         internal static Sprite Icon(string name)
         {
             if (_icons.TryGetValue(name, out var found) && found != null) return found;
@@ -148,6 +149,13 @@ namespace SanctuaryHud
                     break;
                 case "ring":
                     shape = (x, y) => Mathf.Abs(Vector2.Distance(new Vector2(x, y), new Vector2(32f, 32f)) - 22f) - 2.5f;
+                    break;
+                case "box":
+                    shape = (x, y) => Mathf.Abs(Box(x, y, 32f, 32f, 24f, 24f, 5f)) - 2.5f;
+                    break;
+                case "box-ticked":
+                    shape = (x, y) => Mathf.Min(Mathf.Abs(Box(x, y, 32f, 32f, 24f, 24f, 5f)) - 2.5f,
+                        Mathf.Min(Segment(x, y, 18f, 33f, 28f, 22f), Segment(x, y, 28f, 22f, 46f, 43f)) - 3.5f);
                     break;
                 default:
                     return null;
@@ -173,6 +181,15 @@ namespace SanctuaryHud
             var qx = Mathf.Abs(x - cx) - hx + r;
             var qy = Mathf.Abs(y - cy) - hy + r;
             return Mathf.Sqrt(Mathf.Max(qx, 0f) * Mathf.Max(qx, 0f) + Mathf.Max(qy, 0f) * Mathf.Max(qy, 0f)) + Mathf.Min(Mathf.Max(qx, qy), 0f) - r;
+        }
+
+        /// Distance, in pixels, from (x, y) to the segment (ax, ay)-(bx, by).
+        private static float Segment(float x, float y, float ax, float ay, float bx, float by)
+        {
+            var a = new Vector2(ax, ay);
+            var ab = new Vector2(bx, by) - a;
+            var t = Mathf.Clamp01(Vector2.Dot(new Vector2(x, y) - a, ab) / ab.sqrMagnitude);
+            return Vector2.Distance(new Vector2(x, y), a + ab * t);
         }
 
         private static Texture2D NewTexture(int w, int h) =>
