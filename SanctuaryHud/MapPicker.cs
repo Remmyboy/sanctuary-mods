@@ -41,7 +41,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("QoL", "MapListFilters", false,
+            Enabled = config.Bind("QoL", "MapListFilters", true,
                 "Filters above the lobby's map list: players, size, and a switch for custom maps (any map Steam didn't install).");
             _cfgShowCustom = config.Bind("QoL", "MapListShowsCustomMaps", true,
                 "The map list's custom maps switch, remembered between launches.");
