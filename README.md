@@ -42,7 +42,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.18.4**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.18.4) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; lobby map list filters by players, size and custom maps; every panel resizable by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.19.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.19.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; lobby map list search and filters by players, size and custom maps; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.2) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
@@ -645,7 +645,8 @@ The speed is the one the host last announced (its "Speed changed to …" log
 line), since a client's own engine speed need not follow the host's.
 
 **Map list filters** (`MapListFilters`, on by default): a bar above the lobby settings
-screen's map list — a players dropdown, a size dropdown (256, 512, …) and a
+screen's map list — a **Search maps** box (every word typed must appear in the
+map's name or folder), a players dropdown, a size dropdown (256, 512, …) and a
 **Custom maps: on/off** switch — and each row shows its players and size
 (`8P  1024`). Both dropdowns take any number of ticks (2, 3 and 4 players for
 a 2v2 that might use a 4-player map; 256 and 512 for a quick game) and read
