@@ -42,7 +42,7 @@ namespace SanctuaryHud
         internal static void Bind(ConfigFile config)
         {
             Enabled = config.Bind("QoL", "MapListFilters", true,
-                "Filters above the lobby's map list: players, size, and a switch for custom maps (any map Steam didn't install).");
+                "Filters above the lobby's map list: a name search box, players, size, and a switch for custom maps (any map Steam didn't install).");
             _cfgShowCustom = config.Bind("QoL", "MapListShowsCustomMaps", true,
                 "The map list's custom maps switch, remembered between launches.");
         }
@@ -57,6 +57,8 @@ namespace SanctuaryHud
             AccessTools.FieldRefAccess<LobbySettingsInterface, ScrollRect>("mapList");
         private static readonly AccessTools.FieldRef<LobbySettingsInterface, Michsky.UI.Beam.Dropdown> ObserversList =
             AccessTools.FieldRefAccess<LobbySettingsInterface, Michsky.UI.Beam.Dropdown>("observersList");
+        private static readonly AccessTools.FieldRef<LobbySettingsInterface, InputFieldManager> LobbyName =
+            AccessTools.FieldRefAccess<LobbySettingsInterface, InputFieldManager>("lobbyName");
 
         private sealed class MapInfo
         {
@@ -69,6 +71,8 @@ namespace SanctuaryHud
         {
             public GameObject Go;
             public MapInfo Info;
+            // Folder and file name, lower case, for the search box.
+            public string Name;
         }
 
         // Read once per file version: (full path) -> (length, write time, info).
@@ -87,6 +91,9 @@ namespace SanctuaryHud
         private static VerticalLayoutGroup _vlg;
         private static bool _vlgExpand;
         private static ButtonManager _customBtn;
+        private static TMP_InputField _searchBox;
+        // Every word typed must appear in the map's name; lasts the session.
+        private static string[] _search = Array.Empty<string>();
         private static readonly MultiPick _players = new MultiPick("Any players", n => n + " players", " players");
         private static readonly MultiPick _sizes = new MultiPick("Any size", n => n.ToString(System.Globalization.CultureInfo.InvariantCulture), "");
 
@@ -113,7 +120,7 @@ namespace SanctuaryHud
                 {
                     var info = Info(maps[i]);
                     var go = content.GetChild(first + i).gameObject;
-                    _rows.Add(new Row { Go = go, Info = info });
+                    _rows.Add(new Row { Go = go, Info = info, Name = SearchName(maps[i]) });
                     ShowDetails(go, info);
                 }
                 if (sw.ElapsedMilliseconds > 50)
@@ -177,6 +184,8 @@ namespace SanctuaryHud
             hl.childControlWidth = hl.childControlHeight = false;
             hl.childForceExpandWidth = hl.childForceExpandHeight = false;
 
+            var lobbyName = LobbyName(ui);
+            if (lobbyName != null) _searchBox = CloneSearchBox(lobbyName, height);
             _players.Dropdown = CloneDropdown(observers, "Players");
             _sizes.Dropdown = CloneDropdown(observers, "Size");
 
@@ -203,6 +212,74 @@ namespace SanctuaryHud
                     Apply();
                 });
             }
+        }
+
+        /// The lobby name box, cloned as a search box: the game's own look,
+        /// its floating label renamed. Instantiate copies only persistent
+        /// listeners, and those are switched off; the game's own wiring
+        /// (end-edit renames the lobby) is added at runtime and doesn't come.
+        private static TMP_InputField CloneSearchBox(InputFieldManager source, float height)
+        {
+            var go = Object.Instantiate(source.gameObject, _bar.transform, false);
+            go.name = "Search";
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.sizeDelta = new Vector2(260f, Math.Max(rt.sizeDelta.y, height));
+            var field = go.GetComponent<TMP_InputField>();
+            if (field == null)
+            {
+                Object.Destroy(go);
+                return null;
+            }
+            foreach (var ev in new UnityEngine.Events.UnityEventBase[] { field.onValueChanged, field.onEndEdit, field.onSubmit, field.onSelect, field.onDeselect })
+                for (var i = 0; i < ev.GetPersistentEventCount(); i++)
+                    ev.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
+            var manager = go.GetComponent<InputFieldManager>();
+            if (manager != null)
+            {
+                manager.processSubmit = false;
+                manager.clearOnSubmit = false;
+            }
+            field.contentType = TMP_InputField.ContentType.Standard;
+            field.lineType = TMP_InputField.LineType.SingleLine;
+            field.characterLimit = 40;
+            // Every label but the typed text: the placeholder and Beam's
+            // floating title ("Lobby name") both say what the box is for.
+            foreach (var label in go.GetComponentsInChildren<TMP_Text>(true))
+            {
+                if (label == field.textComponent) continue;
+                foreach (var loc in label.GetComponents<MonoBehaviour>())
+                    if (loc != null && loc.GetType().Name.IndexOf("Locali", StringComparison.OrdinalIgnoreCase) >= 0)
+                        loc.enabled = false;
+                label.text = "Search maps";
+            }
+            field.SetTextWithoutNotify(string.Join(" ", _search));
+            field.onValueChanged.AddListener(text =>
+            {
+                _search = (text ?? "").ToLowerInvariant().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                Apply();
+            });
+            go.SetActive(true);
+            return field;
+        }
+
+        /// "Maps/Generated/Big Lake.sanmap" -> "generated/big lake".
+        private static string SearchName(string mapPath)
+        {
+            var p = mapPath.Replace('\\', '/');
+            if (p.StartsWith("Maps/", StringComparison.OrdinalIgnoreCase)) p = p.Substring(5);
+            if (p.EndsWith(".sanmap", StringComparison.OrdinalIgnoreCase)) p = p.Substring(0, p.Length - 7);
+            return p.Replace('_', ' ').ToLowerInvariant();
+        }
+
+        private static bool Matches(string name)
+        {
+            if (_search.Length == 0) return true;
+            if (name == null) return false;
+            foreach (var word in _search)
+                if (name.IndexOf(word, StringComparison.Ordinal) < 0) return false;
+            return true;
         }
 
         private static Michsky.UI.Beam.Dropdown CloneDropdown(Michsky.UI.Beam.Dropdown source, string name)
@@ -349,7 +426,8 @@ namespace SanctuaryHud
                 var info = row.Info;
                 var show = _players.Shows(info.Players)
                     && _sizes.Shows(info.Size)
-                    && (showCustom || !info.Custom);
+                    && (showCustom || !info.Custom)
+                    && Matches(row.Name);
                 if (row.Go.activeSelf != show) row.Go.SetActive(show);
             }
             if (_customBtn != null)
@@ -392,6 +470,7 @@ namespace SanctuaryHud
             _players.Dropdown = _sizes.Dropdown = null;
             _players.Values = _sizes.Values = Array.Empty<int>();
             _customBtn = null;
+            _searchBox = null;
         }
 
         // ---- map facts ------------------------------------------------------

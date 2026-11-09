@@ -57,6 +57,7 @@ public class Probe : BaseUnityPlugin
   rtap <path>                 the same with the right button
   pointer <enter|exit|down|up|click> <path>   one pointer event
   active <0|1> <path>         SetActive (hide a stuck overlay for a shot)
+  settext <path> | <text>     type into an input field (onValueChanged fires; empty clears)
   scroll <0..1> <path>        the ScrollRect on or around path (1 = top)
   scroll to <path>            scroll path's list so path is at the top
   window <Name>               InterfaceManager.TransitionTo(Window.<Name>)
@@ -314,6 +315,19 @@ public class Probe : BaseUnityPlugin
                 if (t == null) { Out("usage: active <0|1> <path> (not found)"); break; }
                 t.gameObject.SetActive(a[0] == "1" || a[0].Equals("true", StringComparison.OrdinalIgnoreCase));
                 Out($"{PathOf(t)} active={t.gameObject.activeSelf}");
+                break;
+            }
+            case "settext":
+            {
+                // settext <path> | <text>: a TMP input field's text, as if typed
+                // (onValueChanged fires). An empty text clears it.
+                var line = string.Join(" ", a);
+                var bar = line.IndexOf('|');
+                var t = bar > 0 ? Find(line.Substring(0, bar).Trim()) : null;
+                var field = t != null ? t.GetComponentInChildren<TMPro.TMP_InputField>(true) : null;
+                if (field == null) { Out("usage: settext <path> | <text> (no input field at path)"); break; }
+                field.text = line.Substring(bar + 1).Trim();
+                Out($"{PathOf(field.transform)} text=\"{field.text}\"");
                 break;
             }
             case "scroll":
