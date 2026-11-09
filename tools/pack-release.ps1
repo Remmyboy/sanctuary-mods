@@ -206,8 +206,19 @@ $outPath = if ([System.IO.Path]::IsPathRooted($OutDir)) { $OutDir } else { Join-
 New-Item -ItemType Directory -Force -Path $outPath | Out-Null
 
 function New-Zip($dir, $zip) {
+    # Written entry by entry with '/' separators: Windows PowerShell 5.1's
+    # Compress-Archive writes '\', which the zip spec forbids and some
+    # extractors turn into file names with backslashes in them.
     if (Test-Path $zip) { Remove-Item $zip -Force }
-    Compress-Archive -Path "$dir\*" -DestinationPath $zip -CompressionLevel Optimal
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+    $root = (Resolve-Path $dir).Path.TrimEnd('\') + '\'
+    $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($f in Get-ChildItem -LiteralPath $dir -Recurse -File -Force) {
+            $name = $f.FullName.Substring($root.Length).Replace('\', '/')
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $f.FullName, $name, [IO.Compression.CompressionLevel]::Optimal)
+        }
+    } finally { $archive.Dispose() }
 }
 
 # ---- ModManager add-in ----------------------------------------------------
