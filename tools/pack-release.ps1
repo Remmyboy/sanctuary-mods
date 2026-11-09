@@ -389,6 +389,12 @@ if (-not $Publish) {
     return
 }
 
+# From here every native call is judged by its exit code. Windows PowerShell
+# 5.1 turns any stderr line (gh's "release not found", git push progress)
+# into a terminating error under 'Stop', which would end the script halfway
+# through a publish, after the tag is pushed.
+$ErrorActionPreference = 'Continue'
+
 # A tag is never moved or reused: someone may already have downloaded it.
 & git -C $repo rev-parse --quiet --verify "refs/tags/$tag" | Out-Null
 if ($LASTEXITCODE -eq 0) { Fail "tag $tag already exists locally - bump [BepInPlugin] first" }
