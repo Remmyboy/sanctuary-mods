@@ -40,7 +40,7 @@ namespace SanctuaryHud
                 "The game's card comes back whenever the overlay is hidden or the mod is unloaded.");
             TidyBuiltIn = config.Bind("BottomPanels", "TidyGameUnitCard", true,
                 "With the game's own card kept (UnitCard off): hide the unit's template id and round its income figures.");
-            Stats = config.Bind("BottomPanels", "UnitCardStats", false,
+            Stats = config.Bind("BottomPanels", "UnitCardStats", true,
                 "On the unit card (UnitCard on): the unit's speed, damage per second and weapon range, for the unit selected " +
                 "or hovered and for a build option under the mouse. Damage per second is worked out from the template the way " +
                 "the game's AI does it: each weapon's damage times the muzzles a cycle fires, over its reload.");

@@ -42,10 +42,10 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.19.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.19.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; lobby map list search and filters by players, size and custom maps; every panel resizable by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.20.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.20.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; lobby map list search and filters by players, size and custom maps; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.7.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.2) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.2) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
-| [BuildHotkeys](BuildHotkeys/) | [**0.5.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.5.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
+| [BuildHotkeys](BuildHotkeys/) | [**0.6.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.6.0) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
 | [LadderReporter](LadderReporter/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.6.1) | Reports ranked results; queues for the ladder from the game and launches matchmade games; uploads the match's stats and replay to its SanctuaryDB page and streams your games live to sanctuarydb.net/live if you opt in |
 | [ReplayManager](ReplayManager/) | [**0.5.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.5.3) | Watch the game's replays fog-free from any seat, with every economy in a table you can sort by any column |
 | [CameraUtilities](CameraUtilities/) | [**0.2.2**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.2.2) | Switches off icons, range rings, order lines and the UI, and unlocks how far out units are drawn, for cinematics |
@@ -192,7 +192,7 @@ thin dividers where pieces meet.
   in a TextMeshPro font, which are cloned; the clock is the HUD's. The time is the template's
   `buildTime` over the selected builders' build power — engineers assisting
   one job add up, a factory builds alone, so the strongest selected one
-  counts. `UnitCardStats` (off by default) adds a line of speed, damage per
+  counts. `UnitCardStats` (on by default) adds a line of speed, damage per
   second and weapon range, for a unit and for a build option alike, read
   from the template (so a balance mod's figures show); damage per second is
   the game's AI's own sum over the weapons. With the replacement off,
@@ -238,7 +238,7 @@ thin dividers where pieces meet.
   light up.
 
   **Drag a queue tile to reorder the factory's queue** (`QoL · ReorderQueueByDragging`,
-  off by default, like nearly everything in the QoL section). A bar shows where it will land. Dropped at the very front,
+  on by default). A bar shows where it will land. Dropped at the very front,
   it cancels what the factory is building and starts the moved item instead;
   anywhere else, the current build carries on. The host has no reorder: its
   one queue command adds or takes away N of an item, and a new item goes on
@@ -622,9 +622,13 @@ comes up, the HUD logs the result panel's object tree.
 
 ### QoL
 
-Everything here lives in the **QoL** section of the Mods page and is **off by
-default**, except the queue right-click fix and the commander delete check
-below; the factory queue drag above (`ReorderQueueByDragging`) is there too.
+Everything here lives in the **QoL** section of the Mods page; the factory
+queue drag above (`ReorderQueueByDragging`) is there too. What shows or adds a
+control is **on by default** (a setting already saved in your config keeps
+its value, so an install from before the defaults changed stays as it was
+until you switch them on). The three that change what an order does
+(`AssistKeepsBuilding`, `AssistUnfinishedFactories`, `FactoryAssistThenQueue`)
+and `UpgradeBadgeOnlyWhileUpgrading` stay off until you switch them on.
 
 **Deleting your commander asks first** (`ConfirmCommanderDelete`, **on** by
 default). Delete (or Ctrl-Delete) with your commander in the selection opens a
@@ -673,13 +677,6 @@ building it. It runs the same decision the game's right-click handler makes,
 from the same inputs, every frame. The cursors are from Kenney's
 [Cursor Pack](https://kenney.nl/assets/cursor-pack) (CC0), embedded in the DLL
 and scaled to the screen: 32 pixels at 1080p, 48 at 1440p, 64 at 4K.
-
-**Ctrl-A selects every unit of the selected types** (`SelectAllOfSelectedTypes`, on Ctrl-A):
-with a T1 tank and a T1 scout selected, Ctrl-A selects every finished T1 tank
-and T1 scout of yours on the map. The game's double-click does this for one
-type and only on screen. With nothing selected, Ctrl-A keeps the game's own
-meaning (hold it to box-select only air units). It swaps the press handler on
-the game's live key map, as BuildHotkeys does, so no file changes.
 
 **Factory rally points you can see.** Right-clicking the ground with a factory
 selected sets where its units go, but the game keeps that point on the host
@@ -734,11 +731,11 @@ drag.
 Everything it sends is a command an unmodded client sends, and no Lua file
 changes, so it stays lobby-compatible. `QoL · ShowRallyPoints`,
 `QoL · DraggableWaypoints` and `QoL · WaypointGrabPixels` (how close a press has to land)
-are in the QoL section of the Mods page, and the first two are off by default:
-turn them on to use them. They work with the overlay hidden too:
-they are controls, not display.
+are in the QoL section of the Mods page, and the first two are on by default.
+They work with the overlay hidden too: they are controls, not display.
 
-The same re-issuing serves three more, all off by default:
+The same re-issuing serves four more; the engineer queue is on by default and
+the other three are off:
 
 - **Engineer queue** (`BottomPanels · EngineerQueue`, needs the build strip).
   The game shows a factory's queue but nothing for an engineer, whose
@@ -1137,6 +1134,15 @@ attack (the `Shift-` form is what queues it), `F5` for control group 1,
 `AnyModifier-K` for a camera pan that works whatever modifier is held. Blank
 unbinds it; `LeftButton`, `RightButton` and `MiddleButton` are keys as well.
 F1 is best avoided, since the game's debug menu sits on it.
+
+**Select every unit of the selected types** (`Game selection · SelectSameTypesKey`,
+on Ctrl-Shift-A): with a T1 tank and a T1 scout selected, the key selects every
+finished T1 tank and T1 scout of yours on the map. The game's double-click does
+this for one type and only on screen. With nothing selected the key does what
+it did before, so putting this on Ctrl-A (after moving the air filter
+`FilterAirMobileSelection` elsewhere, or not) keeps the air filter working on
+an empty selection. It was a SanctuaryHud setting (`SelectAllOfSelectedTypes`)
+before it moved here.
 
 The game keeps every hotkey in one table, `inputActions.lua`, which
 `inputSystem.lua` copies into `LoadedActionMap` as one entry per key, each a

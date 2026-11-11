@@ -27,7 +27,7 @@ namespace SanctuaryHud
 
         internal static void Bind(ConfigFile config)
         {
-            Enabled = config.Bind("BottomPanels", "EngineerQueue", false,
+            Enabled = config.Bind("BottomPanels", "EngineerQueue", true,
                 "Show the buildings queued for the selected engineers (when they share one queue) as a row of tiles " +
                 "where a factory's queue goes, and right-click a tile to take that building out while keeping the " +
                 "rest of the queue. Needs the build strip (BuildStrip) on.");

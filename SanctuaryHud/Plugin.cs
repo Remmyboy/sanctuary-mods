@@ -27,7 +27,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.19.0")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.20.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -184,7 +184,6 @@ namespace SanctuaryHud
 
             // Extras for the game's own controls, all off until switched on.
             CursorHint.Bind(Config);
-            SelectSameType.Bind(Config);
             Waypoints.Bind(Config);
             OrderFixes.Bind(Config);
             EngineerQueue.Bind(Config);
@@ -289,7 +288,6 @@ namespace SanctuaryHud
             }
             // The QoL settings as first named, before release.
             yield return ("QoL", "RightClickHint", "QoL", "RightClickCursors");
-            yield return ("QoL", "CtrlASelectsSameType", "QoL", "SelectAllOfSelectedTypes");
             yield return ("QoL", "GrabPixels", "QoL", "WaypointGrabPixels");
             yield return ("QoL", "QueueDragReorder", "QoL", "ReorderQueueByDragging");
             yield return ("QoL", "ShowClock", "QoL", "ShowMatchClock");
@@ -318,7 +316,6 @@ namespace SanctuaryHud
                 Waypoints.Shutdown();
                 OrderFixes.Shutdown();
                 CursorHint.Shutdown();
-                SelectSameType.Shutdown();
                 CommanderGuard.Shutdown();
                 MatchStats.Shutdown();
                 MapPicker.Shutdown();
@@ -397,7 +394,6 @@ namespace SanctuaryHud
             OrderFixes.Tick();
             GameClock.Tick();
             CursorHint.Tick();
-            SelectSameType.Tick();
             CommanderGuard.Tick();
             MatchStats.Tick();
 

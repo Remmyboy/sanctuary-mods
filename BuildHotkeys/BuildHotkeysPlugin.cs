@@ -31,7 +31,7 @@ namespace SanctuaryHud
     // panel's own click handler — so it takes the same observer check, the
     // same local prediction and the same host-validated command that clicking
     // the button does.
-    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.5.1")]
+    [BepInPlugin("com.sanctuarydb.buildhotkeys", "Build Hotkeys", "0.6.0")]
     public class BuildHotkeysPlugin : BaseUnityPlugin
     {
         private readonly Dictionary<string, ConfigEntry<string>> _cfgKeys =
@@ -69,6 +69,7 @@ namespace SanctuaryHud
         // and puts it back in each new VM, including one swapped in between
         // two checks.
         private LuaHook _hook;
+        private ConfigEntry<string> _cfgSameTypesKey;
         private string _chunk;
         private bool _chunkDirty = true;
         // What the last chunk binds, logged when it goes in.
@@ -180,6 +181,13 @@ namespace SanctuaryHud
                         "Moving it off escape leaves escape to stopping factories; escape still closes the menu once " +
                         "it is open. Hotkey in the game's own format; escape or blank keeps the game's own binding.");
                 BindRemap(action);
+                // The mod's own selection key, last in the game's selection keys.
+                if (action.Id == "Selection.FilterEngineerSelection")
+                    _cfgSameTypesKey = Config.Bind("GameSelection", "SelectSameTypesKey", "Ctrl-Shift-A",
+                        "Selects every finished unit of yours of the types you have selected, across the whole map: " +
+                        "a T1 tank and a T1 scout selected, and this key takes every T1 tank and T1 scout. With nothing " +
+                        "selected, the key does whatever it did before (on Ctrl-A, the air filter). " +
+                        "Hotkey in the game's own format, e.g. Ctrl-Shift-A. Blank to unbind.");
             }
 
             _cfgCycleSeconds = Rebind("Cycle", "Seconds", "Building", "CycleSeconds", 0f,
@@ -690,6 +698,11 @@ namespace SanctuaryHud
             if (TryBindings(_cfgMenuKey.Value, "PauseMenuKey", out var canonicalMenu, out _) && canonicalMenu != "Escape")
                 menuKey = canonicalMenu;
 
+            var sameKey = "";
+            if (_cfgSameTypesKey != null
+                && TryBindings(_cfgSameTypesKey.Value, "SelectSameTypesKey", out var canonicalSame, out _))
+                sameKey = canonicalSame;
+
             // Only actions moved off their defaults go over; the rest are left
             // exactly as the game loaded them.
             var remapEntries = new List<string>();
@@ -707,7 +720,7 @@ namespace SanctuaryHud
             // hotkeys, so a remap of one this version doesn't know about
             // has to go through it to be found.
             if (roleEntries.Count == 0 && cancelKey.Length == 0 && menuKey.Length == 0 && repeatKey.Length == 0
-                && remapEntries.Count == 0 && _discovered)
+                && sameKey.Length == 0 && remapEntries.Count == 0 && _discovered)
             {
                 Logger.LogWarning("Build hotkeys: nothing bound — every role's key is blank or invalid.");
                 _chunk = null;
@@ -726,6 +739,7 @@ namespace SanctuaryHud
                 .Replace("__CANCELKEY__", Quote(cancelKey))
                 .Replace("__REPEATKEY__", Quote(repeatKey))
                 .Replace("__MENUKEY__", Quote(menuKey))
+                .Replace("__SAMEKEY__", Quote(sameKey))
                 .Replace("__REMAPS__", string.Join(",", remapEntries.ToArray()));
             // Same text as what is in: keep the old string, so the hook
             // doesn't even hash it again.
@@ -736,6 +750,7 @@ namespace SanctuaryHud
             if (cancelKey.Length > 0) _installLog.Add($"{cancelKey} -> stop selected factories");
             if (repeatKey.Length > 0) _installLog.Add($"{repeatKey} -> repeat build on/off");
             if (menuKey.Length > 0) _installLog.Add($"{menuKey} -> pause menu (escape only closes it)");
+            if (sameKey.Length > 0) _installLog.Add($"{sameKey} -> select every unit of the selected types");
             _installLog.AddRange(remapLog);
             _installSummary = $"Build hotkeys installed: {roleEntries.Count} roles on {layout.Count} keys, " +
                               $"{remapEntries.Count} game hotkey(s) moved.";
@@ -1239,6 +1254,49 @@ if not __SdbBuildHotkeys then
         map[hk] = copy
       end
     end
+  end
+
+  -- Select every finished unit of the selected types, on its own key in the
+  -- Selection group. A key the game already binds there keeps its meaning
+  -- (all its events, so a held filter still releases) for a press with
+  -- nothing selected. After the moves above, so it lands on their result.
+  BH.sameKey = __SAMEKEY__
+  if BH.sameKey ~= '' and LAM.Selection then
+    local function selectSameTypes()
+      if IsObserver() then return false end
+      local want, any = {}, false
+      for _, u in pairs(SS.GetSelectedUnits()) do
+        local g = u.tp and u.tp.general
+        if g then want[g.tpId] = true any = true end
+      end
+      if not any then return false end
+      local out = {}
+      for _, u in pairs(__Entities.Units) do
+        local g = u.tp and u.tp.general
+        if g and want[g.tpId] and u.localId and not u.dead and not u.deleted
+           and u:IsSelectable() and u:IsCompleted() then
+          out[u.localId.index] = u
+        end
+      end
+      -- What was selected stays, a half-built one included.
+      for k, e in pairs(SS.GetSelectedEntities() or {}) do
+        if out[k] == nil then out[k] = e end
+      end
+      SS.SetSelectedEntities(out)
+      return true
+    end
+    local prev = LAM.Selection[BH.sameKey]
+    if prev then table.insert(report, 'SelectSameTypesKey takes ' .. BH.sameKey .. ' from ' .. ownerOf('Selection', prev) .. ' when something is selected') end
+    touch('Selection', BH.sameKey)
+    local entry = {}
+    for ev, fn in pairs(prev or {}) do entry[ev] = fn end
+    entry.press = function(...)
+      local ok, res = pcall(selectSameTypes)
+      if not ok then Warn('BuildHotkeys select same types: ' .. tostring(res)) end
+      if ok and res then return true end
+      if prev and prev.press then return prev.press(...) end
+    end
+    LAM.Selection[BH.sameKey] = entry
   end
 
   -- Construction has the highest group priority, so these run before the
