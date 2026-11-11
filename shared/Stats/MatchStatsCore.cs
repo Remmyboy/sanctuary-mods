@@ -19,7 +19,7 @@ namespace SanctuaryHud
     {
         /// The pull format this build's chunk writes: the V| line's last field,
         /// a literal in InstallChunk, so bump both together.
-        internal const int Format = 1;
+        internal const int Format = 2;   // 2: reclaimed alloy and energy on T|
 
         /// The game's victory/defeat panel, or null before the UI has one.
         internal static SanctuaryPanelUI ResultPanel()
@@ -48,6 +48,9 @@ namespace SanctuaryHud
         //   and outcome are per tick (economy.lua adds them straight into the
         //   store), so a second's figures are ten ticks summed. Income
         //   already includes reclaim (`income = generation + harvest`).
+        //   Harvest is reclaim alone (wrecks feed the "harvest" category;
+        //   host/props/propsClasses/wreckageClass.lua), so its running sum
+        //   is what the army has reclaimed.
         //   Waste is income above spend while the store sits at its cap;
         //   a stall is a tick where the host throttled spending below what
         //   was asked for.
@@ -95,7 +98,7 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
         a = { n = 0, ta = 0, te = 0, sa = 0, se = 0, wa = 0, we = 0, xa = 0, xe = 0, pa = 0, pe = 0, ms = 0,
               wn = 0, wia = 0, wie = 0, woa = 0, woe = 0,
               bl = 0, ba = 0, bn = 0, be = 0, bs = 0, bv = 0, lm = 0, ls = 0, lc = 0, lv = 0,
-              av = 0, au = 0, pav = 0, pau = 0, le = 0, da = 0, de = 0, ck = 0 }
+              av = 0, au = 0, pav = 0, pau = 0, le = 0, da = 0, de = 0, ck = 0, ra = 0, re = 0 }
         S.armies[id] = a
       end
       return a
@@ -194,6 +197,7 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
       local sta, ste = al.storage or 0, en.storage or 0
       a.n = a.n + 1
       a.ta, a.te, a.sa, a.se = a.ta + ia, a.te + ie, a.sa + oa, a.se + oe
+      a.ra, a.re = a.ra + (al.harvest or 0), a.re + (en.harvest or 0)
       if sta > a.ms then a.ms = sta end
       if sta > 0 and (al.current or 0) >= sta - 0.01 and ia > oa then a.wa = a.wa + ia - oa end
       if ste > 0 and (en.current or 0) >= ste - 0.01 and ie > oe then a.we = a.we + ie - oe end
@@ -294,7 +298,7 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
     __SdbStatsPull = function(from)
       local out = {}
       local map = GameInfo and GameInfo.MapInfo and GameInfo.MapInfo.name or ''
-      out[#out + 1] = string.format('V|%s|%d|%d|%s|%s|%d', S.session, tick(), TR, tostring(GetFocusArmy()), clean(map), 1)
+      out[#out + 1] = string.format('V|%s|%d|%d|%s|%s|%d', S.session, tick(), TR, tostring(GetFocusArmy()), clean(map), 2)
       for id, army in pairs(Armies or {}) do
         if not army.civilian then
           local a = A(id)
@@ -314,11 +318,22 @@ if not __SdbStatsHook and type(Armies) == 'table' and next(Armies) ~= nil and __
             id, a.n, a.ta, a.te, a.sa, a.se, a.wa, a.we, a.xa, a.xe, a.pa, a.pe, a.ms,
             a.bl, a.ba, a.bn, a.be, a.bs, a.bv, a.lm, a.ls, a.lc, a.lv, a.pav, a.pau,
             score(a), a.da, a.ck)
+          out[#out] = out[#out] .. string.format('|%.1f|%.1f', a.ra, a.re)
         end
       end
       for i = (from or 0) + 1, #S.lines do out[#out + 1] = S.lines[i] end
       out[#out + 1] = 'C|' .. #S.lines
       return table.concat(out, '\n')
+    end
+
+    -- What the army in view has reclaimed so far, 'id|alloy|energy', or ''
+    -- with no single army in view; the HUD's strip polls it.
+    __SdbStatsReclaimed = function()
+      local id = GetFocusArmy()
+      local army = Armies and Armies[id]
+      if not army or army.civilian then return '' end
+      local a = A(id)
+      return string.format('%d|%.1f|%.1f', id, a.ra, a.re)
     end
 
     __SdbStatsHook = true

@@ -79,6 +79,7 @@ namespace SanctuaryHud.Replays
             public float ACur, AStore, AIn, AHarvest, AOut, AReq;
             public float ECur, EStore, EIn, EHarvest, EOut, EReq;
             public float ATotalIn, ATotalOut, ETotalIn, ETotalOut;   // whole game so far
+            public float AReclaimed, EReclaimed;                     // harvest, whole game so far
 
             // Anything at all: an unoccupied slot reports zeroes forever.
             public bool Playing =>
@@ -211,11 +212,14 @@ do
         local ok2, err2 = pcall(function()
           D.eco[data.armyId] = data.totals
           local a, e = data.totals.alloys or {}, data.totals.energy or {}
-          local s = D.sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0 }
+          local s = D.sum[data.armyId] or { ai = 0, ao = 0, ei = 0, eo = 0, ah = 0, eh = 0 }
           s.ai = s.ai + (a.income or 0)
           s.ao = s.ao + (a.outcome or 0)
           s.ei = s.ei + (e.income or 0)
           s.eo = s.eo + (e.outcome or 0)
+          -- Harvest is reclaim alone (wrecks feed it), already inside income.
+          s.ah = (s.ah or 0) + (a.harvest or 0)
+          s.eh = (s.eh or 0) + (e.harvest or 0)
           D.sum[data.armyId] = s
           S.ecoDirty = true
         end)
@@ -294,7 +298,7 @@ do
 
   -- Twice a second from C#: the armies, the view, and the economy as text
   -- ('id|alloy cur|store|in|harvest|out|request|energy x6|alloy in total|
-  -- out total|energy in total|out total;...').
+  -- out total|energy in total|out total|alloy reclaimed|energy reclaimed;...').
   S.Poll = function()
     S.Result()
     local out = {}
@@ -311,11 +315,11 @@ do
     local parts = {}
     for id, t in pairs(D.eco) do
       local a, e = t.alloys or {}, t.energy or {}
-      local s = D.sum[id] or { ai = 0, ao = 0, ei = 0, eo = 0 }
-      parts[#parts + 1] = string.format('%d|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.1f|%.1f|%.1f|%.1f',
+      local s = D.sum[id] or { ai = 0, ao = 0, ei = 0, eo = 0, ah = 0, eh = 0 }
+      parts[#parts + 1] = string.format('%d|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.0f|%.0f|%.3f|%.3f|%.3f|%.3f|%.1f|%.1f|%.1f|%.1f|%.1f|%.1f',
         id, a.current or 0, a.storage or 0, a.income or 0, a.harvest or 0, a.outcome or 0, a.request or 0,
         e.current or 0, e.storage or 0, e.income or 0, e.harvest or 0, e.outcome or 0, e.request or 0,
-        s.ai, s.ao, s.ei, s.eo)
+        s.ai, s.ao, s.ei, s.eo, s.ah or 0, s.eh or 0)
     end
     __SdbReplayEco = table.concat(parts, ';')
   end
@@ -431,6 +435,11 @@ end";
                     row.ETotalIn = P(15);
                     row.ETotalOut = P(16);
                 }
+                if (f.Length >= 19)
+                {
+                    row.AReclaimed = P(17);
+                    row.EReclaimed = P(18);
+                }
                 _eco[id] = row;
                 if (row.Playing) _played.Add(id);
             }
@@ -492,7 +501,7 @@ end";
         // Column widths in canvas units, twice the 1080-logical pixels. The
         // panel is sized from these plus its row count, so it fits two
         // players or twelve.
-        private const float NameW = 156, BarW = 148, CellW = 68, UsedW = 84;
+        private const float NameW = 156, BarW = 148, CellW = 68, UsedW = 84, ReclaimW = 104;
         // Column dividers stand in for the gaps between cells: a hairline down
         // the middle of RuleW, and the wider SplitW between alloy and energy.
         private const float RuleW = 10, SplitW = 18;
@@ -510,7 +519,7 @@ end";
         private sealed class ResourceView
         {
             internal HudBar Bar;
-            internal TMP_Text Net, In, Out, Used;
+            internal TMP_Text Net, In, Out, Used, Reclaimed;
         }
 
         private sealed class ArmyView
@@ -620,8 +629,8 @@ end";
                 Activate(row.Cells, known);
                 Activate(row.Waiting.rectTransform, !known);
                 if (!known) continue;
-                Resource(row.Alloy, AlloyColour, e.ACur, e.AStore, e.AIn, e.AReq, e.AOut, e.ATotalOut);
-                Resource(row.Energy, EnergyColour, e.ECur, e.EStore, e.EIn, e.EReq, e.EOut, e.ETotalOut);
+                Resource(row.Alloy, AlloyColour, e.ACur, e.AStore, e.AIn, e.AReq, e.AOut, e.ATotalOut, e.AReclaimed);
+                Resource(row.Energy, EnergyColour, e.ECur, e.EStore, e.EIn, e.EReq, e.EOut, e.ETotalOut, e.EReclaimed);
             }
             for (var i = shown; i < _rows.Count; i++) Activate(_rows[i].Row, false);
             _all.SetOn(_focus == -1);
@@ -638,7 +647,7 @@ end";
 
         // Per-tick values become per-second; out is what the queue asks for,
         // same as the HUD strip, and net is what really moves the store.
-        private static void Resource(ResourceView view, Color colour, float cur, float store, float income, float request, float outcome, float used)
+        private static void Resource(ResourceView view, Color colour, float cur, float store, float income, float request, float outcome, float used, float reclaimed)
         {
             var inc = Mathf.RoundToInt(income * 10);
             var req = Mathf.RoundToInt(request * 10);
@@ -649,6 +658,7 @@ end";
             HudCanvas.SetText(view.In, "+" + inc);
             HudCanvas.SetText(view.Out, "-" + req);
             HudCanvas.SetText(view.Used, Short(used));
+            HudCanvas.SetText(view.Reclaimed, Short(reclaimed));
         }
 
         private void Build(RectTransform root)
@@ -725,7 +735,7 @@ end";
             HudControls.Cell(headings, "Gap", RuleW, HeadH);
             ResourceHeader(headings, "ALLOY", "alloy", AlloyColour, 1);
             HudControls.Cell(headings, "Gap", SplitW, HeadH);
-            ResourceHeader(headings, "ENERGY", "energy", EnergyColour, 6);
+            ResourceHeader(headings, "ENERGY", "energy", EnergyColour, 7);
             HudControls.HRule(table, 6f, 0.16f);
             _armyRows = HudControls.Column(table, "Armies", 0f);
             var allRow = HudControls.Row(table, "All", 0f);
@@ -742,8 +752,8 @@ end";
         }
 
         // A resource's headings, each a sort button: the store (by what is
-        // in it), then net, in, out and used. Their columns are first to
-        // first + 4.
+        // in it), then net, in, out, used and reclaimed. Their columns are
+        // first to first + 5.
         private void ResourceHeader(Transform row, string name, string glyph, Color colour, int first)
         {
             // The resource's mark before its name, as on the HUD's card and strip.
@@ -760,7 +770,7 @@ end";
             }
             SortHeading(row, first, name, colour, TextAlignmentOptions.MidlineLeft, mark != null ? BarW - 24f : BarW);
             var column = first;
-            foreach (var (heading, width) in new[] { ("NET", CellW), ("IN", CellW), ("OUT", CellW), ("USED", UsedW) })
+            foreach (var (heading, width) in new[] { ("NET", CellW), ("IN", CellW), ("OUT", CellW), ("USED", UsedW), ("RECLAIM", ReclaimW) })
             {
                 HudControls.Cell(row, "Gap", RuleW, HeadH);
                 SortHeading(row, ++column, heading, HudControls.TextDim, TextAlignmentOptions.MidlineRight, width);
@@ -774,7 +784,7 @@ end";
         // economy yet stay at the bottom, and ties keep seat order, so
         // rows don't trade places for nothing.
 
-        private const int Columns = 11;   // 0 is seat order, 1-5 alloy, 6-10 energy
+        private const int Columns = 13;   // 0 is seat order, 1-6 alloy, 7-12 energy
         private readonly HudButton[] _sortHeads = new HudButton[Columns];
         private readonly string[] _sortNames = new string[Columns];
         private int _sortBy;
@@ -808,11 +818,13 @@ end";
                 case 3: return e.AIn;
                 case 4: return e.AReq;
                 case 5: return e.ATotalOut;
-                case 6: return e.ECur;
-                case 7: return e.EIn - e.EOut;
-                case 8: return e.EIn;
-                case 9: return e.EReq;
-                case 10: return e.ETotalOut;
+                case 6: return e.AReclaimed;
+                case 7: return e.ECur;
+                case 8: return e.EIn - e.EOut;
+                case 9: return e.EIn;
+                case 10: return e.EReq;
+                case 11: return e.ETotalOut;
+                case 12: return e.EReclaimed;
                 default: return 0f;
             }
         }
@@ -877,6 +889,8 @@ end";
             view.Out = HudControls.Label(row, "Out", "", TextSize, OutColour, TextAlignmentOptions.MidlineRight, CellW);
             HudControls.Rule(row, RuleW, RowH, 0.09f);
             view.Used = HudControls.Label(row, "Used", "", TextSize, HudControls.TextMid, TextAlignmentOptions.MidlineRight, UsedW);
+            HudControls.Rule(row, RuleW, RowH, 0.09f);
+            view.Reclaimed = HudControls.Label(row, "Reclaimed", "", TextSize, HudControls.TextMid, TextAlignmentOptions.MidlineRight, ReclaimW);
             return view;
         }
 

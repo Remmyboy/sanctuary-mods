@@ -32,6 +32,7 @@ namespace SanctuaryHud
     {
         internal static ConfigEntry<float> StripScale, CommanderScale;
         internal static ConfigEntry<bool> Locked;
+        internal static ConfigEntry<bool> ShowReclaimed;
 
         private const float MinScale = 0.5f, MaxScale = 2f;
 
@@ -45,6 +46,51 @@ namespace SanctuaryHud
                     new AcceptableValueRange<float>(MinScale, MaxScale)));
             Locked = config.Bind("TopBar", "Locked", false,
                 "Keep the strip and the commander widget the size they are: no resize grips.");
+            ShowReclaimed = config.Bind("TopBar", "ShowReclaimed", true,
+                "Show how much alloy and energy the army in view has reclaimed so far this match, small, beside each resource's income. In a replay it follows the army being watched.");
+        }
+
+        // ---- reclaimed so far -------------------------------------------------------
+        //
+        // Read from the match-stats collector (MatchStatsCore), which sums the
+        // host's per-tick harvest for every army; the strip shows the army in
+        // view. The collector is put in here too, so this works with the
+        // stats screen switched off. A collector installed by an older build
+        // of LadderReporter has no reclaim figures, and the strip shows none.
+
+        private static float _reclaimAccum = 10f;
+        /// What the army in view has reclaimed, or -1 with nothing to show.
+        private static float _reclaimedAlloy = -1f, _reclaimedEnergy = -1f;
+
+        private static void PollReclaimed(bool wanted)
+        {
+            if (!wanted || !LuaReady)
+            {
+                _reclaimedAlloy = _reclaimedEnergy = -1f;
+                _reclaimAccum = 10f;
+                return;
+            }
+            _reclaimAccum += Time.unscaledDeltaTime;
+            if (_reclaimAccum < 0.5f) return;
+            _reclaimAccum = 0f;
+            if (!RunLua("__SdbReclaimedOut = (__SdbStatsReclaimed and __SdbStatsReclaimed()) or (__SdbStatsHook and 'old') or 'none'")) return;
+            var raw = GetLuaGlobal("__SdbReclaimedOut");
+            _reclaimedAlloy = _reclaimedEnergy = -1f;
+            if (raw == "none")
+            {
+                // Guarded in Lua: a no-op once it is in, whoever put it there.
+                RunLua(MatchStatsCore.InstallChunk);
+                return;
+            }
+            if (string.IsNullOrEmpty(raw) || raw == "old") return;
+            var f = raw.Split('|');
+            if (f.Length < 3) return;
+            if (float.TryParse(f[1], System.Globalization.NumberStyles.Float, Inv, out var a) &&
+                float.TryParse(f[2], System.Globalization.NumberStyles.Float, Inv, out var e))
+            {
+                _reclaimedAlloy = a;
+                _reclaimedEnergy = e;
+            }
         }
 
         /// The live sizes, so a resize drag doesn't write the config file
@@ -100,8 +146,10 @@ namespace SanctuaryHud
             if (!showing || eco == null)
             {
                 if (_root != null && _root.gameObject.activeSelf) _root.gameObject.SetActive(false);
+                PollReclaimed(false);
                 return;
             }
+            PollReclaimed(ShowReclaimed.Value);
             var canvasRoot = HudCanvas.Ensure();
             if (canvasRoot == null) return;
             if (_root == null) Build(canvasRoot);
@@ -122,8 +170,8 @@ namespace SanctuaryHud
             // The game's buttons in the middle, when its panel is hidden.
             var middle = _middle.Sync(GamePanel.Controls, GamePanel.VersionText);
             var half = (width - middle) / 2f;
-            _alloy.Sync(eco, SanctuaryHudPlugin.AlloyTint, 0f, half);
-            _energy.Sync(eco, SanctuaryHudPlugin.EnergyTint, half + middle, half);
+            _alloy.Sync(eco, SanctuaryHudPlugin.AlloyTint, 0f, half, _reclaimedAlloy);
+            _energy.Sync(eco, SanctuaryHudPlugin.EnergyTint, half + middle, half, _reclaimedEnergy);
             _middle.Place(half, middle);
             _leftLine.rectTransform.anchoredPosition = new Vector2(half - 1f, -20f);
             var showRight = middle > 0f;
@@ -243,6 +291,12 @@ namespace SanctuaryHud
             private readonly SanctuaryHudPlugin.FigureText _storageText = new SanctuaryHudPlugin.FigureText(),
                 _maxText = new SanctuaryHudPlugin.FigureText(), _netText = new SanctuaryHudPlugin.FigureText(),
                 _incomeText = new SanctuaryHudPlugin.FigureText(), _spentText = new SanctuaryHudPlugin.FigureText();
+            /// Reclaimed so far: the harvest mark and a small figure, right
+            /// of the storage, left of the flows.
+            private RectTransform _reclaimRow;
+            private RawImage _reclaimMark;
+            private TMP_Text _reclaim;
+            private readonly SanctuaryHudPlugin.FigureText _reclaimText = new SanctuaryHudPlugin.FigureText();
             private int _chipKind = -1;
             private float _chipValue;
             private string _chipText;
@@ -320,6 +374,40 @@ namespace SanctuaryHud
                 half._income = At(rt, "In", 30f, GainColour, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 10f), new Vector2(128f, 32f));
                 half._spent = At(rt, "Out", 30f, LossColour, TextAlignmentOptions.MidlineLeft, new Vector2(0f, 46f), new Vector2(128f, 32f));
 
+                // Reclaimed so far, on the income's row and ending short of
+                // it: the game's reclaim mark (an arrow into a tray) in the
+                // resource's colour, then the figure, muted.
+                var reclaim = new GameObject("Reclaimed", typeof(RectTransform));
+                reclaim.transform.SetParent(rt, false);
+                half._reclaimRow = (RectTransform)reclaim.transform;
+                half._reclaimRow.anchorMin = half._reclaimRow.anchorMax = new Vector2(0f, 1f);
+                half._reclaimRow.pivot = new Vector2(1f, 1f);
+                var rgroup = reclaim.AddComponent<HorizontalLayoutGroup>();
+                rgroup.spacing = 6f;
+                rgroup.childAlignment = TextAnchor.MiddleRight;
+                rgroup.childControlWidth = true;
+                rgroup.childControlHeight = true;
+                rgroup.childForceExpandWidth = false;
+                rgroup.childForceExpandHeight = false;
+                var rfitter = reclaim.AddComponent<ContentSizeFitter>();
+                rfitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                rfitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                var glyph = Glyphs.Get("harvest");
+                if (glyph != null)
+                {
+                    var markGo = new GameObject("Mark", typeof(RectTransform));
+                    markGo.transform.SetParent(reclaim.transform, false);
+                    half._reclaimMark = markGo.AddComponent<RawImage>();
+                    half._reclaimMark.texture = glyph;
+                    half._reclaimMark.raycastTarget = false;
+                    half._reclaimMark.color = ReclaimMarkColour(tint);
+                    var le = markGo.AddComponent<LayoutElement>();
+                    le.preferredWidth = le.minWidth = 26f;
+                    le.preferredHeight = le.minHeight = 26f;
+                }
+                half._reclaim = HudCanvas.Text(reclaim.transform, "Value", 26f, SanctuaryHudPlugin.MutedText, TextAlignmentOptions.MidlineRight);
+                reclaim.SetActive(false);
+
                 // Capacity bar: a thin line in the resource colour on an
                 // accent-tinted track, the way the game draws its own gauges.
                 var track = AccentColour;
@@ -372,7 +460,9 @@ namespace SanctuaryHud
                 return half;
             }
 
-            internal void Sync(Dictionary<string, float> eco, Color tint, float x, float w)
+            private static Color ReclaimMarkColour(Color tint) => new Color(tint.r, tint.g, tint.b, 0.85f);
+
+            internal void Sync(Dictionary<string, float> eco, Color tint, float x, float w, float reclaimed)
             {
                 // The tint can arrive after the strip was built (it is read
                 // off the game's panel once that exists), so the mark takes
@@ -381,6 +471,7 @@ namespace SanctuaryHud
                 {
                     _tint = tint;
                     if (_mark != null) _mark.color = tint;
+                    if (_reclaimMark != null) _reclaimMark.color = ReclaimMarkColour(tint);
                 }
                 _rect.anchoredPosition = new Vector2(x, 0f);
                 var flowsX = w - Pad - 216f - 12f - 128f;
@@ -391,7 +482,15 @@ namespace SanctuaryHud
                     _net.rectTransform.anchoredPosition = new Vector2(w - Pad - 216f, -22f);
                     _income.rectTransform.anchoredPosition = new Vector2(flowsX, -10f);
                     _spent.rectTransform.anchoredPosition = new Vector2(flowsX, -46f);
+                    _reclaimRow.anchoredPosition = new Vector2(flowsX - 24f, -10f);
                 }
+
+                // Shown while there is a figure and room for it: on a narrow
+                // strip it would run into the storage figure, which matters more.
+                var reclaimFits = reclaimed >= 0f &&
+                    flowsX - 24f - _reclaimRow.rect.width > _storageRow.anchoredPosition.x + _storageRow.rect.width + 24f;
+                if (_reclaimRow.gameObject.activeSelf != reclaimFits) _reclaimRow.gameObject.SetActive(reclaimFits);
+                if (reclaimFits) HudCanvas.SetText(_reclaim, _reclaimText.Fmt(reclaimed));
 
                 var k = _keys;
                 var current = SanctuaryHudPlugin.Value(eco, k.Current);

@@ -36,6 +36,8 @@ namespace SanctuaryHud
 
         public int Ticks;
         public float AlloyGathered, EnergyGathered, AlloySpent, EnergySpent;
+        /// Of what was gathered, what came from reclaim (format 2 on).
+        public float AlloyReclaimed, EnergyReclaimed;
         public float AlloyWasted, EnergyWasted;
         public int AlloyStallTicks, EnergyStallTicks;
         public float PeakAlloyIncome, PeakEnergyIncome;
@@ -183,6 +185,8 @@ namespace SanctuaryHud
                         a.Score = F(f, 26);
                         a.KilledValue = F(f, 27);
                         a.CommanderKills = F(f, 28);
+                        a.AlloyReclaimed = F(f, 29);
+                        a.EnergyReclaimed = F(f, 30);
                         break;
                     }
                     case 'S':

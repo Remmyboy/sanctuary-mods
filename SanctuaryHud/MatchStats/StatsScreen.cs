@@ -215,6 +215,10 @@ namespace SanctuaryHud
                     Col("SCORE", 0.9f, a => Fmt(a.Score), AccentColour),
                     Col("ALLOY GATHERED", 1f, a => Fmt(a.AlloyGathered), AlloyColour),
                     Col("ENERGY GATHERED", 1f, a => Fmt(a.EnergyGathered), EnergyColour),
+                    // A collector from an older build of either mod has no
+                    // reclaim figures: a dash, not a zero.
+                    Col("ALLOY RECLAIMED", 1f, a => _data != null && _data.Format < 2 ? "—" : Fmt(a.AlloyReclaimed), AlloyColour),
+                    Col("ENERGY RECLAIMED", 1f, a => _data != null && _data.Format < 2 ? "—" : Fmt(a.EnergyReclaimed), EnergyColour),
                     Col("ALLOY SPENT", 1f, a => Fmt(a.AlloySpent), AlloyColour),
                     Col("ENERGY SPENT", 1f, a => Fmt(a.EnergySpent), EnergyColour),
                     Col("PEAK ALLOY", 0.9f, a => Fmt(a.PeakAlloyIncome) + "/s", AlloyColour),
