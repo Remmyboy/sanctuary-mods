@@ -47,7 +47,8 @@ public class Probe : BaseUnityPlugin
   wait <seconds>              hold the batch
   waitlua <seconds> <expr>    hold until <expr> is truthy, or fail after <seconds>
   waitmatch [seconds]         hold until the client Lua VM exists (default 180)
-  shot <name>                 screenshot to shots\<name>.png
+  shot <name> [path]          screenshot to shots\<name>.png; probe.ps1 crops it to the UI element
+                              at path, else shrinks it (-ShotWidth), and prints the file to Read
   (a path is a full path, its tail, or a name; path#n is the nth shown match from 0, in hierarchy order)
   tree [path] [depth]         UI hierarchy (default: the InterfaceManager canvas, depth 4)
   find <text> [max]           transforms whose name contains <text>, with paths
@@ -156,7 +157,10 @@ public class Probe : BaseUnityPlugin
             catch (Exception e)
             {
                 var inner = e is TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : e;
-                Out("ERROR " + inner.GetType().Name + ": " + inner.Message + "\n" + inner.StackTrace);
+                // The top frames place it; the rest (Unity, Harmony, the probe's own loop) is noise.
+                var frames = (inner.StackTrace ?? "").Split('\n');
+                var stack = string.Join("\n", frames.Take(4)) + (frames.Length > 4 ? $"\n   ... {frames.Length - 4} more frame(s)" : "");
+                Out("ERROR " + inner.GetType().Name + ": " + inner.Message + "\n" + stack);
             }
             if (_batch == null) return;   // quit finished it early
         }
@@ -229,13 +233,23 @@ public class Probe : BaseUnityPlugin
 
             case "shot":
             {
-                var name = arg.Length > 0 ? arg : DateTime.Now.ToString("HHmmss");
+                // shot <name> [ui path]: with a path, the output line carries
+                // that element's screen rect and probe.ps1 crops the image to it.
+                var name = a.Length > 0 ? a[0] : DateTime.Now.ToString("HHmmss");
                 if (!name.EndsWith(".png")) name += ".png";
+                var crop = "";
+                if (a.Length > 1)
+                {
+                    var target = Find(string.Join(" ", a.Skip(1)));
+                    if (target == null) { Out("not found: " + string.Join(" ", a.Skip(1))); break; }
+                    if (!(target is RectTransform rt)) { Out("not a UI element: " + PathOf(target)); break; }
+                    crop = " crop " + ScreenRect(rt);
+                }
                 var path = Path.Combine(Dir, "shots", name);
                 if (File.Exists(path)) File.Delete(path);
                 var sc = Type.GetType("UnityEngine.ScreenCapture, UnityEngine.ScreenCaptureModule");
                 sc.GetMethod("CaptureScreenshot", new[] { typeof(string) }).Invoke(null, new object[] { path });
-                Out(path);
+                Out("shot " + path + crop);
                 Wait("shot written", 10f, () => File.Exists(path));
                 break;
             }
@@ -841,6 +855,29 @@ _G.__probe_out = n > 1 and table.concat(outs, '\t') or '(no value)'";
     }
 
     private static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
+
+    // "x y w h" in screenshot pixels (origin top-left), padded and clamped to the screen.
+    private static string ScreenRect(RectTransform rt)
+    {
+        Canvas.ForceUpdateCanvases();
+        var canvas = rt.GetComponentInParent<Canvas>();
+        var cam = canvas == null || canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.rootCanvas.worldCamera;
+        var corners = new Vector3[4];
+        rt.GetWorldCorners(corners);
+        float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+        foreach (var c in corners)
+        {
+            var p = RectTransformUtility.WorldToScreenPoint(cam, c);
+            x0 = Mathf.Min(x0, p.x); x1 = Mathf.Max(x1, p.x);
+            y0 = Mathf.Min(y0, p.y); y1 = Mathf.Max(y1, p.y);
+        }
+        const int pad = 6;
+        var left = Mathf.Clamp(Mathf.FloorToInt(x0) - pad, 0, Screen.width - 1);
+        var right = Mathf.Clamp(Mathf.CeilToInt(x1) + pad, left + 1, Screen.width);
+        var top = Mathf.Clamp(Screen.height - Mathf.CeilToInt(y1) - pad, 0, Screen.height - 1);
+        var bottom = Mathf.Clamp(Screen.height - Mathf.FloorToInt(y0) + pad, top + 1, Screen.height);
+        return $"{left} {top} {right - left} {bottom - top}";
+    }
 
     // Sorts as the hierarchy reads, top to bottom: sibling indices from the root.
     private static string HierarchyKey(Transform t) =>

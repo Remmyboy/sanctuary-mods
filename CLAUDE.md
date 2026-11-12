@@ -68,9 +68,10 @@ game's own DLLs, which can't be published.
 ## Shell environment (Windows)
 
 - `python` / `python3` / `py` are Python 3.11 with pip (uv-managed; the Store
-  aliases are off since 2026-10-01). Node, dotnet, ilspycmd, gh and ffmpeg are
-  installed. No zip, jq, strings or ImageMagick:
-  use PowerShell `System.IO.Compression`, `ConvertFrom-Json`, node.
+  aliases are off since 2026-10-01). Node, dotnet, ilspycmd and gh are
+  installed. No zip, jq, strings, ffmpeg or ImageMagick:
+  use PowerShell `System.IO.Compression`, `ConvertFrom-Json`, node,
+  `System.Drawing` for images.
 - Edit files with the Edit/Write tools, not sed/perl/heredocs: most C# files
   are CRLF (multi-line regexes silently miss), bash heredocs break on `'`,
   sed eats backslashes in Windows paths, and `printf` turns `\U` into an

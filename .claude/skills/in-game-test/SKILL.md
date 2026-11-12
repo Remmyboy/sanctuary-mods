@@ -15,6 +15,29 @@ Order of cheapness, use the first that answers the question:
 3. **Ask the user** to look - for feel, taste and anything visual the probe's
    screenshot can't settle.
 
+## Keep it cheap
+
+In-game testing used to burn context: every full-screen shot is ~1,800
+tokens that stays in the conversation, and each probe round trip re-reads all
+of it.
+
+- **Hand the probing to the `game-tester` agent** (Haiku) when it's more than
+  a couple of probe calls: `Agent(subagent_type: "game-tester")` with a brief
+  that says the scenario, what to look for, the pass/fail criterion, and
+  which game-touching steps the user allowed (install, launch, -Force, cfg
+  writes). It returns a short report with values and `.view.png` paths;
+  Read a shot yourself only when the judgement is visual and matters.
+  Building, deploying and asking the user stay with you.
+- **One call per scenario**: batch the lines (`wait`, `waitlua`, `waitmatch`
+  hold the batch) instead of one call per step.
+- **Text before pictures**: `eval`, `texts <path>`, `tree <path> 2` answer
+  most questions; a shot is for how it looks.
+- **Crop shots**: `shot name <ui path>` crops to that element (often ~100-300
+  tokens). Plain `shot name` is shrunk to 1280 wide (`-ShotWidth 0` for
+  full size). Read the `.view.png` the output names.
+- Long output is cut to 6,000 chars (`-MaxChars`), the rest in
+  `%LOCALAPPDATA%\SanctuaryProbe\last-output.txt`: Grep it.
+
 Verified end to end on 2026-10-01: install, launch, menu checks, `skirmish
 white desert`, in-match Lua (values, errors, syntax errors), `pfield`,
 `waitlua`, `tree`, `shot`, `leave`, `quit`, uninstall.
@@ -91,8 +114,10 @@ rebuild), waits for its `Hot-loaded` line, waits `-Settle` s, counts again and
 prints the delta. It reloads the mod in the user's game: ask first. Untested
 in game as of 2026-10-04.
 
-**Screenshots**: `shot name` -> `%LOCALAPPDATA%\SanctuaryProbe\shots\name.png`;
-read it with Read. Small details: `pwsh tools/crop.ps1 <png> x y w h -Scale 3`.
+**Screenshots**: `shot name [ui path]` -> `%LOCALAPPDATA%\SanctuaryProbe\shots\name.png`
+(full size) and `name.view.png` (cropped to the element, or shrunk); Read the
+`.view.png`. Small details: `pwsh tools/crop.ps1 <png> x y w h -Scale 3` on
+the full-size one.
 A shot in the same frame as an opening animation catches it half drawn: `wait 1`.
 
 ## Is my build the one running?

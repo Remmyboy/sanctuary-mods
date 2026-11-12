@@ -20,6 +20,11 @@
   `probe.ps1 help` lists the verbs. Batches run in order; `wait`, `waitlua`
   and `waitmatch` hold a batch without blocking the game.
 
+  Output is kept small for whoever reads it: `shot` lines point at a
+  <name>.view.png shrunk to -ShotWidth (1280; 0 = full size) or cropped to the
+  UI element named after the shot (`shot hud Hud/Top bar`), and output past
+  -MaxChars (6000) keeps its head and tail, the rest in last-output.txt.
+
   install and launch refuse while the game is already running unless -Force:
   the user may be in a real match, and a deploy hot-loads into it.
 #>
@@ -28,6 +33,11 @@ param(
     [string]$File,
     [int]$Timeout = 300,
     [int]$Settle = 5,
+    # Shots are shrunk to this width before Read (image tokens grow with pixels);
+    # 0 keeps full size. `shot <name> <ui path>` crops to the element instead.
+    [int]$ShotWidth = 1280,
+    # Longer output keeps its head and tail; the whole text goes to last-output.txt.
+    [int]$MaxChars = 6000,
     [switch]$Force
 )
 
@@ -78,8 +88,58 @@ function Invoke-Batch([string[]]$Batch) {
         }
         Start-Sleep -Milliseconds 250
     }
-    Get-Content $out -Raw
+    $text = Get-Content $out -Raw
     Remove-Item $out
+    $text
+}
+
+# Crop (x y w h) and/or shrink to -ShotWidth; System.Drawing, as there is no
+# ffmpeg or ImageMagick here.
+function Save-View([string]$Png, [string]$View, [int[]]$Crop) {
+    Add-Type -AssemblyName System.Drawing
+    $src = [System.Drawing.Bitmap]::new($Png)
+    try {
+        $r = if ($Crop) {
+            $x = [Math]::Min($Crop[0], $src.Width - 1); $y = [Math]::Min($Crop[1], $src.Height - 1)
+            [System.Drawing.Rectangle]::new($x, $y, [Math]::Min($Crop[2], $src.Width - $x), [Math]::Min($Crop[3], $src.Height - $y))
+        } else { [System.Drawing.Rectangle]::new(0, 0, $src.Width, $src.Height) }
+        $scale = if (-not $Crop -and $ShotWidth -gt 0 -and $r.Width -gt $ShotWidth) { $ShotWidth / $r.Width } else { 1.0 }
+        $w = [Math]::Max(1, [int]($r.Width * $scale)); $h = [Math]::Max(1, [int]($r.Height * $scale))
+        $dst = [System.Drawing.Bitmap]::new($w, $h)
+        $g = [System.Drawing.Graphics]::FromImage($dst)
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.DrawImage($src, [System.Drawing.Rectangle]::new(0, 0, $w, $h), $r, [System.Drawing.GraphicsUnit]::Pixel)
+        $g.Dispose()
+        $dst.Save($View, [System.Drawing.Imaging.ImageFormat]::Png)
+        $dst.Dispose()
+        "${w}x$h"
+    } finally { $src.Dispose() }
+}
+
+# The probe prints `shot <png> [crop x y w h]`. Write <name>.view.png, cropped
+# to the element or shrunk to -ShotWidth, and point the line at it: that is
+# the file to Read. The full-size original stays beside it.
+function Convert-Shots([string]$Text) {
+    $lines = foreach ($l in $Text -split "`r?`n") {
+        if ($l -notmatch '^shot (.+?\.png)(?: crop (\d+) (\d+) (\d+) (\d+))?\s*$' -or -not (Test-Path $Matches[1])) { $l; continue }
+        $png = $Matches[1]
+        $crop = if ($Matches[2]) { [int[]]@($Matches[2], $Matches[3], $Matches[4], $Matches[5]) }
+        if (-not $crop -and $ShotWidth -le 0) { "shot $png"; continue }
+        $view = [IO.Path]::ChangeExtension($png, '.view.png')
+        try { $size = Save-View $png $view $crop; "shot $view  ($size; full size: $png)" }
+        catch { "shot $png  (full size; shrinking failed: $($_.Exception.Message))" }
+    }
+    $lines -join "`n"
+}
+
+function Limit-Output([string]$Text) {
+    if ($MaxChars -le 0 -or $Text.Length -le $MaxChars) { return $Text }
+    $full = Join-Path $Dir 'last-output.txt'
+    [IO.File]::WriteAllText($full, $Text)
+    $head = [int]($MaxChars * 0.7); $tail = $MaxChars - $head
+    $Text.Substring(0, $head) +
+        "`n... [$($Text.Length - $MaxChars) chars cut; all of it in $full - Grep it rather than reading it whole] ...`n" +
+        $Text.Substring($Text.Length - $tail)
 }
 
 # The probe's `objects` counts, as an ordered type -> count table.
@@ -171,4 +231,4 @@ if ($verb -eq 'leakcheck') {
     return
 }
 
-Invoke-Batch $batch
+Limit-Output (Convert-Shots (Invoke-Batch $batch))

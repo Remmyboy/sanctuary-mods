@@ -7,8 +7,8 @@
 
   Pixel coordinates from the top-left of the image. Writes <png>-crop.png
   beside the original unless -Out is given, and prints the path so it can be
-  opened with Read. Uses the WinGet ffmpeg (there is no ImageMagick or PIL
-  here, and the Browser zoom tool only works on web pages).
+  opened with Read. Uses System.Drawing (there is no ffmpeg, ImageMagick or
+  PIL here, and the Browser zoom tool only works on web pages).
 #>
 param(
     [Parameter(Mandatory, Position = 0)][string]$Png,
@@ -21,14 +21,20 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
-if (-not $ffmpeg) {
-    $ffmpeg = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter ffmpeg.exe -ErrorAction SilentlyContinue |
-        Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $ffmpeg) { throw 'ffmpeg not found (winget install Gyan.FFmpeg)' }
+Add-Type -AssemblyName System.Drawing
+$Png = (Resolve-Path $Png).Path
 if (-not $Out) { $Out = [IO.Path]::ChangeExtension($Png, $null).TrimEnd('.') + '-crop.png' }
+$Out = [IO.Path]::GetFullPath($Out)
 $sw = [int]($W * $Scale); $sh = [int]($H * $Scale)
-& $ffmpeg -v error -y -i $Png -vf "crop=${W}:${H}:${X}:${Y},scale=${sw}:${sh}:flags=neighbor" $Out
-if ($LASTEXITCODE -ne 0) { throw 'ffmpeg failed' }
+$src = [System.Drawing.Bitmap]::new($Png)
+try {
+    $dst = [System.Drawing.Bitmap]::new($sw, $sh)
+    $g = [System.Drawing.Graphics]::FromImage($dst)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+    $g.DrawImage($src, [System.Drawing.Rectangle]::new(0, 0, $sw, $sh), [System.Drawing.Rectangle]::new($X, $Y, $W, $H), [System.Drawing.GraphicsUnit]::Pixel)
+    $g.Dispose()
+    $dst.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png)
+    $dst.Dispose()
+} finally { $src.Dispose() }
 $Out
