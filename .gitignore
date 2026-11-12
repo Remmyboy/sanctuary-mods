@@ -4,5 +4,9 @@ obj/
 release/
 *.zip
 
+# Local-only, never committed or released.
+/DevTools/
+/Scom-patcher.dll
+
 # Worktrees live here; only .claude/skills is shared.
 .claude/worktrees/
