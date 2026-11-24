@@ -42,7 +42,7 @@ mod builds to `<name>.dll`, and the project link is its source.
 
 | Project | Download | What it does |
 | --- | --- | --- |
-| [SanctuaryHud](SanctuaryHud/) | [**0.20.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.20.1) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; lobby map list search and filters by players, size and custom maps; every panel resizable by its corner grip |
+| [SanctuaryHud](SanctuaryHud/) | [**0.21.0**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.21.0) | The mini-map the game doesn't have; economy strip in the game's own style, optionally replacing the built-in panel; SanctuaryUI: the orders row, unit and build card, selection row and build strip docked into one panel in place of the game's bottom panels, all built on the game's own UI canvas; commander widget and alerts; reclaim values and build countdowns over the map; post-game match stats with a FAF-style score and a QUIT button; factory rally points shown, waypoints you can drag, delete and select by, and a factory queue you reorder by dragging; an engineer queue you edit like a factory's, and engineers that keep building when the unit they assist dies or moves on; lobby map list search and filters by players, size and custom maps; every panel resizable by its corner grip |
 | [IdleEngineers](IdleEngineers/) | [**0.7.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.7.3) | Idle engineers and factories as clickable tiles, in the eco panels' shape, on the game's own UI canvas; resize the panel by its corner grip |
 | [EcoManager](EcoManager/) | [**0.9.3**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.9.3) | BUILD and ALLOY tile panels in FA's shape, on the game's own UI canvas: everything under construction by spend, extractors by tier; an engineer's assist starts an upgrade and holds it paused until an engineer starts building it; resize either panel by its corner grip |
 | [BuildHotkeys](BuildHotkeys/) | [**0.6.1**](https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.6.1) | One hotkey per *role*, same key every faction, cycling by tier; pause and repeat-build keys; extractor placement that snaps at screen size; any of the game's own hotkeys moved to another key |
@@ -144,14 +144,14 @@ thin dividers where pieces meet.
 
 - **Orders row** (`OrdersRow`) in place of the game's orders panel
   bottom-left. The game draws all twenty-one order buttons for any selection
-  and dims the ones that don't apply; of the bright ones only Stop and the
-  toggles (pause, repeat build, shield, intel, production) do anything when
-  clicked in the current build — the Lua registers no click function for
-  move, attack, patrol and the rest, which are hotkeys and right-clicks
-  anyway. The row shows only the buttons the game has enabled for the
-  selection, and with `HideUnwiredOrders` (on by default) only the ones that
-  are wired, so a factory gets pause, repeat build and stop and a tank gets
-  stop. Each button is a clone of the game's own — its dashed plate in the
+  and dims the ones that don't apply. The row shows only the buttons the game
+  has enabled for the selection, and with `HideUnwiredOrders` (on by default)
+  leaves out the ones that are right-clicks and hotkeys anyway (move, attack,
+  patrol, assist, repair, capture, harvest), so a factory gets pause, repeat
+  build and stop, a submarine submerge and stop, a transport load, unload and
+  stop. `FixOrderButtons` (on by default) repairs the game's own Stop button,
+  which does nothing in 0.0.1.22, and gives transports a Load button: click
+  it, then one of your units to pick it up. Each button is a clone of the game's own — its dashed plate in the
   order's colour, its icon, and the frame its glow shader lights while the
   toggle is on or the mouse is over it — mirroring the concealed one and
   passing it every click, so whatever Lua hung on it runs unchanged. The

@@ -11,11 +11,11 @@ using static SanctuaryHud.HudCore;
 namespace SanctuaryHud
 {
     // The orders panel, bottom left. The game draws all twenty-one order
-    // buttons for any selection and dims the ones that don't apply; of the
-    // bright ones, only Stop and the toggles (pause, repeat build, shield,
-    // intel, production) do anything when clicked in the current build — the
-    // Lua registers no click function for move, attack, patrol and the rest,
-    // which are hotkeys and right-clicks anyway.
+    // buttons for any selection and dims the ones that don't apply. Since
+    // 0.0.1.22 move, attack, patrol, assist, repair, capture and unload
+    // enter an order mode (the next click on the map issues it); harvest
+    // only warns, and Load and Stop are broken in the game's Lua
+    // (OrderButtons fixes both). The toggles flip as before.
     //
     // With this on, the game's panel is made invisible (PanelConceal) and a
     // compact row stands in its place on the HUD canvas: only the orders the
@@ -32,8 +32,9 @@ namespace SanctuaryHud
                 "Replace the game's orders panel (bottom left) with a compact row showing only the orders the selected units can take, " +
                 "using the game's own icons. The game's panel comes back whenever the overlay is hidden or the mod is unloaded.");
             HideInert = config.Bind("BottomPanels", "HideUnwiredOrders", true,
-                "Leave out the buttons the game has not wired up yet: move, attack, patrol, assist and the rest do nothing when clicked " +
-                "in the current build (they are hotkeys and right-clicks). Stop and the toggles — pause, repeat build, shield, intel, production — stay.");
+                "Keep the row short: leave out move, attack, attack move, patrol, assist, repair, capture and harvest, which are " +
+                "right-clicks and hotkeys anyway (harvest does nothing yet). Stop, load, unload and the toggles — submerge, pause, " +
+                "repeat build, shield, intel, production — stay.");
         }
 
         // ---- the game's panel -------------------------------------------------
@@ -105,14 +106,22 @@ namespace SanctuaryHud
             "target_priority", "move", "attack_move", "attack", "patrol", "assist", "stop",
         };
 
-        /// The buttons with a click function in the Lua. Everything else is
-        /// drawn by the game and does nothing.
-        private static readonly HashSet<string> Wired = new HashSet<string> { "stop", "repeat_build", "pause", "shield", "spr", "alloys" };
+        /// The buttons the row shows with HideUnwiredOrders on: the ones with
+        /// no right-click or hotkey doing the same. Keyed by icon, so "dock"
+        /// is Load and "transport" is Unload.
+        private static readonly HashSet<string> Wired = new HashSet<string>
+        {
+            "stop", "repeat_build", "pause", "shield", "spr", "alloys", "stealth", "surface_dive", "dock", "transport",
+        };
 
         private static readonly Dictionary<string, string> Labels = new Dictionary<string, string>
         {
             ["spr"] = "INTEL",
             ["alloys"] = "PRODUCTION",
+            ["stealth"] = "COUNTER INTEL",
+            ["surface_dive"] = "SUBMERGE",
+            ["dock"] = "LOAD",
+            ["transport"] = "UNLOAD",
             ["manual_fire_01"] = "MANUAL FIRE 1",
             ["manual_fire_02"] = "MANUAL FIRE 2",
         };

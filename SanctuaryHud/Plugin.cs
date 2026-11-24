@@ -27,7 +27,7 @@ namespace SanctuaryHud
     // fallback are their own mods in this monorepo; the plumbing they share
     // with this one (economy stream, ECS poll, Lua bridge) lives in
     // shared\HudCore.cs and is compiled into each mod that needs it.
-    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.20.1")]
+    [BepInPlugin("com.sanctuarydb.hud", "SanctuaryDB HUD", "0.21.0")]
     public class SanctuaryHudPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -186,6 +186,7 @@ namespace SanctuaryHud
             CursorHint.Bind(Config);
             Waypoints.Bind(Config);
             OrderFixes.Bind(Config);
+            OrderButtons.Bind(Config);
             EngineerQueue.Bind(Config);
             QueueReorder.Bind(Config);
             GameClock.Bind(Config);
@@ -315,6 +316,7 @@ namespace SanctuaryHud
                 WorldOverlays.Shutdown();
                 Waypoints.Shutdown();
                 OrderFixes.Shutdown();
+                OrderButtons.Shutdown();
                 CursorHint.Shutdown();
                 CommanderGuard.Shutdown();
                 MatchStats.Shutdown();
@@ -392,6 +394,7 @@ namespace SanctuaryHud
             // Controls, not display: on whether the overlay is showing or not.
             Waypoints.Tick();
             OrderFixes.Tick();
+            OrderButtons.Tick();
             GameClock.Tick();
             CursorHint.Tick();
             CommanderGuard.Tick();
