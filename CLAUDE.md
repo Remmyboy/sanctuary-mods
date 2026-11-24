@@ -93,3 +93,13 @@ game's own DLLs, which can't be published.
 - Report what was and wasn't verified in game; "it compiles" is not "it works".
 - Merge main into a branch rather than forcing; other sessions push to main
   mid-task, so fetch right before pushing.
+- `git fetch` and look at `HEAD..origin/main` before diagnosing or porting:
+  the main checkout can lag other sessions' pushes by a whole game-patch
+  port. A Player.log names no mod version: the `in <32 hex>:0` in its stack
+  traces is the DLL's module id (MVID), unique per build, so compare it with
+  the DLL deployed or released before assuming the log is from current code.
+- Per-frame code (`Update`, Harmony postfixes on hot paths) guards each step
+  at the call site, not only inside it: a callee that names a game member a
+  patch removed fails as it is JIT-compiled, so the TypeLoad/MissingMember
+  throws at the call, outside the callee's own try, every frame. Log once
+  and stop that step (LadderReporter's `Guarded`).
