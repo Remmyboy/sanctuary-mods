@@ -1,4 +1,5 @@
 using System;
+using HarmonyLib;
 using SanctuaryUI;
 using TMPro;
 using UnityEngine;
@@ -18,7 +19,18 @@ namespace SanctuaryHud
     // click is passed on too, after the release, as a real press would.
     internal sealed class TabTile : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
     {
-        private ConstructionFilterToggleElement _source;
+        // Since game build 26880003 the tabs are the generic ToggleElement,
+        // whose parts are private (ConstructionFilterToggleElement had them public).
+        private static readonly AccessTools.FieldRef<ToggleElement, Toggle> ElToggle =
+            AccessTools.FieldRefAccess<ToggleElement, Toggle>("toggle");
+        private static readonly AccessTools.FieldRef<ToggleElement, TMP_Text> ElText =
+            AccessTools.FieldRefAccess<ToggleElement, TMP_Text>("displayText");
+        private static readonly AccessTools.FieldRef<ToggleElement, ColorBlock> ElOn =
+            AccessTools.FieldRefAccess<ToggleElement, ColorBlock>("toggledOnColors");
+        private static readonly AccessTools.FieldRef<ToggleElement, ColorBlock> ElOff =
+            AccessTools.FieldRefAccess<ToggleElement, ColorBlock>("toggledOffColors");
+
+        private ToggleElement _source;
         private Toggle _toggle;
         private TMP_Text _text;
         private LayoutElement _layout;
@@ -42,13 +54,13 @@ namespace SanctuaryHud
                 HoverGlow.Add(go);
                 if (prefab.transform is RectTransform prt && prt.rect.width > 1f && prt.rect.height > 1f) tab._native = prt.rect.size;
 
-                var element = go.GetComponent<ConstructionFilterToggleElement>();
+                var element = go.GetComponent<ToggleElement>();
                 if (element != null)
                 {
-                    tab._text = element.displayText;
-                    tab._toggle = element.toggle;
-                    tab._on = element.toggledOnColors;
-                    tab._off = element.toggledOffColors;
+                    tab._text = ElText(element);
+                    tab._toggle = ElToggle(element);
+                    tab._on = ElOn(element);
+                    tab._off = ElOff(element);
                     tab._haveColours = true;
                     DestroyImmediate(element);
                 }
@@ -91,14 +103,15 @@ namespace SanctuaryHud
         /// The source's toggle, looked up when the source changes.
         private Toggle _sourceToggle;
 
-        internal void Mirror(ConstructionFilterToggleElement source)
+        internal void Mirror(ToggleElement source)
         {
             if (source != _source || _sourceToggle == null)
             {
                 _source = source;
-                _sourceToggle = source.toggle != null ? source.toggle : source.GetComponent<Toggle>();
+                _sourceToggle = ElToggle(source) != null ? ElToggle(source) : source.GetComponent<Toggle>();
             }
-            if (_text != null && source.displayText != null) _text.text = source.displayText.text;
+            var sourceText = ElText(source);
+            if (_text != null && sourceText != null) _text.text = sourceText.text;
             var sourceToggle = _sourceToggle;
             if (_toggle != null && sourceToggle != null)
             {

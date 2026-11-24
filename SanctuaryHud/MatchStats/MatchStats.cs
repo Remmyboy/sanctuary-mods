@@ -114,8 +114,8 @@ namespace SanctuaryHud
                 _log?.LogInfo("Match stats: hooks installed.");
             }
 
-            var result = MatchStatsCore.ResultPanel();
-            var resultShowing = result != null && result.IsVisible;
+            var result = MatchStatsCore.ResultScreen();
+            var resultShowing = result != null;
 
             _pullAccum += Time.unscaledDeltaTime;
             // Once the result is in, a pull is also what gives the screen
@@ -128,24 +128,27 @@ namespace SanctuaryHud
                 _endTick = _data.Tick;
                 _log?.LogInfo($"Match stats: result screen up at tick {_endTick}; {_data.Players().Count} armies.");
                 DumpResultPanel(result);
-                if (_cfgAutoOpen.Value) Screen(result)?.Open(_data, _endTick);
+                if (_cfgAutoOpen.Value) Screen()?.Open(_data, _endTick);
             }
 
             if (!_resultSeen) return;
-            var screen = Screen(result);
+            var screen = Screen();
             if (screen == null) return;
             if (Input.GetKeyDown(_cfgToggleKey.Value))
             {
                 if (screen.IsOpen) screen.Close();
                 else screen.Open(_data, _endTick);
             }
-            screen.Update(_data, resultShowing ? result : null);
+            screen.Update(_data, resultShowing, MatchStatsCore.ResultText(result));
         }
 
-        private static StatsScreen Screen(SanctuaryPanelUI beside)
+        // On the HUD canvas, as before game build 26880003. The result is a
+        // menu screen since then, on the menu canvas, not a HUD panel to
+        // build beside.
+        private static StatsScreen Screen()
         {
             if (_screen != null && _screen.Alive && _container != null) return _screen;
-            var root = beside != null ? HudCanvas.Ensure(beside) : HudCanvas.Ensure();
+            var root = HudCanvas.Ensure();
             if (root == null || root.parent == null) return null;
             _screen?.Destroy();
             if (_container != null) UnityEngine.Object.Destroy(_container.gameObject);
@@ -218,7 +221,7 @@ namespace SanctuaryHud
 
         // What the result panel is made of, once, for anyone laying anything
         // else out against it.
-        private static void DumpResultPanel(SanctuaryPanelUI panel)
+        private static void DumpResultPanel(Component panel)
         {
             if (_dumped || panel == null) return;
             _dumped = true;

@@ -119,9 +119,9 @@ namespace SanctuaryHud
                 // into a new file.
                 var result = _status != null && !NetworkManagerIsReplay() &&
                              string.Equals(RecordingPath(), _status.Recording, StringComparison.OrdinalIgnoreCase)
-                    ? MatchStatsCore.ResultPanel()
+                    ? MatchStatsCore.ResultScreen()
                     : null;
-                var show = result != null && result.IsVisible && !MenuOpen(false);
+                var show = result != null && !MenuOpen(false);
                 if (!show)
                 {
                     if (_card != null && _card.gameObject.activeSelf) _card.gameObject.SetActive(false);
@@ -138,7 +138,7 @@ namespace SanctuaryHud
                     Logger.LogInfo("Ladder reporter: status card shown beside the result panel.");
                 }
                 if (_cardShownVersion != _status.Version) FillCard();
-                PlaceCard(result as SanctuaryUI.GameResultPanelUI);
+                PlaceCard(MatchStatsCore.ResultText(result));
             }
             catch (Exception e)
             {
@@ -228,14 +228,13 @@ namespace SanctuaryHud
 
         // To the right of the result text, its top level with the text's;
         // where that doesn't fit, the screen's top right.
-        private void PlaceCard(SanctuaryUI.GameResultPanelUI result)
+        private void PlaceCard(TMP_Text text)
         {
             var size = HudCanvas.Size;
             var w = _card.rect.width;
             var h = _card.rect.height;
             var x = size.x - w - 60f;
             var y = size.y - h - 160f;
-            var text = result != null ? result.gameResultText : null;
             if (text != null && ScreenRectOnRoot(text, out var r) && r.xMax + 60f + w < size.x - 20f)
             {
                 x = r.xMax + 60f;

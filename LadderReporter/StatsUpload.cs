@@ -174,8 +174,7 @@ namespace SanctuaryHud
 
                 if (pullPending)
                 {
-                    var panel = MatchStatsCore.ResultPanel();
-                    if ((panel != null && panel.IsVisible) || Time.realtimeSinceStartup - job.DecidedAt >= 5f) PullStats(job);
+                    if (MatchStatsCore.ResultScreen() != null || Time.realtimeSinceStartup - job.DecidedAt >= 5f) PullStats(job);
                 }
             }
 

@@ -144,7 +144,9 @@ namespace SanctuaryHud.Replays
                 try
                 {
                     ref var net = ref NetworkManager.ClientData.Data;
-                    return net.isCreated ? net.receivedHostData.bufferedCommunicatorDatas.Length : 0;
+                    // Game build 26880003 flattened receivedHostData.bufferedCommunicatorDatas
+                    // into this queue; ReplayClientSockets reads its Length the same way.
+                    return net.isCreated ? net.receivedHostDatas.Length : 0;
                 }
                 catch (Exception e)
                 {

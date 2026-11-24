@@ -137,6 +137,15 @@ static class GameRef
                     foreach (Match m in Regex.Matches(File.ReadAllText(ef), @"^Engine\.(\w+)\s*=", RegexOptions.Multiline))
                         set.Add(m.Groups[1].Value);
             }
+            // Lua-side helpers bootstrap.lua puts on Engine for both VMs
+            // (Engine.GetLocalEntityID; at the Lua root since build 26880003).
+            var boot = Path.Combine(Lua, "bootstrap.lua");
+            if (File.Exists(boot))
+                foreach (Match m in Regex.Matches(File.ReadAllText(boot), @"^\s*Engine\.(\w+)\s*=", RegexOptions.Multiline))
+                {
+                    EngineFunctions.Add(m.Groups[1].Value);
+                    HostEngineFunctions.Add(m.Groups[1].Value);
+                }
         }
 
         void Add(string line)

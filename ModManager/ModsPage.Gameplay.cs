@@ -59,7 +59,7 @@ namespace SanctuaryHud
             {
                 DescribeNext("No gameplay mods",
                     "A gameplay mod is a folder under SanctuaryMods with a mod.json saying \"kind\": \"gameplay\" and Lua or " +
-                    ".santp files laid out like LJ\\lua under its lua folder. See the Writing a mod guide.");
+                    ".santp files laid out like the game's engine\\lua under its lua folder. See the Writing a mod guide.");
                 InfoRow(_gameList, "No gameplay mods installed", "SanctuaryMods\\<mod>\\mod.json");
                 ScrollToTop(_gameList);
                 return;

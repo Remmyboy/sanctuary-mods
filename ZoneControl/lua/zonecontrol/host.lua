@@ -244,10 +244,14 @@ local function DisableWeapons(unit)
     for _, weapon in ipairs(Weapons(unit)) do weapon:SetEnabled(false) end
 end
 
+-- A unit's top speed is its NavAgent's (the Movement component's max speed
+-- getter and setter are not in the host's Engine as of game build 26880003;
+-- what is left there is for homing projectiles). A unit without a NavAgent
+-- answers with an error code and is left alone.
 local function SetSpeed(unit, fn)
-    local ok, err, speed = pcall(Engine.GetMovementMaxSpeed, unit.id)
-    if ok and type(speed) == "number" then
-        pcall(Engine.SetMovementMaxSpeed, unit.id, fn(speed)) -- lua-check: ok
+    local ok, err, speed = pcall(Engine.GetNavAgentMaxSpeed, unit.id)
+    if ok and err == 0 and type(speed) == "number" then
+        pcall(Engine.SetNavAgentMaxSpeed, unit.id, fn(speed)) -- lua-check: ok
     end
 end
 

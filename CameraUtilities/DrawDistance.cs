@@ -69,6 +69,16 @@ namespace SanctuaryHud.CameraUtils
             _loggedFailure = false;
         }
 
+        // ElementAt hands back a reference into the list's own memory, so
+        // this edits the template the game is about to build its prefab from
+        // (the list is a pointer, so a copy of it writes to the same place).
+        private static void Raise(Unity.Collections.LowLevel.Unsafe.UnsafeList<EM.Components.LODLevelComponent> levels, float floor)
+        {
+            if (!levels.IsCreated || levels.Length != 1) return;
+            ref var level = ref levels.ElementAt(0);
+            if (level.renderDistance < floor) level.renderDistance = floor;
+        }
+
         private static void TemplatesPostfix(ref LocalPrefabTemplates localPrefabTemplates)
         {
             try
@@ -76,19 +86,18 @@ namespace SanctuaryHud.CameraUtils
                 var floor = Wanted;
                 if (floor <= 0f) return;
 
-                var levels = localPrefabTemplates.lodPrefabTemplates;
-                if (!levels.IsCreated) return;
-
-                for (var i = 0; i < levels.Length; i++)
-                {
-                    // ElementAt hands back a reference into the list's own
-                    // memory, so this edits the template the game is about to
-                    // build its prefab from.
-                    ref var template = ref levels.ElementAt(i);
-                    if (template.lodDataComponent.lodCount != 1) continue;
-                    if (template.lodDataComponent.renderDistance0 >= floor) continue;
-                    template.lodDataComponent.renderDistance0 = floor;
-                }
+                // Since game build 26880003 every mesh and skinned mesh
+                // carries its own LOD levels (was one lodPrefabTemplates
+                // list). As before, only single-level ones are raised: a
+                // unit with real LODs switches model rather than vanishing.
+                var meshes = localPrefabTemplates.meshPrefabTemplates;
+                if (meshes.IsCreated)
+                    for (var i = 0; i < meshes.Length; i++)
+                        Raise(meshes.ElementAt(i).lodLevels, floor);
+                var skinned = localPrefabTemplates.skinnedMeshPrefabTemplates;
+                if (skinned.IsCreated)
+                    for (var i = 0; i < skinned.Length; i++)
+                        Raise(skinned.ElementAt(i).lodLevels, floor);
 
                 if (Applied != floor)
                 {

@@ -190,7 +190,7 @@ namespace SanctuaryHud
         private static void Collect(OrdersPanelUI panel, bool hideInert)
         {
             _row.Clear();
-            var container = panel.itemContainer;
+            var container = panel.elementContainer;
             if (container == null) return;
             var index = 0;
             for (var i = 0; i < container.childCount; i++)
@@ -424,7 +424,7 @@ namespace SanctuaryHud
             try
             {
                 var found = new List<string>();
-                var container = panel.itemContainer;
+                var container = panel.elementContainer;
                 if (container != null)
                 {
                     var index = 0;

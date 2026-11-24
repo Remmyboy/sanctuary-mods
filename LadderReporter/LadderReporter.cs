@@ -50,7 +50,7 @@ namespace SanctuaryHud
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
     // ReplayUpload.cs.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.1")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.2")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";

@@ -20,7 +20,7 @@ itself, and the traps that cost us the most time.
 | | **UI mod** | **Gameplay mod** |
 | --- | --- | --- |
 | What it changes | Your own screen: HUD, hotkeys, camera, info | The match itself: units, factions, rules, AI, art |
-| Made of | A C# DLL | Lua and `.santp` files laid out like `LJ\lua`, `.sanpack` art packs, optionally a DLL |
+| Made of | A C# DLL | Lua and `.santp` files laid out like `engine\lua`, `.sanpack` art packs, optionally a DLL |
 | Who switches it on | Each player, on the Mods page, any time (even mid-match) | The lobby host, in the lobby's **Mods** panel, before Start |
 | Other players need it? | No | Yes, byte-identical, or Start stays greyed out |
 | Hot reload | Rebuild and it reloads within a second, even mid-match | Lua: next match. DLL: reloads once the match ends |
@@ -77,7 +77,7 @@ SanctuaryMods\
   FasterTanks\
     mod.json            what the mod is (below)
     FasterTanks.dll     optional: C#
-    lua\                gameplay mods: mirrors the game's LJ\lua
+    lua\                gameplay mods: mirrors the game's engine\lua
       append\
         common\colors.lua   added to the end of common\colors.lua
       units\...\x.santp     replaces the game's file of that name
@@ -117,7 +117,7 @@ file as you type and suggest the fields.
 | `id` | **Required.** 1–64 characters from `a-z 0-9 . _ -`. This is how lobbies name the mod to other players, so start it with your own name. |
 | `name`, `version`, `author`, `description` | Shown on the Mods page and in the lobby. A player with a different `version` is told "has Faster Tanks 1.1 (host 1.2)". |
 | `kind` | `"ui"` or `"gameplay"`. Only `"gameplay"` makes the folder's DLLs follow the lobby selection. A folder with Lua or `.santp` files is always gameplay. |
-| `luaRoot` | The folder inside the mod that mirrors `LJ\lua`. Default `lua`. Nothing outside it is overlaid, so docs and scratch files are safe to keep in the mod folder. |
+| `luaRoot` | The folder inside the mod that mirrors `engine\lua`. Default `lua`. Nothing outside it is overlaid, so docs and scratch files are safe to keep in the mod folder. |
 | `url` | Where to get the mod. It's shown to players who are missing it. It's never opened or fetched automatically. |
 | `requires` | Ids of other gameplay mods that must be picked alongside this one. If one isn't, the lobby says so and holds Start. |
 | `apiVersion` | The ModApi major version you wrote against (`1`). |
@@ -603,9 +603,9 @@ sounds.
 
 Since game 0.0.1.21 the lobby picks AIs itself: each AI seat has its own
 settings (AI, difficulty, unit cap, income), and the AI list is every folder
-in the game's `LJ\lua\AI\mods`. So an AI is installed there, not in
+in the game's `engine\lua\AI\mods`. So an AI is installed there, not in
 `SanctuaryMods`, and a mod.json's `ais` is ignored. One thing to know: every
-`.lua` under `LJ\lua` goes into the version hash lobbies match on, so
+`.lua` under `engine\lua` goes into the version hash lobbies match on, so
 everyone in a multiplayer lobby needs the same AI folders.
 
 A faction mod can still give its faction an AI (the faction's `ai`, above):
@@ -616,6 +616,13 @@ some AIs written for newer games call (such as
 them, and points their `{EDA, CHOSEN, GUARD}` tables at the full faction list.
 
 ## Art packs
+
+> **Not working on the current game build.** Since the 24 November 2026
+> update (Steam build 26880003) the game loads its art from Unity
+> AssetBundles instead of `.sanpack` files, so the Mod API can no longer
+> mount art packs. A mod that ships them still loads, with a notice on the
+> Mods page, but its art is missing. The rest of this section describes the
+> earlier builds.
 
 Models, skeletons, animations, materials, textures, UI sprites and effects
 live in the game's `.sanpack` files: zips whose entries are paths such as

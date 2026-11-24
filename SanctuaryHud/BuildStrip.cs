@@ -102,7 +102,7 @@ namespace SanctuaryHud
         private static bool _syncLogged, _engineerQueueLogged;
         private static readonly List<UnitRow.Entry> _options = new List<UnitRow.Entry>();
         private static readonly List<UnitRow.Entry> _queue = new List<UnitRow.Entry>();
-        private static readonly List<ConstructionFilterToggleElement> _tabs = new List<ConstructionFilterToggleElement>();
+        private static readonly List<ToggleElement> _tabs = new List<ToggleElement>();
 
         private static void HideRows()
         {
@@ -225,13 +225,13 @@ namespace SanctuaryHud
             return false;
         }
 
-        private static readonly PanelChildren<ConstructionFilterToggleElement, Toggle> _tabChildren =
-            new PanelChildren<ConstructionFilterToggleElement, Toggle>();
+        private static readonly PanelChildren<ToggleElement, Toggle> _tabChildren =
+            new PanelChildren<ToggleElement, Toggle>();
 
         private static void CollectTabs(ConstructionFilterPanelUI panel)
         {
             _tabs.Clear();
-            var container = panel != null ? panel.itemContainer : null;
+            var container = panel != null ? panel.elementContainer : null;
             if (container == null) return;
             for (var i = 0; i < container.childCount; i++)
             {
@@ -252,7 +252,7 @@ namespace SanctuaryHud
             private RectTransform _rect;
             private SanctuaryPanelUI _panel;
             private readonly List<TabTile> _tiles = new List<TabTile>();
-            private readonly List<ConstructionFilterToggleElement> _shown = new List<ConstructionFilterToggleElement>();
+            private readonly List<ToggleElement> _shown = new List<ToggleElement>();
             private bool _dirty = true;
             private float _scale = -1f;
             private float _cloneFailedAt = -1f;
@@ -299,7 +299,7 @@ namespace SanctuaryHud
                 _shown.Clear();
             }
 
-            internal void Sync(SanctuaryPanelUI panel, List<ConstructionFilterToggleElement> tabs, float scale)
+            internal void Sync(SanctuaryPanelUI panel, List<ToggleElement> tabs, float scale)
             {
                 if (_rect == null) return;
                 if (panel != _panel)

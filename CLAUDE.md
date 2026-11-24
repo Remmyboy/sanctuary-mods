@@ -50,8 +50,11 @@ game's own DLLs, which can't be published.
 
 ## Paths
 
-- Game: `C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine`
-  (`Sanctuary_Data\Managed` for DLLs, `LJ\lua` for the game's Lua,
+- Game: `D:\SteamLibrary\steamapps\common\Sanctuary Shattered Sun Playtest\engine`
+  (moved from `C:\Program Files (x86)\Steam\...` in Nov 2026; tools find it
+  through Steam's libraryfolders.vdf via `tools/game-path.ps1`, the build via
+  Directory.Build.props). `Sanctuary_Data\Managed` for DLLs, `lua` for the
+  game's Lua (`LJ\lua` before build 26880003; ModApi's `ModCatalog.GameLuaRoot`),
   `Sanctuary_Data\Plugins\x86_64\lua51.dll` is its LuaJIT).
 - Logs: `BepInEx\LogOutput.log` (plugin loggers; overwritten each launch) and
   `%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary\Player.log`

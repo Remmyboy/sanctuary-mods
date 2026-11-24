@@ -55,7 +55,8 @@ param(
     # Overrides the version from [BepInPlugin]. Normally leave this alone.
     [string]$Version,
 
-    [string]$GamePath = 'C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine',
+    # Default: wherever Steam has the game (tools/game-path.ps1).
+    [string]$GamePath,
     [string]$OutDir = 'release',
 
     # Create the GitHub release. Without this the zips are only built, which is
@@ -63,7 +64,7 @@ param(
     [switch]$Publish,
 
     # Which game build the release notes claim to target.
-    [string]$BuiltFor = '11 October 2026 (0.0.1.21.1)'
+    [string]$BuiltFor = '24 November 2026 (0.0.1.22.1)'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,6 +73,7 @@ $ErrorActionPreference = 'Stop'
 # "does this tag already exist" probes fail instead of answering no.
 $PSNativeCommandUseErrorActionPreference = $false
 $repo = Split-Path $PSScriptRoot -Parent
+if (-not $GamePath) { . (Join-Path $PSScriptRoot 'game-path.ps1'); $GamePath = $GameDir }
 
 # Staged away from the game folder so packing never disturbs a running game;
 # the clean checkout sits beside it.

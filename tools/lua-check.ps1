@@ -29,7 +29,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path $PSScriptRoot -Parent
-$Lua = 'C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine\Sanctuary_Data\Plugins\x86_64\lua51.dll'
+. (Join-Path $PSScriptRoot 'game-path.ps1')
+$Lua = Join-Path $GameDir 'Sanctuary_Data\Plugins\x86_64\lua51.dll'
 if (-not $Paths) { $Paths = @($Repo) }
 if ($Strict) { $Paths = @('--strict') + $Paths }
 

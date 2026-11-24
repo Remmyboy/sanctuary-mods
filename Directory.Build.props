@@ -7,8 +7,12 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <DebugType>none</DebugType>
-    <!-- Game + BepInEx locations; override with -p:GamePath=... if the install moves. -->
-    <GamePath>C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine</GamePath>
+    <!-- Game + BepInEx locations: the first Steam library that has the game
+         (it moved to D:\SteamLibrary in Nov 2026), or -p:GamePath=... /
+         the SANCTUARY_GAME environment variable. -->
+    <GamePath Condition="'$(GamePath)' == '' and '$(SANCTUARY_GAME)' != ''">$(SANCTUARY_GAME)</GamePath>
+    <GamePath Condition="'$(GamePath)' == '' and Exists('D:\SteamLibrary\steamapps\common\Sanctuary Shattered Sun Playtest\engine\Sanctuary.exe')">D:\SteamLibrary\steamapps\common\Sanctuary Shattered Sun Playtest\engine</GamePath>
+    <GamePath Condition="'$(GamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine</GamePath>
     <!-- Mods deploy to SanctuaryMods\<AssemblyName>\ (see
          Directory.Build.targets); the loader overrides DeployPath. -->
     <!-- Unique AssemblyVersion per build: Mono's Assembly.Load(byte[]) returns

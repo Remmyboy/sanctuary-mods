@@ -24,7 +24,7 @@ namespace SanctuaryHud.Replays
     // playing. Driving the playback lives in ReplayPlayer; this class is the
     // config, the hotkey, the runtime Lua hooks (economy for every army, the
     // lobby roster for names, observer mode) and the panel.
-    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.5.3")]
+    [BepInPlugin("com.sanctuarydb.replaymanager", "Replay Manager", "0.5.4")]
     public class ReplaysPlugin : BaseUnityPlugin
     {
         private Harmony _harmony;
@@ -251,16 +251,21 @@ do
   end)
   if not ok3 then __SdbReplayHookErr = __SdbReplayHookErr .. ' roster: ' .. tostring(err3) end
 
-  -- The game's result panel. The client shows VICTORY or DEFEAT the first
-  -- time the focused army's result comes in, and in the all-armies view
-  -- every army counts as focused, so in a replay it came up the moment the
-  -- first player was wiped out. A replay has no 'us': hold the panel back
-  -- until the match is decided (some army has won, i.e. all its enemies are
-  -- out), then show it for whichever view is being watched (GAME OVER in the
-  -- all-armies view). The game's handler still runs for every update, with
-  -- the panel calls muted, so anything else wrapping it (MatchStats records
-  -- each army's result there) sees them all whichever order the wrappers
-  -- went on in.
+  -- The game's end-of-match screen. The client brings it up (VICTORY or
+  -- DEFEAT) the first time the focused army's result comes in, and in the
+  -- all-armies view every army counts as focused, so in a replay it came up
+  -- the moment the first player was wiped out. A replay has no 'us': hold
+  -- the screen back until the match is decided (some army has won, i.e. all
+  -- its enemies are out), then show it for whichever view is being watched.
+  -- The game's handler still runs for every update, so anything else
+  -- wrapping it (MatchStats records each army's result there) sees them all
+  -- whichever order the wrappers went on in.
+  --
+  -- Since game build 26880003 the handler starts a thread that waits 5 s and
+  -- then opens the EndGameScreen window (it was a panel, shown straight
+  -- away), so it is that NewThread call that is muted, in the module's own
+  -- environment. The screen has no GAME OVER any more: the all-armies view
+  -- gets VICTORY, as the match has a winner.
   S.Result = function()
     if S.resultDone or type(Armies) ~= 'table' or next(Armies) == nil then return end
     S.resultDone = true
@@ -268,16 +273,15 @@ do
       local W = Import('client/winCondition.lua')
       local inner = W.WinConditionUpdate
       if type(inner) ~= 'function' then error('WinConditionUpdate is missing') end
-      local GR = (UIPanelType and UIPanelType.GameResult) or 9
+      local env = getfenv(inner)
       local cond, shown = {}, false
       local mine = function(data, ...)
         if S.off then return inner(data, ...) end
         pcall(function() cond[data.armyID] = data.condition end) -- lua-check: ok
-        local vis, txt = Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues
-        Engine.UI_SetPanelVisibility = function(t, v) if t ~= GR then return vis(t, v) end end
-        Engine.UI_SetGameResultValues = function() end
+        local own = rawget(env, 'NewThread')
+        rawset(env, 'NewThread', function() end)
         local ok2, err2 = pcall(inner, data, ...)
-        Engine.UI_SetPanelVisibility, Engine.UI_SetGameResultValues = vis, txt
+        rawset(env, 'NewThread', own)
         if not ok2 then error(err2, 0) end
         if shown then return end
         local over = false
@@ -285,10 +289,11 @@ do
         if not over then return end
         shown = true
         local c = cond[GetFocusArmy()]
-        local text = (c == 1 and 'VICTORY!') or (c == 2 and 'DEFEAT!') or 'GAME OVER!'
-        local ok3, err3 = pcall(function() txt(EngineClasses.UIGameResultValues(text)) end)
-        if not ok3 then __SdbReplayHookErr = 'result text: ' .. tostring(err3) end
-        vis(GR, true)
+        local ok3, err3 = pcall(function()
+          Engine.UI_SetEndGameScreenResult(c ~= 2)
+          Engine.UI_TransitionToWindow(Window.EndGameScreen)
+        end)
+        if not ok3 then __SdbReplayHookErr = 'result screen: ' .. tostring(err3) end
       end
       W.WinConditionUpdate = mine
       undo[#undo + 1] = function() if W.WinConditionUpdate == mine then W.WinConditionUpdate = inner end end

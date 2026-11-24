@@ -39,7 +39,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Game = 'C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine'
+. (Join-Path $PSScriptRoot 'game-path.ps1')
+$Game = $GameDir
 $BepLog = Join-Path $Game 'BepInEx\LogOutput.log'
 $LocalLow = Join-Path $env:USERPROFILE 'AppData\LocalLow\Enhearten Media PTY\Sanctuary'
 $PlayerLog = Join-Path $LocalLow ($(if ($Previous) { 'Player-prev.log' } else { 'Player.log' }))

@@ -23,7 +23,7 @@ Install the Mod Manager Standalone zip into the game's `engine` folder, then put
 | --- | --- |
 | Game | `Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine` |
 | Game DLLs to compile against | `engine\Sanctuary_Data\Managed` (Trebuchet.dll is the game's code) |
-| Game Lua | `engine\LJ\lua` |
+| Game Lua | `engine\lua` |
 | Mods | `engine\SanctuaryMods\<YourMod>\` |
 | Plugin log (overwritten each launch) | `engine\BepInEx\LogOutput.log` |
 | Unity log (exceptions from mod code land only here) | `%USERPROFILE%\AppData\LocalLow\Enhearten Media PTY\Sanctuary\Player.log`, plus `Player-prev.log` |
@@ -82,7 +82,7 @@ Gameplay mods change the host's Lua, so every player needs them; UI mods live on
 
 ## Lua modding
 
-The single most useful fact: **game Lua files are modules, not globals.** Most "my hook is installed but does nothing" bugs come from that, and they fail silently. The game's Lua is in `engine\LJ\lua` (`host\`, `client\`, `common\`, `AI\`); read it there.
+The single most useful fact: **game Lua files are modules, not globals.** Most "my hook is installed but does nothing" bugs come from that, and they fail silently. The game's Lua is in `engine\lua` (`host\`, `client\`, `common\`, `AI\`); read it there.
 
 **Scoping and hooking**
 
@@ -100,7 +100,7 @@ The single most useful fact: **game Lua files are modules, not globals.** Most "
 - "No errors" proves nothing. A missing function inside a `pcall`, a nil-guarded early return, or a missing AI build-condition function (which resolves to false) all fail without a word. Have your code set a counter global and check it.
 - From C#, reading a Lua global with `lua_tostring` only converts numbers and strings: a global set to `true` reads back exactly like a missing one. Probe with a number or string.
 - Running Lua from C# before the match has loaded does nothing. Wrap injected chunks in `pcall` and store the error in a string global, or you'll never see it.
-- `Engine.*` functions are listed in `LJ/lua/client/generated/doc/engineFunctions.lua`. Diff your calls against it after every patch.
+- `Engine.*` functions are listed in `engine/lua/client/generated/doc/engineFunctions.lua`. Diff your calls against it after every patch.
 
 **Other gotchas**
 
@@ -170,9 +170,9 @@ Most gameplay mods need no C# at all: a folder with a `mod.json` and a `lua\` tr
 
 **Factions:** declare them in `mod.json` and the framework adds the lobby entries. Game visuals such as shields, build beams and adjacency pick materials by the three stock faction tags, which is what `looksLike` is for. Sounds can't come from art packs; new units use the game's sounds.
 
-**AI:** AI runs on the host only. Every decision reads `Armies[i].ai.settings.modDirectory`, and the only per-AI boundary is `AI\mods\<name>\`. The loose `AI\*.lua` files are a shared engine, so an AI that edits them changes every AI in the match. Since 0.0.1.21 the lobby itself gives each AI seat an AI from the `AI\mods` folders, with difficulty, unit cap and income settings; the framework only routes a modded faction's seats to that faction's AI. The AI writes its own log to `LJ\lua\AI\ai_logs`.
+**AI:** AI runs on the host only. Every decision reads `Armies[i].ai.settings.modDirectory`, and the only per-AI boundary is `AI\mods\<name>\`. The loose `AI\*.lua` files are a shared engine, so an AI that edits them changes every AI in the match. Since 0.0.1.21 the lobby itself gives each AI seat an AI from the `AI\mods` folders, with difficulty, unit cap and income settings; the framework only routes a modded faction's seats to that faction's AI. The AI writes its own log to `engine\lua\AI\ai_logs`.
 
-**Art packs:** a `.sanpack` is a zip with the game's layout inside (`Units/<id>/...`, `UI/Sprites/Icons/Units/<id>.sansprite`). Packs go in at match load and come out after. The host reads meshes and skeletons too, so every player needs identical packs.
+**Art packs** (up to build 26880003; since then the game's art is in Unity AssetBundles and `.sanpack` packs are not mounted): a `.sanpack` is a zip with the game's layout inside (`Units/<id>/...`, `UI/Sprites/Icons/Units/<id>.sansprite`). Packs go in at match load and come out after. The host reads meshes and skeletons too, so every player needs identical packs.
 
 **C# gameplay mods** are created only while a lobby has the mod picked and destroyed when the match ends. Use `Modding.IsHost` to tell which machine runs the simulation. `ModLua.Run` runs Lua in *your own* client only; it never reaches the host or other players.
 
@@ -184,7 +184,7 @@ One lesson from those game modes:
 
 ## Game data: units, economy, orders
 
-Unit stats are plain Lua tables in `LJ\lua\common\units\unitsTemplates\<id>\<id>.santp` (295 templates when we counted). Some fields are filled in at load by `common/systems/templateLoader.lua`, so read them from `unit.tp` at runtime rather than from the file.
+Unit stats are plain Lua tables in `engine\lua\common\units\unitsTemplates\<id>\<id>.santp` (295 templates when we counted). Some fields are filled in at load by `common/systems/templateLoader.lua`, so read them from `unit.tp` at runtime rather than from the file.
 
 **Unit ids:** `ue` = EDA, `uc` = Chosen, `ug` = Guardians, then `s`/`l`/`a`/`n` for structure, land, air, naval. Factories are `u{e,c,g}s{1,2,3}51{1,2,3}` (511 land, 512 air, 513 naval).
 
@@ -250,7 +250,7 @@ Check both logs, every time. BepInEx's own Unity log writer often fails to start
 | Mod didn't load, or loaded and does nothing | `Player.log` for exceptions; `LogOutput.log` for your "loaded" line |
 | Gameplay mod Lua error | `Player.log`, tagged `HostLua` (simulation) or `ClientLua` (UI), with file and line. An appended line's number is past the end of the game's file. |
 | Mod API: overlay, pick, Start refusal, syntax errors | `LogOutput.log`, lines from `Sanctuary Mod API`, and the Mods page's Problems list |
-| AI behaviour | `LJ\lua\AI\ai_logs\AI log <date>.txt` |
+| AI behaviour | `engine\lua\AI\ai_logs\AI log <date>.txt` |
 | Crash | `%TEMP%\Enhearten Media PTY\Sanctuary\Crashes` |
 
 `LogOutput.log` and `Player.log` are overwritten each launch (`Player-prev.log` keeps one more). Our dev-only [LogKeeper](../tools/LogKeeper) plugin archives the last 10 sessions.
@@ -286,7 +286,7 @@ The playtest patches often, and a patch breaks mods quietly: most breakage compi
 | Lua engine calls moved | Client `Engine.SetSimulationSpeed` became `Engine.SetReplaySpeed` | Called inside a `pcall`, so nothing logged |
 | New game behaviour | The host now sends its own commander-damage alert | Doubled up with a mod's alert |
 
-- Diff every `Engine.X` your Lua calls against `LJ/lua/client/generated/doc/engineFunctions.lua`.
+- Diff every `Engine.X` your Lua calls against `engine/lua/client/generated/doc/engineFunctions.lua`.
 - Our [tools/game-ref.ps1](../tools/game-ref.ps1) snapshots a build's decompiled C#, Lua and API list, diffs two builds, and checks which names our mods use that moved. It's written for our repo, but the idea transfers.
 - Set `gameVersion` in `mod.json`. On any other version the Mods page tells players which mods might need an update.
 

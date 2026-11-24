@@ -148,7 +148,7 @@ namespace Sanctuary.ModApi
         private static Dictionary<string, Parsed> ReadGame()
         {
             var result = new Dictionary<string, Parsed>(StringComparer.Ordinal);
-            var root = Path.Combine(Paths.GameRootPath, "LJ", "lua", "common", "units", "unitsTemplates");
+            var root = Path.Combine(ModCatalog.GameLuaRoot, "common", "units", "unitsTemplates");
             if (!Directory.Exists(root))
             {
                 ModApiPlugin.Log.LogWarning($"Unit catalog: no unit templates at {root}.");

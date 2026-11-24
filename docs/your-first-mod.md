@@ -31,7 +31,7 @@ it, [writing-mods.md](writing-mods.md) is the full reference.
 ## How a gameplay mod works
 
 A gameplay mod is a folder of Lua files (the language the game's rules are
-written in) laid out like the game's own Lua folder, `engine\LJ\lua`. When the
+written in) laid out like the game's own Lua folder, `engine\lua`. When the
 host of a lobby picks your mod, every player's game swaps your files in
 before the match starts. Nothing on disk is changed, and after the match the
 game goes back to vanilla.
@@ -56,7 +56,7 @@ engine\SanctuaryMods\
         host.lua              the host script: the mod's rules
 ```
 
-`lua\` mirrors the game's `engine\LJ\lua`. A file under `lua\append\` is
+`lua\` mirrors the game's `engine\lua`. A file under `lua\append\` is
 added to the end of the game's file at the same path. Any other file is a
 file of your own, or replaces the game's file at that path.
 
@@ -104,7 +104,7 @@ If it isn't listed at all, check that the file is called `mod.json` (not
 
 ## 3. Change a game file: paint an army
 
-The game's army colours live in `engine\LJ\lua\common\colors.lua`. Open it
+The game's army colours live in `engine\lua\common\colors.lua`. Open it
 (read-only: never edit the game's own files) and you'll find a table called
 `ArmyColors`. The armies take its colours in the order they're set up, which
 is normally seat order: the first seat's army gets `ArmyColors[1]`.

@@ -278,7 +278,7 @@ namespace SanctuaryHud
         /// Every frame once the match has a result: the button under the
         /// result text while the screen is closed, the readout while it is
         /// open, and a refresh when new figures have come in.
-        internal void Update(MatchData data, SanctuaryPanelUI result)
+        internal void Update(MatchData data, bool resultShowing, TMP_Text resultText)
         {
             if (!Alive) return;
             if (data != null) _data = data;
@@ -288,9 +288,9 @@ namespace SanctuaryHud
                 QuitLabels();
             }
 
-            var showButton = !IsOpen && result != null;
+            var showButton = !IsOpen && resultShowing;
             if (_reopen.gameObject.activeSelf != showButton) _reopen.gameObject.SetActive(showButton);
-            if (showButton) PlaceButton(result);
+            if (showButton) PlaceButton(resultText);
 
             if (!IsOpen || _data == null) return;
             if (HudCanvas.Size != _laidOutFor) Refresh();
@@ -328,15 +328,13 @@ namespace SanctuaryHud
             }
         }
 
-        private void PlaceButton(SanctuaryPanelUI result)
+        private void PlaceButton(TMP_Text text)
         {
             var size = HudCanvas.Size;
             var w = _reopen.rect.width;
             var h = _reopen.rect.height;
             var x = (size.x - w) * 0.5f;
             var y = size.y * 0.3f;
-            var resultPanel = result as GameResultPanelUI;
-            var text = resultPanel != null ? resultPanel.gameResultText : null;
             if (text != null && HudCanvas.LocalRect(text, out var r) && r.yMin - 40f - h > 0f)
             {
                 x = r.center.x - w * 0.5f;

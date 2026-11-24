@@ -90,8 +90,17 @@ namespace SanctuaryHud
             if (__result) return;
             if (path == null || !path.StartsWith("map/", StringComparison.OrdinalIgnoreCase)) return;
 
+            // Data.LoadedMapPath went in game build 26880003, with the game's
+            // own "map/" rewriting; maps are under the Lua tree now. The
+            // selected map, as a path under it, is the nearest thing left.
+            // Unverified in game, and maybe no longer needed at all.
             string mapDir;
-            try { mapDir = EM.Gamedata.Data.LoadedMapPath; }
+            try
+            {
+                var selected = EM.Map.MapManager.SelectedMapPath;
+                if (string.IsNullOrEmpty(selected)) return;
+                mapDir = Path.GetDirectoryName(Path.Combine(EM.Lua.FilesCache.luaFolder, selected));
+            }
             catch { return; }
             if (string.IsNullOrEmpty(mapDir)) return;
 

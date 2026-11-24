@@ -250,7 +250,7 @@ namespace Sanctuary.ModApi
                         // takes those from LJ\lua\AI\mods now.
                         if ((nested == null || nested.Count == 0) && !File.Exists(Path.Combine(full, ModManifest.FileName)) && HoldsAis(full))
                         {
-                            notices.Add($"{name} is an AI. Since game 0.0.1.21 AIs go in the game's LJ\\lua\\AI\\mods folder, where the lobby's AI settings list them; here it does nothing.");
+                            notices.Add($"{name} is an AI. Since game 0.0.1.21 AIs go in the game's lua\\AI\\mods folder, where the lobby's AI settings list them; here it does nothing.");
                             continue;
                         }
                         if (nested == null || nested.Count == 0)
@@ -405,6 +405,7 @@ namespace Sanctuary.ModApi
             // Art the host's simulation reads too (meshes, skeletons), so a
             // pack makes the mod one the lobby picks and everyone must match.
             info.Packs = ModApi.Packs.Find(dir, files);
+            if (info.Packs.Count > 0) problems.Add(ModApi.Packs.Unsupported);
 
             info.DllsAreGameplay = !manifest.KindUnset && manifest.Kind == ModKind.Gameplay;
             var matchContent = overlay.Count > 0 || info.Packs.Count > 0 || manifest.Factions.Count > 0;
@@ -447,7 +448,16 @@ namespace Sanctuary.ModApi
 
         private static bool IsAppendPath(string rel) => Overlay.IsAppend(rel, out _);
 
-        private static string GameLuaRoot => Path.Combine(Paths.GameRootPath, "LJ", "lua");
+        /// The game's Lua tree: engine\lua since game build 26880003 (24 Nov
+        /// 2026, FilesCache's luaFolder), engine\LJ\lua before it.
+        public static string GameLuaRoot
+        {
+            get
+            {
+                var lua = Path.Combine(Paths.GameRootPath, "lua");
+                return Directory.Exists(Path.Combine(lua, "common")) ? lua : Path.Combine(Paths.GameRootPath, "LJ", "lua");
+            }
+        }
 
         /// What a faction names has to exist: its commanders' templates, its
         /// AI folder and its icon, in the mod or the game.

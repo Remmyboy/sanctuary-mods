@@ -156,7 +156,7 @@ namespace Sanctuary.ModApi
             // Since game 0.0.1.21 the lobby gives each AI seat any AI under
             // LJ\lua\AI\mods itself; mods no longer bring AIs of their own.
             if (o["ais"] != null && o["ais"].Type != JTokenType.Null)
-                problems.Add(@"mod.json: ais is ignored: since game 0.0.1.21 the lobby picks AIs itself, from the folders in LJ\lua\AI\mods");
+                problems.Add(@"mod.json: ais is ignored: since game 0.0.1.21 the lobby picks AIs itself, from the folders in the game's lua\AI\mods");
             return m;
         }
 

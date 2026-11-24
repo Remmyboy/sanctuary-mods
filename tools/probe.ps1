@@ -44,7 +44,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $Dir = Join-Path $env:LOCALAPPDATA 'SanctuaryProbe'
 $Repo = Split-Path $PSScriptRoot -Parent
-$GameExe = 'C:\Program Files (x86)\Steam\steamapps\common\Sanctuary Shattered Sun Playtest\engine\Sanctuary.exe'
+. (Join-Path $PSScriptRoot 'game-path.ps1')
+$GameExe = Join-Path $GameDir 'Sanctuary.exe'
 $ModDir = Join-Path (Split-Path $GameExe) 'SanctuaryMods\SanctuaryProbe'
 
 function Test-GameRunning { [bool](Get-Process -Name Sanctuary -ErrorAction SilentlyContinue) }

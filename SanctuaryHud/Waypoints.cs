@@ -829,15 +829,19 @@ if not __SdbWaypoints then
     W.preview = id
     Engine.SetIconsEnabled(id, false)
     Engine.SetRangeRingsEnabled(id, true)
+    -- A ghost's bone by name, as client/entities/predictedUnit.lua finds
+    -- them (the old bone getter went in game build 26880003); nil if none.
+    local prefab = tp.general.placementGhostPrefabID
+    local function show(name, on)
+      local bone = Engine.GetLocalEntityID(id, prefab, name)
+      if bone then Engine.SetRendererEnabled(bone, on) end
+    end
     for x = 1, tp.skirtSize.x do
       for y = 1, tp.skirtSize.y do
-        local ok, bone = cells[x][y], {}
-        Engine.GetLocalBone(id, 'Grid' .. x .. ' ' .. y .. 'On', bone)
-        Engine.SetRendererEnabled(bone, ok and all)
-        Engine.GetLocalBone(id, 'Grid' .. x .. ' ' .. y .. 'Off', bone)
-        Engine.SetRendererEnabled(bone, not ok)
-        Engine.GetLocalBone(id, 'Grid' .. x .. ' ' .. y .. 'Neutral', bone)
-        Engine.SetRendererEnabled(bone, ok and not all)
+        local ok, cell = cells[x][y], 'Grid' .. x .. ' ' .. y
+        show(cell .. 'On', ok and all)
+        show(cell .. 'Off', not ok)
+        show(cell .. 'Neutral', ok and not all)
       end
     end
   end

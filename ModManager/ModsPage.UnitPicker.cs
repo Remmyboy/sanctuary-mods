@@ -374,8 +374,9 @@ namespace SanctuaryHud
             SymbolArt art = null;
             try
             {
-                var entry = Load.GetFileEntryFromPath("UI/Sprites/Icons/UnitSymbols/icon_unit_symbol_" + symbol + ".sansprite");
-                var sprite = entry == null ? null : Load.LoadGamedataSprite(entry)?.GetSprite();
+                // Since game build 26880003 the art is in AssetBundles, by
+                // the path client/ui/uiUtils.lua builds (.png, was .sansprite).
+                var sprite = EM.Content.AssetBundleLoader.Load<Sprite>("UI/Sprites/Icons/UnitSymbols/icon_unit_symbol_" + symbol + ".png");
                 if (sprite == null) _log.LogInfo($"Unit picker: no symbol sprite for '{symbol}'.");
                 else art = Split(sprite);
             }

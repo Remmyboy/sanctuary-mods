@@ -418,7 +418,10 @@ namespace SanctuaryHud
                 ?.GetMethod("GetClientID", BindingFlags.Public | BindingFlags.Static);
             _lobbyInfoType = TypeIndex.ByName("LobbyInformationManaged");
 
-            var colorsPath = System.IO.Path.Combine(Paths.GameRootPath, "LJ", "lua", "common", "colors.lua");
+            // engine\lua since game build 26880003, engine\LJ\lua before.
+            var colorsPath = System.IO.Path.Combine(Paths.GameRootPath, "lua", "common", "colors.lua");
+            if (!System.IO.File.Exists(colorsPath))
+                colorsPath = System.IO.Path.Combine(Paths.GameRootPath, "LJ", "lua", "common", "colors.lua");
             _armyColours = ParseArmyColours(colorsPath);
             _log.LogInfo($"Ownership filter: {_armyColours?.Length ?? 0} army colours, GetClientID {(_getClientIdMi != null ? "found" : "missing")}, lobbyInfo {(_lobbyInfoType != null ? "found" : "missing")}.");
         }
@@ -1799,16 +1802,16 @@ namespace SanctuaryHud
         {
             try
             {
-                var ui = SanctuaryUI.SanctuaryUIManager.Instance;
-                // The end-of-match result screen counts too: the game's own
-                // HUD is done by then, so the mods' panels should be as well.
-                if (countResult && ui != null && ui.TryGetPanel(SanctuaryUI.UIPanelType.GameResult, out var result) && result.IsVisible) return true;
                 // InterfaceManager.TransitionTo turns this backdrop on for
                 // every screen except None, and None is what a match runs
                 // under. Since 0.0.1.20 that includes the pause menu, which
                 // left the SanctuaryUI panels to become the InGameMenu screen.
+                // Since game build 26880003 the end-of-match result is a
+                // screen too (EndGameScreen, was the GameResult panel): it
+                // counts unless countResult says not to.
                 var screens = EM.UI.InterfaceManager.Instance;
-                return screens != null && screens.background != null && screens.background.activeInHierarchy;
+                if (screens == null || screens.background == null || !screens.background.activeInHierarchy) return false;
+                return countResult || !screens.IsWindowVisible(EM.UI.InterfaceManager.Window.EndGameScreen);
             }
             catch
             {

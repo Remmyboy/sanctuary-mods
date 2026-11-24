@@ -30,7 +30,7 @@ namespace SanctuaryHud
         internal static void Collect(SanctuaryPanelUI panel, List<Entry> row, bool liveOnly)
         {
             row.Clear();
-            var container = panel != null ? panel.itemContainer : null;
+            var container = panel != null ? panel.elementContainer : null;
             if (container == null) return;
             for (var i = 0; i < container.childCount; i++)
             {

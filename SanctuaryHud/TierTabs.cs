@@ -55,7 +55,7 @@ namespace SanctuaryHud
         /// How many of the panel's tabs are on and clickable.
         private static int LiveTabs(ConstructionFilterPanelUI panel)
         {
-            var container = panel.itemContainer;
+            var container = panel.elementContainer;
             if (container == null) return 0;
             var live = 0;
             for (var i = 0; i < container.childCount; i++)

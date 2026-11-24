@@ -91,8 +91,8 @@ namespace SanctuaryHud
             try
             {
                 var panel = FindPanel<SelectionPanelUI>(UIPanelType.Selection);
-                if (panel == null || !panel.IsVisible || panel.itemContainer == null) return _count;
-                var container = panel.itemContainer;
+                if (panel == null || !panel.IsVisible || panel.elementContainer == null) return _count;
+                var container = panel.elementContainer;
                 for (var i = 0; i < container.childCount; i++)
                 {
                     var child = container.GetChild(i);

@@ -299,6 +299,14 @@ namespace SanctuaryHud
 
         // ---- construction ---------------------------------------------------
 
+        private static string PathOf(Transform t)
+        {
+            if (t == null) return "(none)";
+            var path = t.name;
+            for (var p = t.parent; p != null; p = p.parent) path = p.name + "/" + path;
+            return path;
+        }
+
         private void Build(SideBarInterface bar)
         {
             _builtFor = bar;
@@ -314,9 +322,17 @@ namespace SanctuaryHud
             var im = InterfaceManager.Instance;
             var menu = im != null ? im.GetComponent<PanelManager>() : null;
             if (menu == null) throw new InvalidOperationException("The menu's PanelManager was not found.");
-            var settingsItem = menu.panels.Find(p => p.panelName == InterfaceManager.Window.Settings.ToString())
+            // The panel that holds the live SettingsInterface, else the one
+            // named Settings. Game build 26880003 broke "the Settings panel
+            // holds it", so which object is cloned is logged.
+            var live = SanctuaryUI.SettingsInterface.Instance;
+            var settingsItem = (live == null ? null : menu.panels.Find(p => p.panelObject != null && live.transform.IsChildOf(p.panelObject.transform)))
+                               ?? menu.panels.Find(p => p.panelName == InterfaceManager.Window.Settings.ToString())
                                ?? throw new InvalidOperationException("The menu has no Settings panel.");
-            var settings = settingsItem.panelObject.gameObject;
+            var settings = settingsItem.panelObject != null ? settingsItem.panelObject.gameObject : null;
+            _log.LogInfo($"Mods page: Settings panel '{settingsItem.panelName}' is {PathOf(settings != null ? settings.transform : null)}; " +
+                         $"SettingsInterface is {PathOf(live != null ? live.transform : null)}; panels: {string.Join(", ", menu.panels.Select(p => p.panelName))}.");
+            if (settings == null) throw new InvalidOperationException("The Settings panel has no object.");
             var root = settings.transform.parent; // the InterfaceManager's list of screens
 
             if (_harmony == null)
@@ -388,7 +404,13 @@ namespace SanctuaryHud
             _tHeading = TakeTemplate(_uiList, "Display Header", "Heading");
             _tLine = TakeTemplate(_uiList, "Line", "Line");
             _tSpacer = TakeTemplate(_uiList, "Spacer", "Spacer");
-            _tTextRow = TakeTemplate(_uiList, "UI Scale", "TextRow");
+            // A slider row with a text input: UI Scale was one until game
+            // build 26880003 made it a selector; Controls' Edge Pan Speed
+            // still is.
+            var uiScale = _uiList.Find("UI Scale");
+            _tTextRow = uiScale != null && uiScale.Find("Slider") != null
+                ? TakeTemplate(_uiList, "UI Scale", "TextRow")
+                : TakeTemplate(_gameList, "EdgePanSpeed", "TextRow");
             _tButtonRow = TakeTemplate(_uiList, "ApplyButton", "ButtonRow");
             _tSelectorRow = TakeTemplate(_uiList, "Window Mode", "SelectorRow");
             PrepareSelectorTemplate(_tSelectorRow);

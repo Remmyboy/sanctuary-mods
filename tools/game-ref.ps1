@@ -11,7 +11,8 @@
 
   A snapshot lives in %LOCALAPPDATA%\SanctuaryRef\<buildid>\ and holds
     cs\<Assembly>\   ilspycmd's decompiled project, one file per type (grep it)
-    lua\             a copy of engine\LJ\lua (client, common, host, AI, docs)
+    lua\             a copy of the game's Lua (engine\lua; engine\LJ\lua before
+                     build 26880003): client, common, host, AI, docs
     api.txt          every type/member of the game assemblies, one line each
     api-engine.txt   the same for Unity and other third-party assemblies
     info.txt         build id, date, Trebuchet.dll timestamp
@@ -31,8 +32,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = Join-Path $env:LOCALAPPDATA 'SanctuaryRef'
 $Repo = Split-Path $PSScriptRoot -Parent
-$Steam = 'C:\Program Files (x86)\Steam\steamapps'
-$Game = Join-Path $Steam 'common\Sanctuary Shattered Sun Playtest\engine'
+. (Join-Path $PSScriptRoot 'game-path.ps1')
+$Steam = $SteamApps
+$Game = $GameDir
 $Managed = Join-Path $Game 'Sanctuary_Data\Managed'
 $Decompile = @('Trebuchet', 'Michsky.UI.Beam')
 
@@ -80,7 +82,7 @@ switch ($Command) {
         'copying Lua...'
         $lua = Join-Path $dir 'lua'
         if (Test-Path $lua) { Remove-Item $lua -Recurse -Force }
-        Copy-Item (Join-Path $Game 'LJ\lua') $lua -Recurse
+        Copy-Item $GameLua $lua -Recurse
 
         'writing API listings...'
         Invoke-GameRef api $Managed $dir (Join-Path $Game 'BepInEx\core')

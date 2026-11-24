@@ -1,4 +1,7 @@
-using SanctuaryUI;
+using EM.UI;
+using HarmonyLib;
+using TMPro;
+using UnityEngine;
 
 namespace SanctuaryHud
 {
@@ -21,19 +24,45 @@ namespace SanctuaryHud
         /// a literal in InstallChunk, so bump both together.
         internal const int Format = 2;   // 2: reclaimed alloy and energy on T|
 
-        /// The game's victory/defeat panel, or null before the UI has one.
-        internal static SanctuaryPanelUI ResultPanel()
+        /// The game's victory/defeat screen while it is up, else null. Since
+        /// game build 26880003 it is a menu screen of its own
+        /// (InterfaceManager.Window.EndGameScreen); before that it was the
+        /// SanctuaryUI GameResult panel.
+        internal static EndGameScreenInterface ResultScreen()
         {
             try
             {
-                var ui = SanctuaryUIManager.Instance;
-                return ui != null && ui.TryGetPanel(UIPanelType.GameResult, out var panel) ? panel : null;
+                var im = InterfaceManager.Instance;
+                var screen = EndGameScreenInterface.Instance;
+                return im != null && screen != null && im.IsWindowVisible(InterfaceManager.Window.EndGameScreen) ? screen : null;
             }
             catch
             {
-                // A UI being torn down mid-call: no panel, ask again next frame.
+                // A UI being torn down mid-call: no screen, ask again next frame.
                 return null;
             }
+        }
+
+        private static readonly AccessTools.FieldRef<EndGameScreenInterface, GameObject> Victory =
+            AccessTools.FieldRefAccess<EndGameScreenInterface, GameObject>("victory");
+        private static readonly AccessTools.FieldRef<EndGameScreenInterface, GameObject> Defeat =
+            AccessTools.FieldRefAccess<EndGameScreenInterface, GameObject>("defeat");
+
+        /// The VICTORY or DEFEAT text the screen shows, to lay things out
+        /// against; null when neither shows one.
+        internal static TMP_Text ResultText(EndGameScreenInterface screen)
+        {
+            if (screen == null) return null;
+            try
+            {
+                foreach (var go in new[] { Victory(screen), Defeat(screen) })
+                    if (go != null && go.activeInHierarchy) return go.GetComponentInChildren<TMP_Text>();
+            }
+            catch
+            {
+                // Laid out without it.
+            }
+            return null;
         }
 
         // ---- Lua side --------------------------------------------------------

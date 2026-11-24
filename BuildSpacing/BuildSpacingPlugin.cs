@@ -30,7 +30,7 @@ namespace SanctuaryHud.BuildSpacing
     // modifier), which looks up cameraController.SetZoomAmount at each
     // event; the wrapper keeps the event in build mode with Shift held.
     // Plain scroll still zooms.
-    [BepInPlugin("com.sanctuarydb.buildspacing", "Build Spacing", "0.2.0")]
+    [BepInPlugin("com.sanctuarydb.buildspacing", "Build Spacing", "0.2.1")]
     public class BuildSpacingPlugin : BaseUnityPlugin
     {
         private const int MaxSpacing = 20;

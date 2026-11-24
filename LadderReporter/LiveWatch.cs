@@ -397,13 +397,15 @@ namespace SanctuaryHud
                 if (_liveComplete || !IsLive(_rcsPath(__instance))) return true;
                 if (!_rcsLaunchSent(__instance) || !_rcsLoaded(__instance) || _rcsEnd(__instance)) return true;
                 if (!connections.TryGetValue(ReplayClientSockets.ServerEndpoint, out var item)) return false;
+                // As the game's own loop does since build 26880003.
+                if (NetworkManager.ClientData.Data.pauseState.isPaused) return false;
 
                 var fs = _rcsStream(__instance);
                 var committed = Interlocked.Read(ref _liveCommitted);
                 var simSpeed = ClientEngine.Data.globalEngineData.globalTime.simSpeed;
                 ref var next = ref _rcsNextRead(__instance);
                 next = Math.Max(next, Time.unscaledTimeAsDouble - Time.unscaledDeltaTime);
-                var queued = NetworkManager.ClientData.Data.receivedHostData.bufferedCommunicatorDatas.Length;
+                var queued = NetworkManager.ClientData.Data.receivedHostDatas.Length;
                 while (queued < 32 && Time.unscaledTimeAsDouble >= next)
                 {
                     if (!WholeFrameAhead(fs, committed)) break;

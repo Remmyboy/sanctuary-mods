@@ -44,7 +44,7 @@ namespace Sanctuary.ModApi
         private static readonly MethodInfo RebuildDirIndexMi = typeof(EM.Lua.FilesCache)
             .GetMethod("RebuildDirectoryIndex", BindingFlags.NonPublic | BindingFlags.Static);
 
-        private static string LuaRoot => Path.GetFullPath(Path.Combine(Paths.GameRootPath, "LJ", "lua"));
+        private static string LuaRoot => Path.GetFullPath(ModCatalog.GameLuaRoot);
 
         /// The mods whose files are in the cache right now, in apply order.
         public static IReadOnlyList<ModInfo> Applied => _applied;
