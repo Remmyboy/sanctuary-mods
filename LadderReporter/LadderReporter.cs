@@ -50,7 +50,7 @@ namespace SanctuaryHud
     // After a reported game it can also upload the match's stats and its
     // replay, both opt-in ([Upload], off by default): StatsUpload.cs and
     // ReplayUpload.cs.
-    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.2")]
+    [BepInPlugin("com.sanctuarydb.ladderreporter", "Ladder Reporter", "0.6.3")]
     public partial class LadderReporterPlugin : BaseUnityPlugin
     {
         private const string TicketIdentity = "sanctuarydb-ladder";
@@ -238,7 +238,11 @@ namespace SanctuaryHud
             }
             // Uploads on their own too, and before the Enabled check: a
             // replay queued earlier still uploads with reporting switched off.
-            UpdateUploads();
+            // Guarded here as well as inside: a game type that moved fails
+            // the callee's JIT, which throws at this call, outside its own
+            // try, and every frame (0.6.1 on game 0.0.1.22 filled Player.log
+            // with TypeLoadExceptions from UpdateCard's GameResultPanelUI).
+            Guarded(UpdateUploads, "Ladder uploads");
             try { UpdateLive(); }
             catch (Exception e)
             {
@@ -248,7 +252,7 @@ namespace SanctuaryHud
                     Logger.LogError($"Live: update failed: {e}");
                 }
             }
-            UpdateCard();
+            Guarded(UpdateCard, "Ladder reporter: status card");
             // No SharedTick: this plugin reads only InMatch, which the economy
             // patch keeps, and the shared tick's once-a-second focus-army
             // Lua poll was paid for nothing.
@@ -271,6 +275,28 @@ namespace SanctuaryHud
                     _snapshotFailed = true;
                     Logger.LogError($"Ladder reporter: disabled for this session, the game's internals moved: {e.Message}");
                 }
+            }
+        }
+
+        private readonly HashSet<string> _guardedOff = new HashSet<string>();
+        private readonly HashSet<string> _guardedLogged = new HashSet<string>();
+
+        /// Runs one per-frame step. A step whose code no longer loads against
+        /// this game build (TypeLoad, MissingMember: thrown before its own
+        /// try can run) is logged once and switched off for the session;
+        /// any other failure is logged once and the step keeps running.
+        private void Guarded(Action step, string what)
+        {
+            if (_guardedOff.Contains(what)) return;
+            try { step(); }
+            catch (Exception e) when (e is TypeLoadException || e is MissingMemberException || e is TypeInitializationException)
+            {
+                _guardedOff.Add(what);
+                Logger.LogError($"{what}: off for this session, the game's internals moved: {e}");
+            }
+            catch (Exception e)
+            {
+                if (_guardedLogged.Add(what)) Logger.LogError($"{what}: update failed: {e}");
             }
         }
 
