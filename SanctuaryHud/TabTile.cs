@@ -42,9 +42,19 @@ namespace SanctuaryHud
         /// parent and active. Null when the prefab can't be cloned.
         internal static TabTile Create(SanctuaryPanelUI panel, Transform parent)
         {
-            var prefab = panel != null ? panel.buttonPrefab : null;
+            // The tabs are built from the panel's togglePrefab (AddToggleToItemContainer);
+            // its buttonPrefab is unset on the filter panel since build 26880003.
+            var prefab = panel == null ? null : panel.togglePrefab != null ? panel.togglePrefab : panel.buttonPrefab;
             var holder = HudCanvas.Holder;
-            if (prefab == null || holder == null) return null;
+            if (prefab == null || holder == null)
+            {
+                if (prefab == null && panel != null && !_createLogged)
+                {
+                    _createLogged = true;
+                    _log?.LogWarning("Tier tab: the game's tab panel has no toggle prefab to clone (logged once).");
+                }
+                return null;
+            }
             GameObject go = null;
             try
             {

@@ -389,7 +389,8 @@ namespace SanctuaryHud
                 {
                     _log?.LogDebug("...and the tier tabs, with their prefab:");
                     PanelConceal.DumpSubtree(tabs.transform, 0, _log, 2);
-                    if (tabs.buttonPrefab != null) PanelConceal.DumpSubtree(tabs.buttonPrefab.transform, 0, _log, 3);
+                    var tabPrefab = tabs.togglePrefab != null ? tabs.togglePrefab : tabs.buttonPrefab;
+                    if (tabPrefab != null) PanelConceal.DumpSubtree(tabPrefab.transform, 0, _log, 3);
                 }
             }
             catch (Exception e)
