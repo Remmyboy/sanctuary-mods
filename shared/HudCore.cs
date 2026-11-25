@@ -116,6 +116,12 @@ namespace SanctuaryHud
         /// the ECS poll clears this once a second, which lets late art in
         /// while sparing a reflected call per row per frame.
         private static readonly HashSet<uint> _spriteMisses = new HashSet<uint>();
+        /// Misses per id this match. Since game build 26880003 the sprites
+        /// come out of AssetBundles synchronously, so an id that keeps missing
+        /// is broken art (ues2101's, in 26888717), and every try makes the
+        /// game log an error to Player.log: give up after a few.
+        private static readonly Dictionary<uint, int> _spriteMissCount = new Dictionary<uint, int>();
+        private const int MaxSpriteTries = 5;
         /// Misses already logged, so each id is reported once a match.
         private static readonly HashSet<uint> _spriteMissReported = new HashSet<uint>();
 
@@ -143,7 +149,15 @@ namespace SanctuaryHud
         {
             _spriteCache.Clear();
             _spriteMisses.Clear();
+            _spriteMissCount.Clear();
             _spriteMissReported.Clear();
+        }
+
+        /// Lets missed sprites be tried again, except ids that have missed
+        /// MaxSpriteTries times this match.
+        private static void RetrySpriteMisses()
+        {
+            _spriteMisses.RemoveWhere(id => !_spriteMissCount.TryGetValue(id, out var n) || n < MaxSpriteTries);
         }
 
         /// The game's own sprite for an AssetID index, or null while the game
@@ -173,6 +187,10 @@ namespace SanctuaryHud
             else
             {
                 _spriteMisses.Add(index);
+                var misses = (_spriteMissCount.TryGetValue(index, out var n) ? n : 0) + 1;
+                _spriteMissCount[index] = misses;
+                if (misses == MaxSpriteTries)
+                    _log?.LogInfo($"Build-menu art {index}: still missing after {misses} tries; not asking again this match.");
                 // An id the registry has never heard of and one whose art has
                 // not loaded yet look the same on screen; only the log can
                 // tell them apart.
@@ -598,6 +616,18 @@ namespace SanctuaryHud
             return _iconNamesByIndex != null && _iconNamesByIndex.TryGetValue(registryIndex, out var name) ? name : null;
         }
 
+        /// An iconLookup key as the bare icon name. Since game build 26880003
+        /// (AssetBundles) the keys are asset paths,
+        /// "gameplay/strategicicons/structure1_t1_alloy.png"; before, the bare
+        /// name. Everything here matches on the bare name.
+        private static string BareIconName(string key)
+        {
+            var slash = key.LastIndexOfAny(new[] { '/', '\\' });
+            var name = slash >= 0 ? key.Substring(slash + 1) : key;
+            var dot = name.LastIndexOf('.');
+            return dot > 0 ? name.Substring(0, dot) : name;
+        }
+
         // IconLoader.iconLookup maps name -> registry index; invert it so we
         // can read a unit's tier off its strategic icon. Icons are registered
         // by Lua during match load, so the table can legitimately be empty on
@@ -620,7 +650,7 @@ namespace SanctuaryHud
                     var t = entry.GetType();
                     var k = t.GetProperty("Key")?.GetValue(entry)?.ToString();
                     var v = t.GetProperty("Value")?.GetValue(entry);
-                    if (k != null && v != null) map[Convert.ToInt32(v)] = k;
+                    if (k != null && v != null) map[Convert.ToInt32(v)] = BareIconName(k);
                 }
                 if (map.Count == 0)
                 {
@@ -659,11 +689,18 @@ namespace SanctuaryHud
                 if (_iconLoaderType == null) return -1;
                 var lookup = _iconLoaderType.GetField("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
                              ?? _iconLoaderType.GetProperty("iconLookup", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
-                var tryGetValue = lookup?.GetType().GetMethod("TryGetValue");
-                if (tryGetValue == null) return -1;
-                var args = new object[] { iconName, null };
-                var ok = tryGetValue.Invoke(lookup, args);
-                return ok is bool b && b ? Convert.ToInt32(args[1]) : -1;
+                if (lookup == null) return -1;
+                // Keyed by asset path since game build 26880003, so match on
+                // the bare name. Runs only until the index is found.
+                foreach (var entry in (System.Collections.IEnumerable)lookup)
+                {
+                    var t = entry.GetType();
+                    var k = t.GetProperty("Key")?.GetValue(entry)?.ToString();
+                    if (k == null || !string.Equals(BareIconName(k), iconName, StringComparison.OrdinalIgnoreCase)) continue;
+                    var v = t.GetProperty("Value")?.GetValue(entry);
+                    return v != null ? Convert.ToInt32(v) : -1;
+                }
+                return -1;
             }
             catch
             {
@@ -1452,7 +1489,7 @@ namespace SanctuaryHud
             if (_iconNamesByIndex == null) ResolveIconNames();
             if (_iconAtlas == null || _iconUvRects == null) ResolveIconAtlas();
             // Give art that hadn't loaded a second ago another chance.
-            _spriteMisses.Clear();
+            RetrySpriteMisses();
 
             try
             {
