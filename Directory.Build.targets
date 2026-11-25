@@ -31,9 +31,35 @@
     <Warning Condition="'$(_SkipDeploy)' == 'true'" Text="Sanctuary is running: built $(AssemblyName) but did NOT deploy it (it would hot-load into the game). Rebuild with -p:LiveDeploy=true once that is OK." />
   </Target>
 
+  <!-- Every worktree deploys to the same folder, so a build from a stale
+       checkout can replace a newer one in the game and silently undo a fix
+       (25 Nov 2026: a build from a checkout that had not pulled dropped the
+       tier-tab fix). The SDK stamps the commit into ProductVersion
+       (1.0.0+<sha>); a DLL in the game whose commit this checkout's HEAD does
+       not contain is not replaced unless -p:ForceDeploy=true. A commit this
+       repo doesn't know (a release build, a pruned branch) is let through.
+       Uncommitted changes carry no stamp of their own and go unseen. -->
+  <Target Name="CheckDeployedIsOlder" Condition="Exists('$(GamePath)') And '$(ForceDeploy)' != 'true' And '$(_SkipDeploy)' != 'true' And Exists('$(DeployPath)\$(TargetFileName)')">
+    <!-- FileVersionInfo is not allowed in an MSBuild property function. -->
+    <Exec Command="powershell -NoProfile -NonInteractive -Command &quot;(Get-Item -LiteralPath '$(DeployPath)\$(TargetFileName)').VersionInfo.ProductVersion&quot;" ConsoleToMSBuild="true" IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_DeployedVersion" />
+    </Exec>
+    <PropertyGroup>
+      <_DeployedVersion>$(_DeployedVersion.Trim())</_DeployedVersion>
+      <_DeployedSha Condition="$(_DeployedVersion.Contains('+'))">$(_DeployedVersion.Substring($([MSBuild]::Add($(_DeployedVersion.IndexOf('+')), 1))))</_DeployedSha>
+    </PropertyGroup>
+    <Exec Condition="'$(_DeployedSha)' != ''" Command="git merge-base --is-ancestor $(_DeployedSha) HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="_AncestorExit" />
+    </Exec>
+    <PropertyGroup>
+      <_SkipDeploy Condition="'$(_AncestorExit)' == '1'">true</_SkipDeploy>
+    </PropertyGroup>
+    <Warning Condition="'$(_AncestorExit)' == '1'" Text="The $(AssemblyName).dll in the game was built from $(_DeployedSha.Substring(0, 7)), which this checkout's HEAD does not contain: built $(AssemblyName) but did NOT deploy it, or it would undo that build's changes. Merge or pull it in first (git merge-base --is-ancestor $(_DeployedSha.Substring(0, 7)) HEAD), or rebuild with -p:ForceDeploy=true to replace it anyway." />
+  </Target>
+
   <!-- The skip is checked per task: a target's own Condition is evaluated
        before its DependsOnTargets run. -->
-  <Target Name="DeployToGame" AfterTargets="Build" DependsOnTargets="CheckGameRunning" Condition="Exists('$(GamePath)')">
+  <Target Name="DeployToGame" AfterTargets="Build" DependsOnTargets="CheckGameRunning;CheckDeployedIsOlder" Condition="Exists('$(GamePath)')">
     <MakeDir Condition="'$(_SkipDeploy)' != 'true'" Directories="$(DeployPath)" />
     <Copy Condition="'$(_SkipDeploy)' != 'true'" SourceFiles="$(TargetPath)" DestinationFolder="$(DeployPath)" />
     <Message Condition="'$(_SkipDeploy)' != 'true'" Importance="high" Text="Deployed $(AssemblyName).dll to $(DeployPath)" />

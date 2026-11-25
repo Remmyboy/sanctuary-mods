@@ -43,6 +43,10 @@ game's own DLLs, which can't be published.
   While the game runs, Directory.Build.targets skips the deploy with a warning;
   `-p:LiveDeploy=true` deploys on purpose. `-p:DeployPath=<scratch dir>` builds
   without touching the game.
+- A build also won't replace a mod DLL in the game that was built from a
+  commit your HEAD doesn't contain (a newer build from another session):
+  pull or merge it in rather than reaching for `-p:ForceDeploy=true`.
+  Uncommitted changes have no stamp, so it can't see those.
 - Never stop the game by image name (`taskkill /IM`, `Stop-Process -Name`):
   that kills whatever the user or another session is running. Use the probe's
   `quit`, or `Stop-Process -Id` on a process you started.
